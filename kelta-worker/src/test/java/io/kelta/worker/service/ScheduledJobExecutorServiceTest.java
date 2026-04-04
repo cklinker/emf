@@ -4,11 +4,14 @@ import tools.jackson.databind.ObjectMapper;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.flow.FlowEngine;
 import io.kelta.runtime.flow.InitialStateBuilder;
+import io.kelta.runtime.module.integration.spi.ScriptExecutor;
+import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionRequest;
+import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionResult;
 import io.kelta.worker.repository.ScheduledJobRepository;
 import org.junit.jupiter.api.*;
 
+import java.io.Writer;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +26,8 @@ class ScheduledJobExecutorServiceTest {
     private FlowEngine flowEngine;
     private InitialStateBuilder initialStateBuilder;
     private ObjectMapper objectMapper;
+    private ScriptExecutor scriptExecutor;
+    private ReportExecutionService reportExecutionService;
     private ScheduledJobExecutorService executor;
 
     @BeforeEach
@@ -31,7 +36,11 @@ class ScheduledJobExecutorServiceTest {
         flowEngine = mock(FlowEngine.class);
         initialStateBuilder = new InitialStateBuilder();
         objectMapper = new ObjectMapper();
-        executor = new ScheduledJobExecutorService(repository, flowEngine, initialStateBuilder, objectMapper);
+        scriptExecutor = mock(ScriptExecutor.class);
+        reportExecutionService = mock(ReportExecutionService.class);
+        executor = new ScheduledJobExecutorService(
+                repository, flowEngine, initialStateBuilder, objectMapper,
+                scriptExecutor, reportExecutionService);
     }
 
     @AfterEach
@@ -40,8 +49,8 @@ class ScheduledJobExecutorServiceTest {
     }
 
     @Nested
-    @DisplayName("executeAll")
-    class ExecuteAll {
+    @DisplayName("executeAll — FLOW jobs")
+    class FlowJobs {
 
         @Test
         @DisplayName("Should execute due FLOW job via FlowEngine")
@@ -112,24 +121,230 @@ class ScheduledJobExecutorServiceTest {
 
             executor.executeAll();
 
-            // Both jobs processed — first failed, second succeeded
             verify(repository).updateAfterExecution(eq("j1"), eq("FAILED"), any(), any());
             verify(repository).updateAfterExecution(eq("j2"), eq("SUCCESS"), any(), any());
         }
+    }
+
+    @Nested
+    @DisplayName("executeAll — SCRIPT jobs")
+    class ScriptJobs {
 
         @Test
-        @DisplayName("Should skip unsupported job types and recalculate next_run_at")
-        void shouldSkipUnsupportedJobType() {
+        @DisplayName("Should execute SCRIPT job via ScriptExecutor")
+        void shouldExecuteScriptJob() {
             Map<String, Object> job = Map.of(
+                    "id", "job-s1", "tenant_id", "t1", "job_type", "SCRIPT",
+                    "job_reference_id", "script-1", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findScriptById("script-1")).thenReturn(Optional.of(Map.of(
+                    "id", "script-1", "name", "test-script", "active", true,
+                    "source_code", "var x = 1 + 2; x;", "language", "javascript")));
+            when(scriptExecutor.execute(any(ScriptExecutionRequest.class)))
+                    .thenReturn(ScriptExecutionResult.success(Map.of("result", 3), 50L));
+
+            executor.executeAll();
+
+            verify(scriptExecutor).execute(any(ScriptExecutionRequest.class));
+            verify(repository).updateAfterExecution(eq("job-s1"), eq("SUCCESS"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-s1"), eq("SUCCESS"), isNull(), any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Should mark FAILED when script not found")
+        void shouldFailWhenScriptNotFound() {
+            Map<String, Object> job = Map.of(
+                    "id", "job-s2", "tenant_id", "t1", "job_type", "SCRIPT",
+                    "job_reference_id", "missing-script", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findScriptById("missing-script")).thenReturn(Optional.empty());
+
+            executor.executeAll();
+
+            verify(scriptExecutor, never()).execute(any());
+            verify(repository).updateAfterExecution(eq("job-s2"), eq("FAILED"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-s2"), eq("FAILED"), contains("not found"), any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Should mark FAILED when script is inactive")
+        void shouldFailWhenScriptInactive() {
+            Map<String, Object> job = Map.of(
+                    "id", "job-s3", "tenant_id", "t1", "job_type", "SCRIPT",
+                    "job_reference_id", "script-2", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findScriptById("script-2")).thenReturn(Optional.of(Map.of(
+                    "id", "script-2", "name", "inactive-script", "active", false,
+                    "source_code", "1+1;", "language", "javascript")));
+
+            executor.executeAll();
+
+            verify(scriptExecutor, never()).execute(any());
+            verify(repository).updateAfterExecution(eq("job-s3"), eq("FAILED"), any(), any());
+        }
+
+        @Test
+        @DisplayName("Should mark FAILED when script has no source code")
+        void shouldFailWhenScriptHasNoSource() {
+            Map<String, Object> job = Map.of(
+                    "id", "job-s4", "tenant_id", "t1", "job_type", "SCRIPT",
+                    "job_reference_id", "script-3", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findScriptById("script-3")).thenReturn(Optional.of(Map.of(
+                    "id", "script-3", "name", "empty-script", "active", true,
+                    "source_code", "", "language", "javascript")));
+
+            executor.executeAll();
+
+            verify(scriptExecutor, never()).execute(any());
+            verify(repository).updateAfterExecution(eq("job-s4"), eq("FAILED"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-s4"), eq("FAILED"), contains("no source code"), any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Should mark FAILED when script execution fails")
+        void shouldFailWhenScriptExecutionFails() {
+            Map<String, Object> job = Map.of(
+                    "id", "job-s5", "tenant_id", "t1", "job_type", "SCRIPT",
+                    "job_reference_id", "script-4", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findScriptById("script-4")).thenReturn(Optional.of(Map.of(
+                    "id", "script-4", "name", "error-script", "active", true,
+                    "source_code", "throw new Error('oops');", "language", "javascript")));
+            when(scriptExecutor.execute(any(ScriptExecutionRequest.class)))
+                    .thenReturn(ScriptExecutionResult.failure("Error: oops", 10L));
+
+            executor.executeAll();
+
+            verify(repository).updateAfterExecution(eq("job-s5"), eq("FAILED"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-s5"), eq("FAILED"), eq("Error: oops"), any(), any(), anyLong());
+        }
+    }
+
+    @Nested
+    @DisplayName("executeAll — REPORT_EXPORT jobs")
+    class ReportExportJobs {
+
+        @Test
+        @DisplayName("Should execute REPORT_EXPORT job via ReportExecutionService")
+        void shouldExecuteReportExportJob() throws Exception {
+            Map<String, Object> job = Map.of(
+                    "id", "job-r1", "tenant_id", "t1", "job_type", "REPORT_EXPORT",
+                    "job_reference_id", "report-1", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findReportById("report-1")).thenReturn(Optional.of(Map.of(
+                    "id", "report-1", "name", "Test Report",
+                    "primaryCollectionId", "col-1", "columns", "[]")));
+
+            // Mock exportCsv to write some CSV content
+            doAnswer(inv -> {
+                Writer w = inv.getArgument(1);
+                w.write("Name,Amount\n");
+                w.write("Alice,100\n");
+                w.write("Bob,200\n");
+                return null;
+            }).when(reportExecutionService).exportCsv(any(), any());
+
+            executor.executeAll();
+
+            verify(reportExecutionService).exportCsv(any(), any());
+            verify(repository).updateAfterExecution(eq("job-r1"), eq("SUCCESS"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-r1"), eq("SUCCESS"), isNull(), any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Should mark FAILED when report not found")
+        void shouldFailWhenReportNotFound() {
+            Map<String, Object> job = Map.of(
+                    "id", "job-r2", "tenant_id", "t1", "job_type", "REPORT_EXPORT",
+                    "job_reference_id", "missing-report", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findReportById("missing-report")).thenReturn(Optional.empty());
+
+            executor.executeAll();
+
+            verify(repository).updateAfterExecution(eq("job-r2"), eq("FAILED"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-r2"), eq("FAILED"), contains("not found"), any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Should mark FAILED when report export throws exception")
+        void shouldFailWhenReportExportThrows() throws Exception {
+            Map<String, Object> job = Map.of(
+                    "id", "job-r3", "tenant_id", "t1", "job_type", "REPORT_EXPORT",
+                    "job_reference_id", "report-2", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findReportById("report-2")).thenReturn(Optional.of(Map.of(
+                    "id", "report-2", "name", "Broken Report",
+                    "primaryCollectionId", "col-2", "columns", "[]")));
+            doThrow(new RuntimeException("Collection not found"))
+                    .when(reportExecutionService).exportCsv(any(), any());
+
+            executor.executeAll();
+
+            verify(repository).updateAfterExecution(eq("job-r3"), eq("FAILED"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-r3"), eq("FAILED"), contains("Collection not found"), any(), any(), anyLong());
+        }
+    }
+
+    @Nested
+    @DisplayName("executeAll — mixed job types")
+    class MixedJobs {
+
+        @Test
+        @DisplayName("Should handle mixed FLOW, SCRIPT, and REPORT_EXPORT jobs in one poll cycle")
+        void shouldHandleMixedJobTypes() throws Exception {
+            Map<String, Object> flowJob = Map.of(
+                    "id", "j-flow", "tenant_id", "t1", "job_type", "FLOW",
+                    "job_reference_id", "flow-1", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            Map<String, Object> scriptJob = Map.of(
                     "id", "j-script", "tenant_id", "t1", "job_type", "SCRIPT",
+                    "job_reference_id", "script-1", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            Map<String, Object> reportJob = Map.of(
+                    "id", "j-report", "tenant_id", "t1", "job_type", "REPORT_EXPORT",
+                    "job_reference_id", "report-1", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+
+            when(repository.findDueJobs()).thenReturn(List.of(flowJob, scriptJob, reportJob));
+            when(repository.findFlowById("flow-1")).thenReturn(Optional.of(Map.of(
+                    "id", "flow-1", "active", true, "definition", "{}", "trigger_config", "{}")));
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
+            when(repository.findScriptById("script-1")).thenReturn(Optional.of(Map.of(
+                    "id", "script-1", "name", "test", "active", true,
+                    "source_code", "1+1;", "language", "javascript")));
+            when(scriptExecutor.execute(any(ScriptExecutionRequest.class)))
+                    .thenReturn(ScriptExecutionResult.success(Map.of(), 5L));
+            when(repository.findReportById("report-1")).thenReturn(Optional.of(Map.of(
+                    "id", "report-1", "name", "Report", "primaryCollectionId", "c1", "columns", "[]")));
+            doAnswer(inv -> {
+                Writer w = inv.getArgument(1);
+                w.write("Col\nVal\n");
+                return null;
+            }).when(reportExecutionService).exportCsv(any(), any());
+
+            executor.executeAll();
+
+            verify(repository).updateAfterExecution(eq("j-flow"), eq("SUCCESS"), any(), any());
+            verify(repository).updateAfterExecution(eq("j-script"), eq("SUCCESS"), any(), any());
+            verify(repository).updateAfterExecution(eq("j-report"), eq("SUCCESS"), any(), any());
+        }
+
+        @Test
+        @DisplayName("Should skip unknown job types")
+        void shouldSkipUnknownJobType() {
+            Map<String, Object> job = Map.of(
+                    "id", "j-unknown", "tenant_id", "t1", "job_type", "WEBHOOK",
                     "job_reference_id", "x", "cron_expression", "0 0 * * * *", "timezone", "UTC");
             when(repository.findDueJobs()).thenReturn(List.of(job));
 
             executor.executeAll();
 
-            verify(flowEngine, never()).startExecution(any(), any(), any(), any(), any(), anyBoolean());
-            verify(repository).updateAfterExecution(eq("j-script"), eq("SKIPPED"), any(), any());
+            verify(repository).updateAfterExecution(eq("j-unknown"), eq("SKIPPED"), any(), any());
         }
+    }
+
+    @Nested
+    @DisplayName("general behaviour")
+    class GeneralBehaviour {
 
         @Test
         @DisplayName("Should do nothing when no due jobs")
@@ -139,6 +354,7 @@ class ScheduledJobExecutorServiceTest {
             executor.executeAll();
 
             verify(flowEngine, never()).startExecution(any(), any(), any(), any(), any(), anyBoolean());
+            verify(scriptExecutor, never()).execute(any());
             verify(repository, never()).updateAfterExecution(any(), any(), any(), any());
         }
 
@@ -156,7 +372,6 @@ class ScheduledJobExecutorServiceTest {
 
             executor.executeAll();
 
-            // TenantContext should be cleared after the exception
             assertThat(TenantContext.get()).isNull();
         }
     }
@@ -182,10 +397,8 @@ class ScheduledJobExecutorServiceTest {
         @Test
         @DisplayName("Should calculate from NOW, not from stale time")
         void shouldCalculateFromNow() {
-            // Two calls at roughly the same time should produce similar results
             Instant next1 = ScheduledJobRepository.calculateNextRunAt("0 0 * * * *", "UTC");
             Instant next2 = ScheduledJobRepository.calculateNextRunAt("0 0 * * * *", "UTC");
-            // Both should be in the future
             assertThat(next1).isAfter(Instant.now().minusSeconds(1));
             assertThat(next2).isAfter(Instant.now().minusSeconds(1));
         }

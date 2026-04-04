@@ -94,6 +94,9 @@ public class GovernorLimitsController {
         // Read AI token usage from Redis (tracked by kelta-ai service)
         long aiTokensUsed = getMonthlyAiTokenCount(tenantId);
 
+        // Calculate storage usage from file_attachment table
+        long storageUsedBytes = repository.sumStorageBytes(tenantId);
+
         // Build attributes
         Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("limits", limits);
@@ -103,6 +106,8 @@ public class GovernorLimitsController {
         attributes.put("usersLimit", getIntOrDefault(limits, "maxUsers", DEFAULT_MAX_USERS));
         attributes.put("collectionsUsed", collectionsUsed);
         attributes.put("collectionsLimit", getIntOrDefault(limits, "maxCollections", DEFAULT_MAX_COLLECTIONS));
+        attributes.put("storageUsedBytes", storageUsedBytes);
+        attributes.put("storageGbLimit", getIntOrDefault(limits, "storageGb", DEFAULT_STORAGE_GB));
         attributes.put("aiTokensUsed", aiTokensUsed);
         attributes.put("aiTokensLimit", getLongOrDefault(limits, "aiTokensPerMonth", DEFAULT_AI_TOKENS_PER_MONTH));
         attributes.put("aiEnabled", getBooleanOrDefault(limits, "aiEnabled", DEFAULT_AI_ENABLED));

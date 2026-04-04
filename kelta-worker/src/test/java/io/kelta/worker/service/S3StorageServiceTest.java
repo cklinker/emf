@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.net.URI;
 import java.net.URL;
@@ -29,6 +31,9 @@ class S3StorageServiceTest {
 
     @Mock
     private PresignedGetObjectRequest presignedGetObjectRequest;
+
+    @Mock
+    private PresignedPutObjectRequest presignedPutObjectRequest;
 
     private S3ConfigProperties config;
     private S3StorageService service;
@@ -84,5 +89,37 @@ class S3StorageServiceTest {
     void getDefaultExpiry_reflectsConfigChange() {
         config.setPresignedUrlExpiryMinutes(30);
         assertEquals(Duration.ofMinutes(30), service.getDefaultExpiry());
+    }
+
+    @Test
+    void getPresignedUploadUrl_generatesUrlWithCorrectParameters() throws Exception {
+        String storageKey = "tenant-1/col-1/rec-1/uuid/photo.jpg";
+        String contentType = "image/jpeg";
+        Duration expiry = Duration.ofMinutes(15);
+        URL expectedUrl = URI.create("https://s3-public.example.com/test-bucket/tenant-1/col-1/rec-1/uuid/photo.jpg?presigned=true").toURL();
+
+        when(presignedPutObjectRequest.url()).thenReturn(expectedUrl);
+        when(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class)))
+                .thenReturn(presignedPutObjectRequest);
+
+        String result = service.getPresignedUploadUrl(storageKey, contentType, expiry);
+
+        assertNotNull(result);
+        assertEquals(expectedUrl.toString(), result);
+
+        ArgumentCaptor<PutObjectPresignRequest> captor = ArgumentCaptor.forClass(PutObjectPresignRequest.class);
+        verify(s3Presigner).presignPutObject(captor.capture());
+
+        PutObjectPresignRequest capturedRequest = captor.getValue();
+        assertEquals(expiry, capturedRequest.signatureDuration());
+        assertEquals("test-bucket", capturedRequest.putObjectRequest().bucket());
+        assertEquals(storageKey, capturedRequest.putObjectRequest().key());
+        assertEquals(contentType, capturedRequest.putObjectRequest().contentType());
+    }
+
+    @Test
+    void getMaxFileSize_returnsConfiguredValue() {
+        config.setMaxFileSize(100_000_000L);
+        assertEquals(100_000_000L, service.getMaxFileSize());
     }
 }

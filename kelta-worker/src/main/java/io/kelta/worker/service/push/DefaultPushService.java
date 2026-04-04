@@ -4,13 +4,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
-import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.*;
 
 /**
  * Push notification service: device management and notification routing.
+ *
+ * <p>Loads per-tenant push settings from the tenant.settings JSONB column
+ * and passes them to the active {@link PushProvider} for credential resolution.
  *
  * @since 1.0.0
  */
@@ -25,10 +27,12 @@ public class DefaultPushService {
 
     private final PushProvider pushProvider;
     private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
-    public DefaultPushService(PushProvider pushProvider, JdbcTemplate jdbcTemplate) {
+    public DefaultPushService(PushProvider pushProvider, JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
         this.pushProvider = pushProvider;
         this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public String registerDevice(String userId, String tenantId, String platform,
@@ -79,7 +83,8 @@ public class DefaultPushService {
         var devices = jdbcTemplate.queryForList(
                 "SELECT id, device_token, platform FROM push_device WHERE user_id = ? AND tenant_id = ?",
                 userId, tenantId);
-        return sendToDevices(devices, title, body, data);
+        TenantPushSettings tenantSettings = loadTenantPushSettings(tenantId);
+        return sendToDevices(devices, title, body, data, tenantSettings);
     }
 
     public int sendToTenant(String tenantId, String title, String body, Map<String, String> data) {
@@ -88,11 +93,12 @@ public class DefaultPushService {
 
         securityLog.info("security_event=PUSH_BROADCAST tenant={} devices={} title={}",
                 tenantId, devices.size(), title);
-        return sendToDevices(devices, title, body, data);
+        TenantPushSettings tenantSettings = loadTenantPushSettings(tenantId);
+        return sendToDevices(devices, title, body, data, tenantSettings);
     }
 
     private int sendToDevices(List<Map<String, Object>> devices, String title, String body,
-                               Map<String, String> data) {
+                               Map<String, String> data, TenantPushSettings tenantSettings) {
         int delivered = 0;
         for (var device : devices) {
             String token = (String) device.get("device_token");
@@ -100,7 +106,7 @@ public class DefaultPushService {
             String deviceId = (String) device.get("id");
 
             try {
-                pushProvider.send(new PushMessage(token, platform, title, body, data));
+                pushProvider.send(new PushMessage(token, platform, title, body, data), tenantSettings);
                 delivered++;
             } catch (PushDeliveryException e) {
                 if (e.isInvalidToken()) {
@@ -112,5 +118,23 @@ public class DefaultPushService {
             }
         }
         return delivered;
+    }
+
+    private TenantPushSettings loadTenantPushSettings(String tenantId) {
+        try {
+            var rows = jdbcTemplate.queryForList(
+                    "SELECT settings FROM tenant WHERE id = ?", tenantId);
+            if (rows.isEmpty()) {
+                return null;
+            }
+            Object settings = rows.get(0).get("settings");
+            if (settings == null) {
+                return null;
+            }
+            return TenantPushSettings.fromJsonNode(objectMapper.readTree(settings.toString()));
+        } catch (Exception e) {
+            log.debug("Could not load tenant push settings for {}: {}", tenantId, e.getMessage());
+            return null;
+        }
     }
 }

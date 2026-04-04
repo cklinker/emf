@@ -130,6 +130,32 @@ public class ScheduledJobRepository {
     }
 
     /**
+     * Loads a script by ID for scheduled execution.
+     */
+    public Optional<Map<String, Object>> findScriptById(String scriptId) {
+        var results = jdbcTemplate.queryForList(
+                "SELECT id, tenant_id, name, source_code, active, language FROM script WHERE id = ?",
+                scriptId
+        );
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
+     * Loads a report configuration by ID for scheduled export.
+     */
+    public Optional<Map<String, Object>> findReportById(String reportId) {
+        var results = jdbcTemplate.queryForList(
+                "SELECT id, tenant_id, name, report_type, primary_collection_id AS \"primaryCollectionId\", " +
+                        "columns, filters, sort_order AS \"sortOrder\", " +
+                        "sort_by AS \"sortBy\", sort_direction AS \"sortDirection\", " +
+                        "group_by AS \"groupBy\" " +
+                        "FROM report WHERE id = ?",
+                reportId
+        );
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
      * Finds a job by ID and tenant (tenant-scoped access).
      */
     public Optional<Map<String, Object>> findByIdAndTenant(String jobId, String tenantId) {

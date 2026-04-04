@@ -5,6 +5,8 @@ import io.kelta.runtime.formula.FormulaEvaluator;
 import io.kelta.runtime.module.core.CoreActionsModule;
 import io.kelta.runtime.module.integration.IntegrationModule;
 import io.kelta.runtime.module.integration.spi.EmailService;
+import io.kelta.runtime.module.integration.spi.ScriptExecutor;
+import io.kelta.runtime.module.integration.spi.graalvm.GraalVmScriptExecutor;
 import io.kelta.runtime.module.schema.SchemaLifecycleModule;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
@@ -133,6 +135,12 @@ public class FlowConfig {
     }
 
     @Bean
+    public ScriptExecutor scriptExecutor(
+            @Value("${kelta.script.timeout-seconds:30}") int timeoutSeconds) {
+        return new GraalVmScriptExecutor(timeoutSeconds);
+    }
+
+    @Bean
     public ModuleRegistry moduleRegistry(ActionHandlerRegistry actionHandlerRegistry,
                                           BeforeSaveHookRegistry beforeSaveHookRegistry,
                                           @Autowired(required = false) List<KeltaModule> discoveredModules,
@@ -142,7 +150,8 @@ public class FlowConfig {
                                           ObjectMapper objectMapper,
                                           FlowEngine flowEngine,
                                           RollupSummaryService rollupSummaryService,
-                                          @Autowired(required = false) EmailService emailService) {
+                                          @Autowired(required = false) EmailService emailService,
+                                          @Autowired(required = false) ScriptExecutor scriptExecutor) {
         ModuleRegistry registry = new ModuleRegistry(actionHandlerRegistry, beforeSaveHookRegistry);
 
         if (discoveredModules != null && !discoveredModules.isEmpty()) {
@@ -153,6 +162,11 @@ public class FlowConfig {
             if (emailService != null) {
                 extensions.put(EmailService.class, emailService);
                 log.info("EmailService wired into module context — flow email alerts will use real delivery");
+            }
+
+            if (scriptExecutor != null) {
+                extensions.put(ScriptExecutor.class, scriptExecutor);
+                log.info("ScriptExecutor wired into module context — flow scripts will use GraalVM execution");
             }
 
             ModuleContext context = new ModuleContext(

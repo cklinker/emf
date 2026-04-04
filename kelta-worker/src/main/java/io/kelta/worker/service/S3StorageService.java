@@ -15,9 +15,12 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import jakarta.annotation.PreDestroy;
 import java.io.Closeable;
@@ -91,6 +94,39 @@ public class S3StorageService {
 
         PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
         return presignedRequest.url().toString();
+    }
+
+    /**
+     * Generates a presigned upload URL for direct-to-S3 PUT uploads.
+     *
+     * @param storageKey  the S3 object key (e.g., "tenant-1/col-1/rec-1/uuid/file.pdf")
+     * @param contentType the expected Content-Type of the upload
+     * @param expiry      the URL expiry duration
+     * @return the presigned upload URL
+     */
+    public String getPresignedUploadUrl(String storageKey, String contentType, Duration expiry) {
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(config.getBucket())
+                .key(storageKey)
+                .contentType(contentType)
+                .build();
+
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(expiry)
+                .putObjectRequest(putObjectRequest)
+                .build();
+
+        PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
+        return presignedRequest.url().toString();
+    }
+
+    /**
+     * Returns the configured maximum file upload size in bytes.
+     *
+     * @return the max file size
+     */
+    public long getMaxFileSize() {
+        return config.getMaxFileSize();
     }
 
     /**

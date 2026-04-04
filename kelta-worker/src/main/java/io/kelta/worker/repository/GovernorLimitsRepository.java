@@ -33,6 +33,10 @@ public class GovernorLimitsRepository {
             WHERE tenant_id = ? AND active = true AND (system_collection = false OR system_collection IS NULL)
             """;
 
+    private static final String SUM_STORAGE_BYTES = """
+            SELECT COALESCE(SUM(file_size), 0) FROM file_attachment WHERE tenant_id = ?
+            """;
+
     private static final String UPDATE_TENANT_LIMITS = """
             UPDATE tenant SET limits = ?::jsonb, updated_at = NOW() WHERE id = ?
             """;
@@ -68,6 +72,16 @@ public class GovernorLimitsRepository {
         } catch (Exception e) {
             log.warn("Failed to count active collections for tenant {}: {}", tenantId, e.getMessage());
             return 0;
+        }
+    }
+
+    public long sumStorageBytes(String tenantId) {
+        try {
+            Long total = jdbcTemplate.queryForObject(SUM_STORAGE_BYTES, Long.class, tenantId);
+            return total != null ? total : 0L;
+        } catch (Exception e) {
+            log.warn("Failed to sum storage bytes for tenant {}: {}", tenantId, e.getMessage());
+            return 0L;
         }
     }
 

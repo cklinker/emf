@@ -17,8 +17,13 @@ import io.kelta.runtime.workflow.module.ModuleRegistry;
 import io.kelta.worker.flow.JdbcFlowStore;
 import io.kelta.worker.listener.CollectionConfigEventPublisher;
 import io.kelta.worker.listener.FieldConfigEventPublisher;
+import io.kelta.worker.listener.ApprovalProcessConfigHook;
+import io.kelta.worker.listener.ApprovalRecordLockHook;
 import io.kelta.worker.listener.CerbosPolicySyncHook;
 import io.kelta.worker.listener.ValidationRuleRefreshHook;
+import io.kelta.worker.handler.SubmitForApprovalActionHandler;
+import io.kelta.worker.repository.ApprovalRepository;
+import io.kelta.worker.service.ApprovalService;
 import io.kelta.worker.service.AuditBeforeSaveHook;
 import io.kelta.worker.service.CerbosPolicySyncService;
 import io.kelta.worker.service.SetupAuditService;
@@ -221,5 +226,41 @@ public class FlowConfig {
                 kafkaTemplate, objectMapper, jdbcTemplate);
         hookRegistry.register(hook);
         return hook;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Approval workflow hooks and handlers
+    // ---------------------------------------------------------------------------
+
+    @Bean
+    public ApprovalProcessConfigHook approvalProcessConfigHook(
+            BeforeSaveHookRegistry hookRegistry,
+            KafkaTemplate<String, String> kafkaTemplate,
+            ObjectMapper objectMapper) {
+        ApprovalProcessConfigHook hook = new ApprovalProcessConfigHook(kafkaTemplate, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public ApprovalRecordLockHook approvalRecordLockHook(
+            BeforeSaveHookRegistry hookRegistry,
+            ApprovalRepository approvalRepository,
+            CollectionRegistry collectionRegistry) {
+        ApprovalRecordLockHook hook = new ApprovalRecordLockHook(
+                approvalRepository, collectionRegistry);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public SubmitForApprovalActionHandler submitForApprovalActionHandler(
+            ActionHandlerRegistry actionHandlerRegistry,
+            ApprovalService approvalService,
+            ObjectMapper objectMapper) {
+        SubmitForApprovalActionHandler handler =
+                new SubmitForApprovalActionHandler(approvalService, objectMapper);
+        actionHandlerRegistry.register(handler);
+        return handler;
     }
 }

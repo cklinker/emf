@@ -52,10 +52,14 @@ public class WorkerCacheManager {
     private static final Duration SYSTEM_COLLECTION_TTL = Duration.ofMinutes(10);
     private static final int SYSTEM_COLLECTION_MAX_SIZE = 10_000;
 
+    private static final Duration DASHBOARD_WIDGET_TTL = Duration.ofMinutes(5);
+    private static final int DASHBOARD_WIDGET_MAX_SIZE = 5_000;
+
     private final Cache<String, String> customDomainCache;
     private final Cache<String, Map<String, Object>> permissionsCache;
     private final Cache<String, Map<String, Object>> tenantLimitsCache;
     private final Cache<String, Map<String, Object>> systemCollectionCache;
+    private final Cache<String, Map<String, Object>> dashboardWidgetCache;
 
     public WorkerCacheManager(MeterRegistry meterRegistry) {
         this.customDomainCache = Caffeine.newBuilder()
@@ -82,10 +86,17 @@ public class WorkerCacheManager {
                 .recordStats()
                 .build();
 
+        this.dashboardWidgetCache = Caffeine.newBuilder()
+                .maximumSize(DASHBOARD_WIDGET_MAX_SIZE)
+                .expireAfterWrite(DASHBOARD_WIDGET_TTL)
+                .recordStats()
+                .build();
+
         meterRegistry.gauge("worker.cache.size.custom-domain", customDomainCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.permissions", permissionsCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.tenant-limits", tenantLimitsCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.system-collection", systemCollectionCache, Cache::estimatedSize);
+        meterRegistry.gauge("worker.cache.size.dashboard-widget", dashboardWidgetCache, Cache::estimatedSize);
     }
 
     // ── Custom Domain Cache ──────────────────────────────────────────────
@@ -244,16 +255,58 @@ public class WorkerCacheManager {
         log.debug("Evicted all system collection cache entries");
     }
 
-    // ── Metrics / Diagnostics ────────────────────────────────────────────
+    // ── Dashboard Widget Data Cache ───���───────────────────────────────────
+
+    /**
+     * Returns cached widget data for a dashboard component, if present.
+     *
+     * @param cacheKey the composite key (widget:componentId:paramsHash)
+     * @return the cached widget data if present, empty otherwise
+     */
+    public Optional<Map<String, Object>> getDashboardWidgetData(String cacheKey) {
+        return Optional.ofNullable(dashboardWidgetCache.getIfPresent(cacheKey));
+    }
+
+    /**
+     * Caches widget data for a dashboard component.
+     *
+     * @param cacheKey the composite key
+     * @param data     the widget result data to cache
+     */
+    public void putDashboardWidgetData(String cacheKey, Map<String, Object> data) {
+        dashboardWidgetCache.put(cacheKey, data);
+    }
+
+    /**
+     * Evicts cached widget data for a specific component.
+     *
+     * @param componentId the component ID to evict entries for
+     */
+    public void evictDashboardWidgetData(String componentId) {
+        String prefix = "widget:" + componentId;
+        dashboardWidgetCache.asMap().keySet().removeIf(key -> key.startsWith(prefix));
+        log.debug("Evicted dashboard widget cache entries for component: {}", componentId);
+    }
+
+    /**
+     * Evicts all cached dashboard widget data.
+     */
+    public void evictAllDashboardWidgetData() {
+        dashboardWidgetCache.invalidateAll();
+        log.debug("Evicted all dashboard widget cache entries");
+    }
+
+    // ── Metrics / Diagnostics ───���────────────────────────────────────────
 
     /**
      * Returns estimated sizes for diagnostic logging.
      */
     public String getCacheSummary() {
-        return String.format("WorkerCaches[domains=%d, permissions=%d, limits=%d, sysCollections=%d]",
+        return String.format("WorkerCaches[domains=%d, permissions=%d, limits=%d, sysCollections=%d, dashboardWidgets=%d]",
                 customDomainCache.estimatedSize(),
                 permissionsCache.estimatedSize(),
                 tenantLimitsCache.estimatedSize(),
-                systemCollectionCache.estimatedSize());
+                systemCollectionCache.estimatedSize(),
+                dashboardWidgetCache.estimatedSize());
     }
 }

@@ -102,6 +102,32 @@ public class KeltaTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCo
             String authMethod = (userDetails.getPassword() == null || userDetails.getPassword().isEmpty())
                     ? "sso" : "internal";
             claims.put("auth_method", authMethod);
+
+            // For authorization_code flow via a connected app, include the app metadata
+            if (AuthorizationGrantType.AUTHORIZATION_CODE.equals(context.getAuthorizationGrantType())) {
+                enrichWithConnectedAppClaims(claims, context.getRegisteredClient().getClientId());
+            }
         });
+    }
+
+    /**
+     * Adds connected_app_id and app_scopes claims if the client_id belongs to a
+     * registered connected app. This enables the gateway to apply connected-app-level
+     * rate limits and scope enforcement even for user-delegated tokens.
+     */
+    private void enrichWithConnectedAppClaims(java.util.Map<String, Object> claims, String clientId) {
+        List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                "SELECT id, scopes FROM connected_app WHERE client_id = ? AND active = true",
+                clientId
+        );
+        if (!results.isEmpty()) {
+            Map<String, Object> app = results.get(0);
+            claims.put("connected_app_id", app.get("id"));
+            Object scopes = app.get("scopes");
+            if (scopes != null) {
+                claims.put("app_scopes", scopes.toString());
+            }
+            claims.put("auth_method", "connected_app");
+        }
     }
 }

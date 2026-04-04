@@ -48,30 +48,75 @@ public class PlatformRedirectUriValidator
         // 1. Has the same origin as a registered redirect URI
         // 2. Has a path ending with /auth/callback
         if ("kelta-platform".equals(registeredClient.getClientId())) {
-            try {
-                URI requested = URI.create(requestedRedirectUri);
-                String requestedOrigin = requested.getScheme() + "://" + requested.getHost()
-                        + (requested.getPort() > 0 ? ":" + requested.getPort() : "");
+            if (isOriginMatchWithSuffix(requestedRedirectUri, registeredClient, "/auth/callback")) {
+                return;
+            }
+        }
 
-                for (String registered : registeredClient.getRedirectUris()) {
-                    URI registeredUri = URI.create(registered);
-                    String registeredOrigin = registeredUri.getScheme() + "://" + registeredUri.getHost()
-                            + (registeredUri.getPort() > 0 ? ":" + registeredUri.getPort() : "");
-
-                    if (requestedOrigin.equals(registeredOrigin)
-                            && requested.getPath() != null
-                            && requested.getPath().endsWith("/auth/callback")) {
-                        log.debug("Allowing tenant-scoped redirect_uri: {}", requestedRedirectUri);
-                        return;
-                    }
-                }
-            } catch (IllegalArgumentException e) {
-                // Invalid URI — fall through to error
+        // For connected apps with multiple redirect URIs, validate that the
+        // requested URI matches a registered origin + exact path. This supports
+        // apps that register multiple callback paths for different environments.
+        if (registeredClient.getRedirectUris().size() > 1) {
+            if (isExactOriginAndPathMatch(requestedRedirectUri, registeredClient)) {
+                return;
             }
         }
 
         OAuth2Error error = new OAuth2Error(OAuth2ErrorCodes.INVALID_REQUEST,
                 "invalid_redirect_uri", "https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1");
         throw new OAuth2AuthorizationCodeRequestAuthenticationException(error, authenticationToken);
+    }
+
+    private boolean isOriginMatchWithSuffix(String requestedRedirectUri,
+                                            RegisteredClient registeredClient,
+                                            String pathSuffix) {
+        try {
+            URI requested = URI.create(requestedRedirectUri);
+            String requestedOrigin = extractOrigin(requested);
+
+            for (String registered : registeredClient.getRedirectUris()) {
+                URI registeredUri = URI.create(registered);
+                String registeredOrigin = extractOrigin(registeredUri);
+
+                if (requestedOrigin.equals(registeredOrigin)
+                        && requested.getPath() != null
+                        && requested.getPath().endsWith(pathSuffix)) {
+                    log.debug("Allowing tenant-scoped redirect_uri: {}", requestedRedirectUri);
+                    return true;
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            // Invalid URI
+        }
+        return false;
+    }
+
+    private boolean isExactOriginAndPathMatch(String requestedRedirectUri,
+                                              RegisteredClient registeredClient) {
+        try {
+            URI requested = URI.create(requestedRedirectUri);
+            String requestedOrigin = extractOrigin(requested);
+
+            for (String registered : registeredClient.getRedirectUris()) {
+                URI registeredUri = URI.create(registered);
+                String registeredOrigin = extractOrigin(registeredUri);
+
+                if (requestedOrigin.equals(registeredOrigin)
+                        && requested.getPath() != null
+                        && requested.getPath().equals(registeredUri.getPath())) {
+                    log.debug("Allowing connected app redirect_uri with origin+path match: {}",
+                            requestedRedirectUri);
+                    return true;
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            // Invalid URI
+        }
+        return false;
+    }
+
+    private static String extractOrigin(URI uri) {
+        return uri.getScheme() + "://" + uri.getHost()
+                + (uri.getPort() > 0 ? ":" + uri.getPort() : "");
     }
 }

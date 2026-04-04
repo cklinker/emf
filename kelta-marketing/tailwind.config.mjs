@@ -4,20 +4,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Placeholder brand colors — will be updated with UX Designer output from KEL-28
         kelta: {
-          50: '#f0f7ff',
-          100: '#e0effe',
-          200: '#bae0fd',
-          300: '#7cc8fc',
-          400: '#36adf8',
-          500: '#0c93e9',
-          600: '#0074c7',
-          700: '#015da1',
-          800: '#064f85',
-          900: '#0b426e',
-          950: '#072a49',
+          50: '#F8FAFC',   // Slate 50 — off-white BG
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#06B6D4',   // Cyan — primary accent
+          600: '#3B82F6',   // Blue — secondary accent
+          700: '#334155',   // Slate 700 — secondary text
+          800: '#1e293b',
+          900: '#0F172A',   // Navy — primary dark
+          950: '#020617',
         },
+        navy: '#0F172A',
+        cyan: '#06B6D4',
+        blue: '#3B82F6',
+        success: '#10B981',
+        warning: '#F59E0B',
+        error: '#EF4444',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],

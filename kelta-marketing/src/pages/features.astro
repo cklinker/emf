@@ -108,8 +108,8 @@ const architecture = [
   <!-- Hero -->
   <section class="bg-gradient-to-b from-kelta-50 to-white py-20">
     <div class="mx-auto max-w-7xl px-6 text-center">
-      <h1 class="text-4xl font-extrabold text-gray-900 md:text-5xl">Platform Capabilities</h1>
-      <p class="mt-4 text-lg text-gray-600">
+      <h1 class="text-4xl font-extrabold text-navy md:text-5xl">Platform Capabilities</h1>
+      <p class="mt-4 text-lg text-kelta-700">
         Everything you need to build, automate, and scale enterprise applications.
       </p>
     </div>
@@ -122,11 +122,11 @@ const architecture = [
         {capabilities.map((cap, i) => (
           <div class={`flex flex-col gap-8 md:flex-row ${i % 2 === 1 ? 'md:flex-row-reverse' : ''}`}>
             <div class="flex-1">
-              <h2 class="text-2xl font-bold text-gray-900">{cap.title}</h2>
+              <h2 class="text-2xl font-bold text-navy">{cap.title}</h2>
               <ul class="mt-4 space-y-2">
                 {cap.items.map((item) => (
-                  <li class="flex items-start gap-2 text-sm text-gray-600">
-                    <span class="mt-1 text-kelta-500">&#10003;</span>
+                  <li class="flex items-start gap-2 text-sm text-kelta-700">
+                    <span class="mt-1 text-cyan">&#10003;</span>
                     {item}
                   </li>
                 ))}
@@ -144,22 +144,22 @@ const architecture = [
   <!-- Architecture -->
   <section class="bg-gray-50 py-20">
     <div class="mx-auto max-w-7xl px-6">
-      <h2 class="mb-10 text-center text-3xl font-bold text-gray-900">Architecture at a Glance</h2>
+      <h2 class="mb-10 text-center text-3xl font-bold text-navy">Architecture at a Glance</h2>
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead>
             <tr class="border-b border-gray-200">
-              <th class="py-3 pr-6 font-semibold text-gray-900">Service</th>
-              <th class="py-3 pr-6 font-semibold text-gray-900">Technology</th>
-              <th class="py-3 font-semibold text-gray-900">Purpose</th>
+              <th class="py-3 pr-6 font-semibold text-navy">Service</th>
+              <th class="py-3 pr-6 font-semibold text-navy">Technology</th>
+              <th class="py-3 font-semibold text-navy">Purpose</th>
             </tr>
           </thead>
           <tbody>
             {architecture.map((row) => (
               <tr class="border-b border-gray-100">
-                <td class="py-3 pr-6 font-medium text-kelta-700">{row.service}</td>
-                <td class="py-3 pr-6 font-mono text-xs text-gray-500">{row.tech}</td>
-                <td class="py-3 text-gray-600">{row.purpose}</td>
+                <td class="py-3 pr-6 font-medium text-cyan">{row.service}</td>
+                <td class="py-3 pr-6 font-mono text-xs text-kelta-700">{row.tech}</td>
+                <td class="py-3 text-kelta-700">{row.purpose}</td>
               </tr>
             ))}
           </tbody>
@@ -171,11 +171,11 @@ const architecture = [
   <!-- CTA -->
   <section class="py-20">
     <div class="mx-auto max-w-3xl px-6 text-center">
-      <h2 class="text-3xl font-bold text-gray-900">See it in action</h2>
-      <p class="mt-4 text-gray-600">Clone the repo, run docker-compose up, and explore the full platform.</p>
+      <h2 class="text-3xl font-bold text-navy">See it in action</h2>
+      <p class="mt-4 text-kelta-700">Clone the repo, run docker-compose up, and explore the full platform.</p>
       <a
         href="https://github.com/cklinker/emf"
-        class="mt-8 inline-block rounded-lg bg-kelta-600 px-8 py-3 text-base font-semibold text-white hover:bg-kelta-700"
+        class="mt-8 inline-block rounded-lg bg-navy px-8 py-3 text-base font-semibold text-white hover:bg-kelta-800"
       >
         Get Started on GitHub
       </a>

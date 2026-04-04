@@ -4,12 +4,13 @@ import io.kelta.runtime.module.integration.spi.ScriptExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
  * No-op implementation of {@link ScriptExecutor} that logs operations
- * and returns dummy IDs. Used as a default when no real script runtime is configured.
+ * and returns dummy results. Used as a default when no real script runtime is configured.
  *
  * @since 1.0.0
  */
@@ -29,5 +30,13 @@ public class LoggingScriptExecutor implements ScriptExecutor {
         log.info("[NOOP] ScriptExecutor.queueExecution: id={}, tenant={}, script={}, trigger={}, record={}",
             id, tenantId, scriptId, triggerType, recordId);
         return id;
+    }
+
+    @Override
+    public ScriptExecutionResult execute(ScriptExecutionRequest request) {
+        log.info("[NOOP] ScriptExecutor.execute: source={}chars, bindings={} — returning empty success",
+            request.scriptSource() != null ? request.scriptSource().length() : 0,
+            request.bindings() != null ? request.bindings().keySet() : "null");
+        return ScriptExecutionResult.success(Map.of("result", "noop"), 0);
     }
 }

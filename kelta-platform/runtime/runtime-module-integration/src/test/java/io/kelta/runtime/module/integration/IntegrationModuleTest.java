@@ -80,6 +80,9 @@ class IntegrationModuleTest {
             @Override public String queueExecution(String t, String s, String tt, String r) {
                 return "custom-exec-id";
             }
+            @Override public ScriptExecutionResult execute(ScriptExecutionRequest request) {
+                return ScriptExecutionResult.success(java.util.Map.of(), 0);
+            }
         };
 
         Map<Class<?>, Object> extensions = Map.of(

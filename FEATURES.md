@@ -115,7 +115,6 @@ A multi-layer permission model that gives you fine-grained control over who can 
 
 > **TODO**
 > - Field-level security (HIDDEN fields): Write-side enforcement is complete — HIDDEN fields are blocked from create/update operations via `CerbosFieldSecurityAdvice`. Read-side stripping from API responses is still TODO.
-> - Permission enforcement defaults to disabled (`permissions-enabled=false`) — needs production-ready default
 
 ---
 
@@ -599,7 +598,7 @@ What SMB and larger enterprises need from an application platform, and where Kel
 - [ ] **Field-level security read-side stripping**: Write-side enforcement is complete — HIDDEN fields are blocked from create/update. Read-side stripping from API responses is still needed.
 - [ ] **Flow KAFKA_TRIGGERED trigger**: Wire dynamic Kafka consumers per flow with key/message filtering
 - [ ] **Flow Wait state resume**: Implement `resumeExecution()` to resume flows paused in Wait states
-- [ ] **Permission enforcement default**: Change `permissions-enabled` to default to `true` for production deployments
+- [x] **Permission enforcement default**: `permissions-enabled` now defaults to `true` for production deployments
 
 ### Medium Priority — Integration & Data Gaps
 

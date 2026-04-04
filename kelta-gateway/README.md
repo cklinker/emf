@@ -49,7 +49,7 @@ kelta.gateway:
     enabled: ${TENANT_SLUG_ENABLED:true}
     cache-refresh-ms: 60000
   security:
-    permissions-enabled: ${PERMISSIONS_ENABLED:false}
+    permissions-enabled: ${PERMISSIONS_ENABLED:true}
     permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}
     public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
   kafka.topics:

@@ -41,8 +41,8 @@ const sections = [
 <BaseLayout title="Documentation" description="Guides, API reference, and SDK documentation for Kelta.">
   <section class="bg-gradient-to-b from-kelta-50 to-white py-20">
     <div class="mx-auto max-w-7xl px-6 text-center">
-      <h1 class="text-4xl font-extrabold text-gray-900 md:text-5xl">Documentation</h1>
-      <p class="mt-4 text-lg text-gray-600">
+      <h1 class="text-4xl font-extrabold text-navy md:text-5xl">Documentation</h1>
+      <p class="mt-4 text-lg text-kelta-700">
         Guides, API reference, and SDK documentation to get you building fast.
       </p>
     </div>
@@ -53,13 +53,13 @@ const sections = [
       <div class="grid gap-8 md:grid-cols-2">
         {sections.map((section) => (
           <div class="rounded-xl border border-gray-100 p-8">
-            <h2 class="mb-4 text-xl font-bold text-gray-900">{section.title}</h2>
+            <h2 class="mb-4 text-xl font-bold text-navy">{section.title}</h2>
             <ul class="space-y-3">
               {section.links.map((link) => (
                 <li>
                   <a
                     href={link.href}
-                    class="flex items-center gap-2 text-sm text-kelta-600 hover:text-kelta-700"
+                    class="flex items-center gap-2 text-sm text-cyan hover:text-blue"
                     target={link.href.startsWith('http') ? '_blank' : undefined}
                     rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                   >
@@ -73,7 +73,7 @@ const sections = [
         ))}
       </div>
       <div class="mt-12 rounded-xl border border-kelta-100 bg-kelta-50 p-8 text-center">
-        <p class="text-sm text-kelta-700">
+        <p class="text-sm text-navy">
           Full documentation site coming soon. In the meantime, check out the
           <a href="https://github.com/cklinker/emf" class="font-semibold underline" target="_blank" rel="noopener noreferrer">
             GitHub repository

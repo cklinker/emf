@@ -9,16 +9,14 @@ const navLinks = [
 
 <header class="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
   <nav class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-    <a href="/" class="flex items-center gap-2 text-xl font-bold text-kelta-700">
-      <!-- Logo placeholder — will be replaced with SVG from KEL-28 -->
-      <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-kelta-600 text-sm font-bold text-white">K</span>
-      Kelta
+    <a href="/" class="flex items-center gap-2">
+      <img src="/logo-primary.svg" alt="Kelta" class="h-8" />
     </a>
     <div class="hidden items-center gap-8 md:flex">
       {navLinks.map((link) => (
         <a
           href={link.href}
-          class="text-sm font-medium text-gray-600 transition-colors hover:text-kelta-600"
+          class="text-sm font-medium text-gray-600 transition-colors hover:text-cyan"
           {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
         >
           {link.label}
@@ -26,7 +24,7 @@ const navLinks = [
       ))}
       <a
         href="https://github.com/cklinker/emf"
-        class="rounded-lg bg-kelta-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-kelta-700"
+        class="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-kelta-800"
       >
         Get Started
       </a>
@@ -47,7 +45,7 @@ const navLinks = [
     {navLinks.map((link) => (
       <a
         href={link.href}
-        class="block py-2 text-sm font-medium text-gray-600 hover:text-kelta-600"
+        class="block py-2 text-sm font-medium text-gray-600 hover:text-cyan"
         {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
       >
         {link.label}
@@ -55,7 +53,7 @@ const navLinks = [
     ))}
     <a
       href="https://github.com/cklinker/emf"
-      class="mt-2 block rounded-lg bg-kelta-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-kelta-700"
+      class="mt-2 block rounded-lg bg-navy px-4 py-2 text-center text-sm font-medium text-white hover:bg-kelta-800"
     >
       Get Started
     </a>

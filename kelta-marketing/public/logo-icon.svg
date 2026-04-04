@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="kelta-grad" x1="0%" y1="0%" x2="100%" y2="100%" gradientTransform="rotate(135)">
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Abstract K mark -->
+  <rect x="12" y="8" width="8" height="48" rx="3" fill="url(#kelta-grad)"/>
+  <polygon points="20,32 44,8 52,8 28,32" fill="url(#kelta-grad)"/>
+  <polygon points="20,32 44,56 52,56 28,32" fill="url(#kelta-grad)"/>
+  <circle cx="46" cy="12" r="5" fill="#06B6D4"/>
+  <circle cx="46" cy="52" r="5" fill="#3B82F6"/>
+</svg>

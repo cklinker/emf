@@ -1,0 +1,228 @@
+package io.kelta.auth.federation;
+
+import io.kelta.auth.service.OidcDiscoveryService;
+import io.kelta.auth.service.OidcDiscoveryService.EndpointOverrides;
+import io.kelta.auth.service.OidcDiscoveryService.ResolvedEndpoints;
+import io.kelta.auth.service.WorkerClient;
+import io.kelta.auth.service.WorkerClient.OidcProviderInfo;
+import io.kelta.crypto.EncryptionService;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@DisplayName("DynamicClientRegistrationRepository")
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class DynamicClientRegistrationRepositoryTest {
+
+    @Mock private WorkerClient workerClient;
+    @Mock private OidcDiscoveryService discoveryService;
+    @Mock private EncryptionService encryptionService;
+
+    private DynamicClientRegistrationRepository repo;
+
+    @BeforeEach
+    void setUp() {
+        repo = new DynamicClientRegistrationRepository(workerClient, discoveryService, encryptionService);
+    }
+
+    private OidcProviderInfo provider(String id, String clientId, String clientSecretEnc) {
+        return new OidcProviderInfo(
+                id, "Test Provider", "https://idp.example.com", "https://idp.example.com/jwks",
+                null, clientId, clientSecretEnc,
+                null, null, null,
+                "https://idp.example.com/auth", "https://idp.example.com/token",
+                "https://idp.example.com/userinfo", null,
+                null, null, null
+        );
+    }
+
+    private ResolvedEndpoints validEndpoints() {
+        return new ResolvedEndpoints(
+                "https://idp.example.com/auth",
+                "https://idp.example.com/token",
+                "https://idp.example.com/userinfo",
+                "https://idp.example.com/jwks",
+                null, "discovered"
+        );
+    }
+
+    @Nested
+    @DisplayName("findByRegistrationId")
+    class FindByRegistrationId {
+
+        @Test
+        @DisplayName("returns registration for valid provider")
+        void returnsRegistration() {
+            OidcProviderInfo prov = provider("prov-1", "client-id", "enc-secret");
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(prov));
+            when(encryptionService.decrypt("enc-secret")).thenReturn("decrypted-secret");
+            when(discoveryService.resolve(eq("https://idp.example.com"), any(EndpointOverrides.class)))
+                    .thenReturn(validEndpoints());
+
+            ClientRegistration result = repo.findByRegistrationId("tenant1:prov-1");
+
+            assertThat(result).isNotNull();
+            assertThat(result.getRegistrationId()).isEqualTo("tenant1:prov-1");
+            assertThat(result.getClientId()).isEqualTo("client-id");
+            assertThat(result.getClientSecret()).isEqualTo("decrypted-secret");
+        }
+
+        @Test
+        @DisplayName("returns cached registration on second call")
+        void returnsCached() {
+            OidcProviderInfo prov = provider("prov-1", "client-id", "enc-secret");
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(prov));
+            when(encryptionService.decrypt("enc-secret")).thenReturn("decrypted-secret");
+            when(discoveryService.resolve(anyString(), any())).thenReturn(validEndpoints());
+
+            repo.findByRegistrationId("tenant1:prov-1");
+            ClientRegistration cached = repo.findByRegistrationId("tenant1:prov-1");
+
+            assertThat(cached).isNotNull();
+            // WorkerClient should only be called once (first call), not for cache hit
+            verify(workerClient, times(1)).findActiveOidcProviders("tenant1");
+        }
+
+        @Test
+        @DisplayName("returns null for invalid format")
+        void returnsNullForInvalidFormat() {
+            ClientRegistration result = repo.findByRegistrationId("no-colon-here");
+
+            assertThat(result).isNull();
+            verifyNoInteractions(workerClient);
+        }
+
+        @Test
+        @DisplayName("returns null when provider not found")
+        void returnsNullWhenNotFound() {
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of());
+
+            ClientRegistration result = repo.findByRegistrationId("tenant1:missing-prov");
+
+            assertThat(result).isNull();
+        }
+
+        @Test
+        @DisplayName("returns null when client secret cannot be decrypted")
+        void returnsNullWhenDecryptionFails() {
+            OidcProviderInfo prov = provider("prov-1", "client-id", "enc-secret");
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(prov));
+            when(encryptionService.decrypt("enc-secret")).thenThrow(new RuntimeException("decrypt error"));
+
+            ClientRegistration result = repo.findByRegistrationId("tenant1:prov-1");
+
+            assertThat(result).isNull();
+        }
+
+        @Test
+        @DisplayName("returns null when missing required endpoints")
+        void returnsNullWhenMissingEndpoints() {
+            OidcProviderInfo prov = provider("prov-1", "client-id", "enc-secret");
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(prov));
+            when(encryptionService.decrypt("enc-secret")).thenReturn("decrypted");
+            when(discoveryService.resolve(anyString(), any())).thenReturn(
+                    new ResolvedEndpoints(null, null, null, null, null, "manual"));
+
+            ClientRegistration result = repo.findByRegistrationId("tenant1:prov-1");
+
+            assertThat(result).isNull();
+        }
+
+        @Test
+        @DisplayName("returns null when clientSecretEnc is null")
+        void returnsNullWhenClientSecretNull() {
+            OidcProviderInfo prov = provider("prov-1", "client-id", null);
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(prov));
+            when(discoveryService.resolve(anyString(), any())).thenReturn(validEndpoints());
+
+            ClientRegistration result = repo.findByRegistrationId("tenant1:prov-1");
+
+            assertThat(result).isNull();
+        }
+
+        @Test
+        @DisplayName("returns null when clientSecretEnc is blank")
+        void returnsNullWhenClientSecretBlank() {
+            OidcProviderInfo prov = provider("prov-1", "client-id", "  ");
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(prov));
+
+            ClientRegistration result = repo.findByRegistrationId("tenant1:prov-1");
+
+            assertThat(result).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("findByTenantId")
+    class FindByTenantId {
+
+        @Test
+        @DisplayName("returns registrations for all valid providers")
+        void returnsAllValid() {
+            OidcProviderInfo p1 = provider("prov-1", "client-1", "enc-1");
+            OidcProviderInfo p2 = provider("prov-2", "client-2", "enc-2");
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(p1, p2));
+            when(encryptionService.decrypt(anyString())).thenReturn("decrypted");
+            when(discoveryService.resolve(anyString(), any())).thenReturn(validEndpoints());
+
+            List<ClientRegistration> result = repo.findByTenantId("tenant1");
+
+            assertThat(result).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("filters out providers without clientId")
+        void filtersOutMissingClientId() {
+            OidcProviderInfo valid = provider("prov-1", "client-1", "enc-1");
+            OidcProviderInfo noClient = provider("prov-2", null, "enc-2");
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(valid, noClient));
+            when(encryptionService.decrypt("enc-1")).thenReturn("decrypted");
+            when(discoveryService.resolve(anyString(), any())).thenReturn(validEndpoints());
+
+            List<ClientRegistration> result = repo.findByTenantId("tenant1");
+
+            assertThat(result).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("returns empty list when no providers")
+        void returnsEmptyWhenNoProviders() {
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of());
+
+            List<ClientRegistration> result = repo.findByTenantId("tenant1");
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("evictAll")
+    class EvictAll {
+
+        @Test
+        @DisplayName("clears cache so next lookup hits provider again")
+        void clearsCache() {
+            OidcProviderInfo prov = provider("prov-1", "client-id", "enc-secret");
+            when(workerClient.findActiveOidcProviders("tenant1")).thenReturn(List.of(prov));
+            when(encryptionService.decrypt("enc-secret")).thenReturn("decrypted");
+            when(discoveryService.resolve(anyString(), any())).thenReturn(validEndpoints());
+
+            repo.findByRegistrationId("tenant1:prov-1");
+            repo.evictAll();
+            repo.findByRegistrationId("tenant1:prov-1");
+
+            verify(workerClient, times(2)).findActiveOidcProviders("tenant1");
+        }
+    }
+}

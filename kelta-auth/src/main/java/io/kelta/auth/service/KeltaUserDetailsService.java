@@ -36,7 +36,7 @@ public class KeltaUserDetailsService implements UserDetailsService {
                 FROM platform_user pu
                 JOIN user_credential uc ON uc.user_id = pu.id
                 LEFT JOIN profile p ON p.id = pu.profile_id
-                WHERE pu.email = ?
+                WHERE (pu.email = ? OR pu.username = ?)
                   AND pu.status = 'ACTIVE'
                 """,
                 (rs, rowNum) -> new KeltaUserDetails(
@@ -52,7 +52,7 @@ public class KeltaUserDetailsService implements UserDetailsService {
                                 && rs.getTimestamp("locked_until").toInstant().isAfter(java.time.Instant.now()),
                         rs.getBoolean("force_change_on_login")
                 ),
-                email
+                email, email
         );
 
         if (users.isEmpty()) {

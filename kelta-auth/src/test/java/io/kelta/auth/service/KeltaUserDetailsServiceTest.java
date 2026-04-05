@@ -38,7 +38,7 @@ class KeltaUserDetailsServiceTest {
                 true, false, false
         );
 
-        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("admin@test.com")))
+        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("admin@test.com"), eq("admin@test.com")))
                 .thenReturn(List.of(expectedUser));
 
         var result = userDetailsService.loadUserByUsername("admin@test.com");
@@ -50,8 +50,26 @@ class KeltaUserDetailsServiceTest {
     }
 
     @Test
+    void loadUserByUsername_returnsUserDetailsByUsername() {
+        KeltaUserDetails expectedUser = new KeltaUserDetails(
+                "user-1", "admin@test.com", "tenant-1", "profile-1",
+                "System Administrator", "Test Admin", "$2a$10$hash",
+                true, false, false
+        );
+
+        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("test-admin"), eq("test-admin")))
+                .thenReturn(List.of(expectedUser));
+
+        var result = userDetailsService.loadUserByUsername("test-admin");
+
+        assertNotNull(result);
+        assertEquals("admin@test.com", result.getUsername());
+        assertTrue(result.isEnabled());
+    }
+
+    @Test
     void loadUserByUsername_throwsWhenNotFound() {
-        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("unknown@test.com")))
+        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("unknown@test.com"), eq("unknown@test.com")))
                 .thenReturn(Collections.emptyList());
 
         assertThrows(UsernameNotFoundException.class,

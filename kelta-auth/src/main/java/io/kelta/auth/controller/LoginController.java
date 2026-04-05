@@ -21,15 +21,14 @@ public class LoginController {
 
     @GetMapping("/login")
     public String login(Model model, HttpServletRequest request) {
-        // If the request has stale error params (from a previous failed attempt)
-        // but also has a fresh OAuth2 saved request, strip the error params so
-        // the user sees a clean login page.
-        String queryString = request.getQueryString();
-        if (queryString != null
-                && (queryString.contains("pending_activation") || queryString.contains("federation"))
-                && request.getSession(false) != null
-                && request.getSession().getAttribute("SPRING_SECURITY_SAVED_REQUEST") != null) {
-            return "redirect:/login";
+        // Set error model attributes from query params. The template uses model
+        // attributes instead of Thymeleaf's ${param} to avoid false positives
+        // with Spring Security's request parameter handling.
+        if (request.getParameter("pending_activation") != null) {
+            model.addAttribute("pendingActivation", true);
+        }
+        if (request.getParameter("federation") != null) {
+            model.addAttribute("federationError", true);
         }
 
         // Resolve tenant from the request to load SSO providers

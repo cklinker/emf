@@ -31,6 +31,8 @@ class LoginControllerTest {
     @BeforeEach
     void setUp() {
         lenient().when(request.getSession()).thenReturn(session);
+        lenient().when(request.getParameter("pending_activation")).thenReturn(null);
+        lenient().when(request.getParameter("federation")).thenReturn(null);
     }
 
     @Nested

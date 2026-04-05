@@ -78,6 +78,7 @@ public class AuthorizationServerConfig {
         authorizationServerConfigurer
                 .oidc(Customizer.withDefaults())
                 .authorizationEndpoint(endpoint -> endpoint
+                        .consentPage("/oauth2/consent")
                         .authenticationProviders(configureRedirectUriValidator()));
 
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();

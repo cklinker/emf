@@ -534,6 +534,9 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("rate_limit_per_hour").withDefault(10000))
             .addField(FieldDefinition.bool("active"))
             .addField(FieldDefinition.datetime("lastUsedAt").withColumnName("last_used_at"))
+            .addField(FieldDefinition.json("grantTypes").withColumnName("grant_types"))
+            .addField(FieldDefinition.bool("requirePkce").withColumnName("require_pkce"))
+            .addField(FieldDefinition.bool("consentRequired").withColumnName("consent_required"))
             .build();
     }
 

@@ -66,6 +66,12 @@ public class BootstrapRepository {
             LIMIT 1
             """;
 
+    private static final String SELECT_USER_BY_USERNAME_ANY_STATUS = """
+            SELECT id, profile_id, status FROM platform_user
+            WHERE username = ? AND tenant_id = ?
+            LIMIT 1
+            """;
+
     private static final String SELECT_USER_BY_EMAIL = """
             SELECT id, profile_id FROM platform_user
             WHERE email = ? AND tenant_id = ? AND status = 'ACTIVE'
@@ -141,6 +147,12 @@ public class BootstrapRepository {
     public Optional<Map<String, Object>> findUserByEmailAnyStatus(String email, String tenantId) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 SELECT_USER_BY_EMAIL_ANY_STATUS, email, tenantId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    public Optional<Map<String, Object>> findUserByUsernameAnyStatus(String username, String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                SELECT_USER_BY_USERNAME_ANY_STATUS, username, tenantId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 

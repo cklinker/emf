@@ -53,6 +53,7 @@ import { ApiError } from '@/services/apiClient'
 import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
 import type { PageLayoutDto } from '@/hooks/usePageLayout'
 import type { LookupOption } from '@/components/LookupSelect'
+import type { RecordType } from '@/types/collections'
 
 /** Picklist value returned from the API (field names match backend schema) */
 interface PicklistValueDto {
@@ -61,6 +62,15 @@ interface PicklistValueDto {
   isDefault: boolean
   isActive: boolean
   sortOrder: number
+}
+
+/** Record type picklist override from the API */
+interface RecordTypePicklistOverrideDto {
+  id: string
+  recordTypeId: string
+  fieldId: string
+  availableValues: string | string[]
+  defaultValue?: string
 }
 
 /** System fields excluded from forms */
@@ -360,6 +370,12 @@ interface ObjectFormBodyProps {
   isFieldEditable?: (fieldName: string) => boolean
   /** Resolved page layout (null when none configured — falls back to flat grid) */
   layout?: PageLayoutDto | null
+  /** Available record types for this collection */
+  recordTypes?: RecordType[]
+  /** Currently selected record type ID */
+  selectedRecordTypeId?: string
+  /** Callback when record type selection changes */
+  onRecordTypeChange?: (id: string | undefined) => void
 }
 
 /**
@@ -377,6 +393,9 @@ function ObjectFormBody({
   basePath,
   isFieldEditable,
   layout,
+  recordTypes,
+  selectedRecordTypeId,
+  onRecordTypeChange,
 }: ObjectFormBodyProps): React.ReactElement {
   const navigate = useNavigate()
   const { showToast } = useToast()
@@ -448,12 +467,17 @@ function ObjectFormBody({
       }
     }
 
+    // Include record type ID if selected
+    if (selectedRecordTypeId) {
+      attributes.recordTypeId = selectedRecordTypeId
+    }
+
     if (isNew) {
       mutations.create.mutate(attributes)
     } else {
       mutations.update.mutate({ id: recordId!, data: attributes })
     }
-  }, [editableFields, formData, isNew, mutations, recordId])
+  }, [editableFields, formData, isNew, mutations, recordId, selectedRecordTypeId])
 
   // Handle cancel
   const handleCancel = useCallback(() => {
@@ -515,6 +539,34 @@ function ObjectFormBody({
       </div>
 
       <Separator />
+
+      {/* Record Type Selector — shown when collection has record types */}
+      {recordTypes && recordTypes.length > 0 && (
+        <Card data-testid="record-type-selector">
+          <CardContent className="py-3">
+            <div className="flex items-center gap-4">
+              <Label htmlFor="recordType" className="text-sm font-medium whitespace-nowrap">
+                Record Type
+              </Label>
+              <select
+                id="recordType"
+                data-testid="record-type-select"
+                value={selectedRecordTypeId || ''}
+                onChange={(e) => onRecordTypeChange?.(e.target.value || undefined)}
+                className="flex h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Select record type...</option>
+                {recordTypes.map((rt) => (
+                  <option key={rt.id} value={rt.id}>
+                    {rt.name}
+                    {rt.isDefault ? ' (Default)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Form Fields — use page layout sections when available, otherwise flat grid */}
       {layout && layout.sections.length > 0 ? (
@@ -610,9 +662,64 @@ export function ObjectFormPage(): React.ReactElement {
     isLoading: permissionsLoading,
   } = useCollectionPermissions(collectionName)
 
+  // ---------------------------------------------------------------
+  // Record types: fetch available record types for the collection
+  // ---------------------------------------------------------------
+  const { data: recordTypes } = useQuery({
+    queryKey: ['record-types-for-form', schema?.id],
+    queryFn: async () => {
+      const types = await apiClient.getList<RecordType>(
+        `/api/record-types?filter[collectionId][eq]=${schema!.id}&filter[isActive][eq]=true`
+      )
+      return types.sort((a, b) => a.name.localeCompare(b.name))
+    },
+    enabled: !!schema?.id,
+  })
+
+  const [selectedRecordTypeId, setSelectedRecordTypeId] = useState<string | undefined>(() => {
+    // For edit mode, use the record's existing recordTypeId
+    if (!isNew && record?.recordTypeId) return String(record.recordTypeId)
+    return undefined
+  })
+
+  // Auto-select default record type on create when record types exist
+  React.useEffect(() => {
+    if (isNew && recordTypes && recordTypes.length > 0 && !selectedRecordTypeId) {
+      const defaultType = recordTypes.find((rt) => rt.isDefault)
+      if (defaultType) {
+        setSelectedRecordTypeId(defaultType.id)
+      }
+    }
+  }, [isNew, recordTypes, selectedRecordTypeId])
+
+  // Fetch picklist overrides for the selected record type
+  const { data: recordTypePicklistOverrides } = useQuery({
+    queryKey: ['record-type-picklist-overrides', selectedRecordTypeId],
+    queryFn: async () => {
+      const overrides = await apiClient.getList<RecordTypePicklistOverrideDto>(
+        `/api/record-type-picklists?filter[recordTypeId][eq]=${selectedRecordTypeId}`
+      )
+      // Build a map of fieldId → allowed values
+      const map: Record<string, { values: string[]; defaultValue?: string }> = {}
+      for (const o of overrides) {
+        const values =
+          typeof o.availableValues === 'string'
+            ? (JSON.parse(o.availableValues) as string[])
+            : o.availableValues
+        map[o.fieldId] = { values, defaultValue: o.defaultValue }
+      }
+      return map
+    },
+    enabled: !!selectedRecordTypeId,
+  })
+
   // Resolve page layout for this collection (returns null if none configured)
   const { user } = useAuth()
-  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
+  const { layout, isLoading: layoutLoading } = usePageLayout(
+    schema?.id,
+    user?.id,
+    selectedRecordTypeId
+  )
 
   // Filter fields by field-level permissions (hidden fields excluded, read-only shown as disabled)
   const permissionFilteredFields = useMemo(() => {
@@ -709,14 +816,28 @@ export function ObjectFormPage(): React.ReactElement {
     return permissionFilteredFields.map((f) => {
       let updated = f
       if ((f.type === 'picklist' || f.type === 'multi_picklist') && picklistValuesMap?.[f.id]) {
-        updated = { ...updated, enumValues: picklistValuesMap[f.id] }
+        let values = picklistValuesMap[f.id]
+        // Apply record type picklist restrictions if available
+        const rtOverride = recordTypePicklistOverrides?.[f.id]
+        if (rtOverride) {
+          const allowedSet = new Set(rtOverride.values)
+          values = values.filter((v) => allowedSet.has(v))
+        }
+        updated = { ...updated, enumValues: values }
       }
       if (REFERENCE_TYPES.has(f.type) && lookupOptionsMap?.[f.id]) {
         updated = { ...updated, lookupOptions: lookupOptionsMap[f.id] }
       }
       return updated
     })
-  }, [permissionFilteredFields, picklistValuesMap, picklistFields, lookupOptionsMap, lookupFields])
+  }, [
+    permissionFilteredFields,
+    picklistValuesMap,
+    picklistFields,
+    lookupOptionsMap,
+    lookupFields,
+    recordTypePicklistOverrides,
+  ])
 
   const isLoading =
     schemaLoading || (!isNew && recordLoading) || permissionsLoading || layoutLoading
@@ -810,6 +931,9 @@ export function ObjectFormPage(): React.ReactElement {
       basePath={basePath}
       isFieldEditable={isFieldEditable}
       layout={layout}
+      recordTypes={recordTypes}
+      selectedRecordTypeId={selectedRecordTypeId}
+      onRecordTypeChange={setSelectedRecordTypeId}
     />
   )
 }

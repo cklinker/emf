@@ -82,11 +82,13 @@ export interface UsePageLayoutResult {
  *
  * @param collectionId - The collection UUID
  * @param profileId - The user ID (used as profileId for layout resolution)
+ * @param recordTypeId - Optional record type ID for type-specific layout resolution
  * @returns The resolved layout or null if none configured
  */
 export function usePageLayout(
   collectionId: string | undefined,
-  profileId: string | undefined
+  profileId: string | undefined,
+  recordTypeId?: string
 ): UsePageLayoutResult {
   const { apiClient } = useApi()
   const collectionStore = useCollectionStore()
@@ -96,7 +98,7 @@ export function usePageLayout(
     isLoading,
     error,
   } = useQuery<PageLayoutDto | null, Error>({
-    queryKey: ['page-layout-resolve', collectionId, profileId],
+    queryKey: ['page-layout-resolve', collectionId, profileId, recordTypeId],
     queryFn: async () => {
       try {
         // Step 1: Find layout assignment for this collection (single query)
@@ -104,19 +106,43 @@ export function usePageLayout(
           id: string
           collectionId: string
           profileId?: string
+          recordTypeId?: string
           layoutId: string
           isDefault?: boolean
-        }>(`/api/layout-assignments?filter[collectionId][eq]=${collectionId}&page[size]=10`)
+        }>(`/api/layout-assignments?filter[collectionId][eq]=${collectionId}&page[size]=50`)
 
-        // Prefer profile-specific assignment, then fall back to default
+        // Resolution order:
+        // 1. Profile + record type match
+        // 2. Record type match (any profile)
+        // 3. Profile match (no record type)
+        // 4. Default assignment
         let layoutId: string | undefined
-        const profileMatch = allAssignments.find((a) => a.profileId === profileId)
-        if (profileMatch) {
-          layoutId = profileMatch.layoutId
-        } else {
-          const defaultAssignment = allAssignments.find((a) => a.isDefault)
-          if (defaultAssignment) {
-            layoutId = defaultAssignment.layoutId
+        if (recordTypeId) {
+          const profileAndTypeMatch = allAssignments.find(
+            (a) => a.profileId === profileId && a.recordTypeId === recordTypeId
+          )
+          if (profileAndTypeMatch) {
+            layoutId = profileAndTypeMatch.layoutId
+          } else {
+            const typeMatch = allAssignments.find(
+              (a) => a.recordTypeId === recordTypeId && !a.profileId
+            )
+            if (typeMatch) {
+              layoutId = typeMatch.layoutId
+            }
+          }
+        }
+        if (!layoutId) {
+          const profileMatch = allAssignments.find(
+            (a) => a.profileId === profileId && !a.recordTypeId
+          )
+          if (profileMatch) {
+            layoutId = profileMatch.layoutId
+          } else {
+            const defaultAssignment = allAssignments.find((a) => a.isDefault)
+            if (defaultAssignment) {
+              layoutId = defaultAssignment.layoutId
+            }
           }
         }
 

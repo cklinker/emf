@@ -1,271 +1,52 @@
-# Kelta Project — Claude Code Instructions
+# Kelta Enterprise Platform
 
-## Overview
-
-This is the Kelta Enterprise Platform monorepo. When working on tasks, follow this workflow exactly.
-
-**All changes require a PR.** Never commit directly to `main`. Always create a feature branch, open a PR, and auto-merge. This applies to EPIC tasks, bug fixes, hotfixes, and any other code changes.
+Multi-tenant enterprise platform with configurable objects and workflows. All changes require a PR — never commit directly to `main`.
 
 ## Project Structure
 
 ```
-kelta-platform/runtime/runtime-core   # Core runtime library (Java, JAR)
-kelta-platform/runtime/runtime-events # Shared Kafka event classes (Java, JAR)
-kelta-gateway                         # Spring Cloud Gateway service (Java)
-kelta-auth                            # Internal OIDC provider, identity brokering, MFA (Java)
-kelta-worker                          # Worker service (Java, owns DB migrations)
-kelta-web                             # Frontend SDK, components, plugin-sdk, CLI (TypeScript/React)
-kelta-ui/app                          # Admin/builder UI (TypeScript/React/Vite)
+kelta-platform/runtime/runtime-core   # Core runtime library (models, query, storage, flows)
+kelta-platform/runtime/runtime-events # Shared Kafka event classes (PlatformEvent<T>)
+kelta-platform/runtime/runtime-jsonapi # JSON:API response formatting
+kelta-platform/runtime/runtime-module-core # CRUD action handlers
+kelta-gateway                         # Spring Cloud Gateway (auth, routing, rate limiting)
+kelta-auth                            # Internal OIDC provider, identity brokering, MFA
+kelta-worker                          # Worker service (owns DB migrations, workflow exec)
+kelta-web                             # Frontend SDK monorepo (sdk, components, plugin-sdk)
+kelta-ui/app                          # Admin/builder UI (React/Vite)
+e2e-tests                             # Playwright E2E tests
 ```
 
-- **Java 21**, Spring Boot 3.2.2, Maven
-- **TypeScript/React**, Vite, Vitest, ESLint, Prettier
-- **Database**: PostgreSQL with Flyway migrations
-- **Messaging**: Kafka
-- **Cache**: Redis
+Stack: Java 21, Spring Boot, Maven, PostgreSQL + Flyway, Kafka, Redis, React, Vite, Vitest. Check `kelta-platform/pom.xml` for current framework versions.
 
-## Task Workflow
+## Critical Rules
 
-When assigned a task (e.g., "implement task A1"), follow these steps **in order**:
+**Multi-pod Kafka rule**: Never use in-process-only state changes for configuration data. Any change to in-memory registries or caches must be broadcast via Kafka so all pods receive the update.
 
-### 1. Create a Feature Branch
-
-Branch from `main` using the task ID in the branch name:
-
-```bash
-git checkout main && git pull origin main
-git checkout -b feature/<task-id>-<short-description>
-```
-
-**Branch naming convention:** `feature/<task-id-lowercase>-<kebab-case-description>`
-
-Examples:
-- `feature/a1-field-type-migration`
-- `feature/b5-picklist-service`
-- `feature/d3-formula-evaluator`
-
-### 2. Implement the Feature
-
-- **Source code** — Follow existing patterns in the codebase.
-- **Unit tests** — Test all new classes and methods.
-- **Integration tests** — Update or add integration tests that verify the feature end-to-end.
-
-#### Coding Standards
-
-- Follow existing code style and patterns in the codebase.
-- Java: No unused imports, no raw types, no unchecked casts.
-- TypeScript: Must pass ESLint and Prettier checks.
-- All new entities extend `BaseEntity` (UUID id, createdAt, updatedAt).
-- All new JPA repositories extend `JpaRepository`.
-- All new REST controllers follow existing `@RestController` patterns with proper `@RequestMapping`.
-- Flyway migrations are numbered sequentially (see migration ranges below).
-- Kafka events use `ConfigEventPublisher` pattern.
-
-### 4. Build and Verify
-
-Run the full build pipeline locally. **All steps must pass with zero errors.**
-
-#### Java Backend
-
-```bash
-# 1. Build runtime modules (dependency for gateway and worker)
-mvn clean install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
-
-# 2. Run gateway tests
-mvn verify -f kelta-gateway/pom.xml -B
-
-# 3. Run worker tests
-mvn verify -f kelta-worker/pom.xml -B
-```
-
-#### Frontend (always — CI runs these on every PR)
-
-```bash
-# kelta-web (always run — CI checks this on every PR regardless of changes)
-cd kelta-web && npm install
-npm run lint
-npm run typecheck
-npm run format:check
-npm run test:coverage
-```
-
-If changes were made to kelta-ui:
-```bash
-cd kelta-ui/app && npm install
-npm run lint
-npm run format:check
-npm run test:run
-```
-
-#### Checklist Before PR
-
-- [ ] `mvn verify` passes for gateway (zero test failures, zero lint errors)
-- [ ] `mvn verify` passes for worker (zero test failures, zero lint errors)
-- [ ] `npm run lint` passes in kelta-web
-- [ ] `npm run typecheck` passes in kelta-web
-- [ ] `npm run format:check` passes in kelta-web
-- [ ] `npm run test:coverage` passes in kelta-web
-- [ ] No compiler warnings introduced
-- [ ] Flyway migration numbering is correct and sequential
-- [ ] New tests cover the feature adequately
-
-### 5. Commit and Push
-
-```bash
-git add <specific-files>
-git commit -m "<type>(<scope>): <description>"
-git push -u origin feature/<task-id>-<short-description>
-```
-
-**Commit message format:**
-- `feat(runtime-core): extend FieldType enum with 16 new types`
-- `feat(worker): add internal permissions endpoint`
-- `feat(gateway): add permission enforcement filter`
-- `fix(gateway): handle lookup field resolution in IncludeResolver`
-
-### 6. Open a Pull Request and Auto-Merge
-
-Create a PR using the GitHub CLI and enable auto-merge:
-
-```bash
-gh pr create \
-  --title "[<TASK-ID>] <Short description>" \
-  --body "$(cat <<'EOF'
-## Summary
-- <bullet points describing what was implemented>
-
-## Task
-- EPIC reference: EPIC-PHASE<N>.md, section <stream>
-
-## Changes
-- <list of key files added/modified>
-
-## Testing
-- <describe tests added>
-- <describe how to verify manually if applicable>
-
-## Checklist
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] No lint errors
-- [ ] Flyway migration is correct
-- [ ] Follows existing code patterns
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-EOF
-)"
-
-# Enable auto-merge — PR will merge automatically once CI passes
-gh pr merge --auto --squash
-```
-
----
-
-## Multi-Pod Architecture Rules
-
-The platform runs on multiple worker pods. **Never use in-process-only state changes for configuration data.** Any change to in-memory registries or caches must be broadcast via Kafka so all pods receive the update.
-
-**Pattern:** When a system collection record changes (e.g., validation rules, scripts, flows) and the change affects an in-memory registry:
+**Pattern**: When a system collection record changes and affects an in-memory registry:
 1. Create a `BeforeSaveHook` for the system collection
-2. In the after-create/after-update/after-delete methods, publish a Kafka event to the appropriate topic
+2. In after-create/update/delete, publish a Kafka event (e.g., to `kelta.config.collection.changed`)
 3. All pods consume the event and refresh their local registries
 
-**Do NOT** call `lifecycleManager.refreshX()` directly from a hook — that only updates the local pod. Instead, publish a Kafka event (e.g., to `kelta.config.collection.changed`) so the existing `CollectionSchemaListener` on every pod picks it up and refreshes.
+Do NOT call `lifecycleManager.refreshX()` directly from a hook — that only updates the local pod.
 
-**Example:** `ValidationRuleRefreshHook` publishes a `collection-changed` event when validation rules are created/updated/deleted. `CollectionSchemaListener` on all pods consumes it and calls `refreshCollection()` which reloads validation rules from the database.
+**Coding patterns**:
+- All new entities extend `BaseEntity` (UUID id, createdAt, updatedAt)
+- All new JPA repositories extend `JpaRepository`
+- Kafka events use `ConfigEventPublisher` pattern
+- Flyway migrations: check `kelta-worker/src/main/resources/db/migration/` for next sequential number
 
-## Key Codebase Facts
+## Verification
 
-| Fact | Value |
-|------|-------|
-| Flyway migration ranges | V1-V111 in kelta-worker/src/main/resources/db/migration/ |
-| FieldType enum (runtime-core) | STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DATE, DATETIME, JSON |
-| FieldService VALID_FIELD_TYPES | "string", "number", "boolean", "date", "datetime", "reference", "array", "object" |
-| Worker "number" field type maps to | runtime DOUBLE (not INTEGER) |
-| BaseEntity fields | UUID string id (36 chars), createdAt, updatedAt |
-| ConfigEventPublisher | Kafka-based, @Async, @ConditionalOnProperty |
-| ReferenceConfig record | targetCollection, targetField, cascadeDelete |
+Before any PR, run `/verify` to build and test all modules. CI runs the same checks. Use `/test-java` or `/test-frontend` for targeted testing.
 
-## Reference Documents
+## Reference Docs
 
-- `EPIC-PHASE1.md` — Phase 1: Multi-Tenancy and Permission Foundation
-- `EPIC-PHASE2.md` — Phase 2: Enhanced Object Model and Validation
-- `EPIC-WORKFLOWS.md` — Flow Engine vision and architecture
-- `TODO.md` — High-level implementation plan for all 6 phases
-- `Specifications.MD` — Platform specifications
-- `FEATURES.md` — Complete platform capability inventory with status tracking
-- `MARKETING.md` — Marketing-oriented feature document for the website
+Read these on demand when doing substantial work in the relevant area:
 
-As new phases are planned, their EPIC documents will follow the pattern `EPIC-PHASE<N>.md`.
-
-## CI/CD
-
-- **PR checks** (`.github/workflows/ci.yml`): test-java (build runtime + test gateway, worker) + test-frontend → quality-gate
-- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): On main push, test-java + test-frontend → build-and-push (gateway, worker, UI images) → deploy → smoke-test
-- All CI checks must pass before a PR can be merged
-- **Deployment**: ArgoCD deploys to a local Kubernetes cluster. ArgoCD manifests are in a separate repo:
-  - GitHub: `https://github.com/cklinker/homelab-argo`
-  - Local path: `/Users/craigklinker/GitHub/homelab-argo`
-
-## Kubernetes Access
-
-The platform is deployed via ArgoCD to a local Kubernetes cluster. Use `kubectl` for debugging and log access.
-
-| Resource | Value |
-|----------|-------|
-| Namespace | `kelta` |
-| Gateway | `deployment/kelta-gateway` |
-| Auth | `deployment/kelta-auth` |
-| Worker | `deployment/kelta-worker` |
-
-### Useful Commands
-
-```bash
-# View gateway logs
-kubectl logs -n kelta deployment/kelta-gateway --tail=200
-
-# View worker logs
-kubectl logs -n kelta deployment/kelta-worker --tail=200
-
-# Search for errors in last hour
-kubectl logs -n kelta deployment/kelta-worker --since=1h | grep -i "ERROR\|exception"
-
-# Check pod status
-kubectl get pods -n kelta
-
-# Describe a pod for events/restarts
-kubectl describe pod -n kelta <pod-name>
-```
-
-## Branch and PR Policy
-
-**All changes must go through a pull request.** Never push directly to `main`.
-
-- **Every change** (features, bug fixes, hotfixes, config changes) must be made on a new branch.
-- Create a PR for the branch and ensure CI passes.
-- After CI passes, auto-merge the PR using `gh pr merge --auto --squash`.
-- Branch naming: `feature/<description>` for features, `fix/<description>` for bug fixes.
-
-### Auto-Merge Workflow
-
-After creating a PR, enable auto-merge so it merges as soon as CI passes:
-
-```bash
-# Create PR and enable auto-merge in one step
-gh pr create --title "<title>" --body "<body>"
-gh pr merge --auto --squash
-```
-
-This replaces the previous workflow of waiting for manual merge approval. PRs will merge automatically once all required checks pass.
-
-**Never push additional commits to an existing PR.** Because auto-merge is enabled, the PR will merge as soon as CI passes. If you push a fix to an existing PR, the first CI run may complete and merge before your fix is included, causing your push to be lost. Instead, always create a new branch and a new PR for follow-up changes.
-
-### After a PR is Merged
-
-Always return to `main` and pull the latest changes after a PR is merged:
-
-```bash
-git checkout main && git pull origin main
-```
-
-This ensures your next branch is based on the latest code and avoids stale-branch issues.
+- `.claude/docs/architecture.md` — Service descriptions, layers, data flows, CI/CD, K8s access
+- `.claude/docs/conventions.md` — Java and TypeScript naming, style, import order, error handling
+- `.claude/docs/testing.md` — Test frameworks, structure, mocking patterns, coverage thresholds
+- `.claude/docs/integrations.md` — External services (Cerbos, Svix, Superset, S3), data stores, Kafka topics, monitoring
+- `.claude/docs/concerns.md` — Security risks, known bugs, tech debt, fragile areas, test gaps
+- `.claude/docs/workflow.md` — Full task workflow, branch naming, PR template, pre-PR checklist

@@ -189,16 +189,37 @@ export class DataFactory {
     collectionName: string,
     attributes: Record<string, unknown>,
   ): Promise<JsonApiResource> {
-    const result = await this.request("POST", `/api/${collectionName}`, {
-      data: {
-        type: collectionName,
-        attributes,
-      },
-    });
+    // Dynamic collection routes propagate asynchronously across worker pods.
+    // POST may transiently return 404 even after waitForStorageReady (GET)
+    // succeeds, because the GET may hit a pod that lazily loaded the
+    // collection while POST hits a different pod that hasn't yet. Retry
+    // a few times to handle this race condition.
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const result = await this.request("POST", `/api/${collectionName}`, {
+          data: {
+            type: collectionName,
+            attributes,
+          },
+        });
 
-    const resource = result.data as JsonApiResource;
-    this.createdEntities.push({ type: collectionName, id: resource.id });
-    return resource;
+        const resource = result.data as JsonApiResource;
+        this.createdEntities.push({ type: collectionName, id: resource.id });
+        return resource;
+      } catch (error) {
+        const is404 = error instanceof Error && error.message.includes("(404)");
+        if (is404 && attempt < MAX_RETRIES) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, STORAGE_READY_POLL_MS),
+          );
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error(
+      `createRecord for '${collectionName}' failed after ${MAX_RETRIES} retries`,
+    );
   }
 
   async cleanup(): Promise<void> {

@@ -52,7 +52,13 @@ public class ConnectedAppClientSynchronizer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        synchronizeClients();
+        try {
+            synchronizeClients();
+        } catch (Exception e) {
+            log.warn("Connected app client synchronization skipped: {}. "
+                    + "This is expected if the connected_app table schema has not been migrated yet.",
+                    e.getMessage());
+        }
     }
 
     /**

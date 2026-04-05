@@ -2,6 +2,7 @@ package io.kelta.worker.controller;
 
 import com.svix.Svix;
 import com.svix.models.AppPortalAccessIn;
+import io.kelta.worker.service.SvixTenantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,11 +32,14 @@ public class SvixPortalController {
     private static final Logger log = LoggerFactory.getLogger(SvixPortalController.class);
 
     private final Svix svix;
+    private final SvixTenantService svixTenantService;
     private final String svixServerUrl;
 
     public SvixPortalController(Svix svix,
+                                SvixTenantService svixTenantService,
                                 @Value("${kelta.svix.public-url:${kelta.svix.server-url}}") String svixServerUrl) {
         this.svix = svix;
+        this.svixTenantService = svixTenantService;
         this.svixServerUrl = svixServerUrl;
     }
 
@@ -48,6 +52,7 @@ public class SvixPortalController {
         }
 
         try {
+            svixTenantService.ensureApplication(tenantId, tenantId);
             var accessIn = new AppPortalAccessIn();
             var accessOut = svix.getAuthentication().appPortalAccess(tenantId, accessIn);
             return ResponseEntity.ok(Map.of(

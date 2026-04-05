@@ -190,11 +190,6 @@ export function ObjectDetailPage(): React.ReactElement {
     error: schemaError,
   } = useCollectionSchema(collectionName)
 
-  // Resolve page layout for this collection (returns null if none configured)
-  // Pass record's recordTypeId for type-specific layout resolution
-  const recordTypeId = record?.recordTypeId ? String(record.recordTypeId) : undefined
-  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id, recordTypeId)
-
   // Identify reference fields that need included resources for display labels
   const referenceFields = useMemo(
     () => fields.filter((f) => REFERENCE_FIELD_TYPES.has(f.type) && f.referenceTarget),
@@ -261,6 +256,11 @@ export function ObjectDetailPage(): React.ReactElement {
     include: includeParam,
     enabled: !schemaLoading && !collectionStore.isLoading,
   })
+
+  // Resolve page layout for this collection (returns null if none configured)
+  // Pass record's recordTypeId for type-specific layout resolution
+  const recordTypeId = record?.recordTypeId ? String(record.recordTypeId) : undefined
+  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id, recordTypeId)
 
   // Build lookup display map from included resources using centralized collection store
   const lookupDisplayMap = useMemo(() => {

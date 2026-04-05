@@ -17,7 +17,7 @@ export class ResourceListPage extends BasePage {
       this.page.locator("main").first(),
     );
     this.dataTable = this.page.locator("table").first();
-    this.createButton = this.page.getByRole("link", { name: /new|create/i });
+    this.createButton = this.page.getByRole("button", { name: /new|create/i });
     this.searchInput = this.page.getByPlaceholder(/search/i);
   }
 

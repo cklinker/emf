@@ -123,8 +123,9 @@ export class DataFactory {
           },
         });
 
-        // Any non-500 response means storage is ready (200 OK, or 404 empty list)
-        if (response.status < 500) {
+        // 200-level response means the gateway route is registered and storage is ready.
+        // 404 means the gateway hasn't registered the dynamic route yet — keep polling.
+        if (response.ok) {
           return;
         }
       } catch {

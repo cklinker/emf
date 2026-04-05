@@ -35,9 +35,11 @@ test.describe("Endpoint Performance", () => {
     await page.waitForLoadState("load");
     await page.getByTestId("monitoring-tab-performance").click();
     await page.waitForURL(`**/${tenantSlug}/monitoring/performance`);
+    // Wait for the performance page to finish loading (heading is hidden during loading/error states)
+    await page.waitForLoadState("networkidle");
     const heading = page.getByRole("heading", {
       name: /endpoint performance/i,
     });
-    await expect(heading).toBeVisible();
+    await expect(heading).toBeVisible({ timeout: 15_000 });
   });
 });

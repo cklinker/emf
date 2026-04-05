@@ -18,9 +18,9 @@ COPY kelta-web/packages/plugin-sdk/package.json ./kelta-web/packages/plugin-sdk/
 WORKDIR /app/kelta-web
 RUN npm install
 
-# Copy kelta-web source and build SDK only (components/plugin-sdk are consumed as source)
+# Copy kelta-web source and build SDK + plugin-sdk
 COPY kelta-web/packages ./packages
-RUN npm run build --workspace=packages/sdk
+RUN npm run build --workspace=packages/sdk && npm run build --workspace=packages/plugin-sdk
 
 # Copy kelta-ui package files
 WORKDIR /app/kelta-ui/app

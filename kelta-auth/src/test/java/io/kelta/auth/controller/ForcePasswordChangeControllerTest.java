@@ -87,7 +87,7 @@ class ForcePasswordChangeControllerTest {
         @Test
         void shouldRejectWhenAccountNotFound() {
             when(session.getAttribute(ForcePasswordChangeController.SESSION_ATTR_EMAIL)).thenReturn("user@test.com");
-            when(jdbcTemplate.queryForList(anyString(), eq("user@test.com"))).thenReturn(List.of());
+            when(jdbcTemplate.queryForList(anyString(), eq("user@test.com"), eq("user@test.com"))).thenReturn(List.of());
             Model model = new ConcurrentModel();
             String view = controller.changePassword("old", "newpassword", "newpassword", session, model);
             assertThat(view).isEqualTo("change-password");
@@ -98,7 +98,7 @@ class ForcePasswordChangeControllerTest {
         void shouldRejectIncorrectCurrentPassword() {
             when(session.getAttribute(ForcePasswordChangeController.SESSION_ATTR_EMAIL)).thenReturn("user@test.com");
             String storedHash = passwordEncoder.encode("correct-password");
-            when(jdbcTemplate.queryForList(anyString(), eq("user@test.com")))
+            when(jdbcTemplate.queryForList(anyString(), eq("user@test.com"), eq("user@test.com")))
                     .thenReturn(List.of(Map.of("password_hash", storedHash, "user_id", "uid-1")));
             Model model = new ConcurrentModel();
             String view = controller.changePassword("wrong-password", "newpassword", "newpassword", session, model);
@@ -110,15 +110,15 @@ class ForcePasswordChangeControllerTest {
         void shouldUpdatePasswordAndRedirectOnSuccess() {
             when(session.getAttribute(ForcePasswordChangeController.SESSION_ATTR_EMAIL)).thenReturn("user@test.com");
             String storedHash = passwordEncoder.encode("correct-password");
-            when(jdbcTemplate.queryForList(anyString(), eq("user@test.com")))
+            when(jdbcTemplate.queryForList(anyString(), eq("user@test.com"), eq("user@test.com")))
                     .thenReturn(List.of(Map.of("password_hash", storedHash, "user_id", "uid-1")));
-            when(jdbcTemplate.update(anyString(), anyString(), eq("user@test.com"))).thenReturn(1);
+            when(jdbcTemplate.update(anyString(), anyString(), eq("user@test.com"), eq("user@test.com"))).thenReturn(1);
 
             Model model = new ConcurrentModel();
             String view = controller.changePassword("correct-password", "newpassword", "newpassword", session, model);
 
             assertThat(view).isEqualTo("redirect:/login?passwordChanged");
-            verify(jdbcTemplate).update(anyString(), anyString(), eq("user@test.com"));
+            verify(jdbcTemplate).update(anyString(), anyString(), eq("user@test.com"), eq("user@test.com"));
             verify(session).removeAttribute(ForcePasswordChangeController.SESSION_ATTR_EMAIL);
         }
     }

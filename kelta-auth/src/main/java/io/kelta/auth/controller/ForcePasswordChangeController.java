@@ -66,8 +66,8 @@ public class ForcePasswordChangeController {
         var results = jdbcTemplate.queryForList(
                 "SELECT uc.password_hash, uc.user_id FROM user_credential uc " +
                         "JOIN platform_user pu ON pu.id = uc.user_id " +
-                        "WHERE pu.email = ? AND pu.status = 'ACTIVE'",
-                email
+                        "WHERE (pu.email = ? OR pu.username = ?) AND pu.status = 'ACTIVE'",
+                email, email
         );
 
         if (results.isEmpty()) {
@@ -88,8 +88,8 @@ public class ForcePasswordChangeController {
         jdbcTemplate.update(
                 "UPDATE user_credential SET password_hash = ?, password_changed_at = NOW(), " +
                         "force_change_on_login = false, updated_at = NOW() " +
-                        "WHERE user_id IN (SELECT id FROM platform_user WHERE email = ? AND status = 'ACTIVE')",
-                newHash, email
+                        "WHERE user_id IN (SELECT id FROM platform_user WHERE (email = ? OR username = ?) AND status = 'ACTIVE')",
+                newHash, email, email
         );
 
         session.removeAttribute(SESSION_ATTR_EMAIL);

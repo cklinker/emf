@@ -22,6 +22,7 @@ import io.kelta.worker.listener.FieldConfigEventPublisher;
 import io.kelta.worker.listener.ApprovalProcessConfigHook;
 import io.kelta.worker.listener.ApprovalRecordLockHook;
 import io.kelta.worker.listener.CerbosPolicySyncHook;
+import io.kelta.worker.listener.RecordTypeEnforcementHook;
 import io.kelta.worker.listener.ValidationRuleRefreshHook;
 import io.kelta.worker.handler.SubmitForApprovalActionHandler;
 import io.kelta.worker.repository.ApprovalRepository;
@@ -263,6 +264,16 @@ public class FlowConfig {
             CollectionRegistry collectionRegistry) {
         ApprovalRecordLockHook hook = new ApprovalRecordLockHook(
                 approvalRepository, collectionRegistry);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public RecordTypeEnforcementHook recordTypeEnforcementHook(
+            BeforeSaveHookRegistry hookRegistry,
+            JdbcTemplate jdbcTemplate,
+            ObjectMapper objectMapper) {
+        RecordTypeEnforcementHook hook = new RecordTypeEnforcementHook(jdbcTemplate, objectMapper);
         hookRegistry.register(hook);
         return hook;
     }

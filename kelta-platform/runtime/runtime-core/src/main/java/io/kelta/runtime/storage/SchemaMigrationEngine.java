@@ -324,6 +324,18 @@ public class SchemaMigrationEngine {
         // Reconcile audit columns (owner_id -> created_by/updated_by migration)
         reconcileAuditColumns(qualifiedName, existingColumns);
 
+        // Reconcile record_type_id system column (added for record type enforcement)
+        if (!definition.systemCollection() && !existingColumns.contains("record_type_id")) {
+            String addCol = String.format("ALTER TABLE %s ADD COLUMN record_type_id VARCHAR(36)", qualifiedName);
+            try {
+                jdbcTemplate.execute(addCol);
+                recordMigration(definition.name(), MigrationType.ADD_COLUMN, addCol);
+                log.info("Reconciliation: added record_type_id column to '{}'", qualifiedName);
+            } catch (Exception e) {
+                log.warn("Could not add record_type_id to '{}': {}", qualifiedName, e.getMessage());
+            }
+        }
+
         // Find fields in the definition that don't have a corresponding column
         List<MigrationAction> migrations = new ArrayList<>();
         for (FieldDefinition field : definition.fields()) {

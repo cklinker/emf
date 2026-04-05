@@ -66,7 +66,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
     /** Column names handled as system fields in create/update — skipped in the user-defined field loop. */
     private static final Set<String> SYSTEM_COLUMNS = Set.of(
-        "id", "created_at", "updated_at", "created_by", "updated_by", "tenant_id"
+        "id", "created_at", "updated_at", "created_by", "updated_by", "tenant_id",
+        "record_type_id"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -112,7 +113,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         sql.append("created_by VARCHAR(36), ");
         sql.append("updated_by VARCHAR(36), ");
         sql.append("created_at TIMESTAMP NOT NULL, ");
-        sql.append("updated_at TIMESTAMP NOT NULL");
+        sql.append("updated_at TIMESTAMP NOT NULL, ");
+        sql.append("record_type_id VARCHAR(36)");
 
         List<String> postCreateStatements = new ArrayList<>();
 
@@ -325,6 +327,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             values.add(data.get("tenantId"));
         }
 
+        // Record type ID (system column on user-defined collection tables)
+        if (!definition.systemCollection() && data.containsKey("recordTypeId")) {
+            columns.add("record_type_id");
+            placeholders.add("?");
+            values.add(data.get("recordTypeId"));
+        }
+
         // Add user-defined fields
         for (FieldDefinition field : definition.fields()) {
             if (!field.type().hasPhysicalColumn()) {
@@ -403,6 +412,12 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         if (data.containsKey("updatedBy")) {
             setClauses.add("updated_by = ?");
             values.add(data.get("updatedBy"));
+        }
+
+        // Update record type ID
+        if (!definition.systemCollection() && data.containsKey("recordTypeId")) {
+            setClauses.add("record_type_id = ?");
+            values.add(data.get("recordTypeId"));
         }
 
         // Update user-defined fields
@@ -930,6 +945,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case "createdBy" -> "created_by";
             case "updatedBy" -> "updated_by";
             case "tenantId" -> "tenant_id";
+            case "recordTypeId" -> "record_type_id";
             default -> {
                 if (definition.systemCollection()) {
                     yield definition.getEffectiveColumnName(fieldName);
@@ -960,6 +976,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         reverseMap.put("created_by", "createdBy");
         reverseMap.put("updated_by", "updatedBy");
         reverseMap.put("tenant_id", "tenantId");
+        reverseMap.put("record_type_id", "recordTypeId");
 
         if (definition.systemCollection()) {
             // Collection-level column mappings

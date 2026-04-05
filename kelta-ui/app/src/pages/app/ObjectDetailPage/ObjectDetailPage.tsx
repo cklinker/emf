@@ -191,7 +191,9 @@ export function ObjectDetailPage(): React.ReactElement {
   } = useCollectionSchema(collectionName)
 
   // Resolve page layout for this collection (returns null if none configured)
-  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
+  // Pass record's recordTypeId for type-specific layout resolution
+  const recordTypeId = record?.recordTypeId ? String(record.recordTypeId) : undefined
+  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id, recordTypeId)
 
   // Identify reference fields that need included resources for display labels
   const referenceFields = useMemo(

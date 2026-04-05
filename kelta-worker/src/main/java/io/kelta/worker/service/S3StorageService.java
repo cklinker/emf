@@ -193,6 +193,39 @@ public class S3StorageService {
     }
 
     /**
+     * Uploads bytes directly to S3.
+     *
+     * @param storageKey  the S3 object key
+     * @param data        the bytes to upload
+     * @param contentType the content type (e.g., "application/java-archive")
+     */
+    public void uploadObject(String storageKey, byte[] data, String contentType) {
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(config.getBucket())
+                .key(storageKey)
+                .contentType(contentType)
+                .contentLength((long) data.length)
+                .build();
+
+        s3Client.putObject(request,
+                software.amazon.awssdk.core.sync.RequestBody.fromBytes(data));
+        logger.info("Uploaded {} bytes to s3://{}/{}", data.length, config.getBucket(), storageKey);
+    }
+
+    /**
+     * Deletes an S3 object.
+     *
+     * @param storageKey the S3 object key
+     */
+    public void deleteObject(String storageKey) {
+        s3Client.deleteObject(software.amazon.awssdk.services.s3.model.DeleteObjectRequest.builder()
+                .bucket(config.getBucket())
+                .key(storageKey)
+                .build());
+        logger.info("Deleted s3://{}/{}", config.getBucket(), storageKey);
+    }
+
+    /**
      * Checks if an S3 object exists without downloading it.
      */
     public boolean objectExists(String storageKey) {

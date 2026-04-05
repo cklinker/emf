@@ -1,6 +1,6 @@
 package io.kelta.worker.scim.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.worker.scim.ScimConstants;
 import io.kelta.worker.scim.model.ScimError;
 import jakarta.servlet.FilterChain;

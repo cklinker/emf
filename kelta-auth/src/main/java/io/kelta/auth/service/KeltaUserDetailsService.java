@@ -23,7 +23,8 @@ public class KeltaUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String emailOrUsername) throws UsernameNotFoundException {
+        // The login form accepts "Email or Username", so query by both.
         List<KeltaUserDetails> users = jdbcTemplate.query(
                 """
                 SELECT pu.id, pu.email, pu.tenant_id, pu.profile_id,
@@ -52,15 +53,15 @@ public class KeltaUserDetailsService implements UserDetailsService {
                                 && rs.getTimestamp("locked_until").toInstant().isAfter(java.time.Instant.now()),
                         rs.getBoolean("force_change_on_login")
                 ),
-                email, email
+                emailOrUsername, emailOrUsername
         );
 
         if (users.isEmpty()) {
-            throw new UsernameNotFoundException("User not found: " + email);
+            throw new UsernameNotFoundException("User not found: " + emailOrUsername);
         }
 
         if (users.size() > 1) {
-            log.warn("Multiple users found for email {} across tenants, returning first match", email);
+            log.warn("Multiple users found for email/username {} across tenants, returning first match", emailOrUsername);
         }
 
         return users.get(0);

@@ -295,8 +295,13 @@ public class InternalBootstrapController {
 
     private ResponseEntity<Map<String, Object>> doJitProvisionUser(
             String email, String tenantId, String firstName, String lastName, String profileId) {
-        // Check if user already exists (any status)
+        // Check if user already exists (any status) — try email first, then username
+        // The OIDC email claim may contain the username (e.g. "admin") rather than
+        // the full email ("admin@kelta.local"), so a username fallback is needed.
         Optional<Map<String, Object>> existingOpt = repository.findUserByEmailAnyStatus(email, tenantId);
+        if (existingOpt.isEmpty()) {
+            existingOpt = repository.findUserByUsernameAnyStatus(email, tenantId);
+        }
 
         if (existingOpt.isPresent()) {
             Map<String, Object> existing = existingOpt.get();

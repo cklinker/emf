@@ -208,6 +208,8 @@ public class RouteConfigService {
                 {"images", "/api/images/**", "images"},
                 {"operations", "/api/operations/**", "operations"},
                 {"devices", "/api/devices/**", "devices"},
+                // SCIM 2.0 provisioning
+                {"scim", "/scim/v2/**", "scim"},
         };
 
         for (String[] routeDef : staticRoutes) {

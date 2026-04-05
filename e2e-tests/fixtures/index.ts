@@ -1,6 +1,6 @@
 import { test as base, expect } from "@playwright/test";
 import { DataFactory } from "../helpers/data-factory";
-import { getAuthentikTokens, clearTokenCache } from "./auth-tokens";
+import { getApiToken, clearTokenCache } from "./auth-tokens";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -40,14 +40,14 @@ export const test = base.extend<EMFFixtures>({
   },
 
   dataFactory: async ({ tenantSlug, apiBaseUrl }, use) => {
-    const token = await getAuthentikTokens();
+    const token = await getApiToken();
     const factory = new DataFactory({
       baseUrl: apiBaseUrl,
       token,
       tenantSlug,
       refreshToken: async () => {
         clearTokenCache();
-        return getAuthentikTokens();
+        return getApiToken();
       },
     });
     await use(factory);

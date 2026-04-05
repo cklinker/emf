@@ -115,6 +115,12 @@ const CATEGORIES: SetupCategory[] = [
     icon: <Shield size={20} />,
     items: [
       {
+        name: 'Password Policy',
+        path: '/password-policy',
+        description: 'Configure password complexity, lockout, and expiration rules',
+        permission: 'MANAGE_USERS',
+      },
+      {
         name: 'Login History',
         path: '/login-history',
         description: 'View user login activity',

@@ -276,6 +276,9 @@ export type { SearchSettingsPageProps } from './SearchSettingsPage'
 export { AiSettingsPage } from './AiSettingsPage'
 export type { AiSettingsPageProps } from './AiSettingsPage'
 
+// PasswordPolicyPage - Password policy configuration page
+export { PasswordPolicyPanel as PasswordPolicyPage } from './SecuritySettingsPage/PasswordPolicyPanel'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

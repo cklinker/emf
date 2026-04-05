@@ -323,6 +323,10 @@ vi.mock('./pages', () => ({
   ObservabilitySettingsPage: () => (
     <div data-testid="observability-settings-page">Observability Settings Page</div>
   ),
+  AiSettingsPage: () => <div data-testid="ai-settings-page">AI Settings Page</div>,
+  ApiTokensPage: () => <div data-testid="api-tokens-page">API Tokens Page</div>,
+  PasswordPolicyPage: () => <div data-testid="password-policy-page">Password Policy Page</div>,
+  MfaPolicyPage: () => <div data-testid="mfa-policy-page">MFA Policy Page</div>,
   NotFoundPage: () => <div data-testid="not-found-page">Not Found Page</div>,
 }))
 

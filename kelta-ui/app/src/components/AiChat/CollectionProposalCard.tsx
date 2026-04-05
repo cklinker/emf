@@ -61,7 +61,9 @@ export function CollectionProposalCard({
               Applied
             </Badge>
           ) : (
-            <Badge variant="secondary" className="text-[10px]">Dismissed</Badge>
+            <Badge variant="secondary" className="text-[10px]">
+              Dismissed
+            </Badge>
           )}
         </span>
       </div>
@@ -74,9 +76,7 @@ export function CollectionProposalCard({
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Database className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-semibold">
-            {data.displayName as string}
-          </CardTitle>
+          <CardTitle className="text-sm font-semibold">{data.displayName as string}</CardTitle>
           <Badge variant="outline" className="text-xs">
             {data.name as string}
           </Badge>
@@ -129,11 +129,7 @@ export function CollectionProposalCard({
                     )}
                   </td>
                   <td className="py-1 text-center">
-                    {field.unique ? (
-                      <Check className="mx-auto h-3 w-3 text-green-600" />
-                    ) : (
-                      ''
-                    )}
+                    {field.unique ? <Check className="mx-auto h-3 w-3 text-green-600" /> : ''}
                   </td>
                 </tr>
               ))}

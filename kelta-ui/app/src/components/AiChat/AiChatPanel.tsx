@@ -38,18 +38,11 @@ export function AiChatPanel({
 
   const handleSend = useCallback(
     (message: string) => {
-      sendStreamMessage(
-        baseUrl,
-        message,
-        state.activeConversationId,
-        contextType,
-        contextId,
-        {
-          onDone: (conversationId) => {
-            dispatch({ type: 'SET_CONVERSATION_ID', id: conversationId })
-          },
-        }
-      )
+      sendStreamMessage(baseUrl, message, state.activeConversationId, contextType, contextId, {
+        onDone: (conversationId) => {
+          dispatch({ type: 'SET_CONVERSATION_ID', id: conversationId })
+        },
+      })
     },
     [baseUrl, state.activeConversationId, contextType, contextId, sendStreamMessage, dispatch]
   )
@@ -86,7 +79,9 @@ export function AiChatPanel({
               }
               dispatch({ type: 'ADD_MESSAGE', message: warningMsg })
             }
-          } catch { /* ignore parse error */ }
+          } catch {
+            /* ignore parse error */
+          }
         } else {
           let errorMsg = `Apply failed (${response.status})`
           try {
@@ -96,7 +91,9 @@ export function AiChatPanel({
             } else if (errorBody.errors?.[0]?.title) {
               errorMsg = errorBody.errors[0].title
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
           const errorChatMsg = {
             id: crypto.randomUUID(),
             role: 'assistant' as const,
@@ -155,10 +152,7 @@ export function AiChatPanel({
             </div>
             <div className="flex items-center gap-1">
               {state.tokenUsage && (
-                <TokenUsageBadge
-                  used={state.tokenUsage.used}
-                  limit={state.tokenUsage.limit}
-                />
+                <TokenUsageBadge used={state.tokenUsage.used} limit={state.tokenUsage.limit} />
               )}
               <Button variant="ghost" size="icon" onClick={handleNewChat} title="New chat">
                 <MessageSquarePlus className="h-4 w-4" />
@@ -176,9 +170,7 @@ export function AiChatPanel({
             <div className="flex h-full items-center justify-center p-8">
               <div className="text-center">
                 <Bot className="mx-auto mb-3 h-12 w-12 text-muted-foreground/30" />
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  How can I help?
-                </h3>
+                <h3 className="text-sm font-medium text-muted-foreground">How can I help?</h3>
                 <p className="mt-1 text-xs text-muted-foreground/60">
                   I can create collections and layouts for you.
                   <br />
@@ -196,9 +188,7 @@ export function AiChatPanel({
             return <ChatMessage key={msg.id} message={msg} />
           })}
 
-          {state.isStreaming && (
-            <StreamingMessage text={state.streamingText} isGenerating={true} />
-          )}
+          {state.isStreaming && <StreamingMessage text={state.streamingText} isGenerating={true} />}
 
           <div ref={messagesEndRef} />
         </div>

@@ -43,7 +43,9 @@ export function LayoutProposalCard({
               Applied
             </Badge>
           ) : (
-            <Badge variant="secondary" className="text-[10px]">Dismissed</Badge>
+            <Badge variant="secondary" className="text-[10px]">
+              Dismissed
+            </Badge>
           )}
         </span>
       </div>

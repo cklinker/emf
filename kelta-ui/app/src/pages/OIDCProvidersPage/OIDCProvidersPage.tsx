@@ -654,7 +654,10 @@ function OIDCProviderForm({
 
             {/* Groups Profile Mapping Field */}
             <div className="flex flex-col gap-1">
-              <label htmlFor="oidc-groups-profile-mapping" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="oidc-groups-profile-mapping"
+                className="text-sm font-medium text-foreground"
+              >
                 Groups to Profile Mapping
               </label>
               <textarea
@@ -669,23 +672,29 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-groups-profile-mapping-input"
               />
-              <span id="oidc-groups-profile-mapping-hint" className="mt-1 text-xs text-muted-foreground">
-                JSON mapping of OIDC group names to internal profile names. Users without a match require manual profile assignment.
+              <span
+                id="oidc-groups-profile-mapping-hint"
+                className="mt-1 text-xs text-muted-foreground"
+              >
+                JSON mapping of OIDC group names to internal profile names. Users without a match
+                require manual profile assignment.
               </span>
             </div>
 
             {/* OIDC Discovery Endpoint Overrides */}
             <div className="mt-2 border-t border-border pt-4">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">
-                Endpoint Overrides
-              </h3>
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Endpoint Overrides</h3>
               <p className="mb-3 text-xs text-muted-foreground">
-                Leave blank to auto-discover from the issuer URL. Override when Discovery is unavailable.
+                Leave blank to auto-discover from the issuer URL. Override when Discovery is
+                unavailable.
               </p>
 
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="oidc-jwks-uri" className="text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor="oidc-jwks-uri"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     JWKS URI
                   </label>
                   <input
@@ -701,7 +710,10 @@ function OIDCProviderForm({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="oidc-authorization-uri" className="text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor="oidc-authorization-uri"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     Authorization URI
                   </label>
                   <input
@@ -717,7 +729,10 @@ function OIDCProviderForm({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="oidc-token-uri" className="text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor="oidc-token-uri"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     Token URI
                   </label>
                   <input
@@ -733,7 +748,10 @@ function OIDCProviderForm({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="oidc-userinfo-uri" className="text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor="oidc-userinfo-uri"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     UserInfo URI
                   </label>
                   <input
@@ -749,7 +767,10 @@ function OIDCProviderForm({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="oidc-end-session-uri" className="text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor="oidc-end-session-uri"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     End Session URI
                   </label>
                   <input

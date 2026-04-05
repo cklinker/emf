@@ -35,13 +35,16 @@ export function MfaPolicyPanel(): React.ReactElement {
 
   useEffect(() => {
     if (policy) {
-      // SDK returns { data: { mfaRequired } } typed loosely — unwrap if needed
       const raw = (policy as Record<string, unknown>).data ?? policy
       const p = raw as Record<string, unknown>
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         mfaRequired: typeof p.mfaRequired === 'boolean' ? p.mfaRequired : DEFAULTS.mfaRequired,
-        allowedMethods: Array.isArray(p.allowedMethods) ? p.allowedMethods : DEFAULTS.allowedMethods,
-        gracePeriodDays: typeof p.gracePeriodDays === 'number' ? p.gracePeriodDays : DEFAULTS.gracePeriodDays,
+        allowedMethods: Array.isArray(p.allowedMethods)
+          ? p.allowedMethods
+          : DEFAULTS.allowedMethods,
+        gracePeriodDays:
+          typeof p.gracePeriodDays === 'number' ? p.gracePeriodDays : DEFAULTS.gracePeriodDays,
       })
     }
   }, [policy])
@@ -101,7 +104,8 @@ export function MfaPolicyPanel(): React.ReactElement {
             Require MFA for all users
           </label>
           <p className="text-xs text-muted-foreground ml-7">
-            When enabled, users without MFA enrollment will be prompted to set up MFA on their next login.
+            When enabled, users without MFA enrollment will be prompted to set up MFA on their next
+            login.
           </p>
         </section>
 
@@ -149,13 +153,18 @@ export function MfaPolicyPanel(): React.ReactElement {
               data-testid="grace-period-input"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Number of days users have to enroll in MFA after the policy is enabled. Leave empty to require immediate enrollment.
+              Number of days users have to enroll in MFA after the policy is enabled. Leave empty to
+              require immediate enrollment.
             </p>
           </div>
         </section>
 
         <div className="flex justify-end">
-          <Button type="submit" disabled={updateMutation.isPending} data-testid="save-mfa-policy-button">
+          <Button
+            type="submit"
+            disabled={updateMutation.isPending}
+            data-testid="save-mfa-policy-button"
+          >
             {updateMutation.isPending ? 'Saving...' : 'Save Policy'}
           </Button>
         </div>

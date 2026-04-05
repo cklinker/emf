@@ -39,7 +39,13 @@ function reducer(state: AiChatState, action: AiChatAction): AiChatState {
     case 'SET_CONVERSATIONS':
       return { ...state, conversations: action.conversations }
     case 'SET_ACTIVE_CONVERSATION':
-      return { ...state, activeConversationId: action.id, messages: [], streamingText: '', proposals: [] }
+      return {
+        ...state,
+        activeConversationId: action.id,
+        messages: [],
+        streamingText: '',
+        proposals: [],
+      }
     case 'SET_CONVERSATION_ID':
       return { ...state, activeConversationId: action.id }
     case 'SET_MESSAGES':
@@ -103,6 +109,7 @@ export function AiChatProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAiChat() {
   const context = useContext(AiChatContext)
   if (!context) {

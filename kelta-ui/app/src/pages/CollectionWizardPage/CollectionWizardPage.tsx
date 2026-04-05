@@ -439,9 +439,20 @@ export function CollectionWizardPage({
 
       showToast(t('success.created', { item: 'Collection' }), 'success')
       navigate(`/${getTenantSlug()}/collections/${collectionId}`)
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to create collection:', error)
-      showToast(error instanceof Error ? error.message : t('errors.generic'), 'error')
+      // Extract JSON:API error details from the response when available
+      let message = t('errors.generic')
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { errors?: Array<{ detail?: string }> } } }
+        const apiErrors = axiosError.response?.data?.errors
+        if (apiErrors && apiErrors.length > 0) {
+          message = apiErrors.map((e) => e.detail).filter(Boolean).join('; ') || message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      showToast(message, 'error')
     } finally {
       setIsCreating(false)
     }

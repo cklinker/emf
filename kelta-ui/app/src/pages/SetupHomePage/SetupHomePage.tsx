@@ -121,6 +121,12 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'MANAGE_USERS',
       },
       {
+        name: 'MFA Policy',
+        path: '/mfa-policy',
+        description: 'Configure multi-factor authentication requirements and enrollment',
+        permission: 'MANAGE_USERS',
+      },
+      {
         name: 'Login History',
         path: '/login-history',
         description: 'View user login activity',

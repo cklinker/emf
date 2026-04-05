@@ -116,6 +116,7 @@ import {
   MonitoringLayout,
   MonitoringOverviewPage,
   PasswordPolicyPage,
+  MfaPolicyPage,
 } from './pages'
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
 
@@ -851,6 +852,16 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_USERS">
               <PasswordPolicyPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+      <Route
+        path="mfa-policy"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_USERS">
+              <MfaPolicyPage />
             </RequirePermission>
           </AdminPageRoute>
         }

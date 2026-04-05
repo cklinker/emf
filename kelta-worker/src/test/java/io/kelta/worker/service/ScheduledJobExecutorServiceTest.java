@@ -7,6 +7,7 @@ import io.kelta.runtime.flow.InitialStateBuilder;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionRequest;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionResult;
+import io.kelta.worker.repository.DataExportRepository;
 import io.kelta.worker.repository.ScheduledJobRepository;
 import org.junit.jupiter.api.*;
 
@@ -28,6 +29,8 @@ class ScheduledJobExecutorServiceTest {
     private ObjectMapper objectMapper;
     private ScriptExecutor scriptExecutor;
     private ReportExecutionService reportExecutionService;
+    private DataExportService dataExportService;
+    private DataExportRepository dataExportRepository;
     private ScheduledJobExecutorService executor;
 
     @BeforeEach
@@ -38,9 +41,11 @@ class ScheduledJobExecutorServiceTest {
         objectMapper = new ObjectMapper();
         scriptExecutor = mock(ScriptExecutor.class);
         reportExecutionService = mock(ReportExecutionService.class);
+        dataExportService = mock(DataExportService.class);
+        dataExportRepository = mock(DataExportRepository.class);
         executor = new ScheduledJobExecutorService(
                 repository, flowEngine, initialStateBuilder, objectMapper,
-                scriptExecutor, reportExecutionService);
+                scriptExecutor, reportExecutionService, dataExportService, dataExportRepository);
     }
 
     @AfterEach

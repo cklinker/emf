@@ -7,6 +7,7 @@ import io.kelta.runtime.flow.InitialStateBuilder;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionRequest;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionResult;
+import io.kelta.worker.repository.DataExportRepository;
 import io.kelta.worker.repository.ScheduledJobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ import java.util.UUID;
  *   <li><b>FLOW</b> — executes a flow definition via {@link FlowEngine}</li>
  *   <li><b>SCRIPT</b> — executes a JavaScript script via {@link ScriptExecutor}</li>
  *   <li><b>REPORT_EXPORT</b> — executes a report and exports as CSV via {@link ReportExecutionService}</li>
+ *   <li><b>DATA_EXPORT</b> — triggers a tenant data export via {@link DataExportService}</li>
  * </ul>
  *
  * @since 1.0.0
@@ -45,19 +47,25 @@ public class ScheduledJobExecutorService {
     private final ObjectMapper objectMapper;
     private final ScriptExecutor scriptExecutor;
     private final ReportExecutionService reportExecutionService;
+    private final DataExportService dataExportService;
+    private final DataExportRepository dataExportRepository;
 
     public ScheduledJobExecutorService(ScheduledJobRepository repository,
                                         FlowEngine flowEngine,
                                         InitialStateBuilder initialStateBuilder,
                                         ObjectMapper objectMapper,
                                         ScriptExecutor scriptExecutor,
-                                        ReportExecutionService reportExecutionService) {
+                                        ReportExecutionService reportExecutionService,
+                                        DataExportService dataExportService,
+                                        DataExportRepository dataExportRepository) {
         this.repository = repository;
         this.flowEngine = flowEngine;
         this.initialStateBuilder = initialStateBuilder;
         this.objectMapper = objectMapper;
         this.scriptExecutor = scriptExecutor;
         this.reportExecutionService = reportExecutionService;
+        this.dataExportService = dataExportService;
+        this.dataExportRepository = dataExportRepository;
     }
 
     /**
@@ -90,6 +98,7 @@ public class ScheduledJobExecutorService {
                     case "FLOW" -> executeFlowJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
                     case "SCRIPT" -> executeScriptJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
                     case "REPORT_EXPORT" -> executeReportExportJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
+                    case "DATA_EXPORT" -> executeDataExportJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
                     default -> {
                         log.warn("Unsupported job type '{}' for job {}, skipping", jobType, jobId);
                         Instant nextRun = ScheduledJobRepository.calculateNextRunAt(cronExpression, timezone);
@@ -286,6 +295,46 @@ public class ScheduledJobExecutorService {
 
         log.info("Scheduled job executed: jobId={}, type=REPORT_EXPORT, reportId={}, tenantId={}, records={}, duration={}ms",
                 jobId, reportReferenceId, tenantId, recordsProcessed, durationMs);
+    }
+
+    // ---------------------------------------------------------------------------
+    // DATA_EXPORT execution
+    // ---------------------------------------------------------------------------
+
+    private void executeDataExportJob(String jobId, String tenantId, String exportConfigJson,
+                                       String cronExpression, String timezone, Instant startedAt) {
+        // The job_reference_id stores an export configuration as JSON with name, scope, collectionIds, format
+        Map<String, Object> config;
+        try {
+            config = objectMapper.readValue(exportConfigJson, Map.class);
+        } catch (Exception e) {
+            Instant nextRun = ScheduledJobRepository.calculateNextRunAt(cronExpression, timezone);
+            repository.updateAfterExecution(jobId, "FAILED", startedAt, nextRun);
+            repository.insertExecutionLog(jobId, "FAILED", "Invalid export config: " + e.getMessage(),
+                    startedAt, Instant.now(), Instant.now().toEpochMilli() - startedAt.toEpochMilli());
+            return;
+        }
+
+        String name = (String) config.getOrDefault("name", "Scheduled Export");
+        String exportScope = (String) config.getOrDefault("exportScope", "FULL");
+        String format = (String) config.getOrDefault("format", "CSV");
+        @SuppressWarnings("unchecked")
+        List<String> collectionIds = (List<String>) config.get("collectionIds");
+
+        // Create and execute the export
+        String exportId = dataExportService.createExport(
+                tenantId, name, null, exportScope, collectionIds, format, "system:scheduled-job:" + jobId);
+        dataExportService.executeExport(exportId, tenantId);
+
+        Instant completedAt = Instant.now();
+        long durationMs = completedAt.toEpochMilli() - startedAt.toEpochMilli();
+        Instant nextRun = ScheduledJobRepository.calculateNextRunAt(cronExpression, timezone);
+
+        repository.updateAfterExecution(jobId, "SUCCESS", startedAt, nextRun);
+        repository.insertExecutionLog(jobId, "SUCCESS", null, startedAt, completedAt, durationMs);
+
+        log.info("Scheduled job executed: jobId={}, type=DATA_EXPORT, exportId={}, tenantId={}, duration={}ms",
+                jobId, exportId, tenantId, durationMs);
     }
 
     // ---------------------------------------------------------------------------

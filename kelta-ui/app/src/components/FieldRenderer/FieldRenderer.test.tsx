@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { FieldRenderer } from './FieldRenderer'
+import { componentRegistry } from '@/services/componentRegistry'
 
 function renderField(props: React.ComponentProps<typeof FieldRenderer>) {
   return render(
@@ -243,6 +244,57 @@ describe('FieldRenderer', () => {
     it('renders formatted number', () => {
       renderField({ type: 'rollup_summary', value: 1500 })
       expect(screen.getByText(/1.*500/)).toBeDefined()
+    })
+  })
+
+  describe('plugin field renderer override', () => {
+    beforeEach(() => {
+      componentRegistry.clear()
+    })
+
+    afterEach(() => {
+      componentRegistry.clear()
+    })
+
+    it('uses plugin renderer when registered for the field type', () => {
+      const CustomRenderer = ({ value, fieldName }: { value: unknown; fieldName: string }) => (
+        <span data-testid="custom-renderer">
+          Custom: {fieldName}={String(value)}
+        </span>
+      )
+      componentRegistry.registerFieldRenderer('string', CustomRenderer)
+
+      renderField({ type: 'string', value: 'test-value', fieldName: 'my_field' })
+      expect(screen.getByTestId('custom-renderer')).toBeDefined()
+      expect(screen.getByText('Custom: my_field=test-value')).toBeDefined()
+    })
+
+    it('falls back to default renderer when no plugin renderer is registered', () => {
+      renderField({ type: 'string', value: 'default-rendering' })
+      expect(screen.getByText('default-rendering')).toBeDefined()
+      expect(screen.queryByTestId('custom-renderer')).toBeNull()
+    })
+
+    it('wraps plugin renderer in error boundary', () => {
+      const BrokenRenderer = () => {
+        throw new Error('plugin crash')
+      }
+      componentRegistry.registerFieldRenderer('number', BrokenRenderer)
+
+      renderField({ type: 'number', value: 42 })
+      // Should show compact error instead of crashing
+      expect(screen.getByTestId('plugin-error-compact')).toBeDefined()
+    })
+
+    it('still shows null/undefined as em dash even when plugin is registered', () => {
+      const CustomRenderer = ({ value }: { value: unknown }) => (
+        <span data-testid="custom-renderer">{String(value)}</span>
+      )
+      componentRegistry.registerFieldRenderer('string', CustomRenderer)
+
+      renderField({ type: 'string', value: null })
+      expect(screen.getByText('—')).toBeDefined()
+      expect(screen.queryByTestId('custom-renderer')).toBeNull()
     })
   })
 })

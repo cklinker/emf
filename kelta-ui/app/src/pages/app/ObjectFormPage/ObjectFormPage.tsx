@@ -48,6 +48,8 @@ import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
 import { usePageLayout } from '@/hooks/usePageLayout'
 import { useToast } from '@/components/Toast'
+import { PluginErrorBoundary } from '@/components/PluginErrorBoundary'
+import { usePlugins } from '@/context/PluginContext'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { ApiError } from '@/services/apiClient'
 import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
@@ -131,6 +133,8 @@ interface FormFieldProps {
   readOnly?: boolean
   /** Server-side validation error message for this field */
   error?: string
+  /** Optional plugin-provided custom renderer for this field type */
+  pluginRenderer?: React.ComponentType<import('../../../types/plugin').FieldRendererProps>
 }
 
 /**
@@ -142,6 +146,7 @@ function FormField({
   onChange,
   readOnly = false,
   error,
+  pluginRenderer: PluginRenderer,
 }: FormFieldProps): React.ReactElement {
   const isReadOnly = READ_ONLY_TYPES.has(field.type) || readOnly
   const fieldId = `field-${field.name}`
@@ -158,6 +163,27 @@ function FormField({
       {error}
     </p>
   ) : null
+
+  // Use plugin-provided custom renderer if available
+  if (PluginRenderer) {
+    return (
+      <div className="space-y-2">
+        {labelEl}
+        <PluginErrorBoundary compact componentType="field renderer">
+          <PluginRenderer
+            name={field.name}
+            value={value}
+            onChange={(v) => onChange(field.name, v)}
+            readOnly={isReadOnly}
+            disabled={isReadOnly}
+            error={error}
+            metadata={{ fieldType: field.type, required: field.required }}
+          />
+        </PluginErrorBoundary>
+        {errorEl}
+      </div>
+    )
+  }
 
   // Boolean fields use a checkbox
   if (field.type === 'boolean') {
@@ -399,6 +425,7 @@ function ObjectFormBody({
 }: ObjectFormBodyProps): React.ReactElement {
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const { getFieldRenderer } = usePlugins()
   const [formData, setFormData] = useState<Record<string, unknown>>(initialData)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
@@ -584,6 +611,7 @@ function ObjectFormBody({
                   onChange={fieldIsEditable ? handleFieldChange : () => {}}
                   readOnly={!fieldIsEditable}
                   error={formErrors[field.name]}
+                  pluginRenderer={getFieldRenderer(field.type)}
                 />
               )
             }}
@@ -611,6 +639,7 @@ function ObjectFormBody({
                       onChange={fieldIsEditable ? handleFieldChange : () => {}}
                       readOnly={!fieldIsEditable}
                       error={formErrors[field.name]}
+                      pluginRenderer={getFieldRenderer(field.type)}
                     />
                   )
                 })}

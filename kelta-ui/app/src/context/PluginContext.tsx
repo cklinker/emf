@@ -5,12 +5,17 @@
  * Loads and initializes configured plugins, manages the ComponentRegistry
  * for custom field renderers and page components, and handles plugin lifecycle.
  *
+ * Syncs registrations from the @kelta/plugin-sdk ComponentRegistry into the
+ * host application so that plugins built with BasePlugin/ComponentRegistry
+ * are automatically discovered and rendered.
+ *
  * Requirements:
  * - 12.1: Plugin system loads configured plugins on startup
  * - 12.2: Plugin system supports custom field renderers via ComponentRegistry
  * - 12.3: Plugin system supports custom page components via ComponentRegistry
  * - 12.7: Plugin system handles plugin load failures gracefully
  * - 12.8: Plugin system calls plugin lifecycle hooks (onLoad, onUnload)
+ * - 12.10: Sync SDK ComponentRegistry into host rendering pipeline
  */
 
 import React, {
@@ -23,6 +28,7 @@ import React, {
   useRef,
   type ComponentType,
 } from 'react'
+import { ComponentRegistry } from '@kelta/plugin-sdk'
 import type {
   Plugin,
   PluginInitContext,
@@ -31,6 +37,7 @@ import type {
   FieldRendererProps,
   PageComponentProps,
 } from '../types/plugin'
+import { componentRegistry } from '../services/componentRegistry'
 
 /**
  * Plugin context value interface
@@ -78,6 +85,8 @@ const PluginContext = createContext<PluginContextValue | undefined>(undefined)
  *
  * Wraps the application to provide plugin system state and methods.
  * Loads and initializes plugins on mount, managing their lifecycle.
+ * Also syncs registrations from the SDK's static ComponentRegistry
+ * so that plugins using BasePlugin/ComponentRegistry are discovered.
  *
  * @example
  * ```tsx
@@ -113,7 +122,9 @@ export function PluginProvider({
   const loadedPluginIdsRef = useRef<Set<string>>(new Set())
 
   /**
-   * Register a custom field renderer
+   * Register a custom field renderer.
+   * Also syncs to the componentRegistry singleton so CustomPage / other
+   * consumers that read from the singleton stay in sync.
    * Requirement 12.2: Support custom field renderers via ComponentRegistry
    */
   const registerFieldRenderer = useCallback(
@@ -123,13 +134,16 @@ export function PluginProvider({
         next.set(type, renderer)
         return next
       })
+      // Sync to singleton componentRegistry for consumers like CustomPage
+      componentRegistry.registerFieldRenderer(type, renderer as ComponentType<never>)
       console.info(`[Plugin] Registered field renderer for type: ${type}`)
     },
     []
   )
 
   /**
-   * Register a custom page component
+   * Register a custom page component.
+   * Also syncs to the componentRegistry singleton.
    * Requirement 12.3: Support custom page components via ComponentRegistry
    */
   const registerPageComponent = useCallback(
@@ -139,6 +153,8 @@ export function PluginProvider({
         next.set(name, component)
         return next
       })
+      // Sync to singleton componentRegistry
+      componentRegistry.registerPageComponent(name, component as ComponentType<never>)
       console.info(`[Plugin] Registered page component: ${name}`)
     },
     []
@@ -163,6 +179,57 @@ export function PluginProvider({
     },
     [pageComponents]
   )
+
+  /**
+   * Sync registrations from the SDK's static ComponentRegistry into context state.
+   * This discovers components registered by plugins that use the SDK's
+   * ComponentRegistry.registerFieldRenderer / registerPageComponent directly.
+   *
+   * Requirement 12.10: Sync SDK ComponentRegistry into host rendering pipeline
+   */
+  const syncFromSdkRegistry = useCallback(() => {
+    // Sync field renderers from SDK registry
+    const sdkFieldTypes = ComponentRegistry.getFieldRendererTypes()
+    for (const fieldType of sdkFieldTypes) {
+      const sdkRenderer = ComponentRegistry.getFieldRenderer(fieldType)
+      if (sdkRenderer) {
+        // Wrap SDK renderer as a React ComponentType compatible with our FieldRendererProps
+        const WrappedRenderer: ComponentType<FieldRendererProps> = (props: FieldRendererProps) => {
+          // Bridge admin UI FieldRendererProps → SDK FieldRendererProps
+          const sdkProps = {
+            value: props.value,
+            field: {
+              name: props.name,
+              type: 'string' as const,
+              displayName: props.name,
+              ...(props.metadata as Record<string, unknown>),
+            },
+            onChange: props.onChange,
+            readOnly: props.readOnly ?? props.disabled,
+          }
+          return sdkRenderer(sdkProps)
+        }
+        WrappedRenderer.displayName = `SdkFieldRenderer(${fieldType})`
+        registerFieldRenderer(fieldType, WrappedRenderer)
+      }
+    }
+
+    // Sync page components from SDK registry
+    const sdkPageComponents = ComponentRegistry.getAllPageComponents()
+    for (const registered of sdkPageComponents) {
+      // Wrap SDK page component to bridge props
+      const WrappedPage: ComponentType<PageComponentProps> = (props: PageComponentProps) => {
+        const sdkProps = {
+          client: {} as never, // Plugins should use their own client from init context
+          params: (props.config as Record<string, string>) ?? {},
+          user: null,
+        }
+        return registered.component(sdkProps)
+      }
+      WrappedPage.displayName = `SdkPageComponent(${registered.name})`
+      registerPageComponent(registered.name, WrappedPage)
+    }
+  }, [registerFieldRenderer, registerPageComponent])
 
   /**
    * Load a single plugin
@@ -242,26 +309,32 @@ export function PluginProvider({
    * Requirement 12.7: Continue loading other plugins if one fails
    */
   const initializePlugins = useCallback(async () => {
-    if (plugins.length === 0) {
-      setIsLoading(false)
-      return
-    }
-
     setIsLoading(true)
     setErrors([])
 
     const results: LoadedPlugin[] = []
     const loadErrors: Array<{ pluginId: string; error: string }> = []
 
-    // Load plugins sequentially to maintain order and prevent race conditions
-    for (const plugin of plugins) {
-      const result = await loadPlugin(plugin)
-      results.push(result)
+    // Step 1: Sync any components already registered in the SDK's static ComponentRegistry.
+    // External plugins may have called ComponentRegistry.registerFieldRenderer() before
+    // the React app mounted.
+    syncFromSdkRegistry()
 
-      if (result.status === 'error' && result.error) {
-        loadErrors.push({ pluginId: plugin.id, error: result.error })
+    // Step 2: Load explicitly-passed plugins sequentially to maintain order
+    if (plugins.length > 0) {
+      for (const plugin of plugins) {
+        const result = await loadPlugin(plugin)
+        results.push(result)
+
+        if (result.status === 'error' && result.error) {
+          loadErrors.push({ pluginId: plugin.id, error: result.error })
+        }
       }
     }
+
+    // Step 3: After plugin onLoad hooks have run, sync again in case plugins
+    // registered additional components via the SDK's ComponentRegistry during init.
+    syncFromSdkRegistry()
 
     setLoadedPlugins(results)
     setErrors(loadErrors)
@@ -272,7 +345,7 @@ export function PluginProvider({
     console.info(
       `[Plugin] Plugin initialization complete: ${successCount} loaded, ${failCount} failed`
     )
-  }, [plugins, loadPlugin])
+  }, [plugins, loadPlugin, syncFromSdkRegistry])
 
   /**
    * Initialize plugins on mount
@@ -286,7 +359,7 @@ export function PluginProvider({
 
     initializePlugins()
 
-    // Cleanup: unload plugins on unmount
+    // Cleanup: unload plugins on unmount and clear SDK registry
     return () => {
       const cleanup = async () => {
         for (const loadedPlugin of loadedPlugins) {
@@ -294,6 +367,7 @@ export function PluginProvider({
             await unloadPlugin(loadedPlugin.plugin)
           }
         }
+        ComponentRegistry.clearAll()
       }
       cleanup()
     }

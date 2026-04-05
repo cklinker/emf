@@ -247,6 +247,7 @@ public class AuthorizationServerConfig {
                 new JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper(registeredClientRepository);
         com.fasterxml.jackson.databind.ObjectMapper objectMapper =
                 new com.fasterxml.jackson.databind.ObjectMapper();
+        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         ClassLoader classLoader = JdbcOAuth2AuthorizationService.class.getClassLoader();
         objectMapper.registerModules(org.springframework.security.jackson2.SecurityJackson2Modules.getModules(classLoader));
         objectMapper.registerModule(new org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module());

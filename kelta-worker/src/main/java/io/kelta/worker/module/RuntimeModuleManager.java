@@ -15,6 +15,8 @@ import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -32,9 +34,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Coordinates with the {@link ActionHandlerRegistry} to register/unregister
  * tenant-scoped action handlers.
  * <p>
- * Note: In this phase, modules are registered from their manifest metadata
- * (stub handlers). Full JAR-based ClassLoader loading is deferred to a future
- * phase when S3 storage and sandboxed ClassLoaders are implemented.
+ * When a {@link ModuleJarService} is available, modules are loaded from their
+ * JAR files via a sandboxed {@link SandboxedModuleClassLoader}. If no JAR service
+ * is configured (e.g., S3 is disabled), stub handlers are used instead.
  *
  * @since 1.0.0
  */
@@ -46,17 +48,41 @@ public class RuntimeModuleManager {
     private final ActionHandlerRegistry actionHandlerRegistry;
     private final ModuleManifestParser manifestParser;
     private final ObjectMapper objectMapper;
+    private final ModuleJarService jarService;
+    private final ModuleContext moduleContext;
 
     /** Tracks which modules are loaded per tenant: tenantId -> Set<moduleId> */
     private final Map<String, Set<String>> loadedModules = new ConcurrentHashMap<>();
 
+    /** Tracks active ClassLoaders for cleanup: "tenantId:moduleId" -> ClassLoader */
+    private final Map<String, SandboxedModuleClassLoader> activeClassLoaders = new ConcurrentHashMap<>();
+
+    /** Tracks loaded KeltaModule instances for lifecycle management */
+    private final Map<String, KeltaModule> activeModuleInstances = new ConcurrentHashMap<>();
+
+    /**
+     * Creates a RuntimeModuleManager with JAR loading support.
+     */
     public RuntimeModuleManager(ModuleStore moduleStore,
                                  ActionHandlerRegistry actionHandlerRegistry,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 ModuleJarService jarService,
+                                 ModuleContext moduleContext) {
         this.moduleStore = Objects.requireNonNull(moduleStore);
         this.actionHandlerRegistry = Objects.requireNonNull(actionHandlerRegistry);
         this.objectMapper = Objects.requireNonNull(objectMapper);
         this.manifestParser = new ModuleManifestParser(objectMapper);
+        this.jarService = jarService;
+        this.moduleContext = moduleContext;
+    }
+
+    /**
+     * Creates a RuntimeModuleManager without JAR loading support (stub-only mode).
+     */
+    public RuntimeModuleManager(ModuleStore moduleStore,
+                                 ActionHandlerRegistry actionHandlerRegistry,
+                                 ObjectMapper objectMapper) {
+        this(moduleStore, actionHandlerRegistry, objectMapper, null, null);
     }
 
     /**
@@ -90,7 +116,7 @@ public class RuntimeModuleManager {
             manifest.description(), sourceUrl, checksum, jarSizeBytes,
             manifest.moduleClass(), manifestJson,
             TenantModuleData.STATUS_INSTALLED, installedBy,
-            null, null, List.of()
+            null, null, null, List.of()
         );
 
         moduleStore.createModule(data);
@@ -110,6 +136,65 @@ public class RuntimeModuleManager {
 
         log.info("Installed module '{}' v{} for tenant {} with {} action handlers",
             manifest.name(), manifest.version(), tenantId, actions.size());
+
+        return moduleStore.findById(id).orElse(data);
+    }
+
+    /**
+     * Installs a module with its JAR file.
+     * Uploads the JAR to S3 and persists the S3 key.
+     *
+     * @param tenantId     the tenant ID
+     * @param manifestJson the module manifest JSON
+     * @param jarBytes     the module JAR file bytes
+     * @param installedBy  the user who installed the module
+     * @return the persisted module data
+     */
+    public TenantModuleData installModuleWithJar(String tenantId, String manifestJson,
+                                                   byte[] jarBytes, String installedBy) {
+        if (jarService == null) {
+            throw new IllegalStateException("JAR upload requires S3 storage to be enabled");
+        }
+
+        ModuleManifest manifest = manifestParser.parse(manifestJson);
+
+        String checksum = ModuleJarService.sha256(jarBytes);
+        String s3Key = jarService.uploadJar(tenantId, manifest.id(), manifest.version(), jarBytes);
+
+        // Check for existing installation
+        Optional<TenantModuleData> existing = moduleStore.findByTenantAndModuleId(
+            tenantId, manifest.id());
+        if (existing.isPresent()) {
+            throw new IllegalStateException(
+                "Module '" + manifest.id() + "' is already installed for tenant " + tenantId);
+        }
+
+        String id = UUID.randomUUID().toString();
+        TenantModuleData data = new TenantModuleData(
+            id, tenantId, manifest.id(), manifest.name(), manifest.version(),
+            manifest.description(), s3Key, checksum, (long) jarBytes.length,
+            manifest.moduleClass(), manifestJson,
+            TenantModuleData.STATUS_INSTALLED, installedBy,
+            null, null, s3Key, List.of()
+        );
+
+        moduleStore.createModule(data);
+
+        // Create action records from manifest
+        List<TenantModuleData.TenantModuleActionData> actions = new ArrayList<>();
+        for (ModuleManifest.ActionHandlerManifest handler : manifest.actionHandlers()) {
+            actions.add(new TenantModuleData.TenantModuleActionData(
+                UUID.randomUUID().toString(), id, handler.key(), handler.name(),
+                handler.category(), handler.description(), handler.configSchema(),
+                handler.inputSchema(), handler.outputSchema()
+            ));
+        }
+        if (!actions.isEmpty()) {
+            moduleStore.createActions(actions);
+        }
+
+        log.info("Installed module '{}' v{} for tenant {} with JAR (s3Key={}, {} bytes)",
+            manifest.name(), manifest.version(), tenantId, s3Key, jarBytes.length);
 
         return moduleStore.findById(id).orElse(data);
     }
@@ -163,12 +248,27 @@ public class RuntimeModuleManager {
                 "Module '" + moduleId + "' not found for tenant " + tenantId));
 
         unloadModule(tenantId, module);
+
+        // Clean up S3 JAR if present
+        if (module.s3Key() != null && jarService != null) {
+            try {
+                jarService.deleteJar(module.s3Key());
+            } catch (Exception e) {
+                log.warn("Failed to delete JAR from S3 for module '{}': {}",
+                    moduleId, e.getMessage());
+            }
+        }
+
         moduleStore.deleteModule(module.id());
         log.info("Uninstalled module '{}' from tenant {}", moduleId, tenantId);
     }
 
     /**
      * Loads a module's handlers into the registry (called on enable or pod startup).
+     * <p>
+     * If the module has an S3 JAR key and JAR service is available, loads real handlers
+     * from the JAR using a sandboxed ClassLoader. Otherwise, falls back to stub handlers.
+     * <p>
      * Idempotent — no-op if already loaded.
      *
      * @param tenantId the tenant ID
@@ -181,15 +281,76 @@ public class RuntimeModuleManager {
             return;
         }
 
-        // Register stub handlers from manifest actions
-        for (var action : module.actions()) {
-            ActionHandler stubHandler = createStubHandler(action, module);
-            actionHandlerRegistry.registerTenantHandler(tenantId, stubHandler);
+        if (module.s3Key() != null && jarService != null) {
+            loadFromJar(tenantId, module);
+        } else {
+            loadWithStubs(tenantId, module);
         }
 
         loaded.add(module.moduleId());
         log.info("Loaded module '{}' v{} with {} handlers for tenant {}",
             module.name(), module.version(), module.actions().size(), tenantId);
+    }
+
+    /**
+     * Loads module handlers from the JAR via a sandboxed ClassLoader.
+     */
+    private void loadFromJar(String tenantId, TenantModuleData module) {
+        String classLoaderKey = tenantId + ":" + module.moduleId();
+        try {
+            URL jarUrl = jarService.downloadJarToCache(module.s3Key());
+            SandboxedModuleClassLoader classLoader = new SandboxedModuleClassLoader(
+                module.moduleId(), jarUrl, getClass().getClassLoader());
+
+            // Load the KeltaModule implementation class
+            @SuppressWarnings("unchecked")
+            Class<? extends KeltaModule> moduleClass = (Class<? extends KeltaModule>)
+                classLoader.loadClass(module.moduleClass());
+
+            KeltaModule keltaModule = moduleClass.getDeclaredConstructor().newInstance();
+
+            // Provide restricted module context and initialize
+            if (moduleContext != null) {
+                keltaModule.onStartup(moduleContext);
+            }
+
+            // Register real action handlers from the module
+            List<ActionHandler> handlers = keltaModule.getActionHandlers();
+            for (ActionHandler handler : handlers) {
+                actionHandlerRegistry.registerTenantHandler(tenantId, handler);
+            }
+
+            activeClassLoaders.put(classLoaderKey, classLoader);
+            activeModuleInstances.put(classLoaderKey, keltaModule);
+
+            log.info("Loaded module '{}' from JAR with {} real handlers for tenant {}",
+                module.moduleId(), handlers.size(), tenantId);
+
+        } catch (Exception e) {
+            log.warn("Failed to load module '{}' from JAR for tenant {}: {}. Falling back to stubs.",
+                module.moduleId(), tenantId, e.getMessage(), e);
+
+            // Clean up partial ClassLoader on failure
+            SandboxedModuleClassLoader cl = activeClassLoaders.remove(classLoaderKey);
+            if (cl != null) {
+                try { cl.close(); } catch (IOException ignored) {}
+            }
+            activeModuleInstances.remove(classLoaderKey);
+
+            // Fall back to stubs
+            loadWithStubs(tenantId, module);
+        }
+    }
+
+    /**
+     * Loads stub handlers from manifest metadata (no JAR available).
+     */
+    private void loadWithStubs(String tenantId, TenantModuleData module) {
+        for (var action : module.actions()) {
+            ActionHandler stubHandler = createStubHandler(action, module);
+            actionHandlerRegistry.registerTenantHandler(tenantId, stubHandler);
+        }
+        log.debug("Loaded module '{}' with stub handlers for tenant {}", module.moduleId(), tenantId);
     }
 
     /**
@@ -210,7 +371,32 @@ public class RuntimeModuleManager {
         for (var action : module.actions()) {
             actionKeys.add(action.actionKey());
         }
+
+        // Also remove any real handlers registered by the KeltaModule
+        String classLoaderKey = tenantId + ":" + module.moduleId();
+        KeltaModule keltaModule = activeModuleInstances.remove(classLoaderKey);
+        if (keltaModule != null) {
+            for (ActionHandler handler : keltaModule.getActionHandlers()) {
+                actionKeys.add(handler.getActionTypeKey());
+            }
+        }
+
         actionHandlerRegistry.removeTenantHandlers(tenantId, actionKeys);
+
+        // Close the ClassLoader
+        SandboxedModuleClassLoader classLoader = activeClassLoaders.remove(classLoaderKey);
+        if (classLoader != null) {
+            try {
+                classLoader.close();
+            } catch (IOException e) {
+                log.warn("Failed to close ClassLoader for module '{}': {}", module.moduleId(), e.getMessage());
+            }
+        }
+
+        // Evict JAR from local cache
+        if (module.s3Key() != null && jarService != null) {
+            jarService.evictFromCache(module.s3Key());
+        }
 
         loaded.remove(module.moduleId());
         if (loaded.isEmpty()) {
@@ -252,9 +438,15 @@ public class RuntimeModuleManager {
     }
 
     /**
+     * Checks if JAR-based loading is available.
+     */
+    public boolean isJarLoadingEnabled() {
+        return jarService != null;
+    }
+
+    /**
      * Creates a stub action handler from manifest metadata.
-     * The stub logs execution and returns a placeholder result.
-     * Full implementation via ClassLoader loading will come in a future phase.
+     * Used when no JAR is available for real ClassLoader-based loading.
      */
     private ActionHandler createStubHandler(TenantModuleData.TenantModuleActionData action,
                                              TenantModuleData module) {
@@ -266,13 +458,13 @@ public class RuntimeModuleManager {
 
             @Override
             public ActionResult execute(ActionContext context) {
-                log.info("Executing runtime module handler '{}' from module '{}' v{}",
+                log.info("Executing runtime module handler '{}' from module '{}' v{} (stub mode)",
                     action.actionKey(), module.name(), module.version());
-                // Stub implementation — full JAR-loaded execution in future phase
                 return ActionResult.success(Map.of(
                     "handler", action.actionKey(),
                     "module", module.moduleId(),
-                    "status", "EXECUTED"
+                    "status", "EXECUTED",
+                    "mode", "stub"
                 ));
             }
 

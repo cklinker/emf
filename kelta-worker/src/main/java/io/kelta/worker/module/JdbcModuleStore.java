@@ -37,12 +37,13 @@ public class JdbcModuleStore implements ModuleStore {
             INSERT INTO tenant_module
                 (id, tenant_id, module_id, name, version, description, source_url,
                  jar_checksum, jar_size_bytes, module_class, manifest, status,
-                 installed_by, installed_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, NOW(), NOW())
+                 installed_by, s3_key, installed_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, NOW(), NOW())
             """,
             id, data.tenantId(), data.moduleId(), data.name(), data.version(),
             data.description(), data.sourceUrl(), data.jarChecksum(), data.jarSizeBytes(),
-            data.moduleClass(), data.manifest(), data.status(), data.installedBy());
+            data.moduleClass(), data.manifest(), data.status(), data.installedBy(),
+            data.s3Key());
         return id;
     }
 
@@ -134,7 +135,7 @@ public class JdbcModuleStore implements ModuleStore {
             module.version(), module.description(), module.sourceUrl(),
             module.jarChecksum(), module.jarSizeBytes(), module.moduleClass(),
             module.manifest(), module.status(), module.installedBy(),
-            module.installedAt(), module.updatedAt(), actions);
+            module.installedAt(), module.updatedAt(), module.s3Key(), actions);
     }
 
     private TenantModuleData mapModule(ResultSet rs, int rowNum) throws SQLException {
@@ -154,6 +155,7 @@ public class JdbcModuleStore implements ModuleStore {
             rs.getString("installed_by"),
             toInstant(rs.getTimestamp("installed_at")),
             toInstant(rs.getTimestamp("updated_at")),
+            rs.getString("s3_key"),
             List.of() // Actions loaded separately
         );
     }

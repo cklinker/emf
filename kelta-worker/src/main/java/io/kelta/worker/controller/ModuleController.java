@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -85,6 +86,45 @@ public class ModuleController {
                     JsonApiResponseBuilder.error("409", "Conflict", e.getMessage()));
         } catch (Exception e) {
             log.error("Failed to install module: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Bad Request", e.getMessage()));
+        }
+    }
+
+    /**
+     * Installs a module with its JAR file (multipart upload).
+     * The manifest is extracted from the request part, and the JAR is stored in S3.
+     */
+    @PostMapping(value = "/install-jar", consumes = "multipart/form-data")
+    public ResponseEntity<Map<String, Object>> installModuleWithJar(
+            @RequestHeader("X-Tenant-ID") String tenantId,
+            @RequestHeader(value = "X-User-ID", required = false) String userId,
+            @RequestPart("manifest") String manifestJson,
+            @RequestPart("jar") MultipartFile jarFile) {
+        try {
+            if (manifestJson == null || manifestJson.isBlank()) {
+                return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Validation Error", "manifest is required"));
+            }
+            if (jarFile == null || jarFile.isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Validation Error", "jar file is required"));
+            }
+
+            byte[] jarBytes = jarFile.getBytes();
+            TenantModuleData installed = runtimeModuleManager.installModuleWithJar(
+                tenantId, manifestJson, jarBytes,
+                userId != null ? userId : "system");
+
+            eventPublisher.publishEvent(installed, ModuleChangeType.INSTALLED);
+
+            return ResponseEntity.ok(
+                    JsonApiResponseBuilder.single("modules", installed.id(), moduleToAttributes(installed)));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(409).body(
+                    JsonApiResponseBuilder.error("409", "Conflict", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to install module with JAR: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(
                     JsonApiResponseBuilder.error("400", "Bad Request", e.getMessage()));
         }

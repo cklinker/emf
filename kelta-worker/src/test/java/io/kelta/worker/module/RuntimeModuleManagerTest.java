@@ -2,14 +2,26 @@ package io.kelta.worker.module;
 
 import io.kelta.runtime.module.ModuleStore;
 import io.kelta.runtime.module.TenantModuleData;
+import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
+import io.kelta.runtime.workflow.ActionResult;
+import io.kelta.runtime.workflow.module.KeltaModule;
+import io.kelta.runtime.workflow.module.ModuleContext;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -129,7 +141,7 @@ class RuntimeModuleManagerTest {
         TenantModuleData module2 = new TenantModuleData(
             "mod-2", "tenant-2", "other-module", "Other Module", "1.0.0",
             null, "url", "checksum", null, "com.test.Other", MANIFEST_JSON,
-            TenantModuleData.STATUS_ACTIVE, "system", Instant.now(), Instant.now(),
+            TenantModuleData.STATUS_ACTIVE, "system", Instant.now(), Instant.now(), null,
             List.of(new TenantModuleData.TenantModuleActionData(
                 "a1", "mod-2", "other:action", "Other Action",
                 null, null, null, null, null
@@ -149,7 +161,7 @@ class RuntimeModuleManagerTest {
         TenantModuleData badModule = new TenantModuleData(
             "mod-bad", TENANT_ID, "bad-module", "Bad Module", "1.0.0",
             null, "url", "checksum", null, "com.test.Bad", "invalid-json",
-            TenantModuleData.STATUS_ACTIVE, "system", Instant.now(), Instant.now(),
+            TenantModuleData.STATUS_ACTIVE, "system", Instant.now(), Instant.now(), null,
             List.of() // No actions, but manifest JSON is broken — shouldn't matter for loading
         );
 
@@ -187,6 +199,27 @@ class RuntimeModuleManagerTest {
             () -> manager.enableModule(TENANT_ID, "nonexistent"));
     }
 
+    @Test
+    void shouldReportJarLoadingDisabledWithoutJarService() {
+        assertFalse(manager.isJarLoadingEnabled());
+    }
+
+    @Test
+    void shouldUseStubHandlersWhenModuleHasS3KeyButNoJarService() {
+        // Module has s3Key but no JarService configured — should fall back to stubs
+        TenantModuleData module = createModuleDataWithS3Key("mod-s3", "modules/t/m/v/checksum.jar");
+
+        manager.loadModule(TENANT_ID, module);
+
+        assertTrue(manager.isLoaded(TENANT_ID, "test-module"));
+        // Stub handlers should still be registered
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isPresent());
+        ActionResult result = actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").get()
+            .execute(null);
+        assertTrue(result.successful());
+        assertEquals("stub", result.outputData().get("mode"));
+    }
+
     private TenantModuleData createModuleData(String id) {
         return createModuleData(id, TenantModuleData.STATUS_INSTALLED);
     }
@@ -196,7 +229,24 @@ class RuntimeModuleManagerTest {
             id, TENANT_ID, "test-module", "Test Module", "1.0.0",
             "Test", "https://example.com/module.jar", "sha256:abc", 1024L,
             "com.test.TestModule", MANIFEST_JSON, status, "user-1",
-            Instant.now(), Instant.now(),
+            Instant.now(), Instant.now(), null,
+            List.of(
+                new TenantModuleData.TenantModuleActionData(
+                    "a1", id, "test:action1", "Test Action 1",
+                    "Test", null, null, null, null),
+                new TenantModuleData.TenantModuleActionData(
+                    "a2", id, "test:action2", "Test Action 2",
+                    null, null, null, null, null)
+            )
+        );
+    }
+
+    private TenantModuleData createModuleDataWithS3Key(String id, String s3Key) {
+        return new TenantModuleData(
+            id, TENANT_ID, "test-module", "Test Module", "1.0.0",
+            "Test", "https://example.com/module.jar", "sha256:abc", 1024L,
+            "com.test.TestModule", MANIFEST_JSON, TenantModuleData.STATUS_ACTIVE, "user-1",
+            Instant.now(), Instant.now(), s3Key,
             List.of(
                 new TenantModuleData.TenantModuleActionData(
                     "a1", id, "test:action1", "Test Action 1",

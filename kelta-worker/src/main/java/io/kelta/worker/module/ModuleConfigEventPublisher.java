@@ -45,7 +45,7 @@ public class ModuleConfigEventPublisher {
     public void publishEvent(TenantModuleData module, ModuleChangeType changeType) {
         ModuleChangedPayload payload = new ModuleChangedPayload(
             module.id(), module.tenantId(), module.moduleId(), module.name(),
-            module.version(), null, module.moduleClass(),
+            module.version(), module.s3Key(), module.moduleClass(),
             module.manifest(), changeType
         );
 

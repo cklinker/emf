@@ -21,6 +21,7 @@ import java.util.List;
  * @param installedBy   user who installed the module
  * @param installedAt   installation timestamp
  * @param updatedAt     last update timestamp
+ * @param s3Key         S3 storage key for the module JAR (null if no JAR uploaded)
  * @param actions       action handlers declared by this module
  * @since 1.0.0
  */
@@ -40,6 +41,7 @@ public record TenantModuleData(
     String installedBy,
     Instant installedAt,
     Instant updatedAt,
+    String s3Key,
     List<TenantModuleActionData> actions
 ) {
     public static final String STATUS_INSTALLING = "INSTALLING";

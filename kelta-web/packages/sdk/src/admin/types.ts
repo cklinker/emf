@@ -13,6 +13,7 @@ export interface CollectionDefinition {
   displayName: string;
   description?: string;
   active?: boolean;
+  systemCollection?: boolean;
   currentVersion?: number;
   fields?: FieldDefinition[];
   authz?: AuthzConfig;

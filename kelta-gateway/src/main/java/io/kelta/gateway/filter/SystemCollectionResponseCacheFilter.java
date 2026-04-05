@@ -98,13 +98,20 @@ public class SystemCollectionResponseCacheFilter implements GlobalFilter, Ordere
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        // Only cache GET requests
-        if (exchange.getRequest().getMethod() != HttpMethod.GET) {
-            return chain.filter(exchange);
-        }
-
         String path = exchange.getRequest().getPath().value();
         String collectionName = extractCollectionName(path);
+
+        // For mutating requests (POST, PATCH, PUT, DELETE) on cacheable collections,
+        // evict the gateway cache eagerly so the next GET returns fresh data.
+        // This avoids the race condition where the UI refetches before the async
+        // Kafka cache-eviction event is consumed.
+        if (exchange.getRequest().getMethod() != HttpMethod.GET) {
+            if (collectionName != null && CACHEABLE_COLLECTIONS.contains(collectionName)) {
+                log.debug("Mutating request on cacheable collection '{}', evicting gateway cache", collectionName);
+                cacheManager.evictSystemCollectionResponses(collectionName);
+            }
+            return chain.filter(exchange);
+        }
 
         if (collectionName == null || !CACHEABLE_COLLECTIONS.contains(collectionName)) {
             return chain.filter(exchange);

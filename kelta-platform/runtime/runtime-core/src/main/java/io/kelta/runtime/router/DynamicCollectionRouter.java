@@ -3,6 +3,7 @@ package io.kelta.runtime.router;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
+import io.kelta.runtime.model.system.SystemCollectionDefinitions;
 import io.kelta.runtime.query.FilterCondition;
 import io.kelta.runtime.query.FilterOperator;
 import io.kelta.runtime.query.Pagination;
@@ -805,9 +806,15 @@ public class DynamicCollectionRouter {
             return queryRequest;
         }
 
-        // Add tenant_id filter
+        // For the 'collections' collection, include both tenant-specific and system
+        // records so that system collections are visible alongside custom ones.
         List<FilterCondition> filters = new ArrayList<>(queryRequest.filters());
-        filters.add(new FilterCondition("tenantId", FilterOperator.EQ, tenantId));
+        if ("collections".equals(definition.name())) {
+            filters.add(new FilterCondition("tenantId", FilterOperator.IN,
+                    List.of(tenantId, SystemCollectionDefinitions.SYSTEM_TENANT_ID)));
+        } else {
+            filters.add(new FilterCondition("tenantId", FilterOperator.EQ, tenantId));
+        }
         return queryRequest.withFilters(filters);
     }
 

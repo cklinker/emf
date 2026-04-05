@@ -11,7 +11,13 @@ interface ChatInputProps {
   contextLabel?: string
 }
 
-export function ChatInput({ onSend, onCancel, isStreaming, disabled, contextLabel }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  onCancel,
+  isStreaming,
+  disabled,
+  contextLabel,
+}: ChatInputProps) {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 

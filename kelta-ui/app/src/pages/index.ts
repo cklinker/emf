@@ -282,7 +282,6 @@ export { PasswordPolicyPanel as PasswordPolicyPage } from './SecuritySettingsPag
 // MfaPolicyPage - MFA policy configuration page
 export { MfaPolicyPanel as MfaPolicyPage } from './SecuritySettingsPage/MfaPolicyPanel'
 
-
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

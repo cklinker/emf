@@ -9,7 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Bot, Zap, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,13 +25,6 @@ interface AiConfig {
   temperature: string
   aiTokensPerMonth: string
   aiEnabled: string
-}
-
-interface AiUsage {
-  currentMonthUsage: number
-  tokenLimit: number
-  aiEnabled: boolean
-  history: Record<string, { inputTokens: number; outputTokens: number; requestCount: number }>
 }
 
 const AVAILABLE_MODELS = [
@@ -62,10 +61,7 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
     queryFn: () => keltaClient.admin.ai.config.get(),
   })
 
-  const {
-    data: usage,
-    isLoading: usageLoading,
-  } = useQuery({
+  const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ['ai-usage'],
     queryFn: () => keltaClient.admin.ai.usage(),
     refetchInterval: 60000,
@@ -153,9 +149,7 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
                   type="number"
                   value={currentConfig?.maxTokens}
                   onChange={(e) =>
-                    setEditConfig((prev) =>
-                      prev ? { ...prev, maxTokens: e.target.value } : null
-                    )
+                    setEditConfig((prev) => (prev ? { ...prev, maxTokens: e.target.value } : null))
                   }
                 />
               ) : (
@@ -198,9 +192,7 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
                 <Switch
                   checked={currentConfig?.aiEnabled === 'true'}
                   onCheckedChange={(checked) =>
-                    setEditConfig((prev) =>
-                      prev ? { ...prev, aiEnabled: String(checked) } : null
-                    )
+                    setEditConfig((prev) => (prev ? { ...prev, aiEnabled: String(checked) } : null))
                   }
                 />
               ) : (

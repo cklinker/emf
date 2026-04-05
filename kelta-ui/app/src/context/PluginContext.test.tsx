@@ -835,9 +835,7 @@ describe('PluginContext', () => {
         id: 'sdk-plugin',
         onLoad: async () => {
           // Plugin registers components via the SDK's ComponentRegistry during init
-          const DynamicRenderer = ({ value }: { value: unknown }) => (
-            <span>{String(value)}</span>
-          )
+          const DynamicRenderer = ({ value }: { value: unknown }) => <span>{String(value)}</span>
           ComponentRegistry.registerFieldRenderer('dynamic_field', DynamicRenderer)
         },
       })
@@ -883,9 +881,7 @@ describe('PluginContext', () => {
     })
 
     it('should clean up SDK ComponentRegistry on unmount', async () => {
-      const SdkRenderer = ({ value }: { value: unknown }) => (
-        <span>{String(value)}</span>
-      )
+      const SdkRenderer = ({ value }: { value: unknown }) => <span>{String(value)}</span>
       ComponentRegistry.registerFieldRenderer('cleanup_test', SdkRenderer)
 
       const { unmount } = renderWithPlugins(<TestComponent />, { plugins: [] })

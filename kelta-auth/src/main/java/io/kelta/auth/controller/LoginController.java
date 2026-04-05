@@ -21,6 +21,33 @@ public class LoginController {
 
     @GetMapping("/login")
     public String login(Model model, HttpServletRequest request) {
+        // Convert error query params into session flash attributes and redirect
+        // to clean URL. This ensures error messages display exactly once.
+        String queryString = request.getQueryString();
+        if (queryString != null
+                && (queryString.contains("pending_activation") || queryString.contains("federation"))) {
+            if (queryString.contains("pending_activation")) {
+                request.getSession().setAttribute("login_error_pending_activation", true);
+            }
+            if (queryString.contains("federation")) {
+                request.getSession().setAttribute("login_error_federation", true);
+            }
+            return "redirect:/login";
+        }
+
+        // Consume flash-like session attributes (show once, then remove)
+        var session = request.getSession(false);
+        if (session != null) {
+            if (Boolean.TRUE.equals(session.getAttribute("login_error_pending_activation"))) {
+                model.addAttribute("pendingActivation", true);
+                session.removeAttribute("login_error_pending_activation");
+            }
+            if (Boolean.TRUE.equals(session.getAttribute("login_error_federation"))) {
+                model.addAttribute("federationError", true);
+                session.removeAttribute("login_error_federation");
+            }
+        }
+
         // Resolve tenant from the request to load SSO providers
         String tenantId = resolveTenantId(request);
 

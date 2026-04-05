@@ -192,11 +192,11 @@
                 Invalid email or password. Please try again.
             </div>
 
-            <div th:if="${param.containsKey('pending_activation')}" class="alert-warning">
+            <div th:if="${pendingActivation}" class="alert-warning">
                 Your account is pending activation. Please contact your administrator to assign a profile.
             </div>
 
-            <div th:if="${param.containsKey('federation')}" class="alert-error">
+            <div th:if="${federationError}" class="alert-error">
                 SSO login failed. Please try again or contact your administrator.
             </div>
 

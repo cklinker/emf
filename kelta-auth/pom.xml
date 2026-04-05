@@ -112,6 +112,12 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- Jackson 2.x JSR310 module for Spring Security OAuth2 serialization -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
         <!-- Kelta Runtime Core (encryption, shared utilities) -->
         <dependency>
             <groupId>io.kelta</groupId>

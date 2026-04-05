@@ -51,7 +51,7 @@
 
 ## Dependency Risks
 
-- Multiple BOM version overrides in worker POM increase transitive conflict risk (`kelta-worker/pom.xml` 27-32)
+- Multiple BOM version overrides in worker POM increase transitive conflict risk (`kelta-worker/pom.xml`)
 
 ## Test Coverage Gaps
 

@@ -34,6 +34,11 @@ Microservices + Event-Driven + Dynamic Configuration Platform. Multi-tenant with
 - Vite + React 19 + TypeScript. Builder UI for collections, fields, flows, permissions.
 - Entry: `kelta-ui/app/src/main.tsx`
 
+**AI Service** (`kelta-ai/`):
+- AI-powered assistant for the platform using Anthropic Claude.
+- Chat, proposals, token tracking, conversation history.
+- Entry: `kelta-ai/src/main/java/io/kelta/ai/AiApplication.java`
+
 **Frontend SDK** (`kelta-web/`):
 - Monorepo: `sdk`, `components`, `plugin-sdk`
 
@@ -115,6 +120,7 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 | New gateway filter | `kelta-gateway/.../filter/`, `.../config/` |
 | New UI page | `kelta-ui/app/src/pages/<PageName>/` |
 | New SDK feature | `kelta-web/packages/sdk/src/` |
+| New AI feature | `kelta-ai/src/main/java/io/kelta/ai/` |
 | Database migration | `kelta-worker/src/main/resources/db/migration/V{next}__description.sql` |
 
 ## CI/CD
@@ -131,6 +137,8 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 | Gateway | `deployment/kelta-gateway` |
 | Auth | `deployment/kelta-auth` |
 | Worker | `deployment/kelta-worker` |
+| AI | `deployment/kelta-ai` |
+| Observability | Grafana + Tempo + Loki + Mimir in `observability` namespace |
 
 ```bash
 kubectl logs -n kelta deployment/kelta-gateway --tail=200
@@ -143,7 +151,7 @@ kubectl describe pod -n kelta <pod-name>
 ## Cross-Cutting Concerns
 
 - **Logging**: SLF4J + Logback with Logstash JSON encoder, structured parameterized logging
-- **Tracing**: OpenTelemetry (Java Agent + JS SDK) → Jaeger
-- **Metrics**: Micrometer + Spring Boot Actuator
+- **Tracing**: OpenTelemetry Java Agent v2.25.0 → Tempo (production, LGTM stack) / Jaeger (local dev)
+- **Metrics**: Spring Boot OpenTelemetry starter → Mimir (production) / OTLP HTTP (local dev)
 - **Auth**: JWT validation at gateway, Cerbos for fine-grained authorization
 - **Multi-tenancy**: TenantContext (ThreadLocal), per-tenant PostgreSQL schemas, tenant-aware Kafka events

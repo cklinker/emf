@@ -5,9 +5,9 @@
 ### Frameworks
 - **JUnit 5** (Jupiter) via Spring Boot
 - **AssertJ** fluent assertions
-- **Mockito** 5.21.0 + Byte Buddy
+- **Mockito** 5.21.0
 - **jqwik** 1.8.2 — property-based testing
-- **Testcontainers** 1.19.3 — Docker-based integration tests
+- **Testcontainers** 1.20.4 — Docker-based integration tests
 - **MockWebServer** — HTTP service mocks
 - **Awaitility** — async assertions
 
@@ -53,11 +53,11 @@ class GatewayMetricsTest {
 ## TypeScript Testing
 
 ### Frameworks
-- **Vitest** 1.3+ — unit testing
+- **Vitest** — 1.3.1 (kelta-web), 4.0.18 (kelta-ui)
 - **jsdom** — DOM environment
-- **React Testing Library** 16.3 — component testing
-- **MSW** 2.12.7 — Mock Service Worker
-- **fast-check** 4.5.3 — property-based testing
+- **React Testing Library** — 14.2.1 (kelta-web), 16.3.2 (kelta-ui)
+- **MSW** — 2.2.1 (kelta-web), 2.12.7 (kelta-ui)
+- **fast-check** — 3.15.1 (kelta-web), 4.5.3 (kelta-ui)
 - **Playwright** 1.50.0 — E2E testing (`e2e-tests/`)
 
 ### Organization

@@ -12,12 +12,13 @@ kelta-platform/runtime/runtime-module-core # CRUD action handlers
 kelta-gateway                         # Spring Cloud Gateway (auth, routing, rate limiting)
 kelta-auth                            # Internal OIDC provider, identity brokering, MFA
 kelta-worker                          # Worker service (owns DB migrations, workflow exec)
+kelta-ai                              # AI assistant service (Anthropic Claude integration)
 kelta-web                             # Frontend SDK monorepo (sdk, components, plugin-sdk)
 kelta-ui/app                          # Admin/builder UI (React/Vite)
 e2e-tests                             # Playwright E2E tests
 ```
 
-Stack: Java 21, Spring Boot, Maven, PostgreSQL + Flyway, Kafka, Redis, React, Vite, Vitest. Check `kelta-platform/pom.xml` for current framework versions.
+Stack: Java 25, Spring Boot 4.x, Maven, PostgreSQL + Flyway, Kafka, Redis, React 19, Vite, Vitest. Check `kelta-platform/pom.xml` for current framework versions.
 
 ## Critical Rules
 

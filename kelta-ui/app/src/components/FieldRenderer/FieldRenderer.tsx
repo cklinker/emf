@@ -27,6 +27,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { componentRegistry } from '@/services/componentRegistry'
+import { PluginErrorBoundary } from '@/components/PluginErrorBoundary'
 import type { FieldType } from '@/hooks/useCollectionSchema'
 
 export interface FieldRendererProps {
@@ -170,6 +172,23 @@ export function FieldRenderer({
       >
         —
       </span>
+    )
+  }
+
+  // Check for plugin-provided custom field renderer
+  const CustomRenderer = componentRegistry.getFieldRenderer(type)
+  if (CustomRenderer) {
+    return (
+      <PluginErrorBoundary compact componentType="field renderer">
+        {React.createElement(CustomRenderer, {
+          value,
+          fieldName: fieldName || '',
+          displayName: displayName || fieldName || '',
+          fieldType: type,
+          truncate,
+          tenantSlug,
+        })}
+      </PluginErrorBoundary>
     )
   }
 

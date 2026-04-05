@@ -8,6 +8,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { PluginProvider, usePlugins } from './PluginContext'
+import { ComponentRegistry } from '@kelta/plugin-sdk'
+import { componentRegistry } from '../services/componentRegistry'
 import type { ReactNode } from 'react'
 import type { Plugin, FieldRendererProps, PageComponentProps } from '../types/plugin'
 
@@ -766,6 +768,136 @@ describe('PluginContext', () => {
 
       expect(screen.getByTestId('errors-count')).toHaveTextContent('1')
       expect(screen.getByTestId('errors')).toHaveTextContent('Unknown error')
+    })
+  })
+
+  describe('SDK ComponentRegistry Sync', () => {
+    beforeEach(() => {
+      ComponentRegistry.clearAll()
+      componentRegistry.clear()
+    })
+
+    afterEach(() => {
+      ComponentRegistry.clearAll()
+      componentRegistry.clear()
+    })
+
+    it('should sync field renderers from SDK ComponentRegistry on init', async () => {
+      // Pre-register a renderer in the SDK's static ComponentRegistry
+      const SdkRenderer = ({ value }: { value: unknown }) => (
+        <span data-testid="sdk-renderer">{String(value)}</span>
+      )
+      ComponentRegistry.registerFieldRenderer('custom_widget', SdkRenderer)
+
+      let contextValue: ReturnType<typeof usePlugins> | undefined
+
+      renderWithPlugins(
+        <TestComponent
+          onRender={(ctx) => {
+            contextValue = ctx
+          }}
+        />,
+        { plugins: [] }
+      )
+
+      await waitFor(() => {
+        expect(contextValue?.isLoading).toBe(false)
+      })
+
+      // SDK renderer should be synced into the context
+      expect(contextValue?.getFieldRenderer('custom_widget')).toBeDefined()
+    })
+
+    it('should sync page components from SDK ComponentRegistry on init', async () => {
+      const SdkPage = () => <div data-testid="sdk-page">SDK Page</div>
+      ComponentRegistry.registerPageComponent('sdk-dashboard', '/dashboard', SdkPage)
+
+      let contextValue: ReturnType<typeof usePlugins> | undefined
+
+      renderWithPlugins(
+        <TestComponent
+          onRender={(ctx) => {
+            contextValue = ctx
+          }}
+        />,
+        { plugins: [] }
+      )
+
+      await waitFor(() => {
+        expect(contextValue?.isLoading).toBe(false)
+      })
+
+      expect(contextValue?.getPageComponent('sdk-dashboard')).toBeDefined()
+    })
+
+    it('should sync SDK registrations made during plugin onLoad', async () => {
+      const plugin = createTestPlugin({
+        id: 'sdk-plugin',
+        onLoad: async () => {
+          // Plugin registers components via the SDK's ComponentRegistry during init
+          const DynamicRenderer = ({ value }: { value: unknown }) => (
+            <span>{String(value)}</span>
+          )
+          ComponentRegistry.registerFieldRenderer('dynamic_field', DynamicRenderer)
+        },
+      })
+
+      let contextValue: ReturnType<typeof usePlugins> | undefined
+
+      renderWithPlugins(
+        <TestComponent
+          onRender={(ctx) => {
+            contextValue = ctx
+          }}
+        />,
+        { plugins: [plugin] }
+      )
+
+      await waitFor(() => {
+        expect(contextValue?.isLoading).toBe(false)
+      })
+
+      // Should be synced after the post-plugin-load sync pass
+      expect(contextValue?.getFieldRenderer('dynamic_field')).toBeDefined()
+    })
+
+    it('should sync registrations to the componentRegistry singleton', async () => {
+      const plugin = createTestPlugin({
+        fieldRenderers: {
+          singleton_test: MockFieldRenderer,
+        },
+        pageComponents: {
+          SingletonPage: MockPageComponent,
+        },
+      })
+
+      renderWithPlugins(<TestComponent />, { plugins: [plugin] })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+      })
+
+      // Verify the singleton componentRegistry also received the registrations
+      expect(componentRegistry.hasFieldRenderer('singleton_test')).toBe(true)
+      expect(componentRegistry.hasPageComponent('SingletonPage')).toBe(true)
+    })
+
+    it('should clean up SDK ComponentRegistry on unmount', async () => {
+      const SdkRenderer = ({ value }: { value: unknown }) => (
+        <span>{String(value)}</span>
+      )
+      ComponentRegistry.registerFieldRenderer('cleanup_test', SdkRenderer)
+
+      const { unmount } = renderWithPlugins(<TestComponent />, { plugins: [] })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+      })
+
+      unmount()
+
+      // SDK registry should be cleared
+      expect(ComponentRegistry.hasFieldRenderer('cleanup_test')).toBe(false)
     })
   })
 })

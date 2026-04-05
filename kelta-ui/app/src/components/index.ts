@@ -23,6 +23,10 @@ export type { SidebarProps } from './Sidebar'
 export { ErrorBoundary, ErrorFallback } from './ErrorBoundary'
 export type { ErrorBoundaryProps, ErrorBoundaryState, ErrorFallbackProps } from './ErrorBoundary'
 
+// PluginErrorBoundary component
+export { PluginErrorBoundary } from './PluginErrorBoundary'
+export type { PluginErrorBoundaryProps } from './PluginErrorBoundary'
+
 // Toast notification system
 export {
   Toast,

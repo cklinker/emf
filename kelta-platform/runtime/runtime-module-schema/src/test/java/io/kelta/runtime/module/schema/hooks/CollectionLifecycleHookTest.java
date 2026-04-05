@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -61,6 +62,15 @@ class CollectionLifecycleHookTest {
         void shouldAcceptNameWithUnderscores() {
             BeforeSaveResult result = hook.beforeCreate(new HashMap<>(Map.of("name", "my_collection")), "t1");
             assertTrue(result.isSuccess());
+        }
+
+        @Test
+        @DisplayName("Should accept multi-word underscore names like technician_skills")
+        void shouldAcceptMultiWordUnderscoreNames() {
+            for (String name : List.of("technician_skills", "quote_lines", "invoice_lines", "work_orders")) {
+                BeforeSaveResult result = hook.beforeCreate(new HashMap<>(Map.of("name", name)), "t1");
+                assertTrue(result.isSuccess(), "Expected name '" + name + "' to be accepted");
+            }
         }
 
         @Test

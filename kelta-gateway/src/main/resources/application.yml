@@ -64,7 +64,7 @@ kelta:
     tenant-slug:
       enabled: ${TENANT_SLUG_ENABLED:true}
       require-prefix: ${TENANT_SLUG_REQUIRE_PREFIX:false}
-      platform-paths: /actuator,/platform,/internal,/otel,/api/webhooks
+      platform-paths: /actuator,/platform,/internal,/otel,/api/webhooks,/scim
       cache-refresh-ms: 60000
 
     # Worker service URL (used for routing AND internal API calls)
@@ -100,7 +100,7 @@ kelta:
       public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
       # Paths accessible without authentication for ALL HTTP methods.
       # Used for endpoints receiving data from unauthenticated sources (e.g., browser OTEL SDK).
-      unauthenticated-paths: /otel,/api/webhooks
+      unauthenticated-paths: /otel,/api/webhooks,/scim
 
 # Actuator configuration for health and metrics
 management:

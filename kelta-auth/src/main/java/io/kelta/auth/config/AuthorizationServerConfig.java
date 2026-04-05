@@ -18,6 +18,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -46,7 +48,9 @@ import io.kelta.auth.service.WorkerClient;
 import io.kelta.crypto.EncryptionService;
 
 import jakarta.servlet.http.HttpSession;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -124,6 +128,7 @@ public class AuthorizationServerConfig {
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/auth/session",
+                                "/auth/direct-login",
                                 "/error",
                                 "/css/**",
                                 "/js/**",
@@ -187,7 +192,7 @@ public class AuthorizationServerConfig {
                         })
                 )
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/auth/session")
+                        .ignoringRequestMatchers("/auth/session", "/auth/direct-login")
                 );
 
         // Enable federated OAuth2 login only when federation is configured
@@ -290,8 +295,19 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
+    @ConditionalOnMissingBean
+    public JwtEncoder jwtEncoder(JWKSource<SecurityContext> jwkSource) {
+        return new NimbusJwtEncoder(jwkSource);
+    }
+
+    @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
     }
 
     /**

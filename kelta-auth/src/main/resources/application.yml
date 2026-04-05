@@ -50,6 +50,9 @@ kelta:
     ui-base-url: ${UI_BASE_URL:http://localhost:5173}
     # CORS allowed origins
     cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    # Enable direct login endpoint for programmatic auth (e2e tests)
+    direct-login:
+      enabled: ${DIRECT_LOGIN_ENABLED:false}
   internal:
     token: ${KELTA_INTERNAL_TOKEN:}
     # Connected app: Superset OAuth2 client registration

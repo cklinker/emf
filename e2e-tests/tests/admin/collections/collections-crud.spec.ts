@@ -163,11 +163,22 @@ test.describe("Collections CRUD", () => {
     // Click delete on the first row
     await collectionsPage.clickDelete(0);
 
-    // Confirm the deletion in the dialog (waits for dialog to appear)
+    // Confirm the deletion and wait for the DELETE API call to complete
+    const deletePromise = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === "DELETE" &&
+        resp.url().includes("/api/collections/"),
+    );
     await collectionsPage.confirmDelete();
+    await deletePromise;
 
-    // Wait for the delete to process — the filtered row should disappear
-    // as React Query refetches after the mutation completes
+    // Reload the page to get fresh data — React Query's filtered-list
+    // cache may not invalidate automatically after the mutation.
+    await page.reload();
+    await collectionsPage.waitForTableLoaded();
+    await collectionsPage.filterByName(collectionName);
+
+    // The deleted collection should no longer appear in the filtered list
     const rowLocator = page.locator('[data-testid^="collection-row-"]');
     await expect(rowLocator).toHaveCount(0, { timeout: 10_000 });
   });

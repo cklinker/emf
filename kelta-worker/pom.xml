@@ -138,10 +138,11 @@
             <artifactId>spring-boot-starter-opentelemetry</artifactId>
         </dependency>
 
-        <!-- Spring Kafka -->
+        <!-- NATS messaging for configuration updates -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>io.kelta</groupId>
+            <artifactId>runtime-messaging-nats</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <!-- PostgreSQL JDBC Driver -->

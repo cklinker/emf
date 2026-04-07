@@ -1,6 +1,7 @@
 package io.kelta.worker.service;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.query.*;
@@ -8,12 +9,10 @@ import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.worker.repository.DataExportRepository;
 import org.junit.jupiter.api.*;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -27,22 +26,21 @@ class DataExportServiceTest {
     private CollectionRegistry collectionRegistry;
     private JdbcTemplate jdbcTemplate;
     private ObjectMapper objectMapper;
-    private KafkaTemplate<String, String> kafkaTemplate;
+    private PlatformEventPublisher eventPublisher;
     private DataExportService service;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         exportRepository = mock(DataExportRepository.class);
         queryEngine = mock(QueryEngine.class);
         collectionRegistry = mock(CollectionRegistry.class);
         jdbcTemplate = mock(JdbcTemplate.class);
         objectMapper = JsonMapper.builder().build();
-        kafkaTemplate = mock(KafkaTemplate.class);
+        eventPublisher = mock(PlatformEventPublisher.class);
 
         service = new DataExportService(
                 exportRepository, queryEngine, collectionRegistry,
-                jdbcTemplate, objectMapper, Optional.empty(), kafkaTemplate);
+                jdbcTemplate, objectMapper, Optional.empty(), eventPublisher);
     }
 
     @AfterEach
@@ -127,10 +125,6 @@ class DataExportServiceTest {
         QueryResult queryResult = new QueryResult(records, metadata);
         when(queryEngine.executeQuery(eq(definition), any(QueryRequest.class))).thenReturn(queryResult);
 
-        // Setup Kafka
-        when(kafkaTemplate.send(anyString(), anyString(), anyString()))
-                .thenReturn(CompletableFuture.completedFuture(null));
-
         service.executeExport("exp-1", "t1");
 
         // Verify status transitions
@@ -174,10 +168,6 @@ class DataExportServiceTest {
         PaginationMetadata metadata = new PaginationMetadata(1, 1, 1000, 1);
         QueryResult queryResult = new QueryResult(records, metadata);
         when(queryEngine.executeQuery(eq(definition), any(QueryRequest.class))).thenReturn(queryResult);
-
-        // Setup Kafka
-        when(kafkaTemplate.send(anyString(), anyString(), anyString()))
-                .thenReturn(CompletableFuture.completedFuture(null));
 
         service.executeExport("exp-2", "t1");
 

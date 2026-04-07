@@ -1,14 +1,13 @@
 package io.kelta.worker.service;
 
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.worker.repository.EnvironmentPromotionRepository;
 import io.kelta.worker.repository.EnvironmentRepository;
 import org.junit.jupiter.api.*;
-import org.springframework.kafka.core.KafkaTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,24 +22,20 @@ class MetadataPromotionServiceTest {
     private SandboxEnvironmentService sandboxEnvironmentService;
     private PackageService packageService;
     private ObjectMapper objectMapper;
-    private KafkaTemplate<String, String> kafkaTemplate;
+    private PlatformEventPublisher eventPublisher;
     private MetadataPromotionService service;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         promotionRepository = mock(EnvironmentPromotionRepository.class);
         environmentRepository = mock(EnvironmentRepository.class);
         sandboxEnvironmentService = mock(SandboxEnvironmentService.class);
         packageService = mock(PackageService.class);
         objectMapper = JsonMapper.builder().build();
-        kafkaTemplate = mock(KafkaTemplate.class);
-
-        when(kafkaTemplate.send(anyString(), anyString(), anyString()))
-                .thenReturn(CompletableFuture.completedFuture(null));
+        eventPublisher = mock(PlatformEventPublisher.class);
 
         service = new MetadataPromotionService(promotionRepository, environmentRepository,
-                sandboxEnvironmentService, packageService, objectMapper, kafkaTemplate);
+                sandboxEnvironmentService, packageService, objectMapper, eventPublisher);
     }
 
     @Test

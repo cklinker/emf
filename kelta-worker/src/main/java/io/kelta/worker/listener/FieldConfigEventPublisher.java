@@ -4,19 +4,17 @@ import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.EventFactory;
 import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.Map;
 
 /**
  * Before-save hook for the "fields" system collection that publishes
- * collection config change events to Kafka after field create/update/delete.
+ * collection config change events after field create/update/delete.
  *
  * <p>When a field is added, modified, or removed from a collection, this hook
  * publishes a collection UPDATED event so that workers can refresh the collection
@@ -28,15 +26,12 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
 
     private static final Logger log = LoggerFactory.getLogger(FieldConfigEventPublisher.class);
 
-    static final String TOPIC = "kelta.config.collection.changed";
+    static final String SUBJECT_PREFIX = "kelta.config.collection.changed.";
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final PlatformEventPublisher eventPublisher;
 
-    public FieldConfigEventPublisher(KafkaTemplate<String, String> kafkaTemplate,
-                                      ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.objectMapper = objectMapper;
+    public FieldConfigEventPublisher(PlatformEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -80,24 +75,11 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         payload.setId(collectionId);
         payload.setChangeType(ChangeType.UPDATED);
 
-        try {
-            PlatformEvent<CollectionChangedPayload> event =
-                    EventFactory.createEvent(TOPIC, payload);
-            String json = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send(TOPIC, collectionId, json)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.error("Failed to publish collection changed event for field change " +
-                                "(collectionId={}): {}", collectionId, ex.getMessage());
-                    } else {
-                        log.info("Published collection UPDATED event (triggered by field change) " +
-                                "for collectionId={}", collectionId);
-                    }
-                });
-        } catch (JacksonException e) {
-            log.error("Failed to serialize collection changed event for field change " +
-                    "(collectionId={}): {}", collectionId, e.getMessage());
-        }
+        PlatformEvent<CollectionChangedPayload> event =
+                EventFactory.createEvent("kelta.config.collection.changed", payload);
+        String subject = SUBJECT_PREFIX + collectionId;
+        log.info("Publishing collection UPDATED event (triggered by field change) for collectionId={}", collectionId);
+        eventPublisher.publish(subject, event);
     }
 
     private String getString(Map<String, Object> map, String key) {

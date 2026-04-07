@@ -10,24 +10,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
 /**
- * Kafka listener for configuration change events.
+ * Listener for configuration change events.
  *
- * This listener subscribes to Kafka topics:
- * - Collection changed events: Updates route registry when collections are created/updated/deleted
- * - Worker assignment changed events: Updates routes when collections are assigned to workers
+ * <p>Handles:
+ * <ul>
+ *   <li>Collection changed events: Updates route registry when collections are created/updated/deleted</li>
+ *   <li>Worker assignment changed events: Updates routes when collections are assigned to workers</li>
+ * </ul>
  *
- * All event processing is done asynchronously and handles malformed events gracefully
- * by logging errors and continuing to process subsequent events.
- *
- * <p>Uses {@code recordEventKafkaListenerContainerFactory} (StringDeserializer) because
- * the worker publishes events as JSON strings via {@code StringSerializer}. Messages are
- * manually deserialized using {@link ObjectMapper}.
+ * <p>All event processing handles malformed events gracefully by logging errors
+ * and continuing to process subsequent events. Messages are manually deserialized
+ * using {@link ObjectMapper}.
  */
 @Component
 public class ConfigEventListener {
@@ -50,17 +48,10 @@ public class ConfigEventListener {
     }
 
     /**
-     * Handles collection changed events from Kafka.
+     * Handles collection changed events.
      *
-     * <p>Accepts raw JSON strings and manually deserializes because the worker
-     * publishes via {@code KafkaTemplate<String, String>} (StringSerializer),
-     * which does not include type headers needed by JsonDeserializer.
+     * <p>Accepts raw JSON strings and manually deserializes the payload.
      */
-    @KafkaListener(
-        topics = "${kelta.gateway.kafka.topics.collection-changed}",
-        groupId = "${spring.kafka.consumer.group-id}",
-        containerFactory = "recordEventKafkaListenerContainerFactory"
-    )
     public void handleCollectionChanged(String message) {
         try {
             logger.debug("Received collection changed event: {}", message);
@@ -146,16 +137,10 @@ public class ConfigEventListener {
     }
 
     /**
-     * Handles worker assignment changed events from Kafka.
+     * Handles worker assignment changed events.
      *
-     * <p>Accepts raw JSON strings and manually deserializes because the worker
-     * publishes via {@code KafkaTemplate<String, String>} (StringSerializer).
+     * <p>Accepts raw JSON strings and manually deserializes the payload.
      */
-    @KafkaListener(
-        topics = "${kelta.gateway.kafka.topics.worker-assignment-changed:kelta.worker.assignment.changed}",
-        groupId = "${spring.kafka.consumer.group-id}",
-        containerFactory = "recordEventKafkaListenerContainerFactory"
-    )
     public void handleWorkerAssignmentChanged(String message) {
         try {
             logger.debug("Received worker assignment event: {}", message);

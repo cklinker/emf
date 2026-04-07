@@ -65,10 +65,11 @@
             <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
         </dependency>
 
-        <!-- Kafka for configuration updates -->
+        <!-- NATS messaging for configuration updates -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>io.kelta</groupId>
+            <artifactId>runtime-messaging-nats</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <!-- OAuth2 Resource Server for JWT validation -->
@@ -158,12 +159,6 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
 

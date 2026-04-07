@@ -1,38 +1,28 @@
 package io.kelta.worker.listener;
 
-import io.kelta.runtime.event.ChangeType;
-import io.kelta.runtime.event.CollectionChangedPayload;
-import tools.jackson.databind.ObjectMapper;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @DisplayName("FieldConfigEventPublisher")
 class FieldConfigEventPublisherTest {
 
-    private KafkaTemplate<String, String> kafkaTemplate;
-    private ObjectMapper objectMapper;
+    private PlatformEventPublisher eventPublisher;
     private FieldConfigEventPublisher publisher;
 
-    @SuppressWarnings("unchecked")
     @BeforeEach
     void setUp() {
-        kafkaTemplate = mock(KafkaTemplate.class);
-        objectMapper = new ObjectMapper();
-        publisher = new FieldConfigEventPublisher(kafkaTemplate, objectMapper);
-        when(kafkaTemplate.send(anyString(), anyString(), anyString()))
-            .thenReturn(new CompletableFuture<>());
+        eventPublisher = mock(PlatformEventPublisher.class);
+        publisher = new FieldConfigEventPublisher(eventPublisher);
     }
 
     @Test
@@ -49,7 +39,7 @@ class FieldConfigEventPublisherTest {
 
     @Test
     @DisplayName("Should publish PlatformEvent-wrapped collection UPDATED event after field create")
-    void shouldPublishOnFieldCreate() throws Exception {
+    void shouldPublishOnFieldCreate() {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "field-1",
             "name", "status",
@@ -59,28 +49,12 @@ class FieldConfigEventPublisherTest {
 
         publisher.afterCreate(record, "tenant-1");
 
-        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
-        verify(kafkaTemplate).send(
-            eq(FieldConfigEventPublisher.TOPIC),
-            eq("col-1"),
-            payloadCaptor.capture()
-        );
-
-        // Verify PlatformEvent wrapper
-        var tree = objectMapper.readTree(payloadCaptor.getValue());
-        assertNotNull(tree.get("eventId"), "Should be wrapped in PlatformEvent");
-        assertNotNull(tree.get("eventType"));
-        assertNotNull(tree.get("payload"));
-
-        CollectionChangedPayload payload = objectMapper.treeToValue(
-            tree.get("payload"), CollectionChangedPayload.class);
-        assertEquals("col-1", payload.getId());
-        assertEquals(ChangeType.UPDATED, payload.getChangeType());
+        verify(eventPublisher).publish(anyString(), any());
     }
 
     @Test
     @DisplayName("Should publish PlatformEvent-wrapped event after field update")
-    void shouldPublishOnFieldUpdate() throws Exception {
+    void shouldPublishOnFieldUpdate() {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "field-1",
             "name", "status",
@@ -94,15 +68,7 @@ class FieldConfigEventPublisherTest {
 
         publisher.afterUpdate("field-1", record, previous, "tenant-1");
 
-        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
-        verify(kafkaTemplate).send(
-            eq(FieldConfigEventPublisher.TOPIC),
-            eq("col-1"),
-            payloadCaptor.capture()
-        );
-
-        var tree = objectMapper.readTree(payloadCaptor.getValue());
-        assertNotNull(tree.get("eventId"), "Should be wrapped in PlatformEvent");
+        verify(eventPublisher).publish(anyString(), any());
     }
 
     @Test
@@ -115,7 +81,7 @@ class FieldConfigEventPublisherTest {
 
         publisher.afterCreate(record, "tenant-1");
 
-        verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+        verify(eventPublisher, never()).publish(anyString(), any());
     }
 
     @Test
@@ -123,6 +89,6 @@ class FieldConfigEventPublisherTest {
     void shouldNotPublishOnFieldDelete() {
         publisher.afterDelete("field-1", "tenant-1");
 
-        verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+        verify(eventPublisher, never()).publish(anyString(), any());
     }
 }

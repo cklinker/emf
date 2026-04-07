@@ -23,16 +23,18 @@
 
 ## Messaging
 
-**Apache Kafka 3.7.0** (KRaft mode, no Zookeeper)
-- Bootstrap: `${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}`
+**NATS 2.10** (`nats:2.10-alpine` with `--jetstream`)
+- Server: `${NATS_URL:nats://localhost:4222}` (K8s: `nats.nats.svc.cluster.local:4222`)
 
-| Topic | Purpose |
-|-------|---------|
+| Subject | Purpose |
+|---------|---------|
 | `kelta.config.collection.changed` | Schema change events |
 | `kelta.worker.assignment.changed` | Worker assignment changes |
 | `kelta.record.changed` | Record CRUD events |
 
 Event envelope: `PlatformEvent<T>` with `eventId`, `eventType`, `tenantId`, `correlationId`, `timestamp`, `payload`
+Publishing: `PlatformEventPublisher` (replaces former KafkaTemplate usage)
+Subscriptions: `NatsSubscriptionConfig` registration (broadcast consumers for config changes, queue groups for load-balanced work)
 Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/event/`
 
 ## Monitoring & Observability
@@ -69,11 +71,11 @@ Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/event/`
 | Service | Port | Profile |
 |---------|------|---------|
 | PostgreSQL | 5432 | default |
-| Kafka | 9092 | default |
+| NATS | 4222 | default |
 | Redis | 6379 | default |
 | Keycloak | 8180 | default |
 | Cerbos | 3592/3593 | default |
 | Jaeger | 16686 | default |
 | OpenSearch | 9200 | default |
-| Kafka UI | 8090 | tools |
+| NATS Box | 8090 | tools |
 | Redis Commander | 8091 | tools |

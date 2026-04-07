@@ -9,8 +9,6 @@ import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.PlatformEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -41,10 +39,6 @@ public class SvixWebhookPublisher {
         this.objectMapper = objectMapper;
     }
 
-    @KafkaListener(
-            topics = "kelta.config.collection.changed",
-            groupId = "kelta-worker-svix-webhooks"
-    )
     public void onCollectionChanged(String message) {
         try {
             PlatformEvent<CollectionChangedPayload> event = objectMapper.readValue(

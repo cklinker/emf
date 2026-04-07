@@ -5,8 +5,6 @@ import tools.jackson.databind.ObjectMapper;
 import io.kelta.worker.service.SupersetDatasetService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
-
 /**
  * Kafka listener that syncs Superset datasets when collections are
  * created or updated.
@@ -29,10 +27,6 @@ public class SupersetCollectionSyncListener {
         this.objectMapper = objectMapper;
     }
 
-    @KafkaListener(
-            topics = "${kelta.kafka.topics.collection-changed:kelta.config.collection.changed}",
-            groupId = "kelta-worker-superset-datasets"
-    )
     public void onCollectionChanged(String message) {
         try {
             JsonNode event = objectMapper.readTree(message);

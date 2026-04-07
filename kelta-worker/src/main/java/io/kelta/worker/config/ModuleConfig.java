@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import org.springframework.lang.Nullable;
 
 /**
@@ -78,9 +78,8 @@ public class ModuleConfig {
 
     @Bean
     public ModuleConfigEventPublisher moduleConfigEventPublisher(
-            KafkaTemplate<String, String> kafkaTemplate,
-            ObjectMapper objectMapper) {
-        return new ModuleConfigEventPublisher(kafkaTemplate, objectMapper);
+            PlatformEventPublisher eventPublisher) {
+        return new ModuleConfigEventPublisher(eventPublisher);
     }
 
     /**

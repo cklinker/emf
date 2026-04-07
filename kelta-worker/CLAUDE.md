@@ -1,92 +1,132 @@
-# kelta-worker — Claude AI Context
+# kelta-worker
 
-Primary worker service for the Kelta platform. Owns database migrations (Flyway), workflow execution, collection lifecycle management, and business logic.
+Primary service for the Kelta platform. Owns database migrations (Flyway), workflow execution, collection lifecycle, and all business logic.
 
-## Stack
+## Package Layout
 
-| Layer | Technology |
-|-------|-----------|
-| Language | Java 25 |
-| Framework | Spring Boot 4.x |
-| Build | Maven 3.9+ |
-| Database | PostgreSQL + Flyway |
-| Messaging | Kafka (spring-kafka) |
-| Cache | Redis (Spring Data Redis) |
-| Storage | AWS S3 (optional, presigned URLs) |
-| Auth | Cerbos (authorization), JWT via gateway |
-| Webhooks | Svix |
-| Observability | OpenTelemetry, Prometheus, Logstash JSON logs |
+```
+io.kelta.worker/
+  config/          ← Spring @Configuration (Kafka, Cerbos, S3, scheduler, tenant datasource)
+  controller/      ← REST controllers (thin — delegate to services)
+  event/           ← KafkaRecordEventPublisher
+  filter/          ← Servlet filters (tenant context, MDC, metrics, login tracking)
+  flow/            ← JdbcFlowStore (workflow persistence)
+  handler/         ← Action handlers (e.g., SubmitForApprovalActionHandler)
+  interceptor/     ← Cerbos authorization advice
+  listener/        ← Kafka listeners + BeforeSaveHooks (config event publishing)
+  module/          ← Runtime module management
+  repository/      ← JDBC repositories (raw SQL, NOT JPA)
+  scim/            ← SCIM 2.0 protocol (controller, model, service, filter)
+  service/         ← Business logic (45+ services)
+    email/         ← Email providers (SMTP, templates)
+    push/          ← Push notification providers (FCM)
+    sms/           ← SMS providers
+```
 
 ## Key Patterns
 
-### BaseEntity
-
-All new JPA entities extend `BaseEntity` (provides UUID id, createdAt, updatedAt). All new repositories extend `JpaRepository`.
-
-### Kafka Events (ConfigEventPublisher)
-
-Any change to an in-memory registry or cache must be broadcast via Kafka so all pods receive the update. Never call `lifecycleManager.refreshX()` directly from a hook — that only updates the local pod.
-
-Pattern:
-1. Create a `BeforeSaveHook` for the system collection
-2. In after-create/update/delete, publish via `ConfigEventPublisher` (e.g., to `kelta.config.collection.changed`)
-3. All pods consume the event and refresh their local registry
-
-### Flyway Migrations
-
-Migrations live in `src/main/resources/db/migration/`. Always use the next sequential version number. Current range: V1–V67.
-
-### Collection Lifecycle
-
-`CollectionLifecycleManager` handles init, refresh, and teardown of collection routing. `DynamicCollectionRouter` serves JSON:API CRUD for all registered collections.
-
-### Workflow Engine
-
-`WorkflowEngine` evaluates rules and executes actions. `ScheduledWorkflowExecutor` polls every 60s with optimistic locking for due scheduled rules.
-
-## Build and Test Commands
-
-```bash
-# Build runtime dependencies (run from repo root)
-mvn clean install -DskipTests -f kelta-platform/pom.xml \
-  -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
-  -am -B
-
-# Build worker
-mvn clean package -DskipTests -f kelta-worker/pom.xml -B
-
-# Run tests
-mvn verify -f kelta-worker/pom.xml -B
-
-# Run locally
-mvn spring-boot:run -f kelta-worker/pom.xml
-
-# Or use make
-make verify
-make dev
+### Models
+Models are Java records with static factory methods — NOT JPA entities:
+```java
+public record Conversation(UUID id, String tenantId, ...) {
+    public static Conversation create(String tenantId, ...) { ... }
+}
 ```
 
-## Internal API Endpoints (gateway-facing)
+### Repositories
+Custom JDBC repositories using `JdbcTemplate` with raw SQL — NOT Spring Data JPA:
+```java
+@Repository
+public class ApprovalRepository {
+    private final JdbcTemplate jdbcTemplate;
+    // Raw SQL queries via jdbcTemplate.query(), queryForObject(), update()
+}
+```
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /internal/bootstrap` | All active collections + tenant governor limits |
-| `GET /internal/tenants/slug-map` | Slug-to-tenant-ID mapping |
-| `GET /internal/oidc/by-issuer` | OIDC provider lookup by issuer URI |
-| `GET /internal/permissions` | Effective permissions for a user |
+### BeforeSaveHook → Kafka Event Publishing
+When a system collection config changes, broadcast via Kafka so all pods update:
+1. Create a `BeforeSaveHook` implementation
+2. In after-create/update/delete, publish to a Kafka topic
+3. All pods consume the event and refresh local state
 
-## Important Files
+**Reference**: `CollectionConfigEventPublisher.java` (topic: `kelta.config.collection.changed`)
+**Reference**: `FieldConfigEventPublisher.java` (topic: `kelta.config.field.changed`)
 
-- `src/main/resources/application.yml` — primary configuration
-- `src/main/resources/db/migration/` — Flyway migrations (V1–V67)
-- `src/main/java/io/kelta/worker/service/CollectionLifecycleManager.java` — collection init/refresh/teardown
-- `src/main/java/io/kelta/worker/workflow/` — workflow engine and scheduled executor
-- `src/main/java/io/kelta/worker/listener/` — Kafka event consumers
+Never call `lifecycleManager.refreshX()` directly — that only updates the local pod.
 
-## Reference Docs
+### Kafka Listeners
+```java
+@KafkaListener(topics = "kelta.config.collection.changed", groupId = "kelta-worker-collections")
+```
+**Reference**: `CollectionSchemaListener.java`, `FlowEventListener.java`
 
-For deeper context, read the root `.claude/docs/`:
-- `architecture.md` — Service descriptions, layers, data flows
-- `conventions.md` — Java naming, style, import order
-- `integrations.md` — Kafka topics, Cerbos, Svix, S3, Redis
-- `concerns.md` — Security risks, known bugs, tech debt
+### Flyway Migrations
+Location: `src/main/resources/db/migration/`
+Current range: V1–V99. Use the next sequential number.
+```bash
+ls src/main/resources/db/migration/ | tail -3  # Check latest version
+```
+
+### Error Handling
+- `ScimException` → SCIM endpoints (400, 404, 409 with scimType)
+- `EmailDeliveryException` → Email send failures
+- `SmsDeliveryException` → SMS send failures
+- `PushDeliveryException` → Push notification failures
+- Runtime errors caught by Spring `@ExceptionHandler` in `ScimExceptionHandler`
+
+## When Creating a New Endpoint
+
+1. Add a `@RestController` in `controller/` — keep thin, delegate to service
+2. Create or update a service class in `service/`
+3. If it needs persistence, add methods to existing repository or create new `@Repository` with `JdbcTemplate`
+4. Add a test: `src/test/java/io/kelta/worker/controller/MyControllerTest.java`
+
+**Reference**: `ModuleController.java` + `ScimUserControllerTest.java`
+
+## When Adding a BeforeSaveHook
+
+1. Create a class in `listener/` implementing `BeforeSaveHook`
+2. Specify the system collection name it hooks into
+3. In after-create/update/delete, publish a Kafka event via `KafkaTemplate`
+4. Create a corresponding `@KafkaListener` if other pods need to react
+
+**Reference**: `CollectionConfigEventPublisher.java`, `ValidationRuleRefreshHook.java`
+
+## Reference Implementations
+
+| Pattern | File |
+|---------|------|
+| REST controller | `controller/ModuleController.java` |
+| SCIM controller | `scim/controller/ScimUserController.java` |
+| BeforeSaveHook | `listener/CollectionConfigEventPublisher.java` |
+| Kafka listener | `listener/CollectionSchemaListener.java` |
+| JDBC repository | `repository/ApprovalRepository.java` |
+| Service with Kafka | `service/CollectionLifecycleManager.java` |
+| Unit test | `scim/service/ScimUserServiceTest.java` |
+| Controller test | `scim/controller/ScimUserControllerTest.java` |
+| Action handler | `handler/SubmitForApprovalActionHandler.java` |
+
+## Running Tests
+
+```bash
+mvn test                           # All tests
+mvn test -Dtest=ScimUserServiceTest    # Single class
+mvn test -Dtest=ScimUserServiceTest#getUserNotFound  # Single method
+mvn test -Dtest="Scim*"            # Pattern match
+mvn verify -Pintegration-tests     # Include integration tests
+```
+
+## Build Commands
+
+```bash
+make build     # mvn clean package -DskipTests
+make test      # mvn test
+make verify    # mvn verify -Pintegration-tests
+make dev       # mvn spring-boot:run
+make lint      # mvn checkstyle:check
+make format    # mvn spotless:check
+```
+
+## Test Fixtures
+
+Use `TestFixtures.java` in `src/test/java/io/kelta/worker/` for pre-built domain objects. Leverage `CollectionDefinitionBuilder` and `FieldDefinitionBuilder` from runtime-core for collection/field fixtures.

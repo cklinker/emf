@@ -1,72 +1,102 @@
-# kelta-ai — Claude Code Instructions
+# kelta-ai
 
-## Service Overview
+AI assistant service for the Kelta platform. Wraps the Anthropic Claude API for schema-aware, tenant-scoped AI interactions with SSE streaming support.
 
-AI assistant service for the Kelta Enterprise Platform. Wraps the Anthropic Claude API to deliver schema-aware, tenant-scoped AI interactions. Responses may be streamed via Server-Sent Events (SSE).
+## Package Layout
 
-## Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Language | Java 25 |
-| Framework | Spring Boot 4.x (Web + WebFlux) |
-| AI SDK | `anthropic-java` 2.18.0 |
-| Database | PostgreSQL + Flyway |
-| Cache | Redis (Spring Data Redis) |
-| Build | Maven 3.9.x |
+```
+io.kelta.ai/
+  config/          ← AiConfigProperties (record), AnthropicConfig, WebConfig
+  controller/      ← ChatController (SSE), ChatHistoryController, ProposalController, AiConfigController, AiUsageController
+  filter/          ← TenantContextFilter, TokenLimitFilter
+  model/           ← Records: Conversation, ChatMessage, AiProposal
+  repository/      ← JPA repositories: ConversationRepository, ChatMessageRepository, AiConfigRepository, TokenUsageRepository
+  service/         ← AnthropicService, ChatService, ProposalService, SystemPromptService, TokenTrackingService, WorkerApiClient
+```
 
 ## Key Patterns
 
-- **Streaming**: Use `WebFlux` + SSE for streaming Claude responses. Never block on `Flux` inside a `@RestController`.
-- **Tenant isolation**: Always resolve `TenantContext` from the incoming request before building prompts. Never share context across tenant boundaries.
-- **Context management**: Conversation history and context windows are stored in Redis (short-term) and PostgreSQL (long-term). Use the `ConversationContextService` abstraction.
-- **Prompt templates**: Prompts are constructed via `PromptBuilder` — do not inline raw strings in controllers or service methods.
-- **Error handling**: Anthropic rate limit errors (`429`) must be retried with exponential backoff. Map other SDK errors to appropriate HTTP status codes via `AiExceptionHandler`.
-- **Entities**: All new JPA entities extend `BaseEntity` (UUID id, createdAt, updatedAt).
-- **No star imports**: Enforced by Checkstyle.
-
-## Build & Test Commands
-
-```bash
-# Build (skip tests)
-mvn clean package -DskipTests
-
-# Run all tests
-mvn test
-
-# Full verify (build + checkstyle + tests)
-mvn verify
-
-# Apply Google Java Format
-mvn spotless:apply
-
-# Check formatting without applying
-mvn spotless:check
-
-# Checkstyle report
-mvn checkstyle:check
-
-# Run dev server (requires .env populated)
-mvn spring-boot:run
+### Models
+All models are Java records with static factory methods:
+```java
+public record Conversation(UUID id, String tenantId, String userId, String title, Instant createdAt, Instant updatedAt) {
+    public static Conversation create(String tenantId, String userId, String title) { ... }
+}
 ```
 
-Or use the `Makefile` shortcuts:
+### SSE Streaming
+`ChatController` returns `SseEmitter` for streaming Claude responses:
+```java
+@PostMapping("/stream")
+public SseEmitter chatStream(@RequestHeader("X-Tenant-ID") String tenantId, ...) {
+    SseEmitter emitter = new SseEmitter(config.sseTimeoutMs());
+    // Non-blocking: returns immediately, streams data to client
+}
+```
+**Reference**: `ChatController.java`
 
-```bash
-make build
-make test
-make verify
-make format
-make lint
-make dev
+### Anthropic API Integration
+- `AnthropicService` wraps `anthropic-java` SDK v2.18.0
+- Model configurable via `AiConfigProperties` (default: `claude-sonnet-4-20250514`)
+- Rate limit errors (429) retried with exponential backoff
+- Context built via `SystemPromptService` using schema from `WorkerApiClient`
+
+### Config Properties
+```java
+@ConfigurationProperties(prefix = "kelta.ai")
+public record AiConfigProperties(
+    AnthropicProperties anthropic,  // apiKey, defaultModel, defaultMaxTokens, defaultTemperature
+    String workerServiceUrl,
+    long sseTimeoutMs
+) {}
 ```
 
-## Environment
+### Error Handling
+- Anthropic 429 → exponential backoff retry
+- Map SDK errors to HTTP status codes
+- No custom exception classes — uses standard Spring exceptions
 
-Copy `.env.example` to `.env` and populate before running locally. The `ANTHROPIC_API_KEY` is required.
+## When Adding a New Endpoint
 
-## Reference Docs
+1. Add method to existing controller or create new `@RestController` in `controller/`
+2. Accept `@RequestHeader("X-Tenant-ID")` and `@RequestHeader("X-User-Id")` for tenant isolation
+3. Delegate to service in `service/`
+4. Add test in `src/test/java/io/kelta/ai/controller/`
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — service internals, request flow, context management
-- [docs/api/README.md](docs/api/README.md) — REST/SSE endpoint reference
-- [../../.claude/docs/integrations.md](../../.claude/docs/integrations.md) — platform-level integrations (Kafka, Redis, Cerbos)
+**Reference**: `ChatController.java` + `ChatControllerTest.java`
+
+## Reference Implementations
+
+| Pattern | File |
+|---------|------|
+| SSE streaming | `controller/ChatController.java` |
+| REST controller | `controller/ChatHistoryController.java` |
+| Anthropic wrapper | `service/AnthropicService.java` |
+| Conversation mgmt | `service/ChatService.java` |
+| Worker HTTP client | `service/WorkerApiClient.java` |
+| Controller test | `controller/ChatControllerTest.java` |
+| Service test | `service/AnthropicServiceTest.java` |
+
+## Running Tests
+
+```bash
+mvn test                                # All tests
+mvn test -Dtest=ChatControllerTest      # Single class
+mvn test -Dtest=ChatControllerTest#sendsChatMessage  # Single method
+mvn test -Dtest="*Service*"             # Pattern match
+```
+
+## Build Commands
+
+```bash
+make build     # mvn clean package -DskipTests
+make test      # mvn test
+make verify    # mvn verify
+make dev       # mvn spring-boot:run (requires ANTHROPIC_API_KEY)
+make lint      # mvn checkstyle:check
+make format    # mvn spotless:check
+```
+
+## Test Fixtures
+
+Use `TestFixtures.java` in `src/test/java/io/kelta/ai/` for pre-built `Conversation`, `ChatMessage`, `AiProposal`, and `AiConfigProperties` instances.

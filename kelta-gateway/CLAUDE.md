@@ -1,56 +1,115 @@
-# kelta-gateway — Claude Instructions
+# kelta-gateway
 
-## Stack
+Spring Cloud Gateway — API entry point for all Kelta platform requests. Handles JWT authentication, tenant resolution, Cerbos authorization, rate limiting, and dynamic routing to backend services.
 
-- **Java 25**, Spring Boot 4.0.5, Maven
-- **Spring Cloud Gateway 2025.1.1** (WebFlux-based reactive gateway)
-- **Spring Security** with OAuth2 Resource Server (JWT validation)
-- **Redis** (reactive) for rate limiting and token caching
-- **Kafka** for receiving config change events from other services
-- **Cerbos** (gRPC) for authorization policy enforcement
-- **OpenTelemetry** with OTLP export for traces and metrics
+## Package Layout
+
+```
+io.kelta.gateway/
+  auth/            ← JWT validation, PAT auth, principal extraction, public path matching
+  authz/           ← Route authorization filter + Cerbos integration
+    cerbos/        ← CerbosAuthorizationService, CerbosConfig, CerbosPrincipalBuilder
+  cache/           ← GatewayCacheManager
+  config/          ← Spring Security, Redis, Kafka, route init, WebSocket, service accounts
+  error/           ← Exception classes + GlobalErrorHandler
+  filter/          ← Gateway filters (tenant, security headers, rate limit, logging, caching)
+  health/          ← Health indicators (Kafka, Redis, Worker)
+  listener/        ← Kafka consumers (config events, realtime bridge)
+  metrics/         ← GatewayMetrics (Micrometer)
+  ratelimit/       ← Redis-backed rate limiter
+  route/           ← DynamicRouteLocator, RouteRegistry, RouteDefinition
+  service/         ← RouteConfigService
+  websocket/       ← Real-time subscriptions (WebSocket handler, SubscriptionManager)
+```
 
 ## Key Patterns
 
-- All filters are `GatewayFilter` or `GlobalFilter` implementations using reactive `Mono`/`Flux`.
-- JWT claims are extracted once per request and propagated via `ServerWebExchange` attributes.
-- Tenant context is resolved from the JWT `tenant_id` claim before routing decisions are made.
-- Rate limiting uses `ReactiveRedisRateLimiter`; keys are scoped per tenant + principal.
-- Authorization calls to Cerbos are made after JWT validation, before upstream forwarding.
-- Config updates (e.g., route changes) arrive via Kafka (`kelta.config.*` topics) and update in-memory state on all pods.
+### Reactive Filters
+All filters use reactive `Mono`/`Flux` — never block in the filter chain:
+```java
+public class MyFilter implements GlobalFilter, Ordered {
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        // Extract from exchange, transform, chain.filter(exchange)
+    }
+}
+```
+**Reference**: `TenantResolutionFilter.java`, `SecurityHeadersFilter.java`
 
-## Build and Test Commands
+### Per-Request State
+Use `ServerWebExchange` attributes — never instance fields:
+```java
+exchange.getAttributes().put("tenantId", tenantId);
+```
+
+### Dynamic Routing
+Routes are loaded from worker at startup and updated via Kafka events:
+- `RouteRegistry` — in-memory route store
+- `DynamicRouteLocator` — bridges RouteRegistry with Spring Cloud Gateway
+- `ConfigEventListener` — consumes `kelta.config.collection.changed` and updates routes
+
+### Error Handling
+| Exception | When |
+|-----------|------|
+| `GatewayAuthenticationException` | JWT validation fails |
+| `GatewayAuthorizationException` | Cerbos denies access |
+| `RateLimitExceededException` | Rate limit hit |
+| `RouteNotFoundException` | No matching route |
+
+All handled by `GlobalErrorHandler`.
+
+### Authorization Flow
+1. `JwtAuthenticationFilter` validates token
+2. `TenantResolutionFilter` extracts tenant from JWT claims
+3. `RouteAuthorizationFilter` calls `CerbosAuthorizationService` (gRPC)
+4. If authorized, request forwarded to worker
+
+## When Creating a New Filter
+
+1. Create class in `filter/` implementing `GlobalFilter` (or `GatewayFilter` for per-route)
+2. Implement `Ordered` to control filter chain position
+3. Use `ServerWebExchange` for request/response access
+4. Add test in `src/test/java/io/kelta/gateway/filter/`
+
+**Reference**: `RequestLoggingFilter.java`, `IpRateLimitFilter.java`
+
+## Reference Implementations
+
+| Pattern | File |
+|---------|------|
+| Global filter | `filter/TenantResolutionFilter.java` |
+| Route filter | `filter/SystemCollectionResponseCacheFilter.java` |
+| Auth filter | `auth/JwtAuthenticationFilter.java` |
+| Kafka listener | `listener/ConfigEventListener.java` |
+| Error handler | `error/GlobalErrorHandler.java` |
+| Health indicator | `health/WorkerHealthIndicator.java` |
+| Unit test | Any test in `src/test/java/io/kelta/gateway/` |
+
+## Running Tests
 
 ```bash
-make build        # compile only
-make test         # unit tests
-make verify       # full build + lint + coverage
-make lint         # Checkstyle only
-make format-fix   # apply Spotless formatting
-make dev          # run locally with local profile
+mvn test                              # All tests
+mvn test -Dtest=GatewayMetricsTest    # Single class
+mvn test -Dtest=GatewayMetricsTest#shouldRecordRequestDuration  # Single method
+mvn test -Dtest="*Filter*"            # Pattern match
 ```
 
-Equivalent Maven commands:
+## Build Commands
+
 ```bash
-./mvnw verify
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
-```
-
-## File Layout
-
-```
-src/main/java/io/kelta/gateway/
-  config/          # Spring Security, Redis, routing config classes
-  filter/          # Global and route-specific gateway filters
-  security/        # JWT extractors, tenant resolution, Cerbos client
-  ratelimit/       # Rate limiter implementations
-  kafka/           # Kafka consumers for config events
-src/test/java/     # Unit and slice tests mirroring main structure
-checkstyle.xml     # Checkstyle rules (warnings only, not blocking)
+make build     # mvn clean package -DskipTests
+make test      # mvn test
+make verify    # mvn verify
+make dev       # mvn spring-boot:run
+make lint      # mvn checkstyle:check
+make format    # mvn spotless:check
 ```
 
 ## Do Not
 
-- Do not call blocking APIs from reactive filter chains — use `.subscribeOn(Schedulers.boundedElastic())` only when unavoidable.
-- Do not store per-request state in instance fields — use `ServerWebExchange` attributes.
-- Do not bypass JWT validation for any route except `/actuator/health`.
+- Block in reactive filter chains — use `.subscribeOn(Schedulers.boundedElastic())` only when unavoidable
+- Store per-request state in instance fields — use `ServerWebExchange` attributes
+- Bypass JWT validation for any route except `/actuator/health`
+
+## Test Fixtures
+
+Use `TestFixtures.java` in `src/test/java/io/kelta/gateway/` for pre-built `RouteDefinition`, `GatewayPrincipal`, and `RateLimitConfig` instances.

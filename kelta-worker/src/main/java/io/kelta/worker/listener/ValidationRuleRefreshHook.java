@@ -4,19 +4,18 @@ import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.EventFactory;
 import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.workflow.BeforeSaveHook;
-import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.List;
 import java.util.Map;
 
 /**
  * After-save hook for the "validation-rules" system collection that broadcasts
- * a collection-changed Kafka event whenever a validation rule is created,
+ * a collection-changed event whenever a validation rule is created,
  * updated, or deleted.
  *
  * <p>This event is consumed by {@link CollectionSchemaListener} on <em>every</em>
@@ -38,15 +37,12 @@ public class ValidationRuleRefreshHook implements BeforeSaveHook {
             SELECT name, tenant_id FROM collection WHERE id = ? LIMIT 1
             """;
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final PlatformEventPublisher eventPublisher;
     private final JdbcTemplate jdbcTemplate;
 
-    public ValidationRuleRefreshHook(KafkaTemplate<String, String> kafkaTemplate,
-                                      ObjectMapper objectMapper,
+    public ValidationRuleRefreshHook(PlatformEventPublisher eventPublisher,
                                       JdbcTemplate jdbcTemplate) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -103,27 +99,13 @@ public class ValidationRuleRefreshHook implements BeforeSaveHook {
         payload.setName(collectionName);
         payload.setChangeType(ChangeType.UPDATED);
 
-        try {
-            PlatformEvent<CollectionChangedPayload> event =
-                    EventFactory.createEvent(CollectionConfigEventPublisher.TOPIC, payload);
-            event.setTenantId(tenantId);
-            String json = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send(CollectionConfigEventPublisher.TOPIC, collectionId, json)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.error("Failed to publish collection-changed event for " +
-                                "validation rule change (collectionId={}): {}",
-                                collectionId, ex.getMessage());
-                    } else {
-                        log.info("Published collection-changed event for validation rule " +
-                                "change (collectionId={}, collectionName={})",
-                                collectionId, collectionName);
-                    }
-                });
-        } catch (Exception e) {
-            log.error("Failed to serialize collection-changed event for collectionId={}: {}",
-                    collectionId, e.getMessage());
-        }
+        PlatformEvent<CollectionChangedPayload> event =
+                EventFactory.createEvent("kelta.config.collection.changed", payload);
+        event.setTenantId(tenantId);
+        String subject = CollectionConfigEventPublisher.SUBJECT_PREFIX + collectionId;
+        log.info("Publishing collection-changed event for validation rule change " +
+                "(collectionId={}, collectionName={})", collectionId, collectionName);
+        eventPublisher.publish(subject, event);
     }
 
     private String resolveCollectionName(String collectionId) {

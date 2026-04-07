@@ -4,7 +4,6 @@ import tools.jackson.databind.ObjectMapper;
 import io.kelta.worker.service.CerbosAuthorizationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -30,10 +29,6 @@ public class CerbosCacheInvalidationListener {
         this.objectMapper = objectMapper;
     }
 
-    @KafkaListener(
-        topics = "kelta.cerbos.policies.changed",
-        groupId = "${spring.kafka.consumer.group-id}"
-    )
     @SuppressWarnings("unchecked")
     public void handlePolicyChanged(String message) {
         try {

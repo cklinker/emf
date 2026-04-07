@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -75,11 +74,6 @@ public class FlowEventListener {
      *
      * @param message the raw JSON Kafka message
      */
-    @KafkaListener(
-        topics = "kelta.record.changed",
-        groupId = "kelta-worker-flows",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
     public void handleRecordChanged(String message) {
         try {
             var tree = objectMapper.readTree(message);

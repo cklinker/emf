@@ -2,22 +2,18 @@ package io.kelta.worker.module;
 
 import io.kelta.runtime.event.EventFactory;
 import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.event.ModuleChangeType;
 import io.kelta.runtime.event.ModuleChangedPayload;
 import io.kelta.runtime.module.TenantModuleData;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
 
 /**
- * Publishes module lifecycle events to Kafka for cross-pod propagation.
+ * Publishes module lifecycle events for cross-pod propagation.
  * <p>
  * When a module is installed, enabled, disabled, or uninstalled on one pod,
  * this publisher sends an event so all other pods can update their handler registries.
- * <p>
- * Follows the same pattern as {@link io.kelta.worker.listener.CollectionConfigEventPublisher}.
  *
  * @since 1.0.0
  */
@@ -25,15 +21,12 @@ public class ModuleConfigEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(ModuleConfigEventPublisher.class);
 
-    static final String TOPIC = "kelta.config.module.changed";
+    private static final String SUBJECT_PREFIX = "kelta.config.module.changed.";
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final PlatformEventPublisher eventPublisher;
 
-    public ModuleConfigEventPublisher(KafkaTemplate<String, String> kafkaTemplate,
-                                       ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.objectMapper = objectMapper;
+    public ModuleConfigEventPublisher(PlatformEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -49,25 +42,11 @@ public class ModuleConfigEventPublisher {
             module.manifest(), changeType
         );
 
-        try {
-            PlatformEvent<ModuleChangedPayload> event = EventFactory.createEvent(TOPIC, payload);
-            String json = objectMapper.writeValueAsString(event);
-            String key = module.tenantId() + ":" + module.moduleId();
-
-            kafkaTemplate.send(TOPIC, key, json)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.error("Failed to publish module {} event for '{}' (tenant={}): {}",
-                            changeType, module.moduleId(), module.tenantId(), ex.getMessage());
-                    } else {
-                        log.info("Published module {} event for '{}' v{} (tenant={}) to topic '{}'",
-                            changeType, module.moduleId(), module.version(),
-                            module.tenantId(), TOPIC);
-                    }
-                });
-        } catch (JacksonException e) {
-            log.error("Failed to serialize module changed event for '{}' (tenant={}): {}",
-                module.moduleId(), module.tenantId(), e.getMessage());
-        }
+        PlatformEvent<ModuleChangedPayload> event =
+                EventFactory.createEvent("kelta.config.module.changed", payload);
+        String subject = SUBJECT_PREFIX + module.tenantId() + "." + module.moduleId();
+        log.info("Publishing module {} event for '{}' v{} (tenant={}) to '{}'",
+                changeType, module.moduleId(), module.version(), module.tenantId(), subject);
+        eventPublisher.publish(subject, event);
     }
 }

@@ -13,7 +13,7 @@
     <artifactId>runtime-events</artifactId>
 
     <name>Kelta Runtime Events</name>
-    <description>Shared event classes for Kafka messaging across Kelta services</description>
+    <description>Shared event classes and messaging abstractions for Kelta services</description>
 
     <dependencies>
         <!-- Jackson for JSON serialization -->

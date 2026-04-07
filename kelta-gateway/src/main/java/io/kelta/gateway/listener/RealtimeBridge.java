@@ -5,7 +5,6 @@ import io.kelta.gateway.websocket.RealtimeWebSocketHandler;
 import io.kelta.gateway.websocket.SubscriptionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketSession;
 
@@ -14,34 +13,27 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Bridges Kafka record change events to WebSocket subscribers.
+ * Bridges record change events to WebSocket subscribers.
  *
- * <p>Consumes from {@code kelta.record.changed} topic using a separate
- * consumer group from the config event listeners. Routes events to
- * subscribed WebSocket sessions based on tenant and collection.
+ * <p>Routes events to subscribed WebSocket sessions based on tenant and collection.
  *
  * @since 1.0.0
  */
 @Component
-public class RealtimeKafkaBridge {
+public class RealtimeBridge {
 
-    private static final Logger log = LoggerFactory.getLogger(RealtimeKafkaBridge.class);
+    private static final Logger log = LoggerFactory.getLogger(RealtimeBridge.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final SubscriptionManager subscriptionManager;
     private final RealtimeWebSocketHandler webSocketHandler;
 
-    public RealtimeKafkaBridge(SubscriptionManager subscriptionManager,
-                                RealtimeWebSocketHandler webSocketHandler) {
+    public RealtimeBridge(SubscriptionManager subscriptionManager,
+                          RealtimeWebSocketHandler webSocketHandler) {
         this.subscriptionManager = subscriptionManager;
         this.webSocketHandler = webSocketHandler;
     }
 
-    @KafkaListener(
-            topics = "${kelta.kafka.topics.record-changed:kelta.record.changed}",
-            groupId = "kelta-gateway-realtime",
-            containerFactory = "recordEventKafkaListenerContainerFactory"
-    )
     @SuppressWarnings("unchecked")
     public void onRecordChanged(String message) {
         try {

@@ -10,7 +10,6 @@ import io.kelta.worker.service.SearchIndexService;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -52,11 +51,6 @@ public class SearchIndexListener {
      *
      * @param message the raw JSON Kafka message
      */
-    @KafkaListener(
-        topics = "kelta.record.changed",
-        groupId = "kelta-worker-search-index",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
     public void handleRecordChanged(String message) {
         try {
             var tree = objectMapper.readTree(message);

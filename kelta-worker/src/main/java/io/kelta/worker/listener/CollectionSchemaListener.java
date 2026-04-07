@@ -7,7 +7,6 @@ import io.kelta.worker.service.SearchIndexService;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 /**
@@ -50,11 +49,6 @@ public class CollectionSchemaListener {
      *
      * @param message the raw JSON message from Kafka
      */
-    @KafkaListener(
-            topics = "${kelta.kafka.topics.collection-changed:kelta.config.collection.changed}",
-            groupId = "${kelta.worker.id:kelta-worker-default}-schema",
-            containerFactory = "kafkaListenerContainerFactory"
-    )
     public void handleCollectionChanged(String message) {
         log.debug("Received collection changed event: {}", message);
 

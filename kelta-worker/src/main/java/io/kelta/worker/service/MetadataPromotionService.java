@@ -1,10 +1,12 @@
 package io.kelta.worker.service;
 
+import io.kelta.runtime.event.EventFactory;
+import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.worker.repository.EnvironmentPromotionRepository;
 import io.kelta.worker.repository.EnvironmentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -16,27 +18,27 @@ import java.util.*;
 public class MetadataPromotionService {
 
     private static final Logger log = LoggerFactory.getLogger(MetadataPromotionService.class);
-    private static final String KAFKA_TOPIC_PROMOTION = "kelta.config.promotion.executed";
+    private static final String SUBJECT_PROMOTION = "kelta.config.promotion.executed";
 
     private final EnvironmentPromotionRepository promotionRepository;
     private final EnvironmentRepository environmentRepository;
     private final SandboxEnvironmentService sandboxEnvironmentService;
     private final PackageService packageService;
     private final ObjectMapper objectMapper;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final PlatformEventPublisher eventPublisher;
 
     public MetadataPromotionService(EnvironmentPromotionRepository promotionRepository,
                                     EnvironmentRepository environmentRepository,
                                     SandboxEnvironmentService sandboxEnvironmentService,
                                     PackageService packageService,
                                     ObjectMapper objectMapper,
-                                    KafkaTemplate<String, String> kafkaTemplate) {
+                                    PlatformEventPublisher eventPublisher) {
         this.promotionRepository = promotionRepository;
         this.environmentRepository = environmentRepository;
         this.sandboxEnvironmentService = sandboxEnvironmentService;
         this.packageService = packageService;
         this.objectMapper = objectMapper;
-        this.kafkaTemplate = kafkaTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     public Map<String, Object> createPromotion(String tenantId, String sourceEnvId, String targetEnvId,
@@ -245,17 +247,16 @@ public class MetadataPromotionService {
     private void publishPromotionEvent(String tenantId, String promotionId,
                                         String sourceEnvId, String targetEnvId, String status) {
         try {
-            Map<String, Object> event = Map.of(
-                    "type", "promotion.executed",
-                    "tenantId", tenantId,
+            Map<String, Object> payload = Map.of(
                     "promotionId", promotionId,
                     "sourceEnvironmentId", sourceEnvId,
                     "targetEnvironmentId", targetEnvId,
-                    "status", status,
-                    "timestamp", Instant.now().toString()
+                    "status", status
             );
-            String json = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send(KAFKA_TOPIC_PROMOTION, tenantId + ":" + promotionId, json);
+            PlatformEvent<Map<String, Object>> event = EventFactory.createEvent("promotion.executed", payload);
+            event.setTenantId(tenantId);
+            String subject = SUBJECT_PROMOTION + "." + tenantId + "." + promotionId;
+            eventPublisher.publish(subject, event);
         } catch (Exception e) {
             log.error("Failed to publish promotion event for {} (tenant={})", promotionId, tenantId, e);
         }

@@ -10,17 +10,6 @@ spring:
   codec:
     max-in-memory-size: 10MB
 
-  # Kafka configuration for receiving configuration updates
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      group-id: kelta-gateway
-      auto-offset-reset: latest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: io.kelta.gateway.event,java.util
-  
   # Redis configuration for caching and rate limiting
   data:
     redis:
@@ -59,6 +48,9 @@ spring:
 
 # Kelta Gateway specific configuration
 kelta:
+  nats:
+    url: ${NATS_URL:nats://localhost:4222}
+    connection-name: kelta-gateway
   gateway:
     # Tenant slug URL prefix configuration
     tenant-slug:
@@ -72,13 +64,6 @@ kelta:
 
     # AI service URL (used for routing /api/ai/** requests)
     ai-service-url: ${AI_SERVICE_URL:http://emf-ai:80}
-    
-    # Kafka topics for configuration updates and record change events
-    kafka:
-      topics:
-        collection-changed: kelta.config.collection.changed
-        worker-assignment-changed: kelta.worker.assignment.changed
-        record-changed: kelta.record.changed
     
     # Rate limiting is driven by per-tenant governor limits (apiCallsPerDay)
     # fetched from the worker during bootstrap.
@@ -117,7 +102,7 @@ management:
     redis:
       enabled: true
     kafka:
-      enabled: true
+      enabled: false
   tracing:
     export:
       enabled: true

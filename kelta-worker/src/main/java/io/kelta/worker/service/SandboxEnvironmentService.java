@@ -1,10 +1,12 @@
 package io.kelta.worker.service;
 
+import io.kelta.runtime.event.EventFactory;
+import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.worker.repository.EnvironmentRepository;
 import io.kelta.worker.repository.PackageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -16,21 +18,21 @@ import java.util.*;
 public class SandboxEnvironmentService {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxEnvironmentService.class);
-    private static final String KAFKA_TOPIC_ENV_CHANGED = "kelta.config.environment.changed";
+    private static final String SUBJECT_ENV_CHANGED = "kelta.config.environment.changed";
 
     private final EnvironmentRepository environmentRepository;
     private final PackageRepository packageRepository;
     private final ObjectMapper objectMapper;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final PlatformEventPublisher eventPublisher;
 
     public SandboxEnvironmentService(EnvironmentRepository environmentRepository,
                                      PackageRepository packageRepository,
                                      ObjectMapper objectMapper,
-                                     KafkaTemplate<String, String> kafkaTemplate) {
+                                     PlatformEventPublisher eventPublisher) {
         this.environmentRepository = environmentRepository;
         this.packageRepository = packageRepository;
         this.objectMapper = objectMapper;
-        this.kafkaTemplate = kafkaTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     public Map<String, Object> ensureProductionEnvironment(String tenantId, String createdBy) {
@@ -370,15 +372,14 @@ public class SandboxEnvironmentService {
 
     private void publishEnvironmentEvent(String tenantId, String envId, String changeType) {
         try {
-            Map<String, Object> event = Map.of(
-                    "type", "environment.changed",
-                    "tenantId", tenantId,
+            Map<String, Object> payload = Map.of(
                     "environmentId", envId,
-                    "changeType", changeType,
-                    "timestamp", Instant.now().toString()
+                    "changeType", changeType
             );
-            String json = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send(KAFKA_TOPIC_ENV_CHANGED, tenantId + ":" + envId, json);
+            PlatformEvent<Map<String, Object>> event = EventFactory.createEvent("environment.changed", payload);
+            event.setTenantId(tenantId);
+            String subject = SUBJECT_ENV_CHANGED + "." + tenantId + "." + envId;
+            eventPublisher.publish(subject, event);
             log.debug("Published environment {} event for env {} (tenant={})", changeType, envId, tenantId);
         } catch (Exception e) {
             log.error("Failed to publish environment event for {} (tenant={})", envId, tenantId, e);

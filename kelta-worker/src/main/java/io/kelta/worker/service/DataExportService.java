@@ -1,6 +1,9 @@
 package io.kelta.worker.service;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.event.EventFactory;
+import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.query.*;
@@ -9,7 +12,6 @@ import io.kelta.worker.repository.DataExportRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -35,7 +37,7 @@ public class DataExportService {
 
     private static final Logger log = LoggerFactory.getLogger(DataExportService.class);
     private static final int EXPORT_PAGE_SIZE = 1000;
-    private static final String KAFKA_TOPIC = "kelta.data.export.completed";
+    private static final String SUBJECT_EXPORT_COMPLETED = "kelta.data.export.completed";
 
     private final DataExportRepository exportRepository;
     private final QueryEngine queryEngine;
@@ -43,7 +45,7 @@ public class DataExportService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final S3StorageService s3StorageService;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final PlatformEventPublisher eventPublisher;
 
     public DataExportService(DataExportRepository exportRepository,
                              QueryEngine queryEngine,
@@ -51,14 +53,14 @@ public class DataExportService {
                              JdbcTemplate jdbcTemplate,
                              ObjectMapper objectMapper,
                              Optional<S3StorageService> s3StorageService,
-                             KafkaTemplate<String, String> kafkaTemplate) {
+                             PlatformEventPublisher eventPublisher) {
         this.exportRepository = exportRepository;
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.s3StorageService = s3StorageService.orElse(null);
-        this.kafkaTemplate = kafkaTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -415,24 +417,17 @@ public class DataExportService {
                                         String format, int recordCount) {
         try {
             Map<String, Object> payload = Map.of(
-                    "eventType", "data.export.completed",
-                    "tenantId", tenantId,
                     "exportId", exportId,
                     "format", format,
-                    "recordCount", recordCount,
-                    "timestamp", Instant.now().toString()
+                    "recordCount", recordCount
             );
-            String key = tenantId + ":" + exportId;
-            String json = objectMapper.writeValueAsString(payload);
-            kafkaTemplate.send(KAFKA_TOPIC, key, json)
-                    .whenComplete((result, ex) -> {
-                        if (ex != null) {
-                            log.error("Failed to publish export completed event: exportId={}, error={}",
-                                    exportId, ex.getMessage());
-                        }
-                    });
+            PlatformEvent<Map<String, Object>> event = EventFactory.createEvent("data.export.completed", payload);
+            event.setTenantId(tenantId);
+            String subject = SUBJECT_EXPORT_COMPLETED + "." + tenantId + "." + exportId;
+            eventPublisher.publish(subject, event);
         } catch (Exception e) {
-            log.error("Failed to serialize export completed event: {}", e.getMessage());
+            log.error("Failed to publish export completed event: exportId={}, error={}",
+                    exportId, e.getMessage());
         }
     }
 

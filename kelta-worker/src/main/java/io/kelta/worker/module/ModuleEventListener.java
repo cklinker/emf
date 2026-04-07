@@ -7,7 +7,6 @@ import io.kelta.runtime.module.TenantModuleData;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -39,11 +38,6 @@ public class ModuleEventListener {
         this.objectMapper = objectMapper;
     }
 
-    @KafkaListener(
-        topics = "${kelta.kafka.topics.module-changed:kelta.config.module.changed}",
-        groupId = "${kelta.worker.id:kelta-worker-default}-modules",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
     public void handleModuleChanged(String message) {
         log.debug("Received module changed event: {}", message);
 

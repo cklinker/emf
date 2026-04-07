@@ -39,7 +39,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
+import io.kelta.runtime.event.PlatformEventPublisher;
 
 import java.util.List;
 import java.util.Map;
@@ -184,16 +184,15 @@ public class FlowConfig {
     }
 
     // ---------------------------------------------------------------------------
-    // Before-save hook publishers — emit Kafka events on collection/field changes
+    // Before-save hook publishers — emit events on collection/field changes
     // ---------------------------------------------------------------------------
 
     @Bean
     public CollectionConfigEventPublisher collectionConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
-            KafkaTemplate<String, String> kafkaTemplate,
-            ObjectMapper objectMapper) {
+            PlatformEventPublisher eventPublisher) {
         CollectionConfigEventPublisher publisher =
-                new CollectionConfigEventPublisher(kafkaTemplate, objectMapper);
+                new CollectionConfigEventPublisher(eventPublisher);
         hookRegistry.register(publisher);
         return publisher;
     }
@@ -201,10 +200,9 @@ public class FlowConfig {
     @Bean
     public FieldConfigEventPublisher fieldConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
-            KafkaTemplate<String, String> kafkaTemplate,
-            ObjectMapper objectMapper) {
+            PlatformEventPublisher eventPublisher) {
         FieldConfigEventPublisher publisher =
-                new FieldConfigEventPublisher(kafkaTemplate, objectMapper);
+                new FieldConfigEventPublisher(eventPublisher);
         hookRegistry.register(publisher);
         return publisher;
     }
@@ -234,11 +232,10 @@ public class FlowConfig {
     @Bean
     public ValidationRuleRefreshHook validationRuleRefreshHook(
             BeforeSaveHookRegistry hookRegistry,
-            KafkaTemplate<String, String> kafkaTemplate,
-            ObjectMapper objectMapper,
+            PlatformEventPublisher eventPublisher,
             JdbcTemplate jdbcTemplate) {
         ValidationRuleRefreshHook hook = new ValidationRuleRefreshHook(
-                kafkaTemplate, objectMapper, jdbcTemplate);
+                eventPublisher, jdbcTemplate);
         hookRegistry.register(hook);
         return hook;
     }
@@ -250,9 +247,8 @@ public class FlowConfig {
     @Bean
     public ApprovalProcessConfigHook approvalProcessConfigHook(
             BeforeSaveHookRegistry hookRegistry,
-            KafkaTemplate<String, String> kafkaTemplate,
-            ObjectMapper objectMapper) {
-        ApprovalProcessConfigHook hook = new ApprovalProcessConfigHook(kafkaTemplate, objectMapper);
+            PlatformEventPublisher eventPublisher) {
+        ApprovalProcessConfigHook hook = new ApprovalProcessConfigHook(eventPublisher);
         hookRegistry.register(hook);
         return hook;
     }

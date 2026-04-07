@@ -9,14 +9,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Kafka listener that handles record change events for system collections.
+ * Listener that handles record change events for system collections.
  *
- * <p>When system collection records are modified through the worker's
- * {@code DynamicCollectionRouter}, this listener:
+ * <p>When system collection records are modified, this listener:
  * <ol>
  *   <li>Refreshes gateway routes when {@code collections} records change</li>
  *   <li>Refreshes governor limit cache when {@code tenants} records change</li>
@@ -47,11 +45,6 @@ public class SystemCollectionRouteListener {
         this.cacheManager = cacheManager;
     }
 
-    @KafkaListener(
-            topics = "${kelta.gateway.kafka.topics.record-changed:kelta.record.changed}",
-            groupId = "${spring.kafka.consumer.group-id}-record",
-            containerFactory = "recordEventKafkaListenerContainerFactory"
-    )
     public void onRecordChanged(String message) {
         try {
             var tree = objectMapper.readTree(message);

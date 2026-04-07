@@ -4,17 +4,16 @@ import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.EventFactory;
 import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.workflow.BeforeSaveHook;
-import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.Map;
 
 /**
  * After-save hook for the "approval-processes" system collection that broadcasts
- * a collection-changed Kafka event whenever an approval process is created,
+ * a collection-changed event whenever an approval process is created,
  * updated, or deleted.
  *
  * <p>This ensures all worker pods refresh their knowledge of available approval
@@ -27,13 +26,10 @@ public class ApprovalProcessConfigHook implements BeforeSaveHook {
 
     private static final Logger log = LoggerFactory.getLogger(ApprovalProcessConfigHook.class);
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final PlatformEventPublisher eventPublisher;
 
-    public ApprovalProcessConfigHook(KafkaTemplate<String, String> kafkaTemplate,
-                                      ObjectMapper objectMapper) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.objectMapper = objectMapper;
+    public ApprovalProcessConfigHook(PlatformEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -79,23 +75,11 @@ public class ApprovalProcessConfigHook implements BeforeSaveHook {
         payload.setName("approval-processes");
         payload.setChangeType(changeType);
 
-        try {
-            PlatformEvent<CollectionChangedPayload> event =
-                    EventFactory.createEvent(CollectionConfigEventPublisher.TOPIC, payload);
-            event.setTenantId(tenantId);
-            String json = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send(CollectionConfigEventPublisher.TOPIC, collectionId, json)
-                    .whenComplete((result, ex) -> {
-                        if (ex != null) {
-                            log.error("Failed to publish approval process config change event: {}",
-                                    ex.getMessage());
-                        } else {
-                            log.info("Published approval process config change event (collectionId={})",
-                                    collectionId);
-                        }
-                    });
-        } catch (Exception e) {
-            log.error("Failed to serialize approval process config event: {}", e.getMessage());
-        }
+        PlatformEvent<CollectionChangedPayload> event =
+                EventFactory.createEvent("kelta.config.collection.changed", payload);
+        event.setTenantId(tenantId);
+        String subject = CollectionConfigEventPublisher.SUBJECT_PREFIX + collectionId;
+        log.info("Publishing approval process config change event (collectionId={})", collectionId);
+        eventPublisher.publish(subject, event);
     }
 }

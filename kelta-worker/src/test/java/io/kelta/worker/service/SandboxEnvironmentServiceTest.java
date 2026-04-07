@@ -1,15 +1,14 @@
 package io.kelta.worker.service;
 
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.worker.repository.EnvironmentRepository;
 import io.kelta.worker.repository.PackageRepository;
 import org.junit.jupiter.api.*;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,25 +21,22 @@ class SandboxEnvironmentServiceTest {
     private EnvironmentRepository environmentRepository;
     private PackageRepository packageRepository;
     private ObjectMapper objectMapper;
-    private KafkaTemplate<String, String> kafkaTemplate;
+    private PlatformEventPublisher eventPublisher;
     private JdbcTemplate jdbcTemplate;
     private SandboxEnvironmentService service;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         environmentRepository = mock(EnvironmentRepository.class);
         packageRepository = mock(PackageRepository.class);
         objectMapper = JsonMapper.builder().build();
-        kafkaTemplate = mock(KafkaTemplate.class);
+        eventPublisher = mock(PlatformEventPublisher.class);
         jdbcTemplate = mock(JdbcTemplate.class);
 
         when(environmentRepository.getJdbcTemplate()).thenReturn(jdbcTemplate);
-        when(kafkaTemplate.send(anyString(), anyString(), anyString()))
-                .thenReturn(CompletableFuture.completedFuture(null));
 
         service = new SandboxEnvironmentService(environmentRepository, packageRepository,
-                objectMapper, kafkaTemplate);
+                objectMapper, eventPublisher);
     }
 
     @Test

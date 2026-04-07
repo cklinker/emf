@@ -2,7 +2,7 @@
 
 ## Pattern
 
-Microservices + Event-Driven + Dynamic Configuration Platform. Multi-tenant with per-tenant schema isolation. Configuration-driven collection/object model (no code deployment for new objects). Event-driven updates via Kafka for schema changes, record mutations, and cache invalidation.
+Microservices + Event-Driven + Dynamic Configuration Platform. Multi-tenant with per-tenant schema isolation. Configuration-driven collection/object model (no code deployment for new objects). Event-driven updates via NATS JetStream for schema changes, record mutations, and cache invalidation.
 
 ## Services
 
@@ -13,7 +13,7 @@ Microservices + Event-Driven + Dynamic Configuration Platform. Multi-tenant with
 
 **Worker** (`kelta-worker/`):
 - Generic collection hosting and REST endpoint provider.
-- Loads collections on startup, listens for schema changes via Kafka.
+- Loads collections on startup, listens for schema changes via NATS JetStream.
 - Owns database migrations (Flyway), workflow execution, search indexing.
 - Entry: `kelta-worker/src/main/java/io/kelta/WorkerApplication.java`
 
@@ -24,7 +24,7 @@ Microservices + Event-Driven + Dynamic Configuration Platform. Multi-tenant with
 
 **Runtime Libraries** (`kelta-platform/runtime/`):
 - `runtime-core` — Collection model, query engine, storage, validation, flow execution
-- `runtime-events` — Shared Kafka event classes (PlatformEvent<T>)
+- `runtime-events` — Shared event classes (PlatformEvent<T>)
 - `runtime-jsonapi` — JSON:API response formatting
 - `runtime-module-core` — Core action handlers (CRUD, flows, decisions)
 - `runtime-module-integration` — Integration module
@@ -60,7 +60,7 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 - **Controllers**: `kelta-worker/src/main/java/io/kelta/controller/` — Admin REST endpoints
 - **Dynamic Router**: `runtime-core/.../router/DynamicCollectionRouter.java` — Routes `/api/{collectionName}`
 - **Services**: `kelta-worker/src/main/java/io/kelta/service/` — Business logic (CollectionLifecycleManager, CerbosAuthorizationService, SearchIndexService, S3StorageService)
-- **Listeners**: `kelta-worker/src/main/java/io/kelta/listener/` — Kafka consumers (CollectionSchemaListener, SearchIndexListener, CerbosCacheInvalidationListener, SvixWebhookPublisher)
+- **Listeners**: `kelta-worker/src/main/java/io/kelta/listener/` — NATS subscribers (CollectionSchemaListener, SearchIndexListener, CerbosCacheInvalidationListener, SvixWebhookPublisher)
 - **Data**: `kelta-worker/src/main/java/io/kelta/repository/` — JdbcTemplate + JPA repositories
 
 ## Runtime Core Layers
@@ -93,10 +93,10 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 9. PhysicalTableStorageAdapter queries PostgreSQL
 10. JSON:API response formatted via JsonApiResponseBuilder
 
-**Kafka Event Flow (Schema Change):**
+**NATS Event Flow (Schema Change):**
 1. Admin updates collection field via UI
-2. Worker publishes `collection-changed` to `kelta.config.collection.changed`
-3. CollectionSchemaListener receives on all workers
+2. Worker publishes `collection-changed` to subject `kelta.config.collection.changed` via PlatformEventPublisher
+3. CollectionSchemaListener receives on all workers (broadcast)
 4. CollectionLifecycleManager refreshes definition
 5. Schema migration triggered (ALTER TABLE)
 6. CollectionRegistry updated
@@ -107,7 +107,7 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 | Abstraction | Purpose | Location |
 |-------------|---------|----------|
 | CollectionDefinition | Metadata-driven object model | `runtime-core/.../model/CollectionDefinition.java` |
-| PlatformEvent<T> | Kafka event envelope (tenantId, correlationId, userId) | `runtime-events/.../event/` |
+| PlatformEvent<T> | NATS event envelope (tenantId, correlationId, userId) | `runtime-events/.../event/` |
 | TenantContext | ThreadLocal tenant isolation | `runtime-core/.../context/TenantContext.java` |
 | BootstrapConfig | Gateway startup config (collections, routes, limits) | `kelta-gateway/.../config/BootstrapConfig.java` |
 
@@ -154,4 +154,4 @@ kubectl describe pod -n kelta <pod-name>
 - **Tracing**: OpenTelemetry Java Agent v2.25.0 → Tempo (production, LGTM stack) / Jaeger (local dev)
 - **Metrics**: Spring Boot OpenTelemetry starter → Mimir (production) / OTLP HTTP (local dev)
 - **Auth**: JWT validation at gateway, Cerbos for fine-grained authorization
-- **Multi-tenancy**: TenantContext (ThreadLocal), per-tenant PostgreSQL schemas, tenant-aware Kafka events
+- **Multi-tenancy**: TenantContext (ThreadLocal), per-tenant PostgreSQL schemas, tenant-aware NATS events

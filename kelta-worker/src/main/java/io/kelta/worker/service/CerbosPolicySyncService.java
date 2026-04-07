@@ -2,13 +2,15 @@ package io.kelta.worker.service;
 
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.event.EventFactory;
+import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.repository.BootstrapRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -34,14 +36,14 @@ public class CerbosPolicySyncService {
 
     private static final Logger log = LoggerFactory.getLogger(CerbosPolicySyncService.class);
 
-    static final String POLICY_CHANGED_TOPIC = "kelta.cerbos.policies.changed";
+    private static final String SUBJECT_PREFIX = "kelta.cerbos.policies.changed.";
 
     private final JdbcTemplate jdbcTemplate;
     private final BootstrapRepository bootstrapRepository;
     private final CerbosPolicyGenerator policyGenerator;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final PlatformEventPublisher eventPublisher;
     private final WorkerCacheManager cacheManager;
     private final String cerbosAdminUrl;
     private final String cerbosAdminAuth;
@@ -51,7 +53,7 @@ public class CerbosPolicySyncService {
             BootstrapRepository bootstrapRepository,
             CerbosPolicyGenerator policyGenerator,
             ObjectMapper objectMapper,
-            KafkaTemplate<String, String> kafkaTemplate,
+            PlatformEventPublisher eventPublisher,
             WorkerCacheManager cacheManager,
             @Value("${kelta.worker.cerbos.host:cerbos.emf.svc.cluster.local}") String cerbosHost,
             @Value("${kelta.worker.cerbos.http-port:3592}") int cerbosHttpPort,
@@ -61,7 +63,7 @@ public class CerbosPolicySyncService {
         this.bootstrapRepository = bootstrapRepository;
         this.policyGenerator = policyGenerator;
         this.objectMapper = objectMapper;
-        this.kafkaTemplate = kafkaTemplate;
+        this.eventPublisher = eventPublisher;
         this.cacheManager = cacheManager;
         this.httpClient = HttpClient.newHttpClient();
         this.cerbosAdminUrl = "http://" + cerbosHost + ":" + cerbosHttpPort;
@@ -315,25 +317,16 @@ public class CerbosPolicySyncService {
     }
 
     private void publishPolicyChangedEvent(String tenantId) {
-        try {
-            Map<String, String> payload = Map.of(
-                    "tenantId", tenantId,
-                    "syncedAt", Instant.now().toString()
-            );
-            String json = objectMapper.writeValueAsString(payload);
-            kafkaTemplate.send(POLICY_CHANGED_TOPIC, tenantId, json)
-                    .whenComplete((result, ex) -> {
-                        if (ex != null) {
-                            log.error("Failed to publish policy changed event for tenant {}: {}",
-                                    tenantId, ex.getMessage());
-                        } else {
-                            log.debug("Published policy changed event for tenant {}", tenantId);
-                        }
-                    });
-        } catch (Exception e) {
-            log.error("Failed to serialize policy changed event for tenant {}: {}",
-                    tenantId, e.getMessage());
-        }
+        Map<String, String> payload = Map.of(
+                "tenantId", tenantId,
+                "syncedAt", Instant.now().toString()
+        );
+        PlatformEvent<Map<String, String>> event =
+                EventFactory.createEvent("kelta.cerbos.policies.changed", payload);
+        event.setTenantId(tenantId);
+        String subject = SUBJECT_PREFIX + tenantId;
+        log.debug("Publishing policy changed event for tenant {}", tenantId);
+        eventPublisher.publish(subject, event);
     }
 
     private Boolean toBoolean(Object value) {

@@ -699,10 +699,11 @@ class SchemaMigrationEngineTest {
         @Test
         @DisplayName("Should do nothing when table has all columns")
         void shouldDoNothingWhenTableHasAllColumns() {
-            // Create table with all columns
+            // Create table with all columns (including system columns that reconcileSchema auto-adds)
             jdbcTemplate.execute(
                 "CREATE TABLE test_data (id VARCHAR(36) PRIMARY KEY, " +
                 "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, " +
+                "created_by VARCHAR(36), updated_by VARCHAR(36), record_type_id VARCHAR(36), " +
                 "name TEXT, description TEXT)");
 
             List<FieldDefinition> fields = List.of(
@@ -738,10 +739,11 @@ class SchemaMigrationEngineTest {
         @Test
         @DisplayName("Should add multiple missing columns")
         void shouldAddMultipleMissingColumns() {
-            // Create table with only 'name' column
+            // Create table with only 'name' column (include system columns to isolate the test)
             jdbcTemplate.execute(
                 "CREATE TABLE test_data (id VARCHAR(36) PRIMARY KEY, " +
-                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, name TEXT)");
+                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, " +
+                "created_by VARCHAR(36), updated_by VARCHAR(36), record_type_id VARCHAR(36), name TEXT)");
 
             // Define collection with 'name', 'price', and 'quantity' columns
             List<FieldDefinition> fields = List.of(
@@ -775,10 +777,11 @@ class SchemaMigrationEngineTest {
         @Test
         @DisplayName("Should handle case-insensitive column matching")
         void shouldHandleCaseInsensitiveColumnMatching() {
-            // Create table with uppercase column name
+            // Create table with uppercase column name (include system columns to isolate the test)
             jdbcTemplate.execute(
                 "CREATE TABLE test_data (id VARCHAR(36) PRIMARY KEY, " +
-                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, NAME TEXT)");
+                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, " +
+                "created_by VARCHAR(36), updated_by VARCHAR(36), record_type_id VARCHAR(36), NAME TEXT)");
 
             // Define collection with lowercase field name
             List<FieldDefinition> fields = List.of(

@@ -1,0 +1,22 @@
+repository:
+  name: emf
+  private: true
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  default_branch: main
+
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - lint
+          - secrets
+          - test
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+      restrictions: null

@@ -1,0 +1,25 @@
+openapi: 3.0.3
+info:
+  title: Kelta AI API
+  version: 1.0.0
+  description: AI assistant service - Anthropic Claude integration
+paths:
+  /api/v1/chat:
+    post:
+      summary: Send chat message
+      tags: [Chat]
+  /api/v1/chat/stream:
+    post:
+      summary: Stream chat response
+      tags: [Chat]
+  /api/v1/conversations/{id}:
+    get:
+      summary: Get conversation
+      tags: [Conversations]
+    delete:
+      summary: Delete conversation
+      tags: [Conversations]
+  /actuator/health:
+    get:
+      summary: Health check
+      tags: [Actuator]

@@ -1,0 +1,232 @@
+openapi: 3.0.3
+info:
+  title: Kelta SDK API
+  description: |
+    Reference specification for the Kelta TypeScript SDK (`packages/sdk`).
+    This documents the HTTP endpoints consumed by the SDK client.
+    For the full backend API, see the OpenAPI spec in `kelta-control-plane`.
+  version: 0.0.1
+  contact:
+    name: Craig Klinker
+    url: https://github.com/cklinker
+
+servers:
+  - url: http://localhost:8080
+    description: Local development gateway
+  - url: https://api.rzware.com
+    description: Production gateway
+
+tags:
+  - name: objects
+    description: Configurable object CRUD operations
+  - name: workflows
+    description: Workflow execution endpoints
+
+paths:
+  /api/v1/objects/{collection}:
+    get:
+      tags: [objects]
+      summary: List records in a collection
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filter
+          in: query
+          schema:
+            type: string
+          description: JSON:API filter expression
+        - name: page[size]
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: page[number]
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Paginated list of records
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/ResourceCollection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [objects]
+      summary: Create a record in a collection
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '#/components/schemas/ResourceDocument'
+      responses:
+        '201':
+          description: Created record
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/ResourceDocument'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/objects/{collection}/{id}:
+    get:
+      tags: [objects]
+      summary: Fetch a single record
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Record
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/ResourceDocument'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [objects]
+      summary: Update a record
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '#/components/schemas/ResourceDocument'
+      responses:
+        '200':
+          description: Updated record
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/ResourceDocument'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [objects]
+      summary: Delete a record
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  schemas:
+    ResourceDocument:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Resource'
+
+    ResourceCollection:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resource'
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+
+    Resource:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          format: uuid
+        attributes:
+          type: object
+          additionalProperties: true
+        relationships:
+          type: object
+          additionalProperties: true
+
+    Error:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              title:
+                type: string
+              detail:
+                type: string
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required
+    Forbidden:
+      description: Insufficient permissions
+    NotFound:
+      description: Resource not found
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

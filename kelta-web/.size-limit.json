@@ -1,0 +1,6 @@
+[
+  {
+    "path": "packages/*/dist/**/*.js",
+    "limit": "200 kB"
+  }
+]

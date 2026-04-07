@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+  "dist",
+  "node_modules",
+  ".env.example",
+]

@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: Kelta Auth API
+  version: 1.0.0
+  description: OAuth2 Authorization Server and Identity Provider for the Kelta platform
+paths:
+  /oauth2/authorize:
+    get:
+      summary: Authorization endpoint
+      tags: [OAuth2]
+  /oauth2/token:
+    post:
+      summary: Token endpoint
+      tags: [OAuth2]
+  /oauth2/revoke:
+    post:
+      summary: Token revocation
+      tags: [OAuth2]
+  /userinfo:
+    get:
+      summary: User info endpoint
+      tags: [OAuth2]
+  /api/v1/mfa/enroll:
+    post:
+      summary: Start MFA enrollment
+      tags: [MFA]
+  /api/v1/mfa/verify:
+    post:
+      summary: Verify TOTP code
+      tags: [MFA]
+  /actuator/health:
+    get:
+      summary: Health check
+      tags: [Actuator]

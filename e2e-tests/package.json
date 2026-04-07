@@ -5,6 +5,9 @@
   "description": "End-to-end tests for the EMF platform",
   "type": "module",
   "scripts": {
+    "setup": "npm install && npx playwright install",
+    "dev": "npx playwright test --ui",
+    "build": "npx tsc --noEmit",
     "test": "playwright test",
     "test:chromium": "playwright test --project=chromium",
     "test:headed": "playwright test --headed",

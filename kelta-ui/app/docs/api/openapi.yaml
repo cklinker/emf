@@ -1,0 +1,39 @@
+openapi: 3.0.3
+info:
+  title: Kelta Admin UI API
+  description: |
+    The Kelta Admin UI communicates with backend services via the kelta-gateway.
+    This document describes the primary API surface consumed by the frontend.
+  version: 1.0.0
+  contact:
+    name: Craig Klinker
+    url: https://github.com/cklinker
+servers:
+  - url: http://localhost:8080
+    description: Local development (via kelta-gateway)
+  - url: https://api.rzware.com
+    description: Production
+paths:
+  /api/v1/health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearerAuth: []

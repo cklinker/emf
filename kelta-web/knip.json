@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "packages/sdk/src/index.ts",
+    "packages/components/src/index.ts",
+    "packages/plugin-sdk/src/index.ts",
+    "packages/cli/src/index.ts"
+  ],
+  "project": [
+    "packages/*/src/**/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "packages/*/src/**/*.test.{ts,tsx}",
+    "packages/*/src/**/*.spec.{ts,tsx}"
+  ],
+  "ignoreDependencies": [
+    "@testing-library/jest-dom",
+    "@testing-library/user-event",
+    "fast-check",
+    "msw"
+  ]
+}

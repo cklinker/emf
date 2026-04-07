@@ -1,0 +1,48 @@
+openapi: 3.0.3
+info:
+  title: Kelta Platform API
+  version: 1.0.0
+  description: Multi-tenant enterprise platform with configurable objects and workflows
+  license:
+    name: MIT
+paths:
+  /api/v1/collections:
+    get:
+      summary: List collections
+      tags: [Collections]
+    post:
+      summary: Create collection
+      tags: [Collections]
+  /api/v1/collections/{id}:
+    get:
+      summary: Get collection
+      tags: [Collections]
+    patch:
+      summary: Update collection
+      tags: [Collections]
+    delete:
+      summary: Delete collection
+      tags: [Collections]
+  /api/v1/collections/{collectionId}/records:
+    get:
+      summary: List records
+      tags: [Records]
+    post:
+      summary: Create record
+      tags: [Records]
+  /api/v1/workflows:
+    get:
+      summary: List workflows
+      tags: [Workflows]
+  /api/v1/workflows/{id}/execute:
+    post:
+      summary: Execute workflow
+      tags: [Workflows]
+  /oauth2/authorize:
+    get:
+      summary: OAuth2 authorization
+      tags: [Auth]
+  /oauth2/token:
+    post:
+      summary: OAuth2 token
+      tags: [Auth]

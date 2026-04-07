@@ -1,0 +1,18 @@
+openapi: 3.0.3
+info:
+  title: Kelta Gateway API
+  version: 1.0.0
+  description: Spring Cloud Gateway - API routing, authentication, and rate limiting
+paths:
+  /api/v1/{path}:
+    get:
+      summary: Proxied API requests to kelta-worker
+      tags: [Proxy]
+  /actuator/health:
+    get:
+      summary: Health check
+      tags: [Actuator]
+  /actuator/gateway/routes:
+    get:
+      summary: List configured routes
+      tags: [Actuator]

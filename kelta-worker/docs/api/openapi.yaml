@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: Kelta Worker API
+  version: 1.0.0
+  description: Primary service - collections, records, workflows, and business logic
+paths:
+  /api/v1/collections:
+    get:
+      summary: List collections
+      tags: [Collections]
+    post:
+      summary: Create collection
+      tags: [Collections]
+  /api/v1/collections/{id}/records:
+    get:
+      summary: List records
+      tags: [Records]
+    post:
+      summary: Create record
+      tags: [Records]
+  /api/v1/workflows:
+    get:
+      summary: List workflows
+      tags: [Workflows]
+  /api/v1/workflows/{id}/execute:
+    post:
+      summary: Execute workflow
+      tags: [Workflows]
+  /actuator/health:
+    get:
+      summary: Health check
+      tags: [Actuator]

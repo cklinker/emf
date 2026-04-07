@@ -1,0 +1,5 @@
+{
+  "entry": ["tests/**/*.spec.ts", "tests/**/*.test.ts", "fixtures/**/*.ts", "helpers/**/*.ts"],
+  "project": ["**/*.ts"],
+  "ignore": ["node_modules/**", "test-results/**", "playwright-report/**", "dist/**"]
+}

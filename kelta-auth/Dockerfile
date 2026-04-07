@@ -15,20 +15,22 @@ COPY kelta-platform/runtime/runtime-events/pom.xml ./runtime/runtime-events/
 COPY kelta-platform/runtime/runtime-jsonapi/pom.xml ./runtime/runtime-jsonapi/
 COPY kelta-platform/runtime/runtime-module-core/pom.xml ./runtime/runtime-module-core/
 COPY kelta-platform/runtime/runtime-module-integration/pom.xml ./runtime/runtime-module-integration/
+COPY kelta-platform/runtime/runtime-messaging-nats/pom.xml ./runtime/runtime-messaging-nats/
 COPY kelta-platform/runtime/runtime-module-schema/pom.xml ./runtime/runtime-module-schema/
 
 # Download runtime dependencies (cached unless pom.xml changes)
-RUN mvn dependency:go-offline -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi -am || true
+RUN mvn dependency:go-offline -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi -am || true
 
 # Copy source and build runtime modules
 COPY kelta-platform/runtime/runtime-core/src ./runtime/runtime-core/src
 COPY kelta-platform/runtime/runtime-events/src ./runtime/runtime-events/src
+COPY kelta-platform/runtime/runtime-messaging-nats/src ./runtime/runtime-messaging-nats/src
 COPY kelta-platform/runtime/runtime-jsonapi/src ./runtime/runtime-jsonapi/src
 COPY kelta-platform/runtime/runtime-module-core/src ./runtime/runtime-module-core/src
 COPY kelta-platform/runtime/runtime-module-integration/src ./runtime/runtime-module-integration/src
 COPY kelta-platform/runtime/runtime-module-schema/src ./runtime/runtime-module-schema/src
 
-RUN mvn clean install -DskipTests -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am
+RUN mvn clean install -DskipTests -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am
 
 # =============================================================================
 # Stage 2: Build the auth application

@@ -1,0 +1,11 @@
+title = "Kelta Auth Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''target''',
+  '''\.env\.example''',
+]

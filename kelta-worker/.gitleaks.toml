@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore non-sensitive paths"
+paths = [
+    "target",
+    ".env.example",
+]

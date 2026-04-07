@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore build output and example env files"
+paths = [
+    "target",
+    ".env.example",
+]

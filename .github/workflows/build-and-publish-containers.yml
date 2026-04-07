@@ -74,7 +74,7 @@ jobs:
         run: rm -rf ~/.m2/repository/io/kelta
 
       - name: Build runtime modules
-        run: mvn clean install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
+        run: mvn clean install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
 
       - name: Test Gateway
         run: mvn verify -f kelta-gateway/pom.xml -B

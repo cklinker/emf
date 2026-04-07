@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "references": [
+    { "path": "./kelta-ui/app" },
+    { "path": "./kelta-web" },
+    { "path": "./e2e-tests" }
+  ],
+  "include": [],
+  "exclude": ["node_modules", "dist"]
+}

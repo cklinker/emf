@@ -1,0 +1,28 @@
+{
+  "name": "kelta-platform",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Multi-tenant enterprise platform with configurable objects and workflows",
+  "scripts": {
+    "setup": "cd kelta-web && npm install && cd ../kelta-ui/app && npm install && cd ../../e2e-tests && npm install",
+    "dev": "cd kelta-ui/app && npm run dev",
+    "build": "cd kelta-web && npm run build && cd ../kelta-ui/app && npm run build",
+    "test": "cd kelta-web && npm test && cd ../kelta-ui/app && npm test",
+    "test:java": "mvn verify -f kelta-gateway/pom.xml -B && mvn verify -f kelta-worker/pom.xml -B",
+    "test:e2e": "cd e2e-tests && npx playwright test",
+    "lint": "cd kelta-web && npm run lint && cd ../kelta-ui/app && npm run lint",
+    "format": "cd kelta-web && npm run format && cd ../kelta-ui/app && npm run format",
+    "format:check": "cd kelta-web && npm run format:check && cd ../kelta-ui/app && npm run format:check",
+    "typecheck": "cd kelta-web && npm run typecheck",
+    "verify": "npm run lint && npm run typecheck && npm run test",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.0",
+    "knip": "^5.0.0",
+    "@next/bundle-analyzer": "^15.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

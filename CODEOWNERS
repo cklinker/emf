@@ -1,0 +1,22 @@
+# Default owner for everything
+* @cklinker
+
+# Java services
+/kelta-gateway/ @cklinker
+/kelta-worker/ @cklinker
+/kelta-auth/ @cklinker
+/kelta-ai/ @cklinker
+/kelta-platform/ @cklinker
+
+# Frontend
+/kelta-ui/ @cklinker
+/kelta-web/ @cklinker
+
+# E2E tests
+/e2e-tests/ @cklinker
+
+# CI/CD
+/.github/ @cklinker
+
+# Infrastructure
+/docker-compose.yml @cklinker

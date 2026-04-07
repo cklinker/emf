@@ -1,0 +1,2 @@
+cd kelta-web && npm run format:check && npm run lint
+cd ../kelta-ui/app && npm run format:check && npm run lint

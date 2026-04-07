@@ -1,0 +1,14 @@
+title = "Kelta Platform Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''node_modules''',
+  '''\.m2''',
+  '''target''',
+  '''dist''',
+  '''\.env\.example''',
+]

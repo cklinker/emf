@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    "kelta-web": {
+      "entry": ["packages/*/src/index.{ts,tsx}"],
+      "project": ["packages/*/src/**/*.{ts,tsx}"],
+      "ignore": ["**/dist/**"]
+    },
+    "kelta-ui/app": {
+      "entry": ["src/main.tsx"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["**/dist/**"]
+    }
+  }
+}

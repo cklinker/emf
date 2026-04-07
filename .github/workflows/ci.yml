@@ -141,11 +141,28 @@ jobs:
           retention-days: 7
 
   # ===========================================================================
+  # Security scanning
+  # ===========================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: k8s-runner
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ===========================================================================
   # Quality gate - all checks must pass
   # ===========================================================================
   quality-gate:
     name: Quality Gate
-    needs: [test-java, test-frontend]
+    needs: [test-java, test-frontend, security-scan]
     if: always()
     runs-on: k8s-runner
     steps:
@@ -157,6 +174,10 @@ jobs:
           fi
           if [[ "${{ needs.test-frontend.result }}" != "success" ]]; then
             echo "Frontend tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.security-scan.result }}" != "success" ]]; then
+            echo "Security scan failed"
             exit 1
           fi
           echo "All quality gates passed"

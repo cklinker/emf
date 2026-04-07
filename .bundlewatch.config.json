@@ -1,0 +1,15 @@
+{
+  "files": [
+    {
+      "path": "kelta-ui/app/dist/**/*.js",
+      "maxSize": "500kB"
+    },
+    {
+      "path": "kelta-web/packages/*/dist/**/*.js",
+      "maxSize": "200kB"
+    }
+  ],
+  "ci": {
+    "trackBranches": ["main"]
+  }
+}

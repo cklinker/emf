@@ -13,8 +13,6 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:kelta}
     password: ${SPRING_DATASOURCE_PASSWORD:kelta}
     driver-class-name: org.postgresql.Driver
-    hikari:
-      connection-init-sql: SET app.current_tenant_id = ''
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -44,6 +42,8 @@ kelta:
   external-base-url: ${EXTERNAL_BASE_URL:http://localhost:8080}
   worker:
     id: ${WORKER_ID:}
+    cerbos-cb-threshold: ${CERBOS_CB_THRESHOLD:3}
+    cerbos-cb-cooldown-seconds: ${CERBOS_CB_COOLDOWN_SECONDS:10}
     cerbos:
       host: ${CERBOS_HOST:cerbos.emf.svc.cluster.local}
       grpc-port: ${CERBOS_GRPC_PORT:3593}

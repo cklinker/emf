@@ -1,6 +1,7 @@
 package io.kelta.worker.module;
 
 import io.kelta.worker.service.S3StorageService;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,10 +13,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
  * Manages module JAR storage in S3 and local caching for ClassLoader loading.
@@ -141,6 +144,30 @@ public class ModuleJarService {
 
     static String buildS3Key(String tenantId, String moduleId, String version, String checksum) {
         return String.format("modules/%s/%s/%s/%s.jar", tenantId, moduleId, version, checksum);
+    }
+
+    /**
+     * Deletes the temporary cache directory on application shutdown.
+     * Only runs when the cache dir was auto-created (i.e., it lives under the system temp dir).
+     * Skipped silently if deletion fails — the OS will clean up on reboot.
+     */
+    @PreDestroy
+    void cleanupCacheDir() {
+        try {
+            if (localCacheDir.startsWith(Path.of(System.getProperty("java.io.tmpdir")))) {
+                try (Stream<Path> walk = Files.walk(localCacheDir)) {
+                    walk.sorted(Comparator.reverseOrder())
+                            .forEach(path -> {
+                                try {
+                                    Files.deleteIfExists(path);
+                                } catch (IOException ignored) {}
+                            });
+                }
+                log.info("Cleaned up module cache dir: {}", localCacheDir);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to clean up module cache dir {}: {}", localCacheDir, e.getMessage());
+        }
     }
 
     private static Path createDefaultCacheDir() {

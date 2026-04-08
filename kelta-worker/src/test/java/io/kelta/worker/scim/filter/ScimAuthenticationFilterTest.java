@@ -83,9 +83,7 @@ class ScimAuthenticationFilterTest {
 
         String tokenHash = ScimAuthenticationFilter.hashToken("valid-token-123");
         when(jdbcTemplate.queryForList(contains("scim_client"), eq(tokenHash)))
-                .thenReturn(List.of(Map.of("tenant_id", "t1", "name", "Okta", "active", true)));
-        when(jdbcTemplate.update(contains("last_used_at"), eq(tokenHash)))
-                .thenReturn(1);
+                .thenReturn(List.of(Map.of("tenant_id", "t1", "name", "Okta")));
 
         filter.doFilter(request, response, chain);
 
@@ -102,9 +100,11 @@ class ScimAuthenticationFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
+        // With the atomic UPDATE...RETURNING, an inactive client returns no rows
+        // (filtered by AND active = true in the WHERE clause)
         String tokenHash = ScimAuthenticationFilter.hashToken("some-token");
         when(jdbcTemplate.queryForList(contains("scim_client"), eq(tokenHash)))
-                .thenReturn(List.of(Map.of("tenant_id", "t1", "name", "Okta", "active", false)));
+                .thenReturn(List.of());
 
         filter.doFilter(request, response, chain);
 

@@ -6,6 +6,7 @@ import dev.cerbos.sdk.CheckResourcesResult;
 import dev.cerbos.sdk.CheckResult;
 import dev.cerbos.sdk.builders.Principal;
 import dev.cerbos.sdk.builders.Resource;
+import io.kelta.worker.config.WorkerProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +44,7 @@ class CerbosAuthorizationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CerbosAuthorizationService(cerbosClient, new SimpleMeterRegistry());
+        service = new CerbosAuthorizationService(cerbosClient, new SimpleMeterRegistry(), new WorkerProperties());
     }
 
     @Nested

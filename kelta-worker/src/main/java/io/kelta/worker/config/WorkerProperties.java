@@ -26,6 +26,16 @@ public class WorkerProperties {
      */
     private String id;
 
+    /**
+     * Number of consecutive Cerbos failures before the circuit breaker opens.
+     */
+    private int cerbosCbThreshold = 3;
+
+    /**
+     * How long (in seconds) the Cerbos circuit breaker stays open after tripping.
+     */
+    private long cerbosCbCooldownSeconds = 10;
+
     public String getId() {
         if (id == null || id.isBlank()) {
             id = "worker-" + UUID.randomUUID().toString().substring(0, 8);
@@ -35,5 +45,21 @@ public class WorkerProperties {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public int getCerbosCbThreshold() {
+        return cerbosCbThreshold;
+    }
+
+    public void setCerbosCbThreshold(int cerbosCbThreshold) {
+        this.cerbosCbThreshold = cerbosCbThreshold;
+    }
+
+    public long getCerbosCbCooldownSeconds() {
+        return cerbosCbCooldownSeconds;
+    }
+
+    public void setCerbosCbCooldownSeconds(long cerbosCbCooldownSeconds) {
+        this.cerbosCbCooldownSeconds = cerbosCbCooldownSeconds;
     }
 }

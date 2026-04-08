@@ -1,8 +1,8 @@
 package io.kelta.worker.service;
 
 import tools.jackson.databind.ObjectMapper;
-import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.flow.FlowEngine;
+import io.kelta.worker.util.TenantContextUtils;
 import io.kelta.runtime.flow.InitialStateBuilder;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionRequest;
@@ -92,19 +92,19 @@ public class ScheduledJobExecutorService {
             Instant startedAt = Instant.now();
 
             try {
-                TenantContext.set(tenantId);
-
-                switch (jobType) {
-                    case "FLOW" -> executeFlowJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
-                    case "SCRIPT" -> executeScriptJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
-                    case "REPORT_EXPORT" -> executeReportExportJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
-                    case "DATA_EXPORT" -> executeDataExportJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
-                    default -> {
-                        log.warn("Unsupported job type '{}' for job {}, skipping", jobType, jobId);
-                        Instant nextRun = ScheduledJobRepository.calculateNextRunAt(cronExpression, timezone);
-                        repository.updateAfterExecution(jobId, "SKIPPED", startedAt, nextRun);
+                TenantContextUtils.withTenant(tenantId, () -> {
+                    switch (jobType) {
+                        case "FLOW" -> executeFlowJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
+                        case "SCRIPT" -> executeScriptJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
+                        case "REPORT_EXPORT" -> executeReportExportJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
+                        case "DATA_EXPORT" -> executeDataExportJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
+                        default -> {
+                            log.warn("Unsupported job type '{}' for job {}, skipping", jobType, jobId);
+                            Instant nextRun = ScheduledJobRepository.calculateNextRunAt(cronExpression, timezone);
+                            repository.updateAfterExecution(jobId, "SKIPPED", startedAt, nextRun);
+                        }
                     }
-                }
+                });
             } catch (Exception e) {
                 Instant completedAt = Instant.now();
                 long durationMs = completedAt.toEpochMilli() - startedAt.toEpochMilli();
@@ -115,8 +115,6 @@ public class ScheduledJobExecutorService {
 
                 log.error("Scheduled job failed: jobId={}, type={}, refId={}, tenantId={}, error={}, duration={}ms",
                         jobId, jobType, jobReferenceId, tenantId, e.getMessage(), durationMs);
-            } finally {
-                TenantContext.clear();
             }
         }
     }

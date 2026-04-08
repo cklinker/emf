@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.Objects;
 
 /**
  * Service implementing the approval workflow engine.
@@ -80,7 +81,8 @@ public class ApprovalService {
             process = processes.getFirst();
         }
 
-        String resolvedProcessId = (String) process.get("id");
+        String resolvedProcessId = Objects.requireNonNull(
+                (String) process.get("id"), "Approval process row is missing 'id'");
 
         // Get the steps
         var steps = approvalRepository.findStepsByProcessId(resolvedProcessId);
@@ -338,7 +340,9 @@ public class ApprovalService {
         String processId = (String) instance.get("approval_process_id");
         String collectionId = (String) instance.get("collection_id");
         String recordId = (String) instance.get("record_id");
-        int currentStep = ((Number) instance.get("current_step_number")).intValue();
+        Number stepNumber = (Number) instance.get("current_step_number");
+        int currentStep = Objects.requireNonNull(stepNumber,
+                "Approval instance missing 'current_step_number'").intValue();
 
         if ("REJECT_FINAL".equals(action) || ("REJECTED".equals(actionType) && action == null)) {
             // Final rejection
@@ -443,6 +447,12 @@ public class ApprovalService {
             // Convert camelCase field name to snake_case column name
             String columnName = fieldName.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
 
+            if (!isValidIdentifier(tableName) || !isValidIdentifier(columnName)) {
+                log.warn("Rejected unsafe SQL identifier: tableName='{}', columnName='{}'",
+                        tableName, columnName);
+                return null;
+            }
+
             var results = jdbcTemplate.queryForList(
                     "SELECT " + columnName + " FROM " + tableName +
                             " WHERE id = ? AND tenant_id = ?",
@@ -494,6 +504,11 @@ public class ApprovalService {
 
             String tableName = (String) collResults.getFirst().get("table_name");
 
+            if (!isValidIdentifier(tableName)) {
+                log.warn("Rejected unsafe table name in field updates: '{}'", tableName);
+                return;
+            }
+
             for (Map<String, Object> update : updates) {
                 String field = (String) update.get("field");
                 Object value = update.get("value");
@@ -503,6 +518,11 @@ public class ApprovalService {
                 }
 
                 String columnName = field.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
+
+                if (!isValidIdentifier(columnName)) {
+                    log.warn("Rejected unsafe column name in field update: '{}'", columnName);
+                    continue;
+                }
 
                 try {
                     jdbcTemplate.update(
@@ -518,6 +538,14 @@ public class ApprovalService {
         } catch (Exception e) {
             log.error("Failed to parse/apply field updates: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Validates that a SQL identifier (table or column name) contains only safe characters.
+     * Accepts lowercase letters, digits, and underscores — no spaces, quotes, or SQL keywords.
+     */
+    private static boolean isValidIdentifier(String identifier) {
+        return identifier != null && identifier.matches("^[a-z_][a-z0-9_]*$");
     }
 
     // =========================================================================

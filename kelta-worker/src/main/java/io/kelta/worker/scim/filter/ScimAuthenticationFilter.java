@@ -65,27 +65,22 @@ public class ScimAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String tokenHash = hashToken(token);
+
+        // Atomic check-and-update: only succeeds if the token exists and is active.
+        // Using RETURNING avoids a TOCTOU race between the SELECT and the UPDATE.
         List<Map<String, Object>> clients = jdbcTemplate.queryForList(
-                "SELECT tenant_id, name, active FROM scim_client WHERE token_hash = ?",
+                "UPDATE scim_client SET last_used_at = NOW() "
+                        + "WHERE token_hash = ? AND active = true "
+                        + "RETURNING tenant_id, name",
                 tokenHash);
 
         if (clients.isEmpty()) {
-            securityLog.warn("SCIM auth failed: invalid token");
-            sendError(response, 401, "Invalid bearer token");
+            securityLog.warn("SCIM auth failed: invalid or deactivated token");
+            sendError(response, 401, "Invalid or deactivated bearer token");
             return;
         }
 
-        Map<String, Object> client = clients.get(0);
-        if (!Boolean.TRUE.equals(client.get("active"))) {
-            securityLog.warn("SCIM auth failed: client '{}' is deactivated", client.get("name"));
-            sendError(response, 401, "SCIM client is deactivated");
-            return;
-        }
-
-        String tenantId = (String) client.get("tenant_id");
-
-        // Update last_used_at
-        jdbcTemplate.update("UPDATE scim_client SET last_used_at = NOW() WHERE token_hash = ?", tokenHash);
+        String tenantId = (String) clients.get(0).get("tenant_id");
 
         // Wrap request to inject tenant header
         var wrappedRequest = new ScimTenantRequestWrapper(request, tenantId);

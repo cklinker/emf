@@ -326,7 +326,8 @@ public class SchemaMigrationEngine {
 
         // Reconcile record_type_id system column (added for record type enforcement)
         if (!definition.systemCollection() && !existingColumns.contains("record_type_id")) {
-            String addCol = String.format("ALTER TABLE %s ADD COLUMN record_type_id VARCHAR(36)", qualifiedName);
+            String addCol = String.format(
+                "ALTER TABLE %s ADD COLUMN IF NOT EXISTS record_type_id VARCHAR(36)", qualifiedName);
             try {
                 jdbcTemplate.execute(addCol);
                 recordMigration(definition.name(), MigrationType.ADD_COLUMN, addCol);
@@ -401,7 +402,7 @@ public class SchemaMigrationEngine {
         boolean createdByAdded = false;
 
         if (!existingColumns.contains("created_by")) {
-            String sql = "ALTER TABLE " + tableIdentifier + " ADD COLUMN created_by VARCHAR(36)";
+            String sql = "ALTER TABLE " + tableIdentifier + " ADD COLUMN IF NOT EXISTS created_by VARCHAR(36)";
             try {
                 jdbcTemplate.execute(sql);
                 log.info("Added audit column 'created_by' to table '{}'", tableIdentifier);
@@ -412,7 +413,7 @@ public class SchemaMigrationEngine {
         }
 
         if (!existingColumns.contains("updated_by")) {
-            String sql = "ALTER TABLE " + tableIdentifier + " ADD COLUMN updated_by VARCHAR(36)";
+            String sql = "ALTER TABLE " + tableIdentifier + " ADD COLUMN IF NOT EXISTS updated_by VARCHAR(36)";
             try {
                 jdbcTemplate.execute(sql);
                 log.info("Added audit column 'updated_by' to table '{}'", tableIdentifier);
@@ -661,9 +662,12 @@ public class SchemaMigrationEngine {
 
         String columnName = resolvePhysicalColumnName(definition, field);
 
+        // IF NOT EXISTS keeps ADD COLUMN idempotent across concurrent reconciles
+        // (broadcast collection-changed events reach every worker pod; NATS JetStream
+        // may also redeliver a message if the ack is delayed).
         StringBuilder sql = new StringBuilder("ALTER TABLE ");
         sql.append(tableIdentifier);
-        sql.append(" ADD COLUMN ");
+        sql.append(" ADD COLUMN IF NOT EXISTS ");
         sql.append(sanitizeIdentifier(columnName));
         sql.append(" ");
         sql.append(mapFieldTypeToSql(field.type()));
@@ -678,12 +682,12 @@ public class SchemaMigrationEngine {
         // Companion columns
         if (field.type() == FieldType.CURRENCY) {
             sql.append("; ALTER TABLE ").append(tableIdentifier);
-            sql.append(" ADD COLUMN ").append(sanitizeIdentifier(columnName + "_currency_code"));
+            sql.append(" ADD COLUMN IF NOT EXISTS ").append(sanitizeIdentifier(columnName + "_currency_code"));
             sql.append(" VARCHAR(3)");
         }
         if (field.type() == FieldType.GEOLOCATION) {
             sql.append("; ALTER TABLE ").append(tableIdentifier);
-            sql.append(" ADD COLUMN ").append(sanitizeIdentifier(columnName + "_longitude"));
+            sql.append(" ADD COLUMN IF NOT EXISTS ").append(sanitizeIdentifier(columnName + "_longitude"));
             sql.append(" DOUBLE PRECISION");
         }
 

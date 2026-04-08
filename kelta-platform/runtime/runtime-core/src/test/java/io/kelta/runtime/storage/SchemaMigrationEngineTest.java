@@ -484,6 +484,43 @@ class SchemaMigrationEngineTest {
         }
         
         @Test
+        @DisplayName("Should be idempotent when column already exists (concurrent reconcile race)")
+        void shouldBeIdempotentWhenColumnAlreadyExists() {
+            // Scenario: two worker pods both receive the same collection-changed event
+            // (broadcast subscription). Pod A has already run the ALTER TABLE ADD COLUMN.
+            // Pod B's definition diff still thinks the column is missing, so it re-issues
+            // the same statement. With IF NOT EXISTS this must not throw.
+
+            List<FieldDefinition> oldFields = List.of(
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
+            );
+            setupTestTable("test_data", oldFields);
+
+            // Pod A already added the column
+            jdbcTemplate.execute("ALTER TABLE test_data ADD COLUMN description TEXT");
+
+            // Pod B computes the diff against the old definition and tries to add it again
+            List<FieldDefinition> newFields = List.of(
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
+            );
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
+
+            // Must not throw — ADD COLUMN IF NOT EXISTS keeps this idempotent
+            assertDoesNotThrow(() -> migrationEngine.migrateSchema(oldDef, newDef));
+
+            // Column should still be usable
+            jdbcTemplate.update(
+                "INSERT INTO test_data (id, created_at, updated_at, name, description) VALUES (?, ?, ?, ?, ?)",
+                "1", Instant.now(), Instant.now(), "Test", "Test Description"
+            );
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM test_data WHERE description = 'Test Description'", Integer.class);
+            assertEquals(1, count);
+        }
+
+        @Test
         @DisplayName("Should deprecate column when field is removed")
         void shouldDeprecateColumnWhenFieldIsRemoved() {
             // Create initial table with two fields

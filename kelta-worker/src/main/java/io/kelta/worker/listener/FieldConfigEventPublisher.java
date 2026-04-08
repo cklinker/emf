@@ -9,7 +9,9 @@ import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,10 +30,17 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
 
     static final String SUBJECT_PREFIX = "kelta.config.collection.changed.";
 
-    private final PlatformEventPublisher eventPublisher;
+    private static final String SELECT_COLLECTION_NAME = """
+            SELECT name FROM collection WHERE id = ? LIMIT 1
+            """;
 
-    public FieldConfigEventPublisher(PlatformEventPublisher eventPublisher) {
+    private final PlatformEventPublisher eventPublisher;
+    private final JdbcTemplate jdbcTemplate;
+
+    public FieldConfigEventPublisher(PlatformEventPublisher eventPublisher,
+                                      JdbcTemplate jdbcTemplate) {
         this.eventPublisher = eventPublisher;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -71,15 +80,36 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
             return;
         }
 
+        String collectionName = resolveCollectionName(collectionId);
+        if (collectionName == null) {
+            log.warn("Could not resolve collection name for id={}, skipping collection-changed broadcast", collectionId);
+            return;
+        }
+
         CollectionChangedPayload payload = new CollectionChangedPayload();
         payload.setId(collectionId);
+        payload.setName(collectionName);
         payload.setChangeType(ChangeType.UPDATED);
 
         PlatformEvent<CollectionChangedPayload> event =
                 EventFactory.createEvent("kelta.config.collection.changed", payload);
         String subject = SUBJECT_PREFIX + collectionId;
-        log.info("Publishing collection UPDATED event (triggered by field change) for collectionId={}", collectionId);
+        log.info("Publishing collection UPDATED event (triggered by field change) for collectionId={}, collectionName={}",
+                collectionId, collectionName);
         eventPublisher.publish(subject, event);
+    }
+
+    private String resolveCollectionName(String collectionId) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    SELECT_COLLECTION_NAME, collectionId);
+            if (!rows.isEmpty()) {
+                return (String) rows.get(0).get("name");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve collection name for id={}: {}", collectionId, e.getMessage());
+        }
+        return null;
     }
 
     private String getString(Map<String, Object> map, String key) {

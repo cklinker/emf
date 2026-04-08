@@ -200,9 +200,10 @@ public class FlowConfig {
     @Bean
     public FieldConfigEventPublisher fieldConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
-            PlatformEventPublisher eventPublisher) {
+            PlatformEventPublisher eventPublisher,
+            JdbcTemplate jdbcTemplate) {
         FieldConfigEventPublisher publisher =
-                new FieldConfigEventPublisher(eventPublisher);
+                new FieldConfigEventPublisher(eventPublisher, jdbcTemplate);
         hookRegistry.register(publisher);
         return publisher;
     }

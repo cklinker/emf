@@ -1,0 +1,38 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="kelta-auth" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="SPRING_BOOT_MAIN_CLASS" value="io.kelta.auth.AuthApplication" />
+    <module name="kelta-auth" />
+    <envs>
+      <!-- Database — shared with kelta-worker -->
+      <env name="DB_URL" value="jdbc:postgresql://localhost:5432/kelta_control_plane" />
+      <env name="DB_USERNAME" value="kelta" />
+      <env name="DB_PASSWORD" value="kelta" />
+      <!-- Redis -->
+      <env name="SPRING_DATA_REDIS_HOST" value="localhost" />
+      <env name="SPRING_DATA_REDIS_PORT" value="6379" />
+      <!--
+        CRITICAL: kelta-auth must issue tokens with the same issuer URI that kelta-gateway
+        validates against. When running in the IDE alongside a compose stack, both must use
+        http://kelta-auth:8080. Add to /etc/hosts (one-time):
+            127.0.0.1  kelta-auth
+      -->
+      <env name="KELTA_AUTH_ISSUER_URI" value="http://kelta-auth:8080" />
+      <env name="WORKER_SERVICE_URL" value="http://localhost:8083" />
+      <!-- Session / CORS -->
+      <env name="COOKIE_DOMAIN" value="localhost" />
+      <env name="UI_BASE_URL" value="http://localhost:5173" />
+      <env name="CORS_ALLOWED_ORIGINS" value="http://localhost:5173" />
+      <env name="DIRECT_LOGIN_ENABLED" value="true" />
+      <!-- Secrets — copy from your .env file, or set in IDE Environment Variables dialog -->
+      <env name="KELTA_ENCRYPTION_KEY" value="$KELTA_ENCRYPTION_KEY$" />
+      <env name="JWK_SET" value="$JWK_SET$" />
+      <env name="KELTA_INTERNAL_TOKEN" value="dev-internal-token" />
+      <!-- Logging -->
+      <env name="LOG_LEVEL" value="INFO" />
+      <env name="SECURITY_LOG_LEVEL" value="WARN" />
+    </envs>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

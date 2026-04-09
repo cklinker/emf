@@ -1,0 +1,31 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="kelta-gateway" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="SPRING_BOOT_MAIN_CLASS" value="io.kelta.gateway.GatewayApplication" />
+    <module name="kelta-gateway" />
+    <envs>
+      <!-- Redis -->
+      <env name="REDIS_HOST" value="localhost" />
+      <env name="REDIS_PORT" value="6379" />
+      <!-- NATS -->
+      <env name="NATS_URL" value="nats://localhost:4222" />
+      <!--
+        CRITICAL: must exactly match KELTA_AUTH_ISSUER_URI in kelta-auth.
+        With SINGLE_ISSUER=true the gateway validates all JWTs against this URI.
+        See /etc/hosts note in kelta-auth.run.xml.
+      -->
+      <env name="KELTA_AUTH_ISSUER_URI" value="http://kelta-auth:8080" />
+      <!-- Route to worker and AI on host ports -->
+      <env name="WORKER_SERVICE_URL" value="http://localhost:8083" />
+      <env name="AI_SERVICE_URL" value="http://localhost:8084" />
+      <!-- Cerbos (from compose stack) -->
+      <env name="CERBOS_HOST" value="localhost" />
+      <env name="CERBOS_GRPC_PORT" value="3593" />
+      <env name="SINGLE_ISSUER" value="true" />
+      <!-- Logging -->
+      <env name="LOG_LEVEL" value="INFO" />
+    </envs>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

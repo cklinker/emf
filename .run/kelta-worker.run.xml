@@ -1,0 +1,41 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="kelta-worker" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="SPRING_BOOT_MAIN_CLASS" value="io.kelta.worker.WorkerApplication" />
+    <module name="kelta-worker" />
+    <envs>
+      <!-- Database -->
+      <env name="SPRING_DATASOURCE_URL" value="jdbc:postgresql://localhost:5432/kelta_control_plane" />
+      <env name="SPRING_DATASOURCE_USERNAME" value="kelta" />
+      <env name="SPRING_DATASOURCE_PASSWORD" value="kelta" />
+      <!-- Redis -->
+      <env name="SPRING_DATA_REDIS_HOST" value="localhost" />
+      <env name="SPRING_DATA_REDIS_PORT" value="6379" />
+      <!-- NATS -->
+      <env name="NATS_URL" value="nats://localhost:4222" />
+      <!--
+        See /etc/hosts note in kelta-auth.run.xml — both gateway and worker resolve
+        kelta-auth tokens against this issuer URI.
+      -->
+      <env name="KELTA_AUTH_ISSUER_URI" value="http://kelta-auth:8080" />
+      <env name="EXTERNAL_BASE_URL" value="http://localhost:8080" />
+      <!-- Cerbos (from compose stack) -->
+      <env name="CERBOS_HOST" value="localhost" />
+      <env name="CERBOS_GRPC_PORT" value="3593" />
+      <!-- Email — disabled for local dev (enable mailpit profile for SMTP UI) -->
+      <env name="EMAIL_ENABLED" value="false" />
+      <env name="SMTP_HOST" value="localhost" />
+      <env name="SMTP_PORT" value="1025" />
+      <env name="SMTP_AUTH" value="false" />
+      <env name="SMTP_STARTTLS" value="false" />
+      <env name="SCHEDULER_ENABLED" value="true" />
+      <!-- Secrets — copy from your .env file, or set in IDE Environment Variables dialog -->
+      <env name="KELTA_ENCRYPTION_KEY" value="$KELTA_ENCRYPTION_KEY$" />
+      <env name="KELTA_INTERNAL_TOKEN" value="dev-internal-token" />
+      <!-- Logging -->
+      <env name="LOG_LEVEL" value="INFO" />
+    </envs>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

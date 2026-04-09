@@ -8,6 +8,7 @@ import dev.cerbos.sdk.CheckResult;
 import dev.cerbos.sdk.builders.AttributeValue;
 import dev.cerbos.sdk.builders.Principal;
 import dev.cerbos.sdk.builders.Resource;
+import io.kelta.worker.config.WorkerProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -48,11 +49,8 @@ public class CerbosAuthorizationService {
     /** Maximum time (seconds) to wait for a single Cerbos gRPC call. */
     private static final long CERBOS_TIMEOUT_SECONDS = 2;
 
-    /** Consecutive failures before the circuit breaker opens. */
-    private static final int CIRCUIT_BREAKER_THRESHOLD = 3;
-
-    /** Seconds to keep the circuit open (deny all) before retrying. */
-    private static final long CIRCUIT_BREAKER_COOLDOWN_SECONDS = 10;
+    // Circuit breaker thresholds — configurable via kelta.worker.cerbos-cb-threshold
+    // and kelta.worker.cerbos-cb-cooldown-seconds (see WorkerProperties).
 
     /** Safety-net TTL for cache entries (primary invalidation is event-driven). */
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
@@ -61,6 +59,8 @@ public class CerbosAuthorizationService {
 
     private final CerbosBlockingClient cerbosClient;
     private final ExecutorService cerbosExecutor;
+    private final int circuitBreakerThreshold;
+    private final long circuitBreakerCooldownSeconds;
 
     // Cache for field access: key = "tenantId:profileId:collectionId" → allowed field IDs
     private final Cache<String, List<String>> fieldAccessCache;
@@ -74,8 +74,11 @@ public class CerbosAuthorizationService {
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicLong circuitOpenUntil = new AtomicLong(0);
 
-    public CerbosAuthorizationService(CerbosBlockingClient cerbosClient, MeterRegistry meterRegistry) {
+    public CerbosAuthorizationService(CerbosBlockingClient cerbosClient, MeterRegistry meterRegistry,
+                                       WorkerProperties workerProperties) {
         this.cerbosClient = cerbosClient;
+        this.circuitBreakerThreshold = workerProperties.getCerbosCbThreshold();
+        this.circuitBreakerCooldownSeconds = workerProperties.getCerbosCbCooldownSeconds();
         this.cerbosExecutor = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "cerbos-worker-check");
             t.setDaemon(true);
@@ -110,9 +113,7 @@ public class CerbosAuthorizationService {
         }
 
         Future<Boolean> future = cerbosExecutor.submit(() -> {
-            Principal principal = Principal.newInstance(email, "user")
-                    .withAttribute("profileId", stringAttr(profileId))
-                    .withAttribute("tenantId", stringAttr(tenantId));
+            Principal principal = buildPrincipal(email, profileId, tenantId);
 
             Resource resource = Resource.newInstance("record", recordId)
                     .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
@@ -159,9 +160,7 @@ public class CerbosAuthorizationService {
         }
 
         Future<Boolean> future = cerbosExecutor.submit(() -> {
-            Principal principal = Principal.newInstance(email, "user")
-                    .withAttribute("profileId", stringAttr(profileId))
-                    .withAttribute("tenantId", stringAttr(tenantId));
+            Principal principal = buildPrincipal(email, profileId, tenantId);
 
             Resource resource = Resource.newInstance("field", fieldId)
                     .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
@@ -225,9 +224,7 @@ public class CerbosAuthorizationService {
         cacheMisses.increment();
 
         Future<List<String>> future = cerbosExecutor.submit(() -> {
-            Principal principal = Principal.newInstance(email, "user")
-                    .withAttribute("profileId", stringAttr(profileId))
-                    .withAttribute("tenantId", stringAttr(tenantId));
+            Principal principal = buildPrincipal(email, profileId, tenantId);
 
             var batchRequest = cerbosClient.batch(principal);
             for (String fieldId : fieldIds) {
@@ -293,9 +290,7 @@ public class CerbosAuthorizationService {
         }
 
         Future<Set<String>> future = cerbosExecutor.submit(() -> {
-            Principal principal = Principal.newInstance(email, "user")
-                    .withAttribute("profileId", stringAttr(profileId))
-                    .withAttribute("tenantId", stringAttr(tenantId));
+            Principal principal = buildPrincipal(email, profileId, tenantId);
 
             var batchRequest = cerbosClient.batch(principal);
             for (Map<String, Object> record : records) {
@@ -392,6 +387,12 @@ public class CerbosAuthorizationService {
         return false;
     }
 
+    private Principal buildPrincipal(String email, String profileId, String tenantId) {
+        return Principal.newInstance(email, "user")
+                .withAttribute("profileId", stringAttr(profileId))
+                .withAttribute("tenantId", stringAttr(tenantId));
+    }
+
     private void recordSuccess() {
         if (consecutiveFailures.get() > 0) {
             consecutiveFailures.set(0);
@@ -400,11 +401,11 @@ public class CerbosAuthorizationService {
 
     private void recordFailure() {
         int failures = consecutiveFailures.incrementAndGet();
-        if (failures >= CIRCUIT_BREAKER_THRESHOLD) {
-            long until = System.currentTimeMillis() + (CIRCUIT_BREAKER_COOLDOWN_SECONDS * 1000);
+        if (failures >= circuitBreakerThreshold) {
+            long until = System.currentTimeMillis() + (circuitBreakerCooldownSeconds * 1000);
             circuitOpenUntil.set(until);
             log.error("Cerbos circuit breaker OPEN — denying all checks for {}s after {} consecutive failures",
-                    CIRCUIT_BREAKER_COOLDOWN_SECONDS, failures);
+                    circuitBreakerCooldownSeconds, failures);
         }
     }
 

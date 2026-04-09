@@ -50,7 +50,7 @@ public class ScimUserService {
         countParams.add(tenantId);
         countParams.addAll(parsed.params());
 
-        String countSql = "SELECT COUNT(*) FROM platform_user pu WHERE pu.tenant_id = ? AND " + parsed.sql();
+        String countSql = "SELECT COUNT(*) FROM platform_user pu WHERE pu.tenant_id = ? AND pu.status = 'ACTIVE' AND " + parsed.sql();
         int total = jdbcTemplate.queryForObject(countSql, Integer.class, countParams.toArray());
 
         List<Object> queryParams = new ArrayList<>();
@@ -60,7 +60,7 @@ public class ScimUserService {
         int offset = Math.max(0, startIndex - 1);
         String sql = "SELECT pu.id, pu.email, pu.username, pu.first_name, pu.last_name, "
                 + "pu.status, pu.locale, pu.timezone, pu.manager_id, pu.created_at, pu.updated_at "
-                + "FROM platform_user pu WHERE pu.tenant_id = ? AND " + parsed.sql()
+                + "FROM platform_user pu WHERE pu.tenant_id = ? AND pu.status = 'ACTIVE' AND " + parsed.sql()
                 + " ORDER BY pu.created_at ASC LIMIT ? OFFSET ?";
         queryParams.add(count);
         queryParams.add(offset);
@@ -157,11 +157,15 @@ public class ScimUserService {
 
         for (ScimPatchOp.Operation op : patchOp.getOperations()) {
             String operation = op.getOp().toLowerCase(Locale.ROOT);
-            if (!"replace".equals(operation) && !"add".equals(operation)) {
+            if (!"replace".equals(operation) && !"add".equals(operation) && !"remove".equals(operation)) {
                 throw new ScimException(HttpStatus.BAD_REQUEST,
                         "Unsupported PATCH operation: " + op.getOp());
             }
-            applyUserPatchOp(tenantId, userId, op);
+            if ("remove".equals(operation)) {
+                applyUserRemoveOp(tenantId, userId, op);
+            } else {
+                applyUserPatchOp(tenantId, userId, op);
+            }
         }
 
         log.info("SCIM: Patched user {} in tenant {}", userId, tenantId);
@@ -220,6 +224,25 @@ public class ScimUserService {
                 }
             }
             default -> log.warn("SCIM: Ignoring unsupported PATCH path: {}", path);
+        }
+    }
+
+    private void applyUserRemoveOp(String tenantId, String userId, ScimPatchOp.Operation op) {
+        String path = op.getPath() != null ? op.getPath().toLowerCase(Locale.ROOT) : "";
+        switch (path) {
+            case "locale" -> jdbcTemplate.update(
+                    "UPDATE platform_user SET locale = NULL, updated_at = NOW() WHERE tenant_id = ? AND id = ?",
+                    tenantId, userId);
+            case "timezone" -> jdbcTemplate.update(
+                    "UPDATE platform_user SET timezone = NULL, updated_at = NOW() WHERE tenant_id = ? AND id = ?",
+                    tenantId, userId);
+            case "name.givenname" -> jdbcTemplate.update(
+                    "UPDATE platform_user SET first_name = NULL, updated_at = NOW() WHERE tenant_id = ? AND id = ?",
+                    tenantId, userId);
+            case "name.familyname" -> jdbcTemplate.update(
+                    "UPDATE platform_user SET last_name = NULL, updated_at = NOW() WHERE tenant_id = ? AND id = ?",
+                    tenantId, userId);
+            default -> log.warn("SCIM: Ignoring unsupported PATCH remove path: {}", path);
         }
     }
 

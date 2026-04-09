@@ -2,8 +2,8 @@ package io.kelta.worker.service;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.BulkJobRepository;
+import io.kelta.worker.util.TenantContextUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -59,22 +59,18 @@ public class BulkJobProcessorService {
             String externalIdField = (String) job.get("external_id_field");
 
             try {
-                TenantContext.set(tenantId);
-
-                List<Map<String, Object>> records = parseDataPayload(job);
-                if (records == null || records.isEmpty()) {
-                    bulkJobRepository.markFailed(jobId, "No records found in data payload");
-                    continue;
-                }
-
-                bulkOperationService.processJob(jobId, collectionId, operation,
-                        records, batchSize, externalIdField);
-
+                TenantContextUtils.withTenant(tenantId, () -> {
+                    List<Map<String, Object>> records = parseDataPayload(job);
+                    if (records == null || records.isEmpty()) {
+                        bulkJobRepository.markFailed(jobId, "No records found in data payload");
+                        return;
+                    }
+                    bulkOperationService.processJob(jobId, collectionId, operation,
+                            records, batchSize, externalIdField);
+                });
             } catch (Exception e) {
                 log.error("Bulk job {} failed: {}", jobId, e.getMessage(), e);
                 bulkJobRepository.markFailed(jobId, e.getMessage());
-            } finally {
-                TenantContext.clear();
             }
         }
     }

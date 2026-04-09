@@ -29,7 +29,7 @@ class SearchReindexControllerTest {
     class GetStats {
 
         @Test
-        void shouldReturnStatsForValidTenant() {
+        void shouldReturnStatsForValidTenant() throws Exception {
             when(searchIndexService.getSearchIndexStats("tenant-1"))
                     .thenReturn(Map.of("totalDocs", 100));
 
@@ -50,7 +50,7 @@ class SearchReindexControllerTest {
         }
 
         @Test
-        void shouldReturn500OnServiceException() {
+        void shouldReturn500OnServiceException() throws Exception {
             when(searchIndexService.getSearchIndexStats("tenant-1"))
                     .thenThrow(new RuntimeException("DB error"));
 

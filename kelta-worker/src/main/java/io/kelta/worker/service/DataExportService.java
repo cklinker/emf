@@ -1,7 +1,8 @@
 package io.kelta.worker.service;
 
-import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.event.EventFactory;
+import io.kelta.worker.util.CsvFormatUtils;
+import io.kelta.worker.util.TenantContextUtils;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.model.CollectionDefinition;
@@ -44,7 +45,7 @@ public class DataExportService {
     private final CollectionRegistry collectionRegistry;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
-    private final S3StorageService s3StorageService;
+    private final Optional<S3StorageService> s3StorageService;
     private final PlatformEventPublisher eventPublisher;
 
     public DataExportService(DataExportRepository exportRepository,
@@ -59,7 +60,7 @@ public class DataExportService {
         this.collectionRegistry = collectionRegistry;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
-        this.s3StorageService = s3StorageService.orElse(null);
+        this.s3StorageService = s3StorageService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -111,60 +112,57 @@ public class DataExportService {
         exportRepository.markInProgress(exportId);
 
         try {
-            TenantContext.set(tenantId);
+            TenantContextUtils.withTenant(tenantId, () -> {
+                // Resolve target collections
+                List<CollectionInfo> collections = resolveCollections(tenantId, exportScope, collectionIdsJson);
+                if (collections.isEmpty()) {
+                    exportRepository.markFailed(exportId, "No collections found for export");
+                    return;
+                }
 
-            // Resolve target collections
-            List<CollectionInfo> collections = resolveCollections(tenantId, exportScope, collectionIdsJson);
-            if (collections.isEmpty()) {
-                exportRepository.markFailed(exportId, "No collections found for export");
-                return;
-            }
+                // Execute export
+                byte[] exportData;
+                int totalRecords;
+                int recordsExported;
 
-            // Execute export
-            byte[] exportData;
-            int totalRecords = 0;
-            int recordsExported = 0;
+                if ("JSON".equalsIgnoreCase(format)) {
+                    ExportResult result = exportAsJson(exportId, tenantId, collections);
+                    exportData = result.data;
+                    totalRecords = result.totalRecords;
+                    recordsExported = result.recordsExported;
+                } else {
+                    ExportResult result = exportAsCsv(exportId, tenantId, collections);
+                    exportData = result.data;
+                    totalRecords = result.totalRecords;
+                    recordsExported = result.recordsExported;
+                }
 
-            if ("JSON".equalsIgnoreCase(format)) {
-                ExportResult result = exportAsJson(exportId, tenantId, collections);
-                exportData = result.data;
-                totalRecords = result.totalRecords;
-                recordsExported = result.recordsExported;
-            } else {
-                ExportResult result = exportAsCsv(exportId, tenantId, collections);
-                exportData = result.data;
-                totalRecords = result.totalRecords;
-                recordsExported = result.recordsExported;
-            }
+                // Store to S3 if available
+                String storageKey = null;
+                if (s3StorageService.isPresent()) {
+                    String extension = "JSON".equalsIgnoreCase(format) ? "json" : "csv";
+                    String contentType = "JSON".equalsIgnoreCase(format)
+                            ? "application/json" : "text/csv";
+                    storageKey = String.format("exports/%s/%s/%s.%s",
+                            tenantId, exportId, sanitizeFileName(name), extension);
+                    s3StorageService.get().uploadObject(storageKey, exportData, contentType);
+                }
 
-            // Store to S3 if available
-            String storageKey = null;
-            if (s3StorageService != null) {
-                String extension = "JSON".equalsIgnoreCase(format) ? "json" : "csv";
-                String contentType = "JSON".equalsIgnoreCase(format)
-                        ? "application/json" : "text/csv";
-                storageKey = String.format("exports/%s/%s/%s.%s",
-                        tenantId, exportId, sanitizeFileName(name), extension);
-                s3StorageService.uploadObject(storageKey, exportData, contentType);
-            }
+                exportRepository.markCompleted(exportId, totalRecords, recordsExported,
+                        storageKey, exportData.length);
 
-            exportRepository.markCompleted(exportId, totalRecords, recordsExported,
-                    storageKey, exportData.length);
+                // Publish event
+                publishExportCompleted(tenantId, exportId, format, recordsExported);
 
-            // Publish Kafka event
-            publishExportCompleted(tenantId, exportId, format, recordsExported);
-
-            log.info("Data export completed: exportId={}, tenant={}, scope={}, format={}, " +
-                            "collections={}, records={}, size={}",
-                    exportId, tenantId, exportScope, format,
-                    collections.size(), recordsExported, exportData.length);
-
+                log.info("Data export completed: exportId={}, tenant={}, scope={}, format={}, " +
+                                "collections={}, records={}, size={}",
+                        exportId, tenantId, exportScope, format,
+                        collections.size(), recordsExported, exportData.length);
+            });
         } catch (Exception e) {
             log.error("Data export failed: exportId={}, tenant={}, error={}",
                     exportId, tenantId, e.getMessage(), e);
             exportRepository.markFailed(exportId, e.getMessage());
-        } finally {
-            TenantContext.clear();
         }
     }
 
@@ -185,8 +183,8 @@ public class DataExportService {
         }
 
         String storageKey = (String) export.get("storage_key");
-        if (storageKey != null && s3StorageService != null) {
-            try (var storageObject = s3StorageService.streamObject(storageKey)) {
+        if (storageKey != null && s3StorageService.isPresent()) {
+            try (var storageObject = s3StorageService.get().streamObject(storageKey)) {
                 return storageObject.content().readAllBytes();
             } catch (IOException e) {
                 throw new DataExportException("Failed to read export from storage", e);
@@ -207,8 +205,8 @@ public class DataExportService {
 
         Map<String, Object> export = exportOpt.get();
         String storageKey = (String) export.get("storage_key");
-        if (storageKey != null && s3StorageService != null) {
-            return s3StorageService.getPresignedDownloadUrl(storageKey, s3StorageService.getDefaultExpiry());
+        if (storageKey != null && s3StorageService.isPresent()) {
+            return s3StorageService.get().getPresignedDownloadUrl(storageKey, s3StorageService.get().getDefaultExpiry());
         }
         return null;
     }
@@ -432,23 +430,11 @@ public class DataExportService {
     }
 
     private String formatValue(Object value) {
-        if (value == null) return "";
-        if (value instanceof Map || value instanceof List) {
-            try {
-                return objectMapper.writeValueAsString(value);
-            } catch (Exception e) {
-                return value.toString();
-            }
-        }
-        return value.toString();
+        return CsvFormatUtils.formatValue(value, objectMapper);
     }
 
     private String escapeCsv(String value) {
-        if (value == null) return "";
-        if (value.contains("\"") || value.contains(",") || value.contains("\n") || value.contains("\r")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        return value;
+        return CsvFormatUtils.escapeCsv(value);
     }
 
     private String sanitizeFileName(String name) {

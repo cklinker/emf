@@ -55,8 +55,13 @@ public class ScimGroupService {
         queryParams.add(count);
         queryParams.add(offset);
 
-        List<ScimGroup> groups = jdbcTemplate.query(sql, (rs, rowNum) -> mapGroup(rs, tenantId, baseUrl),
+        List<ScimGroup> groups = jdbcTemplate.query(sql, (rs, rowNum) -> mapGroupShell(rs, baseUrl),
                 queryParams.toArray());
+
+        // Batch-load all members in a single query to avoid N+1
+        if (!groups.isEmpty()) {
+            populateMembersForGroups(groups, baseUrl);
+        }
 
         return new ScimListResponse<>(groups, total, startIndex, groups.size());
     }
@@ -211,6 +216,52 @@ public class ScimGroupService {
                         + "VALUES (?, ?, ?, ?, NOW()) "
                         + "ON CONFLICT (group_id, member_type, member_id) DO NOTHING",
                 id, groupId, memberType, member.getValue());
+    }
+
+    /** Maps a group row without loading members — used by the list path to avoid N+1 queries. */
+    private ScimGroup mapGroupShell(ResultSet rs, String baseUrl) throws SQLException {
+        String groupId = rs.getString("id");
+        ScimGroup group = new ScimGroup();
+        group.setId(groupId);
+        group.setDisplayName(rs.getString("name"));
+        group.setExternalId(rs.getString("oidc_group_name"));
+        group.setMeta(new ScimMeta("Group",
+                formatTimestamp(rs.getObject("created_at", OffsetDateTime.class)),
+                formatTimestamp(rs.getObject("updated_at", OffsetDateTime.class)),
+                baseUrl + "/scim/v2/Groups/" + groupId));
+        return group;
+    }
+
+    /** Batch-loads members for all groups in one query and populates each group. */
+    private void populateMembersForGroups(List<ScimGroup> groups, String baseUrl) {
+        List<String> groupIds = groups.stream().map(ScimGroup::getId).toList();
+        String placeholders = String.join(",", groupIds.stream().map(id -> "?").toList());
+
+        Map<String, List<ScimMember>> membersByGroup = new HashMap<>();
+        jdbcTemplate.query(
+                "SELECT gm.group_id, gm.member_id, gm.member_type, "
+                        + "CASE WHEN gm.member_type = 'USER' THEN pu.email ELSE ug2.name END AS display "
+                        + "FROM group_membership gm "
+                        + "LEFT JOIN platform_user pu ON gm.member_type = 'USER' AND pu.id = gm.member_id "
+                        + "LEFT JOIN user_group ug2 ON gm.member_type = 'GROUP' AND ug2.id = gm.member_id "
+                        + "WHERE gm.group_id IN (" + placeholders + ")",
+                (rs) -> {
+                    String gid = rs.getString("group_id");
+                    String type = "USER".equals(rs.getString("member_type")) ? "User" : "Group";
+                    String refPath = "User".equals(type) ? "/scim/v2/Users/" : "/scim/v2/Groups/";
+                    ScimMember member = new ScimMember(
+                            rs.getString("member_id"),
+                            baseUrl + refPath + rs.getString("member_id"),
+                            rs.getString("display"),
+                            type);
+                    membersByGroup.computeIfAbsent(gid, k -> new ArrayList<>()).add(member);
+                },
+                groupIds.toArray());
+
+        for (ScimGroup group : groups) {
+            List<ScimMember> members = membersByGroup.get(group.getId());
+            group.setMembers(members == null || members.isEmpty() ? null : members);
+        }
     }
 
     private ScimGroup mapGroup(ResultSet rs, String tenantId, String baseUrl) throws SQLException {

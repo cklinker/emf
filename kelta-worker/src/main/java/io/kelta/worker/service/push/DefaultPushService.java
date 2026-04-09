@@ -1,10 +1,9 @@
 package io.kelta.worker.service.push;
 
+import io.kelta.worker.repository.PushRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.*;
 
@@ -26,13 +25,11 @@ public class DefaultPushService {
     private static final int MAX_TOKEN_LENGTH = 500;
 
     private final PushProvider pushProvider;
-    private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
+    private final PushRepository pushRepository;
 
-    public DefaultPushService(PushProvider pushProvider, JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public DefaultPushService(PushProvider pushProvider, PushRepository pushRepository) {
         this.pushProvider = pushProvider;
-        this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapper;
+        this.pushRepository = pushRepository;
     }
 
     public String registerDevice(String userId, String tenantId, String platform,
@@ -46,22 +43,14 @@ public class DefaultPushService {
         }
 
         // Upsert (unique on tenant_id + device_token)
-        var existing = jdbcTemplate.queryForList(
-                "SELECT id FROM push_device WHERE tenant_id = ? AND device_token = ?",
-                tenantId, deviceToken);
+        var existingId = pushRepository.findDeviceIdByToken(tenantId, deviceToken);
 
         String deviceId;
-        if (existing.isEmpty()) {
-            deviceId = UUID.randomUUID().toString();
-            jdbcTemplate.update(
-                    "INSERT INTO push_device (id, user_id, tenant_id, platform, device_token, device_name, created_at, updated_at) " +
-                            "VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
-                    deviceId, userId, tenantId, platform, deviceToken, deviceName);
+        if (existingId.isEmpty()) {
+            deviceId = pushRepository.insertDevice(userId, tenantId, platform, deviceToken, deviceName);
         } else {
-            deviceId = (String) existing.get(0).get("id");
-            jdbcTemplate.update(
-                    "UPDATE push_device SET user_id = ?, platform = ?, device_name = ?, updated_at = NOW() WHERE id = ?",
-                    userId, platform, deviceName, deviceId);
+            deviceId = existingId.get();
+            pushRepository.updateDevice(deviceId, userId, platform, deviceName);
         }
 
         log.info("Device registered: id={} user={} platform={}", deviceId, userId, platform);
@@ -69,27 +58,21 @@ public class DefaultPushService {
     }
 
     public void removeDevice(String deviceId, String tenantId) {
-        jdbcTemplate.update("DELETE FROM push_device WHERE id = ? AND tenant_id = ?", deviceId, tenantId);
+        pushRepository.deleteDevice(deviceId, tenantId);
     }
 
     public List<Map<String, Object>> listDevices(String userId, String tenantId) {
-        return jdbcTemplate.queryForList(
-                "SELECT id, platform, device_name, created_at, updated_at FROM push_device " +
-                        "WHERE user_id = ? AND tenant_id = ? ORDER BY updated_at DESC",
-                userId, tenantId);
+        return pushRepository.findDevicesByUser(userId, tenantId);
     }
 
     public int sendToUser(String userId, String tenantId, String title, String body, Map<String, String> data) {
-        var devices = jdbcTemplate.queryForList(
-                "SELECT id, device_token, platform FROM push_device WHERE user_id = ? AND tenant_id = ?",
-                userId, tenantId);
+        var devices = pushRepository.findDevicesForUser(userId, tenantId);
         TenantPushSettings tenantSettings = loadTenantPushSettings(tenantId);
         return sendToDevices(devices, title, body, data, tenantSettings);
     }
 
     public int sendToTenant(String tenantId, String title, String body, Map<String, String> data) {
-        var devices = jdbcTemplate.queryForList(
-                "SELECT id, device_token, platform FROM push_device WHERE tenant_id = ?", tenantId);
+        var devices = pushRepository.findDevicesForTenant(tenantId);
 
         securityLog.info("security_event=PUSH_BROADCAST tenant={} devices={} title={}",
                 tenantId, devices.size(), title);
@@ -111,7 +94,7 @@ public class DefaultPushService {
             } catch (PushDeliveryException e) {
                 if (e.isInvalidToken()) {
                     log.info("Removing stale device token: id={}", deviceId);
-                    jdbcTemplate.update("DELETE FROM push_device WHERE id = ?", deviceId);
+                    pushRepository.deleteDeviceById(deviceId);
                 } else {
                     log.warn("Push delivery failed for device {}: {}", deviceId, e.getMessage());
                 }
@@ -122,16 +105,8 @@ public class DefaultPushService {
 
     private TenantPushSettings loadTenantPushSettings(String tenantId) {
         try {
-            var rows = jdbcTemplate.queryForList(
-                    "SELECT settings FROM tenant WHERE id = ?", tenantId);
-            if (rows.isEmpty()) {
-                return null;
-            }
-            Object settings = rows.get(0).get("settings");
-            if (settings == null) {
-                return null;
-            }
-            return TenantPushSettings.fromJsonNode(objectMapper.readTree(settings.toString()));
+            var settings = pushRepository.getTenantSettings(tenantId);
+            return settings != null ? TenantPushSettings.fromJsonNode(settings) : null;
         } catch (Exception e) {
             log.debug("Could not load tenant push settings for {}: {}", tenantId, e.getMessage());
             return null;

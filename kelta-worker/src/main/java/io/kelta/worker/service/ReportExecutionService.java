@@ -1,6 +1,7 @@
 package io.kelta.worker.service;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.worker.util.CsvFormatUtils;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.query.*;
@@ -388,23 +389,11 @@ public class ReportExecutionService {
     }
 
     private String formatValue(Object value) {
-        if (value == null) return "";
-        if (value instanceof Map || value instanceof List) {
-            try {
-                return objectMapper.writeValueAsString(value);
-            } catch (Exception e) {
-                return value.toString();
-            }
-        }
-        return value.toString();
+        return CsvFormatUtils.formatValue(value, objectMapper);
     }
 
     private String escapeCsv(String value) {
-        if (value == null) return "";
-        if (value.contains("\"") || value.contains(",") || value.contains("\n") || value.contains("\r")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        return value;
+        return CsvFormatUtils.escapeCsv(value);
     }
 
     // =========================================================================

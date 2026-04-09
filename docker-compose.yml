@@ -1,10 +1,30 @@
 # Kelta Local Development Environment
-# Provides: PostgreSQL, Redis, Kafka, and Keycloak (OIDC)
+# ─────────────────────────────────────────────────────────────────────────────
+# Quick start:
+#   make setup    ← first time: copies .env and generates dev RSA key
+#   make up       ← start the stack
+#   make seed     ← confirm health + print credentials
+#
+# Profiles:
+#   (none)        postgres, redis, nats, cerbos, kelta-auth, kelta-worker,
+#                 kelta-gateway, kelta-ui
+#   ai            adds kelta-ai (requires ANTHROPIC_API_KEY in .env)
+#   tools         adds pgadmin, redis-commander, mailpit
+#   observability adds opensearch, jaeger
+#   seed          runs the one-shot kelta-bootstrap healthcheck/info container
+#
+# Issuer URI note:
+#   KELTA_AUTH_ISSUER_URI=http://kelta-auth:8080 is used everywhere INSIDE
+#   Docker (container DNS). For hybrid IDE debug add to /etc/hosts:
+#     127.0.0.1  kelta-auth
+# ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  # ===========================================
-  # PostgreSQL Database
-  # ===========================================
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Infrastructure
+  # ═══════════════════════════════════════════════════════════════════════════
+
   postgres:
     image: postgres:15-alpine
     container_name: kelta-postgres
@@ -17,7 +37,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kelta -d kelta_control_plane"]
       interval: 10s
@@ -26,9 +45,6 @@ services:
     networks:
       - kelta-network
 
-  # ===========================================
-  # Redis Cache
-  # ===========================================
   redis:
     image: redis:7-alpine
     container_name: kelta-redis
@@ -46,9 +62,6 @@ services:
     networks:
       - kelta-network
 
-  # ===========================================
-  # NATS (JetStream mode)
-  # ===========================================
   nats:
     image: nats:2.10-alpine
     container_name: kelta-nats
@@ -67,55 +80,252 @@ services:
     networks:
       - kelta-network
 
-  # ===========================================
-  # Keycloak OIDC Provider
-  # ===========================================
-  keycloak:
-    image: quay.io/keycloak/keycloak:23.0
-    container_name: kelta-keycloak
+  cerbos:
+    image: ghcr.io/cerbos/cerbos:0.40.0
+    container_name: kelta-cerbos
     restart: unless-stopped
-    command: start-dev --import-realm
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_HTTP_PORT: 8180
-      KC_HEALTH_ENABLED: "true"
+    command: ["server", "--config=/config/config.yaml"]
     ports:
-      - "8180:8180"
+      - "3592:3592"
+      - "3593:3593"
     volumes:
-      - ./docker/keycloak/kelta-realm.json:/opt/keycloak/data/import/kelta-realm.json:ro
-      - keycloak_data:/opt/keycloak/data
+      - ./docker/cerbos/config.yaml:/config/config.yaml:ro
+      - ./docker/cerbos/policies:/policies:ro
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8180;echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3592/_cerbos/health"]
+      interval: 10s
+      timeout: 5s
       retries: 5
+    networks:
+      - kelta-network
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Platform Services
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  kelta-auth:
+    build:
+      context: .
+      dockerfile: kelta-auth/Dockerfile
+    container_name: kelta-auth
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Database — same shared DB as kelta-worker
+      DB_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
+      DB_USERNAME: kelta
+      DB_PASSWORD: kelta
+      # Redis
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      # CRITICAL: issuer URI must match what tokens are issued with inside Docker
+      KELTA_AUTH_ISSUER_URI: http://kelta-auth:8080
+      WORKER_SERVICE_URL: http://kelta-worker:8080
+      # Session cookies
+      COOKIE_DOMAIN: localhost
+      UI_BASE_URL: http://localhost:5173
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+      # Enable direct login for bootstrap/e2e (safe because DIRECT_LOGIN_ENABLED
+      # defaults to false in production)
+      DIRECT_LOGIN_ENABLED: "true"
+      LOG_LEVEL: INFO
+      SECURITY_LOG_LEVEL: WARN
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
       start_period: 60s
     networks:
       - kelta-network
 
-  # ===========================================
-  # Redis Commander (optional - for debugging)
-  # ===========================================
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: kelta-redis-commander
+  kelta-worker:
+    build:
+      context: .
+      dockerfile: kelta-worker/Dockerfile
+    container_name: kelta-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Database — worker owns Flyway migrations
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
+      SPRING_DATASOURCE_USERNAME: kelta
+      SPRING_DATASOURCE_PASSWORD: kelta
+      # Redis
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      # NATS
+      NATS_URL: nats://nats:4222
+      # Auth
+      KELTA_AUTH_ISSUER_URI: http://kelta-auth:8080
+      EXTERNAL_BASE_URL: http://localhost:8080
+      # Cerbos
+      CERBOS_HOST: cerbos
+      CERBOS_GRPC_PORT: "3593"
+      # Email — disabled by default; enable mailpit profile for SMTP UI
+      EMAIL_ENABLED: "false"
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
+      SCHEDULER_ENABLED: "true"
+      LOG_LEVEL: INFO
+    ports:
+      - "8083:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      cerbos:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    networks:
+      - kelta-network
+
+  kelta-gateway:
+    build:
+      context: .
+      dockerfile: kelta-gateway/Dockerfile
+    container_name: kelta-gateway
     restart: unless-stopped
     environment:
-      REDIS_HOSTS: local:redis:6379
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # NATS
+      NATS_URL: nats://nats:4222
+      # CRITICAL: must match kelta-auth's KELTA_AUTH_ISSUER_URI exactly
+      KELTA_AUTH_ISSUER_URI: http://kelta-auth:8080
+      WORKER_SERVICE_URL: http://kelta-worker:8080
+      AI_SERVICE_URL: http://kelta-ai:8080
+      # Cerbos
+      CERBOS_HOST: cerbos
+      CERBOS_GRPC_PORT: "3593"
+      # Single issuer: all JWTs must come from kelta-auth
+      SINGLE_ISSUER: "true"
+      LOG_LEVEL: INFO
     ports:
-      - "8091:8081"
+      - "8080:8080"
     depends_on:
       redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      cerbos:
+        condition: service_healthy
+      kelta-auth:
+        condition: service_healthy
+      kelta-worker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kelta-network
+
+  kelta-ui:
+    build:
+      context: .
+      dockerfile: kelta-ui/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+    container_name: kelta-ui
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      kelta-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80 >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kelta-network
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AI service (profile: ai) — requires ANTHROPIC_API_KEY in .env
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  kelta-ai:
+    build:
+      context: .
+      dockerfile: kelta-ai/Dockerfile
+    container_name: kelta-ai
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
+      SPRING_DATASOURCE_USERNAME: kelta
+      SPRING_DATASOURCE_PASSWORD: kelta
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      WORKER_SERVICE_URL: http://kelta-worker:8080
+      LOG_LEVEL: INFO
+    ports:
+      - "8084:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kelta-worker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - kelta-network
+    profiles:
+      - ai
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Bootstrap (profile: seed) — one-shot healthcheck + info printer
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  kelta-bootstrap:
+    build:
+      context: docker/bootstrap
+    container_name: kelta-bootstrap
+    environment:
+      GATEWAY_URL: http://kelta-gateway:8080
+      AUTH_URL: http://kelta-auth:8080
+      WORKER_URL: http://kelta-worker:8080
+    depends_on:
+      kelta-gateway:
         condition: service_healthy
     networks:
       - kelta-network
     profiles:
-      - tools
+      - seed
 
-  # ===========================================
-  # pgAdmin (optional - for debugging)
-  # ===========================================
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Dev tools (profile: tools)
+  # ═══════════════════════════════════════════════════════════════════════════
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: kelta-pgadmin
@@ -136,83 +346,38 @@ services:
     profiles:
       - tools
 
-  # ===========================================
-  # Kelta API Gateway Service
-  # ===========================================
-  kelta-gateway:
-    build:
-      context: .
-      dockerfile: kelta-gateway/Dockerfile
-    container_name: kelta-gateway
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: kelta-redis-commander
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: integration-test
-      NATS_URL: nats://nats:4222
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8180/realms/kelta
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/kelta/protocol/openid-connect/certs
-      KELTA_GATEWAY_SERVICE_ACCOUNT_CLIENT_ID: kelta-gateway-service
-      KELTA_GATEWAY_SERVICE_ACCOUNT_CLIENT_SECRET: kelta-gateway-service-secret
-      LOGGING_LEVEL_IO_KELTA: INFO
+      REDIS_HOSTS: local:redis:6379
     ports:
-      - "8080:8080"
+      - "8091:8081"
     depends_on:
       redis:
         condition: service_healthy
-      nats:
-        condition: service_healthy
-      keycloak:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
     networks:
       - kelta-network
+    profiles:
+      - tools
 
-  # ===========================================
-  # Kelta Worker Service
-  # ===========================================
-  kelta-worker:
-    build:
-      context: .
-      dockerfile: kelta-worker/Dockerfile
-    container_name: kelta-worker
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: kelta-mailpit
     restart: unless-stopped
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
-      SPRING_DATASOURCE_USERNAME: kelta
-      SPRING_DATASOURCE_PASSWORD: kelta
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      NATS_URL: nats://nats:4222
-      WORKER_POOL: default
-      WORKER_CAPACITY: 50
-      LOGGING_LEVEL_IO_KELTA: INFO
     ports:
-      - "8083:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
+      - "1025:1025"
+      - "8025:8025"
     networks:
       - kelta-network
+    profiles:
+      - tools
 
-  # ===========================================
-  # OpenSearch (observability data store)
-  # ===========================================
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Observability (profile: observability)
+  # ═══════════════════════════════════════════════════════════════════════════
+
   opensearch:
     image: opensearchproject/opensearch:2.17.1
     container_name: kelta-opensearch
@@ -236,9 +401,6 @@ services:
     profiles:
       - observability
 
-  # ===========================================
-  # Jaeger V2 (OTLP receiver + trace UI)
-  # ===========================================
   jaeger:
     image: jaegertracing/jaeger:2
     container_name: kelta-jaeger
@@ -258,45 +420,10 @@ services:
     profiles:
       - observability
 
-  # ===========================================
-  # Sample Service for Integration Testing
-  # ===========================================
-  sample-service:
-    build:
-      context: .
-      dockerfile: sample-service/Dockerfile
-    container_name: kelta-sample-service
-    restart: unless-stopped
-    environment:
-      SPRING_PROFILES_ACTIVE: integration-test
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
-      SPRING_DATASOURCE_USERNAME: kelta
-      SPRING_DATASOURCE_PASSWORD: kelta
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      KELTA_STORAGE_MODE: PHYSICAL_TABLES
-      LOGGING_LEVEL_IO_KELTA: INFO
-    ports:
-      - "8082:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    networks:
-      - kelta-network
-
 volumes:
   postgres_data:
   redis_data:
   nats_data:
-  keycloak_data:
   pgadmin_data:
   opensearch_data:
 

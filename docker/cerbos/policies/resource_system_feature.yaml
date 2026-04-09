@@ -1,0 +1,10 @@
+---
+# Dev allow-all: system_feature resources (gateway + worker permission checks)
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "system_feature"
+  rules:
+    - actions: ["*"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]

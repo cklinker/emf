@@ -1,0 +1,24 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="kelta-ai" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="SPRING_BOOT_MAIN_CLASS" value="io.kelta.ai.AiApplication" />
+    <module name="kelta-ai" />
+    <envs>
+      <!-- Database -->
+      <env name="SPRING_DATASOURCE_URL" value="jdbc:postgresql://localhost:5432/kelta_control_plane" />
+      <env name="SPRING_DATASOURCE_USERNAME" value="kelta" />
+      <env name="SPRING_DATASOURCE_PASSWORD" value="kelta" />
+      <!-- Redis -->
+      <env name="SPRING_DATA_REDIS_HOST" value="localhost" />
+      <env name="SPRING_DATA_REDIS_PORT" value="6379" />
+      <!-- Worker (on host port) -->
+      <env name="WORKER_SERVICE_URL" value="http://localhost:8083" />
+      <!-- Secrets — copy from your .env file, or set in IDE Environment Variables dialog -->
+      <env name="ANTHROPIC_API_KEY" value="$ANTHROPIC_API_KEY$" />
+      <!-- Logging -->
+      <env name="LOG_LEVEL" value="INFO" />
+    </envs>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

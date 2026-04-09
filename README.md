@@ -14,11 +14,10 @@ Kelta is a platform for building dynamic, runtime-configurable enterprise applic
                     │    Redis     │      │  PostgreSQL  │
                     │   (Cache)    │      │     (DB)     │
                     └──────────────┘      └──────────────┘
-                           │
-                    ┌──────┴───────┐
-                    │    Kafka     │
-                    │  (Events)    │
-                    └──────────────┘
+       ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+       │  kelta-auth  │     │    Cerbos    │     │     NATS     │
+       │   (OIDC)     │     │   (Authz)    │     │  (JetStream) │
+       └──────────────┘     └──────────────┘     └──────────────┘
 ```
 
 ## Project Structure
@@ -48,51 +47,89 @@ Kelta is a platform for building dynamic, runtime-configurable enterprise applic
 
 ## Prerequisites
 
-- Java 21 (Temurin recommended)
+- Java 25 (Temurin recommended)
 - Maven 3.9+
-- Node.js 18+
+- Node.js 20+
 - Docker & Docker Compose
 
-## Getting Started
+## Local Development
 
-### 1. Start Infrastructure
-
-```bash
-cp .env.example .env
-docker-compose up -d
-```
-
-This starts PostgreSQL, Redis, Kafka, and Keycloak. Optional debugging tools (Kafka UI, Redis Commander, pgAdmin) are available via the `tools` profile:
+### One-command start
 
 ```bash
-docker-compose --profile tools up -d
+make setup   # first time only: copies .env, generates RSA JWK + AES key
+make up      # starts postgres, redis, nats, cerbos, auth, worker, gateway, ui
+make seed    # waits for healthy stack, then prints credentials
 ```
 
-### 2. Build Runtime Libraries
+Default credentials (seeded by Flyway migrations):
 
-The runtime modules must be built first as they are dependencies for the gateway and worker.
+| Field | Value |
+|-------|-------|
+| URL | http://localhost:5173 |
+| Email | `admin@kelta.local` |
+| Password | `password` (force-change on first login) |
+| Tenant slug | `default` |
+
+### Service ports
+
+| Service | Host port | Notes |
+|---------|-----------|-------|
+| kelta-ui | :5173 | React admin UI |
+| kelta-gateway | :8080 | Main API entry point |
+| kelta-auth | :8081 | Internal OIDC provider |
+| kelta-worker | :8083 | Business logic + Flyway |
+| kelta-ai | :8084 | AI service (`--profile ai`) |
+| Cerbos | :3592 (HTTP) / :3593 (gRPC) | Authorization engine |
+| PostgreSQL | :5432 | |
+| Redis | :6379 | |
+| NATS | :4222 | |
+| pgAdmin | :8092 | `--profile tools` |
+| Redis Commander | :8091 | `--profile tools` |
+| Mailpit (SMTP UI) | :8025 | `--profile tools` |
+
+### Useful Makefile targets
+
+```bash
+make up-ai           # default stack + kelta-ai (needs ANTHROPIC_API_KEY in .env)
+make up-full         # default + ai + tools
+make rebuild SVC=kelta-worker   # rebuild + restart one service
+make logs SVC=kelta-gateway     # tail logs
+make down            # stop all containers
+make reset           # wipe volumes and restart clean
+```
+
+### Debugging a service in the IDE (hybrid mode)
+
+Stop the container for the service you want to debug, then launch it from IntelliJ using the checked-in run config in `.run/`:
+
+```bash
+make debug SVC=kelta-worker
+# IntelliJ → Run → kelta-worker  (or use .run/kelta-worker.run.xml)
+```
+
+**One-time `/etc/hosts` entry required** (issuer URI consistency):
+
+```
+127.0.0.1  kelta-auth
+```
+
+This is necessary because `KELTA_AUTH_ISSUER_URI=http://kelta-auth:8080` is used
+everywhere — inside Docker via container DNS and from the IDE via this hosts entry.
+Without it, gateway's `single-issuer` validation will reject tokens issued by
+kelta-auth running in the IDE.
+
+**Secrets in run configs** — the `.run/*.run.xml` files use `$VAR_NAME$` for
+secrets (`KELTA_ENCRYPTION_KEY`, `JWK_SET`, `ANTHROPIC_API_KEY`). Set them in
+the IntelliJ _Run/Debug Configurations → Environment variables_ dialog by
+copying the values from your `.env` file.
+
+### Build runtime libraries (required before first IDE run)
 
 ```bash
 mvn clean install -DskipTests -f kelta-platform/pom.xml \
   -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
   -am -B
-```
-
-### 3. Run Backend Services
-
-```bash
-# Gateway (port 8080)
-mvn spring-boot:run -f kelta-gateway/pom.xml
-
-# Worker (port 8083)
-mvn spring-boot:run -f kelta-worker/pom.xml
-```
-
-### 4. Run Frontend
-
-```bash
-cd kelta-web && npm install
-cd kelta-ui/app && npm install && npm run dev
 ```
 
 ## Running Tests
@@ -122,29 +159,16 @@ npm run format:check
 npm run test:coverage
 ```
 
-## Local Services
-
-| Service | URL | Notes |
-|---------|-----|-------|
-| Gateway API | http://localhost:8080 | Main API entry point |
-| Worker | http://localhost:8083 | Worker service |
-| Keycloak | http://localhost:8180 | OIDC provider (admin/admin) |
-| Kafka UI | http://localhost:8090 | Requires `tools` profile |
-| Redis Commander | http://localhost:8091 | Requires `tools` profile |
-| pgAdmin | http://localhost:8092 | Requires `tools` profile |
-
 ## Environment Variables
 
-See [`.env.example`](.env.example) for the full list. Key variables:
+See [`.env.example`](.env.example). The only required secrets are generated by `make gen-keys`:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5432` | PostgreSQL port |
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9094` | Kafka broker address |
-| `OIDC_ISSUER_URI` | `http://localhost:8180/realms/kelta` | Keycloak OIDC issuer |
-| `SECURITY_ENABLED` | `true` | Enable/disable authentication |
-| `KAFKA_EVENTS_ENABLED` | `true` | Enable/disable Kafka event publishing |
+| Variable | Description |
+|----------|-------------|
+| `JWK_SET` | RSA-2048 JWK Set for JWT signing (generated by `make gen-keys`) |
+| `KELTA_ENCRYPTION_KEY` | AES-256 key for envelope encryption (generated by `make gen-keys`) |
+| `KELTA_INTERNAL_TOKEN` | Shared secret for internal service calls (default: `dev-internal-token`) |
+| `ANTHROPIC_API_KEY` | Required only when running kelta-ai (`--profile ai`) |
 
 ## CI/CD
 

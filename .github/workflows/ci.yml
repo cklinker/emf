@@ -141,11 +141,68 @@ jobs:
           retention-days: 7
 
   # ===========================================================================
+  # Cross-service integration tests (Testcontainers harness)
+  # Boots full mini-stack and runs AuthFlow, CollectionLifecycle, TenantIsolation
+  # scenarios. Runs after unit tests so harness can reuse the Maven cache.
+  # ===========================================================================
+  integration-tests:
+    name: Integration Tests
+    needs: [test-java]
+    runs-on: k8s-runner
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Install Maven
+        run: |
+          if ! command -v mvn &> /dev/null; then
+            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
+            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
+          fi
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Clean stale Kelta artifacts
+        run: rm -rf ~/.m2/repository/io/kelta
+
+      - name: Build runtime modules
+        run: mvn clean install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
+
+      - name: Build service JARs (required by test harness)
+        run: |
+          mvn install -DskipTests -f kelta-auth/pom.xml -B
+          mvn install -DskipTests -f kelta-worker/pom.xml -B
+          mvn install -DskipTests -f kelta-gateway/pom.xml -B
+
+      - name: Run cross-service harness
+        run: mvn verify -f kelta-test-harness/pom.xml -Pintegration-tests -B
+
+      - name: Upload harness reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-failsafe-reports
+          path: kelta-test-harness/target/failsafe-reports/
+          retention-days: 7
+
+  # ===========================================================================
   # Quality gate - all checks must pass
   # ===========================================================================
   quality-gate:
     name: Quality Gate
-    needs: [test-java, test-frontend]
+    needs: [test-java, test-frontend, integration-tests]
     if: always()
     runs-on: k8s-runner
     steps:
@@ -157,6 +214,10 @@ jobs:
           fi
           if [[ "${{ needs.test-frontend.result }}" != "success" ]]; then
             echo "Frontend tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+            echo "Integration tests failed"
             exit 1
           fi
           echo "All quality gates passed"

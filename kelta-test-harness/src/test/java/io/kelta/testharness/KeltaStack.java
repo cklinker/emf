@@ -232,20 +232,12 @@ public final class KeltaStack {
                         .withDockerfileFromBuilder(b -> b
                                 .from("eclipse-temurin:25-jre-alpine")
                                 .copy("app.jar", "/app.jar")
-                                // Keep the JVM footprint small for CI. Without these caps each JVM
-                                // can consume 1+ GB (heap + unlimited metaspace + JIT code cache),
-                                // OOM-killing the k8s runner pod when three services run together.
-                                //   -Xmx256m             — heap
-                                //   -XX:MaxMetaspaceSize  — class metadata (unlimited by default)
-                                //   -XX:ReservedCodeCacheSize — JIT native code cache
-                                //   -XX:TieredStopAtLevel=1 — interpreter + C1 only, no C2 code cache
-                                //   -XX:+UseSerialGC      — minimal GC thread/memory overhead
+                                // Cap heap and metaspace so three concurrent service JVMs don't
+                                // exceed the runner pod's memory limit. Metaspace is unbounded by
+                                // default and can add 200-400 MB per JVM for a complex Spring Boot app.
                                 .entryPoint("java",
-                                        "-Xmx256m",
-                                        "-XX:MaxMetaspaceSize=192m",
-                                        "-XX:ReservedCodeCacheSize=64m",
-                                        "-XX:TieredStopAtLevel=1",
-                                        "-XX:+UseSerialGC",
+                                        "-Xmx512m",
+                                        "-XX:MaxMetaspaceSize=256m",
                                         "-jar", "/app.jar")
                         )
         );

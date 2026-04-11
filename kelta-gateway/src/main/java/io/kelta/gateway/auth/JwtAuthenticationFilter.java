@@ -119,6 +119,17 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                 GatewayPrincipal principal = principalExtractor.extractPrincipal(jwt);
                 log.debug("Successfully authenticated user: {} for path: {}", principal.getUsername(), path);
 
+                // Enforce that the JWT's tenant_id matches the slug-resolved tenant.
+                // This prevents cross-tenant access: a token issued for tenant A must not
+                // be accepted on tenant B's slug.
+                String jwtTenantId = principal.getTenantId();
+                if (jwtTenantId != null && !jwtTenantId.isEmpty() && !jwtTenantId.equals(tenantId)) {
+                    log.warn("Cross-tenant access attempt: JWT tenant={} request tenant={} path={}",
+                            jwtTenantId, tenantId, path);
+                    metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "tenant_mismatch");
+                    throw new JwtException("JWT tenant_id does not match request tenant");
+                }
+
                 // Store principal in exchange attributes for downstream filters
                 ServerWebExchange mutatedExchange = exchange.mutate()
                     .request(exchange.getRequest())

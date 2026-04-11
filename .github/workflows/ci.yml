@@ -192,12 +192,38 @@ jobs:
         # Pre-pulling here ensures the image is in Docker's cache before tests run.
         run: docker pull eclipse-temurin:25-jre-alpine
 
+      - name: Pre-build service images
+        # Build the three service container images using the pre-built fat JARs.
+        # Without this step, Testcontainers would stream ~400 MB of JARs through the
+        # Docker socket INSIDE the test JVM, which can starve the runner's GitHub
+        # heartbeat thread and cause "runner lost communication" on K8s runners.
+        # KeltaStack.serviceContainer() uses these pre-built images when
+        # KELTA_HARNESS_PREBUILT_IMAGES=true is set on the harness step.
+        run: |
+          for service in kelta-worker kelta-auth kelta-gateway; do
+            jar="${service}/target/${service}-1.0.0-SNAPSHOT.jar"
+            ctx=$(mktemp -d)
+            cp "$jar" "$ctx/app.jar"
+            cat > "$ctx/Dockerfile" <<'EOF'
+          FROM eclipse-temurin:25-jre-alpine
+          COPY app.jar /app.jar
+          ENTRYPOINT ["java", "-Xmx512m", "-XX:MaxMetaspaceSize=256m", "-jar", "/app.jar"]
+          EOF
+            docker build -t "${service}-harness" "$ctx"
+            rm -rf "$ctx"
+            echo "Built ${service}-harness"
+          done
+
       - name: Run cross-service harness
         env:
           # Ryuk (Testcontainers resource reaper) binds a port on the Docker host's
           # localhost, which is unreachable from inside the k8s pod. Disable it; the
           # containers are short-lived and the job cleans up after itself.
           TESTCONTAINERS_RYUK_DISABLED: "true"
+          # Tell KeltaStack to use the Docker images pre-built in the step above
+          # instead of building them inside the test JVM. Avoids the heavy JAR
+          # streaming that disrupts the runner's GitHub heartbeat thread.
+          KELTA_HARNESS_PREBUILT_IMAGES: "true"
           # Cap the Maven launcher JVM. The forked test JVM is capped separately via
           # maven-failsafe-plugin <argLine> in kelta-test-harness/pom.xml.
           # Service JVMs run inside Docker (outside the runner pod's cgroup) and are

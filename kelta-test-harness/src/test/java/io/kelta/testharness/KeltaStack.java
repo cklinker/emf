@@ -217,11 +217,30 @@ public final class KeltaStack {
 
     /**
      * Builds a lightweight JRE container that runs the pre-built fat JAR
-     * for the given service. The JAR must already exist at
-     * {@code ../<service>/target/<service>-<version>.jar}.
+     * for the given service.
+     *
+     * <p>In CI, set {@code KELTA_HARNESS_PREBUILT_IMAGES=true} and pre-build the
+     * images with {@code docker build} before running the harness. This avoids
+     * streaming 400 MB of JARs through the Docker socket inside the test JVM,
+     * which can starve the runner's GitHub heartbeat thread and cause the
+     * "runner lost communication" error on self-hosted K8s runners.
+     *
+     * <p>In local dev, the image is built on first run from the JAR in
+     * {@code ../<service>/target/<service>-<version>.jar}. Subsequent runs reuse
+     * the cached Docker image (Testcontainers content-addressable cache).
      */
     @SuppressWarnings("unchecked")
     private static GenericContainer<?> serviceContainer(String service) {
+        String imageName = service + "-harness";
+
+        // In CI, images are pre-built by the "Pre-build service images" step.
+        // Using a pre-built image skips the 200–400 MB JAR streaming that would
+        // otherwise happen inside the test JVM at container start-up time.
+        if ("true".equalsIgnoreCase(System.getenv("KELTA_HARNESS_PREBUILT_IMAGES"))) {
+            log.info("Using pre-built image {} (KELTA_HARNESS_PREBUILT_IMAGES=true)", imageName);
+            return new GenericContainer<>(DockerImageName.parse(imageName));
+        }
+
         Path jarPath = resolveJar(service);
         if (!Files.exists(jarPath)) {
             throw new IllegalStateException(
@@ -230,7 +249,7 @@ public final class KeltaStack {
         }
 
         return new GenericContainer<>(
-                new ImageFromDockerfile(service + "-harness", false)
+                new ImageFromDockerfile(imageName, false)
                         .withFileFromPath("app.jar", jarPath)
                         .withDockerfileFromBuilder(b -> b
                                 .from("eclipse-temurin:25-jre-alpine")

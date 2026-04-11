@@ -352,6 +352,29 @@
                 <skipITs>false</skipITs>
             </properties>
         </profile>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <configuration>
+                            <buildArgs>
+                                <!--
+                                  grpc-netty-shaded (Cerbos SDK) initialises ChannelHandlerMask at
+                                  build time, which captures a Logback Logger instance.  GraalVM
+                                  defaults all classes to run-time init, causing a conflict.  Force
+                                  logback and shaded grpc-netty to build-time init to resolve it.
+                                -->
+                                <buildArg>--initialize-at-build-time=ch.qos.logback</buildArg>
+                                <buildArg>--initialize-at-build-time=ch.qos.logback.classic.Logger</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
     
     <!-- Reporting section for Maven site -->

@@ -187,10 +187,17 @@ jobs:
           mvn install -DskipTests -f kelta-worker/pom.xml -B
           mvn install -DskipTests -f kelta-gateway/pom.xml -B
 
-      - name: Pre-pull service container base image
-        # Testcontainers builds service images at test-start time with no pull timeout.
-        # Pre-pulling here ensures the image is in Docker's cache before tests run.
-        run: docker pull eclipse-temurin:25-jre-alpine
+      - name: Pre-pull Docker images
+        # Docker image pulls have no timeout by default. If any image is not in
+        # Docker's cache and the registry is slow or unreachable from the K8s pod,
+        # the pull blocks the test JVM thread indefinitely. Pre-pulling all images
+        # here ensures everything is cached before the test process starts.
+        run: |
+          docker pull postgres:15-alpine
+          docker pull redis:7-alpine
+          docker pull nats:2.10-alpine
+          docker pull ghcr.io/cerbos/cerbos:0.40.0
+          docker pull eclipse-temurin:25-jre-alpine
 
       - name: Pre-build service images
         # Build the three service container images using the pre-built fat JARs.

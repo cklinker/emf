@@ -21,6 +21,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Singleton stack of Testcontainers that backs all harness scenario tests.
@@ -196,19 +197,45 @@ public final class KeltaStack {
     public static void start() {
         log.info("Starting Kelta test stack...");
 
-        // Phase 1: infrastructure in parallel
-        org.testcontainers.lifecycle.Startables.deepStart(POSTGRES, REDIS, NATS, CERBOS).join();
+        // Phase 1: infrastructure in parallel.
+        // Each container gets its own log line so CI output shows exactly which
+        // container is hanging — avoids the silent-block problem with deepStart.
+        log.info("Phase 1: starting infrastructure containers in parallel...");
+        CompletableFuture<Void> postgresF = CompletableFuture.runAsync(() -> {
+            log.info("  [POSTGRES] starting...");
+            POSTGRES.start();
+            log.info("  [POSTGRES] up");
+        });
+        CompletableFuture<Void> redisF = CompletableFuture.runAsync(() -> {
+            log.info("  [REDIS] starting...");
+            REDIS.start();
+            log.info("  [REDIS] up");
+        });
+        CompletableFuture<Void> natsF = CompletableFuture.runAsync(() -> {
+            log.info("  [NATS] starting...");
+            NATS.start();
+            log.info("  [NATS] up");
+        });
+        CompletableFuture<Void> cerbosF = CompletableFuture.runAsync(() -> {
+            log.info("  [CERBOS] starting...");
+            CERBOS.start();
+            log.info("  [CERBOS] up");
+        });
+        CompletableFuture.allOf(postgresF, redisF, natsF, cerbosF).join();
         log.info("Infrastructure healthy");
 
         // Phase 2: worker (owns Flyway migrations)
+        log.info("Phase 2: starting kelta-worker...");
         WORKER.start();
         log.info("kelta-worker healthy (Flyway complete)");
 
         // Phase 3: auth (needs DB + worker)
+        log.info("Phase 3: starting kelta-auth...");
         AUTH.start();
         log.info("kelta-auth healthy");
 
         // Phase 4: gateway (needs auth JWKS + worker routes)
+        log.info("Phase 4: starting kelta-gateway...");
         GATEWAY.start();
         log.info("kelta-gateway healthy — stack ready");
     }

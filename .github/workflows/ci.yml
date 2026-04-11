@@ -187,6 +187,11 @@ jobs:
           mvn install -DskipTests -f kelta-gateway/pom.xml -B
 
       - name: Run cross-service harness
+        env:
+          # Ryuk (Testcontainers resource reaper) binds a port on the Docker host's
+          # localhost, which is unreachable from inside the k8s pod. Disable it; the
+          # containers are short-lived and the job cleans up after itself.
+          TESTCONTAINERS_RYUK_DISABLED: "true"
         run: mvn verify -f kelta-test-harness/pom.xml -Pintegration-tests -B
 
       - name: Upload harness reports

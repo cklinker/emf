@@ -232,9 +232,12 @@ public final class KeltaStack {
                         .withDockerfileFromBuilder(b -> b
                                 .from("eclipse-temurin:25-jre-alpine")
                                 .copy("app.jar", "/app.jar")
+                                // Explicit heap cap: without a container memory limit the JVM sees
+                                // host RAM (can be 100s of GB on CI runners) and MaxRAMPercentage
+                                // would allocate most of it, OOM-killing the runner.
                                 .entryPoint("java",
                                         "-XX:+UseContainerSupport",
-                                        "-XX:MaxRAMPercentage=75.0",
+                                        "-Xmx512m",
                                         "-jar", "/app.jar")
                         )
         );

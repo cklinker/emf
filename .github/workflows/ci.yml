@@ -149,6 +149,7 @@ jobs:
     name: Integration Tests
     needs: [test-java]
     runs-on: k8s-runner
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

@@ -232,12 +232,20 @@ public final class KeltaStack {
                         .withDockerfileFromBuilder(b -> b
                                 .from("eclipse-temurin:25-jre-alpine")
                                 .copy("app.jar", "/app.jar")
-                                // Explicit heap cap: without a container memory limit the JVM sees
-                                // host RAM (can be 100s of GB on CI runners) and MaxRAMPercentage
-                                // would allocate most of it, OOM-killing the runner.
+                                // Keep the JVM footprint small for CI. Without these caps each JVM
+                                // can consume 1+ GB (heap + unlimited metaspace + JIT code cache),
+                                // OOM-killing the k8s runner pod when three services run together.
+                                //   -Xmx256m             — heap
+                                //   -XX:MaxMetaspaceSize  — class metadata (unlimited by default)
+                                //   -XX:ReservedCodeCacheSize — JIT native code cache
+                                //   -XX:TieredStopAtLevel=1 — interpreter + C1 only, no C2 code cache
+                                //   -XX:+UseSerialGC      — minimal GC thread/memory overhead
                                 .entryPoint("java",
-                                        "-XX:+UseContainerSupport",
-                                        "-Xmx512m",
+                                        "-Xmx256m",
+                                        "-XX:MaxMetaspaceSize=192m",
+                                        "-XX:ReservedCodeCacheSize=64m",
+                                        "-XX:TieredStopAtLevel=1",
+                                        "-XX:+UseSerialGC",
                                         "-jar", "/app.jar")
                         )
         );

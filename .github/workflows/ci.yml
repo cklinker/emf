@@ -187,6 +187,11 @@ jobs:
           mvn install -DskipTests -f kelta-worker/pom.xml -B
           mvn install -DskipTests -f kelta-gateway/pom.xml -B
 
+      - name: Pre-pull service container base image
+        # Testcontainers builds service images at test-start time with no pull timeout.
+        # Pre-pulling here ensures the image is in Docker's cache before tests run.
+        run: docker pull eclipse-temurin:25-jre-alpine
+
       - name: Run cross-service harness
         env:
           # Ryuk (Testcontainers resource reaper) binds a port on the Docker host's

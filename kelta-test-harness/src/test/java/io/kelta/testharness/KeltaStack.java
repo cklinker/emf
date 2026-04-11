@@ -8,6 +8,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -95,8 +96,18 @@ public final class KeltaStack {
                     .withNetworkAliases("cerbos")
                     .withNetwork(NETWORK)
                     .withCommand("server", "--config=/config/config.yaml")
-                    .withFileSystemBind(cerbosConfigPath(), "/config", org.testcontainers.containers.BindMode.READ_ONLY)
-                    .withFileSystemBind(cerbosPoliciesPath(), "/policies", org.testcontainers.containers.BindMode.READ_ONLY)
+                    // Use withCopyFileToContainer instead of withFileSystemBind.
+                    // withFileSystemBind passes a host path to the Docker daemon for a bind-mount,
+                    // but in K8s runners the workspace is an emptyDir whose real on-node path is
+                    // unknown to Docker.  withCopyFileToContainer reads the files from the test
+                    // JVM's filesystem (the pod) and streams them into the container via docker cp,
+                    // which works regardless of the volume type.
+                    .withCopyFileToContainer(
+                            MountableFile.forHostPath(cerbosConfigPath()),
+                            "/config/")
+                    .withCopyFileToContainer(
+                            MountableFile.forHostPath(cerbosPoliciesPath()),
+                            "/policies/")
                     .withExposedPorts(3592, 3593)
                     .waitingFor(Wait.forHttp("/_cerbos/health").forPort(3592).withStartupTimeout(Duration.ofSeconds(60)));
 

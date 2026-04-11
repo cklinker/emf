@@ -198,6 +198,11 @@ jobs:
           # localhost, which is unreachable from inside the k8s pod. Disable it; the
           # containers are short-lived and the job cleans up after itself.
           TESTCONTAINERS_RYUK_DISABLED: "true"
+          # Cap the Maven launcher JVM. The forked test JVM is capped separately via
+          # maven-failsafe-plugin <argLine> in kelta-test-harness/pom.xml.
+          # Service JVMs run inside Docker (outside the runner pod's cgroup) and are
+          # already capped via -Xmx512m in KeltaStack.serviceContainer().
+          MAVEN_OPTS: "-Xmx1g -XX:MaxMetaspaceSize=384m"
         run: mvn verify -f kelta-test-harness/pom.xml -Pintegration-tests -B
 
       - name: Upload harness reports

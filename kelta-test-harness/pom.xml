@@ -114,6 +114,12 @@
                         <include>**/*ScenarioTest.java</include>
                         <include>**/*IT.java</include>
                     </includes>
+                    <!-- Cap the forked test JVM so it doesn't OOM the CI runner pod.
+                         Service JVMs run inside Docker (outside the pod's cgroup) and
+                         are already capped via -Xmx512m in KeltaStack.serviceContainer().
+                         This cap covers only the JUnit/Testcontainers test process itself,
+                         which holds Testcontainers client state + Docker image context data. -->
+                    <argLine>-Xmx2g -XX:MaxMetaspaceSize=384m</argLine>
                 </configuration>
                 <executions>
                     <execution>

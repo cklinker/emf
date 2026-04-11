@@ -249,7 +249,17 @@ public final class KeltaStack {
         // otherwise happen inside the test JVM at container start-up time.
         if ("true".equalsIgnoreCase(System.getenv("KELTA_HARNESS_PREBUILT_IMAGES"))) {
             log.info("Using pre-built image {} (KELTA_HARNESS_PREBUILT_IMAGES=true)", imageName);
-            return new GenericContainer<>(DockerImageName.parse(imageName));
+            // Build a thin wrapper FROM the pre-built image. The Dockerfile is a single
+            // FROM line — no COPY, no file streaming — so the build context is ~50 bytes.
+            // Docker resolves the FROM from its local image cache without a registry pull
+            // (docker build does not pull by default when the image exists locally).
+            // The ENTRYPOINT is inherited from the pre-built base image.
+            // deleteOnExit=true removes the ephemeral wrapper image after each run so
+            // stale references don't accumulate between CI runs.
+            return new GenericContainer<>(
+                    new ImageFromDockerfile(imageName + "-test", true)
+                            .withDockerfileFromBuilder(b -> b.from(imageName))
+            );
         }
 
         Path jarPath = resolveJar(service);

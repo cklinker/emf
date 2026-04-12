@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,7 +26,11 @@ class WorkerMetricsConfigTest {
         lifecycleManager = mock(CollectionLifecycleManager.class);
         when(lifecycleManager.getActiveCollectionCount()).thenReturn(5);
 
-        metricsConfig = new WorkerMetricsConfig(meterRegistry, lifecycleManager);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<CollectionLifecycleManager> provider = mock(ObjectProvider.class);
+        when(provider.getObject()).thenReturn(lifecycleManager);
+
+        metricsConfig = new WorkerMetricsConfig(meterRegistry, provider);
     }
 
     @Test

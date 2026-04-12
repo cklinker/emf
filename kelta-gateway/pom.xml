@@ -378,11 +378,17 @@
                                   registration happen during the build where full JDK reflection
                                   is available; results are captured in the image heap.
                                 -->
+                                <!--
+                                  All protobuf-generated packages (Cerbos SDK + transitive
+                                  deps) must be initialized at build time so their descriptor
+                                  registration (which uses reflection) runs during the build.
+                                -->
                                 <buildArg>--initialize-at-build-time=com.google.protobuf</buildArg>
                                 <buildArg>--initialize-at-build-time=com.google.api</buildArg>
                                 <buildArg>--initialize-at-build-time=com.google.gson</buildArg>
-                                <buildArg>--initialize-at-build-time=dev.cerbos.api</buildArg>
+                                <buildArg>--initialize-at-build-time=dev.cerbos</buildArg>
                                 <buildArg>--initialize-at-build-time=build.buf.validate</buildArg>
+                                <buildArg>--initialize-at-build-time=grpc.gateway</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>

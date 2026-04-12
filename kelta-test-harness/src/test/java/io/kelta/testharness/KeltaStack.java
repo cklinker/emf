@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 
 /**
  * Singleton stack of Testcontainers that backs all harness scenario tests.
@@ -80,7 +81,10 @@ public final class KeltaStack {
                     .withNetworkAliases("redis")
                     .withNetwork(NETWORK)
                     .withExposedPorts(6379)
-                    .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1));
+                    // forListeningPort() does a plain TCP connect to port 6379.
+                    // Avoids relying on docker log streaming (which can hang if the
+                    // Docker daemon's log driver buffers or discards output on K8s).
+                    .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)));
 
     @SuppressWarnings({"resource", "unchecked"})
     public static final GenericContainer<?> NATS =
@@ -198,30 +202,43 @@ public final class KeltaStack {
         log.info("Starting Kelta test stack...");
 
         // Phase 1: infrastructure in parallel.
-        // Each container gets its own log line so CI output shows exactly which
-        // container is hanging — avoids the silent-block problem with deepStart.
+        // Use a dedicated 4-thread executor rather than ForkJoinPool.commonPool().
+        // The common pool's parallelism equals (availableProcessors - 1), which can
+        // be as low as 1 on a CPU-constrained K8s pod. With only 1-2 threads, the
+        // 3rd and 4th tasks queue behind POSTGRES/NATS and never get scheduled before
+        // allOf.join() times out or the runner dies. A fixed pool of 4 guarantees all
+        // four containers start concurrently regardless of pod CPU allocation.
         log.info("Phase 1: starting infrastructure containers in parallel...");
-        CompletableFuture<Void> postgresF = CompletableFuture.runAsync(() -> {
-            log.info("  [POSTGRES] starting...");
-            POSTGRES.start();
-            log.info("  [POSTGRES] up");
+        var infra = Executors.newFixedThreadPool(4, r -> {
+            Thread t = new Thread(r, "infra-starter-" + r.hashCode());
+            t.setDaemon(true);
+            return t;
         });
-        CompletableFuture<Void> redisF = CompletableFuture.runAsync(() -> {
-            log.info("  [REDIS] starting...");
-            REDIS.start();
-            log.info("  [REDIS] up");
-        });
-        CompletableFuture<Void> natsF = CompletableFuture.runAsync(() -> {
-            log.info("  [NATS] starting...");
-            NATS.start();
-            log.info("  [NATS] up");
-        });
-        CompletableFuture<Void> cerbosF = CompletableFuture.runAsync(() -> {
-            log.info("  [CERBOS] starting...");
-            CERBOS.start();
-            log.info("  [CERBOS] up");
-        });
-        CompletableFuture.allOf(postgresF, redisF, natsF, cerbosF).join();
+        try {
+            CompletableFuture<Void> postgresF = CompletableFuture.runAsync(() -> {
+                log.info("  [POSTGRES] starting...");
+                POSTGRES.start();
+                log.info("  [POSTGRES] up");
+            }, infra);
+            CompletableFuture<Void> redisF = CompletableFuture.runAsync(() -> {
+                log.info("  [REDIS] starting...");
+                REDIS.start();
+                log.info("  [REDIS] up");
+            }, infra);
+            CompletableFuture<Void> natsF = CompletableFuture.runAsync(() -> {
+                log.info("  [NATS] starting...");
+                NATS.start();
+                log.info("  [NATS] up");
+            }, infra);
+            CompletableFuture<Void> cerbosF = CompletableFuture.runAsync(() -> {
+                log.info("  [CERBOS] starting...");
+                CERBOS.start();
+                log.info("  [CERBOS] up");
+            }, infra);
+            CompletableFuture.allOf(postgresF, redisF, natsF, cerbosF).join();
+        } finally {
+            infra.shutdown();
+        }
         log.info("Infrastructure healthy");
 
         // Phase 2: worker (owns Flyway migrations)

@@ -379,6 +379,9 @@
                                   is available; results are captured in the image heap.
                                 -->
                                 <buildArg>--initialize-at-build-time=com.google.protobuf</buildArg>
+                                <!-- protobuf-java-util depends on Gson for JSON format;
+                                     build-time protobuf init pulls Gson into the image heap. -->
+                                <buildArg>--initialize-at-build-time=com.google.gson</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>

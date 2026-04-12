@@ -2,7 +2,7 @@
 # Builder: GraalVM CE 25 + Maven  |  Runtime: debian:12-slim (no JRE needed)
 
 ARG MAVEN_VERSION=3.9.9
-ARG GRAALVM_IMAGE=ghcr.io/graalvm/native-image-community:ol9-java25
+ARG GRAALVM_IMAGE=ghcr.io/graalvm/native-image-community:25-ol9
 
 # =============================================================================
 # Stage 1: Build runtime-platform dependencies

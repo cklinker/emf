@@ -33,17 +33,18 @@ public class WorkerMetricsConfig {
     // and is fully AOT-compatible.
     public WorkerMetricsConfig(MeterRegistry meterRegistry,
                                 ObjectProvider<CollectionLifecycleManager> lifecycleManagerProvider) {
-        CollectionLifecycleManager lifecycleManager = lifecycleManagerProvider.getObject();
-        // Active collections gauge — reads live count from the lifecycle manager
-        Gauge.builder("kelta.worker.collections.active", lifecycleManager,
-                        CollectionLifecycleManager::getActiveCollectionCount)
+        // Active collections gauge — reads live count from the lifecycle manager.
+        // Uses the ObjectProvider lambda so resolution is deferred until the gauge
+        // is actually read, breaking the circular dependency with CollectionLifecycleManager.
+        Gauge.builder("kelta.worker.collections.active", lifecycleManagerProvider,
+                        p -> p.getObject().getActiveCollectionCount())
                 .description("Number of active collections hosted by this worker")
                 .register(meterRegistry);
 
         // HPA collection count gauge — same value, exposed as kelta_worker_collection_count
         // in Prometheus format for Kubernetes HPA custom metrics (target: 40 per pod)
-        Gauge.builder("kelta.worker.collection.count", lifecycleManager,
-                        CollectionLifecycleManager::getActiveCollectionCount)
+        Gauge.builder("kelta.worker.collection.count", lifecycleManagerProvider,
+                        p -> p.getObject().getActiveCollectionCount())
                 .description("Collection count for HPA scaling (target: 40 per pod)")
                 .register(meterRegistry);
 

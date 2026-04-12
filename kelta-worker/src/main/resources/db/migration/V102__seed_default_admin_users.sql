@@ -7,7 +7,7 @@
 --
 -- Username: admin
 -- Email:    admin@kelta.local
--- Password: password (BCrypt-hashed, force_change_on_login = FALSE)
+-- Password: password (BCrypt-hashed, force_change_on_login = TRUE)
 
 DO $$
 DECLARE
@@ -43,10 +43,9 @@ BEGIN
         INSERT INTO platform_user (id, tenant_id, email, username, first_name, last_name, status, profile_id, created_at, updated_at)
         VALUES (new_user_id, t.id, 'admin@kelta.local', 'admin', 'System', 'Administrator', 'ACTIVE', admin_profile_id, NOW(), NOW());
 
-        -- Create user_credential with BCrypt hash of 'password'; no forced change so automated
-        -- tools (e.g. test harness, local dev) can authenticate immediately.
+        -- Create user_credential with BCrypt hash of 'password' and force change on first login
         INSERT INTO user_credential (id, user_id, password_hash, force_change_on_login, created_at)
-        VALUES (gen_random_uuid()::text, new_user_id, '$2a$10$zAQaSHX1XSR1bwUL3pz9EOzecplsxInVizZc9HwLf7xPluSiE1EP6', FALSE, NOW());
+        VALUES (gen_random_uuid()::text, new_user_id, '$2a$10$zAQaSHX1XSR1bwUL3pz9EOzecplsxInVizZc9HwLf7xPluSiE1EP6', TRUE, NOW());
 
         RAISE NOTICE 'Created default admin user for tenant % (%)', t.slug, t.id;
     END LOOP;

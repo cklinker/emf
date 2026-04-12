@@ -3,8 +3,8 @@ package io.kelta.worker.config;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 
 import java.lang.management.ManagementFactory;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -27,8 +27,13 @@ public class WorkerMetricsConfig {
 
     private final AtomicInteger initializingCount = new AtomicInteger(0);
 
+    // ObjectProvider instead of @Lazy to break the circular dependency with
+    // CollectionLifecycleManager. @Lazy creates a CGLIB proxy at runtime which
+    // is not supported in GraalVM native images. ObjectProvider defers resolution
+    // and is fully AOT-compatible.
     public WorkerMetricsConfig(MeterRegistry meterRegistry,
-                                @Lazy CollectionLifecycleManager lifecycleManager) {
+                                ObjectProvider<CollectionLifecycleManager> lifecycleManagerProvider) {
+        CollectionLifecycleManager lifecycleManager = lifecycleManagerProvider.getObject();
         // Active collections gauge — reads live count from the lifecycle manager
         Gauge.builder("kelta.worker.collections.active", lifecycleManager,
                         CollectionLifecycleManager::getActiveCollectionCount)

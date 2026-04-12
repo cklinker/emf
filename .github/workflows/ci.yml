@@ -148,7 +148,9 @@ jobs:
   integration-tests:
     name: Integration Tests
     needs: [test-java]
-    runs-on: k8s-runner
+    # Dedicated large runner (1 replica, 12 CPU / 24Gi request) for the full
+    # Testcontainers stack. Avoids contention with the smaller k8s-runner pool.
+    runs-on: k8s-runner-integration
     timeout-minutes: 20
     steps:
       - name: Checkout code

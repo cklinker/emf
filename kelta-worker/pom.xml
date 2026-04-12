@@ -237,11 +237,17 @@
                                      init lets this happen during the build with full JDK
                                      reflection, avoiding reflection registration for every
                                      protobuf inner class. -->
+                                <!--
+                                  All protobuf-generated packages (Cerbos SDK + transitive
+                                  deps) must be initialized at build time so their descriptor
+                                  registration (which uses reflection) runs during the build.
+                                -->
                                 <buildArg>--initialize-at-build-time=com.google.protobuf</buildArg>
                                 <buildArg>--initialize-at-build-time=com.google.api</buildArg>
                                 <buildArg>--initialize-at-build-time=com.google.gson</buildArg>
-                                <buildArg>--initialize-at-build-time=dev.cerbos.api</buildArg>
+                                <buildArg>--initialize-at-build-time=dev.cerbos</buildArg>
                                 <buildArg>--initialize-at-build-time=build.buf.validate</buildArg>
+                                <buildArg>--initialize-at-build-time=grpc.gateway</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>

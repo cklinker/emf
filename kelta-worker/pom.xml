@@ -232,6 +232,12 @@
                                      build time; force logback to build-time init to resolve. -->
                                 <buildArg>--initialize-at-build-time=ch.qos.logback</buildArg>
                                 <buildArg>--initialize-at-build-time=ch.qos.logback.classic.Logger</buildArg>
+                                <!-- Protobuf descriptor system uses reflection to discover
+                                     accessor methods on generated message classes.  Build-time
+                                     init lets this happen during the build with full JDK
+                                     reflection, avoiding reflection registration for every
+                                     protobuf inner class. -->
+                                <buildArg>--initialize-at-build-time=com.google.protobuf</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>

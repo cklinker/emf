@@ -238,9 +238,10 @@
                                      reflection, avoiding reflection registration for every
                                      protobuf inner class. -->
                                 <buildArg>--initialize-at-build-time=com.google.protobuf</buildArg>
-                                <!-- protobuf-java-util depends on Gson for JSON format;
-                                     build-time protobuf init pulls Gson into the image heap. -->
+                                <buildArg>--initialize-at-build-time=com.google.api</buildArg>
                                 <buildArg>--initialize-at-build-time=com.google.gson</buildArg>
+                                <buildArg>--initialize-at-build-time=dev.cerbos.api</buildArg>
+                                <buildArg>--initialize-at-build-time=build.buf.validate</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>

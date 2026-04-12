@@ -238,6 +238,7 @@
                                      reflection, avoiding reflection registration for every
                                      protobuf inner class. -->
                                 <buildArg>--initialize-at-build-time=com.google.protobuf</buildArg>
+                                <buildArg>--initialize-at-build-time=com.google.gson</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>

@@ -38,7 +38,7 @@ export class CollectionDetailPage extends BasePage {
   }
 
   async waitForDetailLoaded(): Promise<void> {
-    await this.waitForContentReady(this.container);
+    await this.waitForContentReady(this.collectionTitle);
   }
 
   async waitForFieldRows(): Promise<void> {

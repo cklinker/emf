@@ -208,6 +208,15 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
      * @param tenantId the tenant ID for scoped lookup (null for unscoped — not recommended)
      */
     private Mono<ProviderInfo> resolveProviderInfo(String issuer, String tenantId) {
+        // Short-circuit for the internal kelta-auth issuer: the JWKS URI is well-known
+        // and does not need a worker round-trip. This avoids a 404 (→ 500) when
+        // kelta-auth is not registered as an OIDC federation provider in the worker DB.
+        if (fallbackIssuerUri != null && fallbackIssuerUri.equals(issuer)) {
+            String jwksUri = issuer.endsWith("/") ? issuer + "oauth2/jwks" : issuer + "/oauth2/jwks";
+            log.debug("Using built-in JWKS URI for internal issuer: {}", jwksUri);
+            return Mono.just(new ProviderInfo(jwksUri, null));
+        }
+
         // Cache key includes tenant ID to prevent cross-tenant cache poisoning
         String cacheKey = tenantId != null ? tenantId + ":" + issuer : issuer;
 

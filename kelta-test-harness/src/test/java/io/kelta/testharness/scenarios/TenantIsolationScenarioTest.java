@@ -1,0 +1,162 @@
+package io.kelta.testharness.scenarios;
+
+import io.kelta.testharness.ScenarioBase;
+import io.kelta.testharness.fixtures.TenantFixture;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.web.client.HttpClientErrorException;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * Verifies that tenant data and routing are fully isolated.
+ *
+ * <p>The gateway uses the tenant slug in the URL path to identify the target tenant
+ * and enforces that the JWT's {@code tenant_id} claim matches. Requests to a slug
+ * belonging to a different tenant must be rejected (401/403), and requests to an
+ * entirely unknown slug must return 404.
+ *
+ * <p>Seeded tenants (Flyway):
+ * <ul>
+ *   <li>V9  — {@code default} (id: 00000000-0000-0000-0000-000000000001)</li>
+ *   <li>V50 — {@code threadline-clothing} (9 collections)</li>
+ * </ul>
+ * V102 seeds {@code admin@kelta.local / password} for every ACTIVE tenant.
+ */
+@DisplayName("Tenant Isolation Scenario")
+class TenantIsolationScenarioTest extends ScenarioBase {
+
+    /**
+     * Confirms that both seeded tenants are present in the worker's slug-map, proving
+     * that Flyway migrations ran fully and both tenants are ACTIVE.
+     */
+    @Test
+    @DisplayName("both seeded tenants are registered in the slug-map")
+    void bothSeededTenantsExist() {
+        String defaultId    = tenants.tenantIdForSlug(TenantFixture.DEFAULT_SLUG);
+        String ecommerceId  = tenants.tenantIdForSlug(TenantFixture.ECOMMERCE_SLUG);
+
+        assertThat(defaultId).isNotNull().matches("[0-9a-f-]{36}");
+        assertThat(ecommerceId).isNotNull().matches("[0-9a-f-]{36}");
+        assertThat(defaultId).isNotEqualTo(ecommerceId);
+    }
+
+    /**
+     * A token scoped to one tenant must be rejected when used against a different
+     * tenant's slug endpoint.
+     *
+     * <p>We login once (direct-login returns the first DB match for the user, which
+     * may be either tenant). We then determine which tenant the token belongs to and
+     * attempt to access the OTHER tenant's slug. The gateway should reject with 401
+     * or 403 because the JWT's {@code tenant_id} does not match the slug's tenant.
+     */
+    @Test
+    @DisplayName("token for tenant A is rejected on tenant B slug")
+    void tokenForTenantARejectedOnTenantBSlug() {
+        String token    = auth.loginAsAdmin();
+        String tenantId = auth.extractTenantId(token);
+        String mySlug   = tenants.slugForTenantId(tenantId);
+        assertThat(mySlug).isNotNull();
+
+        // Determine the OTHER seeded tenant's slug
+        String otherSlug = TenantFixture.DEFAULT_SLUG.equals(mySlug)
+                ? TenantFixture.ECOMMERCE_SLUG
+                : TenantFixture.DEFAULT_SLUG;
+
+        // Using my token against the other tenant's slug should be rejected
+        assertThatThrownBy(() ->
+                gatewayClientWithToken(token)
+                        .get()
+                        .uri("/" + otherSlug + "/api/collections")
+                        .retrieve()
+                        .toBodilessEntity()
+        ).isInstanceOfSatisfying(HttpClientErrorException.class, ex -> {
+            HttpStatusCode status = ex.getStatusCode();
+            // Gateway must reject with 401 (unauthenticated for wrong tenant) or 403 (forbidden)
+            assertThat(status.value()).isIn(
+                    HttpStatus.UNAUTHORIZED.value(),
+                    HttpStatus.FORBIDDEN.value()
+            );
+        });
+    }
+
+    /**
+     * An unauthenticated request to any tenant slug endpoint must be rejected with 401.
+     * Verifies that tenant isolation applies even without a token.
+     */
+    @Test
+    @DisplayName("unauthenticated request is rejected on any tenant slug")
+    void unauthenticatedRequestRejectedOnBothSlugs() {
+        for (String slug : List.of(TenantFixture.DEFAULT_SLUG, TenantFixture.ECOMMERCE_SLUG)) {
+            assertThatThrownBy(() ->
+                    gatewayClient()
+                            .get()
+                            .uri("/" + slug + "/api/collections")
+                            .retrieve()
+                            .toBodilessEntity()
+            ).isInstanceOfSatisfying(HttpClientErrorException.class, ex ->
+                    assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
+            );
+        }
+    }
+
+    /**
+     * A request to a completely unknown slug must return 404 — not 401 or 500.
+     * This ensures the gateway fails fast for non-existent tenants without leaking
+     * information about valid slug existence via auth errors.
+     */
+    @Test
+    @DisplayName("unknown slug returns 404 regardless of authentication")
+    void unknownSlugReturns404() {
+        String token = auth.loginAsAdmin();
+
+        // Without token
+        HttpStatusCode unauthStatus = gatewayClient()
+                .get()
+                .uri("/does-not-exist-xyz/api/collections")
+                .retrieve()
+                .onStatus(s -> true, (req, resp) -> {})
+                .toBodilessEntity()
+                .getStatusCode();
+
+        // With a valid token
+        HttpStatusCode authStatus = gatewayClientWithToken(token)
+                .get()
+                .uri("/does-not-exist-xyz/api/collections")
+                .retrieve()
+                .onStatus(s -> true, (req, resp) -> {})
+                .toBodilessEntity()
+                .getStatusCode();
+
+        assertThat(unauthStatus).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(authStatus).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * Verifies that a token scoped to a tenant can successfully access that same
+     * tenant's data — confirming isolation is one-directional (not overly restrictive).
+     */
+    @Test
+    @DisplayName("token grants access to its own tenant slug")
+    void tokenGrantsAccessToOwnTenantSlug() {
+        String token    = auth.loginAsAdmin();
+        String tenantId = auth.extractTenantId(token);
+        String mySlug   = tenants.slugForTenantId(tenantId);
+        assertThat(mySlug).isNotNull();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = gatewayClientWithToken(token)
+                .get()
+                .uri("/" + mySlug + "/api/collections")
+                .retrieve()
+                .body(Map.class);
+
+        assertThat(body).containsKey("data");
+    }
+}

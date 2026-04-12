@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>io.kelta</groupId>
+    <artifactId>kelta-test-harness</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Kelta Test Harness</name>
+    <description>
+        Cross-service integration test harness. Boots the full Kelta mini-stack
+        (Postgres, Redis, NATS, Cerbos, kelta-auth, kelta-worker, kelta-gateway)
+        via Testcontainers and runs scenario tests against it.
+
+        Prerequisites: build all services first with
+          mvn -B install -DskipTests -pl kelta-auth,kelta-worker,kelta-gateway
+
+        Run integration tests:
+          mvn -B verify -f kelta-test-harness/pom.xml -Pintegration-tests
+    </description>
+
+    <properties>
+        <java.version>25</java.version>
+        <testcontainers.version>1.20.4</testcontainers.version>
+        <skipITs>true</skipITs>
+        <!-- Maven resource filtering injects these into harness.properties -->
+        <harness.basedir>${project.basedir}</harness.basedir>
+        <harness.version>${project.version}</harness.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Spring Web for RestClient calls to services -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Test framework -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Testcontainers core -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+
+        <plugins>
+            <!-- Surefire: unit tests only (no ITs) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>**/*ScenarioTest.java</exclude>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- Failsafe: integration tests, activated by -Pintegration-tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <skipITs>${skipITs}</skipITs>
+                    <includes>
+                        <include>**/*ScenarioTest.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
+                    <!-- Cap the forked test JVM so it doesn't OOM the CI runner pod.
+                         Service JVMs run inside Docker (outside the pod's cgroup) and
+                         are already capped via -Xmx512m in KeltaStack.serviceContainer().
+                         This cap covers only the JUnit/Testcontainers test process itself,
+                         which holds Testcontainers client state + Docker image context data. -->
+                    <argLine>-Xmx2g -XX:MaxMetaspaceSize=384m</argLine>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Activate integration tests: mvn verify -Pintegration-tests -->
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
+        </profile>
+    </profiles>
+</project>

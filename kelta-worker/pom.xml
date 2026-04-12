@@ -218,6 +218,28 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <configuration>
+                            <buildArgs>
+                                <!-- grpc-netty-shaded (Cerbos SDK) captures a Logback Logger at
+                                     build time; force logback to build-time init to resolve. -->
+                                <buildArg>--initialize-at-build-time=ch.qos.logback</buildArg>
+                                <buildArg>--initialize-at-build-time=ch.qos.logback.classic.Logger</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <plugin>

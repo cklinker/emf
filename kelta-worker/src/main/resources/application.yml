@@ -110,6 +110,8 @@ management:
       enabled: true
     livenessState:
       enabled: true
+    mail:
+      enabled: ${kelta.email.enabled:true}
   tracing:
     export:
       enabled: true

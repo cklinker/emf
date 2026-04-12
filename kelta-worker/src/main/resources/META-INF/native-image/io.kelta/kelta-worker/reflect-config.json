@@ -4,11 +4,5 @@
     "methods": [
       { "name": "<init>", "parameterTypes": [] }
     ]
-  },
-  {
-    "name": "com.google.api.FieldBehavior",
-    "allDeclaredConstructors": true,
-    "allDeclaredMethods": true,
-    "allDeclaredFields": true
   }
 ]

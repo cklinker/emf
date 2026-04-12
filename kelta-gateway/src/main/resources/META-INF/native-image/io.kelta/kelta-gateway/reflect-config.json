@@ -28,11 +28,5 @@
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
-  },
-  {
-    "name": "com.google.api.FieldBehavior",
-    "allDeclaredConstructors": true,
-    "allDeclaredMethods": true,
-    "allDeclaredFields": true
   }
 ]

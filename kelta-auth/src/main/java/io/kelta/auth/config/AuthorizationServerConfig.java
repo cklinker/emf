@@ -92,6 +92,8 @@ public class AuthorizationServerConfig {
             .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
             .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
             .cors(Customizer.withDefaults())
+            .addFilterBefore(new TenantContextFilter(),
+                    org.springframework.security.oauth2.server.authorization.web.OAuth2AuthorizationEndpointFilter.class)
             .exceptionHandling(exceptions -> exceptions
                 .defaultAuthenticationEntryPointFor(
                         new LoginUrlAuthenticationEntryPoint("/login"),

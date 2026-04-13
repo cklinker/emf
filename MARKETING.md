@@ -1,4 +1,3 @@
-# Kelta — The Enterprise Application Platform
 
 **Build enterprise applications in hours, not months. No vendor lock-in. No per-seat pricing trap.**
 

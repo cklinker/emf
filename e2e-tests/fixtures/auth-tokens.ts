@@ -37,10 +37,12 @@ export async function getApiToken(): Promise<string> {
   const password = process.env.E2E_TEST_PASSWORD || "";
 
   if (authBaseUrl && password) {
+    const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
     const result = await attemptDirectLogin({
       authBaseUrl,
       username,
       password,
+      tenantSlug,
     });
 
     if (result) {

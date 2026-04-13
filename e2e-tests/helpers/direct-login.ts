@@ -24,6 +24,7 @@ export async function attemptDirectLogin(options: {
   authBaseUrl: string;
   username: string;
   password: string;
+  tenantSlug?: string;
 }): Promise<DirectLoginResult | null> {
   const url = `${options.authBaseUrl}/auth/direct-login`;
 
@@ -34,6 +35,7 @@ export async function attemptDirectLogin(options: {
       body: JSON.stringify({
         username: options.username,
         password: options.password,
+        tenantSlug: options.tenantSlug,
       }),
     });
 

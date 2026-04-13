@@ -4,6 +4,7 @@ import io.kelta.auth.config.AuthProperties;
 import io.kelta.auth.model.KeltaUserDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -57,10 +58,16 @@ public class DirectLoginController {
     }
 
     @PostMapping
-    public ResponseEntity<?> login(@RequestBody DirectLoginRequest request) {
+    public ResponseEntity<?> login(@RequestBody DirectLoginRequest request, HttpSession session) {
         if (request.username() == null || request.password() == null) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "username and password are required"));
+        }
+
+        // Set tenant context in the session so KeltaUserDetailsService can scope
+        // the user lookup to the correct tenant (same as LoginController does for OIDC).
+        if (request.tenantSlug() != null && !request.tenantSlug().isBlank()) {
+            session.setAttribute("tenantId", request.tenantSlug());
         }
 
         Authentication authentication;
@@ -146,5 +153,5 @@ public class DirectLoginController {
         ));
     }
 
-    public record DirectLoginRequest(String username, String password) {}
+    public record DirectLoginRequest(String username, String password, String tenantSlug) {}
 }

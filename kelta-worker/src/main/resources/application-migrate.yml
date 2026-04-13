@@ -1,0 +1,10 @@
+# Active when SPRING_PROFILES_ACTIVE=migrate (K8s PreSync Job only).
+# Enables Flyway and runs ApplicationRunners (SystemCollectionSeeder), then exits.
+# Worker pods run with the default profile where flyway.enabled=false.
+spring:
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+  main:
+    web-application-type: none   # no HTTP server — process exits after ApplicationRunners complete

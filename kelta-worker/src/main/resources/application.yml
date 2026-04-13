@@ -14,7 +14,7 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:kelta}
     driver-class-name: org.postgresql.Driver
   flyway:
-    enabled: true
+    enabled: false   # migrations run via K8s PreSync Job (application-migrate.yml re-enables)
     baseline-on-migrate: true
     baseline-version: 0
   data:

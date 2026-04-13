@@ -137,6 +137,7 @@ public final class KeltaStack {
             .withEnv("SMTP_AUTH",                  "false")
             .withEnv("SMTP_STARTTLS",              "false")
             .withEnv("SCHEDULER_ENABLED",          "false")
+            .withEnv("SPRING_FLYWAY_ENABLED",      "true")   // disabled by default (K8s PreSync Job); re-enable for the test harness
             .withExposedPorts(8080)
             .waitingFor(Wait.forHttp("/actuator/health").withStartupTimeout(Duration.ofMinutes(3)));
 

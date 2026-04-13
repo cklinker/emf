@@ -246,6 +246,11 @@ jobs:
                 sed -i "s|image: .*${PREFIX}-worker:.*|image: harbor.rzware.com/emf/${PREFIX}-worker:${IMAGE_TAG}|g" "$DIR/worker-deployment.yaml"
               fi
 
+              # Update worker migration Job (PreSync hook — must stay in sync with Deployment image)
+              if [ -f "$DIR/worker-migrate-job.yaml" ]; then
+                sed -i "s|image: .*${PREFIX}-worker:.*|image: harbor.rzware.com/emf/${PREFIX}-worker:${IMAGE_TAG}|g" "$DIR/worker-migrate-job.yaml"
+              fi
+
               # Update auth server deployment
               if [ -f "$DIR/auth-deployment.yaml" ]; then
                 sed -i "s|image: .*${PREFIX}-auth:.*|image: harbor.rzware.com/emf/${PREFIX}-auth:${IMAGE_TAG}|g" "$DIR/auth-deployment.yaml"

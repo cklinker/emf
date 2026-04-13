@@ -24,6 +24,7 @@ setup("authenticate via Authentik", async ({ page }) => {
       authBaseUrl: directLoginUrl,
       username,
       password,
+      tenantSlug: TENANT_SLUG,
     });
 
     if (result) {
@@ -71,7 +72,7 @@ setup("authenticate via Authentik", async ({ page }) => {
     () => {
       const url = window.location.href;
       // Already redirected to Authentik
-      if (url.includes("authentik")) return true;
+      if (url.includes("auth")) return true;
       // Still on app login page — check if provider buttons are rendered
       const buttons = document.querySelectorAll("button");
       return buttons.length > 0;
@@ -80,20 +81,20 @@ setup("authenticate via Authentik", async ({ page }) => {
   );
 
   // If we're still on the app's login page, click a provider button to trigger OIDC redirect
-  if (!page.url().includes("authentik")) {
+  if (!page.url().includes("Internal")) {
     // Wait for the login page to fully render with provider buttons
     await page.waitForSelector('[data-testid="login-page"]', {
       timeout: 10_000,
     });
     // Click the first provider button (contains a KeyRound icon and provider name)
     const providerButton = page
-      .locator('[data-testid="login-page"] button')
+      .locator('[class="btn-primary"] button')
       .first();
     await providerButton.click({ timeout: 10_000 });
   }
 
   // Wait until we're on the Authentik login page
-  await page.waitForURL("**/authentik**", { timeout: 30_000 });
+  await page.waitForURL("**/auth**", { timeout: 30_000 });
 
   // Now we're on Authentik's login form — fill in credentials
   await loginViaAuthentik(page, {

@@ -176,7 +176,16 @@ test.describe("Collections CRUD", () => {
     // cache may not invalidate automatically after the mutation.
     await page.reload();
     await collectionsPage.waitForTableLoaded();
+
+    // Filter and wait for the API response so the debounce settles before asserting
+    const filterPromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/api/collections") &&
+        resp.request().method() === "GET",
+      { timeout: 10_000 },
+    );
     await collectionsPage.filterByName(collectionName);
+    await filterPromise;
 
     // The deleted collection should no longer appear in the filtered list
     const rowLocator = page.locator('[data-testid^="collection-row-"]');

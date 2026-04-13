@@ -13,11 +13,7 @@ test.describe("End-User Navigation", () => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
 
-    // The user menu may be a button with the user's name/initials
-    const userMenu = page.getByTestId("user-menu");
-    const avatarButton = page.getByRole("button", { name: /e2e|user|avatar/i });
-    const userMenuOrAvatar = userMenu.or(avatarButton);
-    await expect(userMenuOrAvatar).toBeVisible();
+    await expect(page.getByTestId("user-menu-button")).toBeVisible();
   });
 
   test("navigates between collections", async ({ page, dataFactory }) => {

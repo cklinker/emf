@@ -34,8 +34,9 @@ public class NatsAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public NatsSubscriptionManager natsSubscriptionManager(NatsConnectionManager connectionManager) {
-        return new NatsSubscriptionManager(connectionManager);
+    public NatsSubscriptionManager natsSubscriptionManager(NatsConnectionManager connectionManager,
+                                                            ObjectMapper objectMapper) {
+        return new NatsSubscriptionManager(connectionManager, objectMapper);
     }
 
     @Bean

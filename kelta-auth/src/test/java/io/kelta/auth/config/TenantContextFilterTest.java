@@ -10,8 +10,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -125,6 +129,17 @@ class TenantContextFilterTest {
                 HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
         verify(session).setAttribute("tenantId", "default");
         verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("runs before springSecurityFilterChain via @Order annotation")
+    void shouldBeOrderedBeforeSpringSecurity() {
+        Order order = TenantContextFilter.class.getAnnotation(Order.class);
+        assertNotNull(order, "TenantContextFilter must have @Order to run before Spring Security");
+        assertTrue(order.value() < SecurityFilterProperties.DEFAULT_FILTER_ORDER,
+                "TenantContextFilter @Order must be less than SecurityFilterProperties.DEFAULT_FILTER_ORDER "
+                        + "(" + SecurityFilterProperties.DEFAULT_FILTER_ORDER + ") so the session tenant is "
+                        + "set before Spring Security redirects to /login. Was: " + order.value());
     }
 
     @Test

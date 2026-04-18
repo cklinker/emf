@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Component;
@@ -32,9 +34,15 @@ import java.util.regex.Pattern;
  * <p>Registered as a servlet-level filter (before Spring Security) via {@code @Component}.
  * The method condition (GET + /oauth2/authorize) makes it a no-op for all other requests.
  *
+ * <p>Must run before {@code springSecurityFilterChain} so the tenant is recorded in the
+ * session before Spring Security redirects unauthenticated users to {@code /login}; otherwise
+ * the subsequent POST to /login would reach {@code KeltaUserDetailsService} with no tenant
+ * in session and authentication would fail.
+ *
  * Path pattern: /{tenant-slug}/auth/callback
  */
 @Component
+@Order(SecurityFilterProperties.DEFAULT_FILTER_ORDER - 10)
 public class TenantContextFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(TenantContextFilter.class);
@@ -72,6 +80,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
             SecurityContextHolder.clearContext();
         }
         session.setAttribute(SESSION_TENANT_ATTR, slug);
+        log.debug("Tenant '{}' applied to session from /oauth2/authorize redirect_uri", slug);
     }
 
     private String extractTenantSlug(String redirectUri) {

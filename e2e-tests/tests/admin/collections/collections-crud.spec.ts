@@ -142,6 +142,10 @@ test.describe("Collections CRUD", () => {
     });
     const collectionName = collection.attributes.name as string;
 
+    // Collection create propagates asynchronously across worker pods via NATS;
+    // wait until the GET endpoint confirms visibility before loading the UI.
+    await dataFactory.waitForCollectionVisible(collection.id);
+
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
     await collectionsPage.waitForTableLoaded();
@@ -172,20 +176,17 @@ test.describe("Collections CRUD", () => {
     await collectionsPage.confirmDelete();
     await deletePromise;
 
-    // Reload the page to get fresh data — React Query's filtered-list
-    // cache may not invalidate automatically after the mutation.
+    // DELETE may take a moment to propagate to the LIST endpoint on other pods;
+    // poll the per-id GET until it 404s so the subsequent reload sees fresh data.
+    await dataFactory.waitForCollectionDeleted(collection.id);
+
+    // Reload to drop any client-side cache and re-fetch from the backend.
     await page.reload();
     await collectionsPage.waitForTableLoaded();
 
-    // Filter and wait for the API response so the debounce settles before asserting
-    const filterPromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes("/api/collections") &&
-        resp.request().method() === "GET",
-      { timeout: 10_000 },
-    );
+    // The list-page filter is applied client-side (see CollectionsPage.tsx),
+    // so filterByName does NOT trigger a GET — no point awaiting a response.
     await collectionsPage.filterByName(collectionName);
-    await filterPromise;
 
     // The deleted collection should no longer appear in the filtered list
     const rowLocator = page.locator('[data-testid^="collection-row-"]');

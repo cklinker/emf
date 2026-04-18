@@ -222,6 +222,80 @@ export class DataFactory {
     );
   }
 
+  /**
+   * Poll GET /api/collections/{id} until the collection is visible (2xx) or timeout.
+   *
+   * Collection create propagates asynchronously across worker pods via NATS. The
+   * POST returns success as soon as the record is committed on the originating
+   * pod, but the LIST endpoint on another pod may not yet reflect the new row.
+   */
+  async waitForCollectionVisible(
+    collectionId: string,
+    timeoutMs = STORAGE_READY_TIMEOUT_MS,
+  ): Promise<void> {
+    const url = `${this.api.baseUrl}/${this.api.tenantSlug}/api/collections/${collectionId}`;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/vnd.api+json",
+            Authorization: `Bearer ${this.currentToken}`,
+          },
+        });
+        if (response.ok) return;
+      } catch {
+        // Network error — keep retrying
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, STORAGE_READY_POLL_MS),
+      );
+    }
+
+    throw new Error(
+      `Collection '${collectionId}' not visible after ${timeoutMs}ms`,
+    );
+  }
+
+  /**
+   * Poll GET /api/collections/{id} until the collection is gone (404) or timeout.
+   *
+   * After DELETE returns, the soft-delete may take a moment to propagate to the
+   * list endpoint on other pods. This ensures the deletion is fully visible
+   * before the caller asserts against the UI.
+   */
+  async waitForCollectionDeleted(
+    collectionId: string,
+    timeoutMs = STORAGE_READY_TIMEOUT_MS,
+  ): Promise<void> {
+    const url = `${this.api.baseUrl}/${this.api.tenantSlug}/api/collections/${collectionId}`;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/vnd.api+json",
+            Authorization: `Bearer ${this.currentToken}`,
+          },
+        });
+        if (response.status === 404) return;
+      } catch {
+        // Network error — keep retrying
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, STORAGE_READY_POLL_MS),
+      );
+    }
+
+    throw new Error(
+      `Collection '${collectionId}' still visible after ${timeoutMs}ms`,
+    );
+  }
+
   async cleanup(): Promise<void> {
     for (const entity of this.createdEntities.reverse()) {
       try {

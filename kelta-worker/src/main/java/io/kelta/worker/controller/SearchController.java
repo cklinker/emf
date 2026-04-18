@@ -61,10 +61,10 @@ public class SearchController {
 
         int effectiveLimit = Math.max(1, Math.min(limit, MAX_LIMIT));
 
-        TenantContext.set(tenantId);
-        try {
-            List<Map<String, Object>> results = searchIndexService.search(
-                    tenantId, q.trim(), effectiveLimit);
+        final String trimmed = q.trim();
+        final int eff = effectiveLimit;
+        Map<String, Object> response = TenantContext.callWithTenant(tenantId, () -> {
+            List<Map<String, Object>> results = searchIndexService.search(tenantId, trimmed, eff);
 
             List<Map<String, Object>> data = results.stream().map(row -> {
                 Map<String, Object> item = new LinkedHashMap<>();
@@ -77,14 +77,13 @@ public class SearchController {
                 return item;
             }).toList();
 
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("data", data);
-            response.put("meta", Map.of("total", data.size()));
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("data", data);
+            body.put("meta", Map.of("total", data.size()));
+            return body;
+        });
 
-            return ResponseEntity.ok(response);
-        } finally {
-            TenantContext.clear();
-        }
+        return ResponseEntity.ok(response);
     }
 
     private Map<String, Object> emptyResponse() {

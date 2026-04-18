@@ -1,5 +1,6 @@
 package io.kelta.worker.service;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.config.WorkerProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,14 +53,19 @@ public class WorkerBootstrapService {
     public void onApplicationReady() {
         log.info("Worker '{}' starting bootstrap from database", workerProperties.getId());
 
-        try {
-            initializeAllCollections();
-            log.info("Worker '{}' successfully bootstrapped all collections",
-                    workerProperties.getId());
-        } catch (Exception e) {
-            log.error("Failed to bootstrap collections from database. " +
-                    "Worker will start with no collections loaded.", e);
-        }
+        // Bootstrap reads the `collection` table across every tenant so each pod
+        // can serve any tenant's requests; wrap the query in the platform sentinel
+        // scope so it bypasses RLS without relying on a blank tenant context.
+        TenantContext.runAsPlatform(() -> {
+            try {
+                initializeAllCollections();
+                log.info("Worker '{}' successfully bootstrapped all collections",
+                        workerProperties.getId());
+            } catch (Exception e) {
+                log.error("Failed to bootstrap collections from database. " +
+                        "Worker will start with no collections loaded.", e);
+            }
+        });
     }
 
     /**

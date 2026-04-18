@@ -75,44 +75,43 @@ public class CerbosPolicySyncService {
      * Syncs all Cerbos policies for a tenant.
      */
     public void syncTenant(String tenantId) {
-        TenantContext.set(tenantId);
-        try {
-            log.info("Syncing Cerbos policies for tenant {}", tenantId);
+        TenantContext.runWithTenant(tenantId, () -> {
+            try {
+                log.info("Syncing Cerbos policies for tenant {}", tenantId);
 
-            List<CerbosPolicyGenerator.ProfileData> profiles = loadProfilesForTenant(tenantId);
-            if (profiles.isEmpty()) {
-                log.info("No profiles found for tenant {} — skipping Cerbos policy sync", tenantId);
-                return;
+                List<CerbosPolicyGenerator.ProfileData> profiles = loadProfilesForTenant(tenantId);
+                if (profiles.isEmpty()) {
+                    log.info("No profiles found for tenant {} — skipping Cerbos policy sync", tenantId);
+                    return;
+                }
+                List<String> collectionIds = loadCollectionIdsForTenant(tenantId);
+                List<CerbosPolicyGenerator.CustomRule> customRules = loadCustomRulesForTenant(tenantId);
+
+                // Generate policies
+                Map<String, Object> derivedRoles = policyGenerator.generateDerivedRoles(tenantId, profiles);
+                Map<String, Object> systemPolicy = policyGenerator.generateSystemFeaturePolicy(tenantId, profiles);
+                Map<String, Object> collectionPolicy = policyGenerator.generateCollectionPolicy(tenantId, profiles, collectionIds);
+                Map<String, Object> fieldPolicy = policyGenerator.generateFieldPolicy(tenantId, profiles);
+                Map<String, Object> recordPolicy = policyGenerator.generateRecordPolicy(tenantId, profiles, collectionIds, customRules);
+
+                // Push to Cerbos Admin API
+                pushPolicy(derivedRoles);
+                pushPolicy(systemPolicy);
+                pushPolicy(collectionPolicy);
+                pushPolicy(fieldPolicy);
+                pushPolicy(recordPolicy);
+
+                log.info("Cerbos policies synced for tenant {} ({} profiles, {} collections)",
+                        tenantId, profiles.size(), collectionIds.size());
+
+                // Evict cached permissions — profile permissions may have changed
+                cacheManager.evictAllPermissions();
+
+                publishPolicyChangedEvent(tenantId);
+            } catch (Exception e) {
+                log.error("Failed to sync Cerbos policies for tenant {}: {}", tenantId, e.getMessage(), e);
             }
-            List<String> collectionIds = loadCollectionIdsForTenant(tenantId);
-            List<CerbosPolicyGenerator.CustomRule> customRules = loadCustomRulesForTenant(tenantId);
-
-            // Generate policies
-            Map<String, Object> derivedRoles = policyGenerator.generateDerivedRoles(tenantId, profiles);
-            Map<String, Object> systemPolicy = policyGenerator.generateSystemFeaturePolicy(tenantId, profiles);
-            Map<String, Object> collectionPolicy = policyGenerator.generateCollectionPolicy(tenantId, profiles, collectionIds);
-            Map<String, Object> fieldPolicy = policyGenerator.generateFieldPolicy(tenantId, profiles);
-            Map<String, Object> recordPolicy = policyGenerator.generateRecordPolicy(tenantId, profiles, collectionIds, customRules);
-
-            // Push to Cerbos Admin API
-            pushPolicy(derivedRoles);
-            pushPolicy(systemPolicy);
-            pushPolicy(collectionPolicy);
-            pushPolicy(fieldPolicy);
-            pushPolicy(recordPolicy);
-
-            log.info("Cerbos policies synced for tenant {} ({} profiles, {} collections)",
-                    tenantId, profiles.size(), collectionIds.size());
-
-            // Evict cached permissions — profile permissions may have changed
-            cacheManager.evictAllPermissions();
-
-            publishPolicyChangedEvent(tenantId);
-        } catch (Exception e) {
-            log.error("Failed to sync Cerbos policies for tenant {}: {}", tenantId, e.getMessage(), e);
-        } finally {
-            TenantContext.clear();
-        }
+        });
     }
 
     /**
@@ -136,7 +135,9 @@ public class CerbosPolicySyncService {
      * Syncs policies for all active tenants.
      */
     public void syncAllTenants() {
-        List<Map<String, Object>> tenants = bootstrapRepository.findRoutableTenants();
+        // Enumerating every tenant is an explicit cross-tenant read.
+        List<Map<String, Object>> tenants = TenantContext.callAsPlatform(
+                bootstrapRepository::findRoutableTenants);
         log.info("Syncing Cerbos policies for {} tenants", tenants.size());
 
         for (Map<String, Object> tenant : tenants) {

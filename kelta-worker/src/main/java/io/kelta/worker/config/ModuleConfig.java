@@ -1,5 +1,6 @@
 package io.kelta.worker.config;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.formula.FormulaEvaluator;
 import io.kelta.runtime.module.ModuleStore;
 import io.kelta.runtime.query.QueryEngine;
@@ -87,13 +88,18 @@ public class ModuleConfig {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady(ApplicationReadyEvent event) {
-        try {
-            RuntimeModuleManager manager = event.getApplicationContext()
-                .getBean(RuntimeModuleManager.class);
-            log.info("Loading active runtime modules on startup...");
-            manager.loadAllActiveModules();
-        } catch (Exception e) {
-            log.warn("Could not load runtime modules on startup: {}", e.getMessage());
-        }
+        // Reading all active modules is an explicit cross-tenant operation;
+        // bind the platform sentinel so RLS allows the query without falling
+        // back to a blank tenant context.
+        TenantContext.runAsPlatform(() -> {
+            try {
+                RuntimeModuleManager manager = event.getApplicationContext()
+                    .getBean(RuntimeModuleManager.class);
+                log.info("Loading active runtime modules on startup...");
+                manager.loadAllActiveModules();
+            } catch (Exception e) {
+                log.warn("Could not load runtime modules on startup: {}", e.getMessage());
+            }
+        });
     }
 }

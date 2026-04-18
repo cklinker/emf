@@ -55,15 +55,21 @@ public class InternalBootstrapController {
     public ResponseEntity<Map<String, Object>> getBootstrapConfig() {
         log.debug("REST request to get gateway bootstrap configuration");
 
-        List<Map<String, Object>> collections = loadCollections();
-        Map<String, Map<String, Object>> governorLimits = loadGovernorLimits();
+        // Both queries scan every tenant — gateway needs the full set to build
+        // routes and governor caches. Bind the platform sentinel so RLS allows
+        // the read without relying on a blank tenant context.
+        Map<String, Object> response = TenantContext.callAsPlatform(() -> {
+            List<Map<String, Object>> collections = loadCollections();
+            Map<String, Map<String, Object>> governorLimits = loadGovernorLimits();
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("collections", collections);
-        response.put("governorLimits", governorLimits);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("collections", collections);
+            body.put("governorLimits", governorLimits);
 
-        log.info("Returning bootstrap config: {} collections, {} tenant governor limits",
-                collections.size(), governorLimits.size());
+            log.info("Returning bootstrap config: {} collections, {} tenant governor limits",
+                    collections.size(), governorLimits.size());
+            return body;
+        });
 
         return ResponseEntity.ok(response);
     }
@@ -82,16 +88,19 @@ public class InternalBootstrapController {
     public ResponseEntity<Map<String, String>> getSlugMap() {
         log.debug("REST request to get tenant slug map");
 
-        List<Map<String, Object>> rows = repository.findRoutableTenants();
-
-        Map<String, String> slugMap = new LinkedHashMap<>();
-        for (Map<String, Object> row : rows) {
-            String id = (String) row.get("id");
-            String slug = (String) row.get("slug");
-            if (id != null && slug != null && !slug.isBlank()) {
-                slugMap.put(slug, id);
+        // Reading every routable tenant is an explicit platform-level lookup.
+        Map<String, String> slugMap = TenantContext.callAsPlatform(() -> {
+            List<Map<String, Object>> rows = repository.findRoutableTenants();
+            Map<String, String> out = new LinkedHashMap<>();
+            for (Map<String, Object> row : rows) {
+                String id = (String) row.get("id");
+                String slug = (String) row.get("slug");
+                if (id != null && slug != null && !slug.isBlank()) {
+                    out.put(slug, id);
+                }
             }
-        }
+            return out;
+        });
 
         log.info("Returning tenant slug map with {} entries", slugMap.size());
         return ResponseEntity.ok(slugMap);
@@ -110,15 +119,17 @@ public class InternalBootstrapController {
     public ResponseEntity<Map<String, Integer>> getGovernorLimitsMap() {
         log.debug("REST request to get governor limits map");
 
-        Map<String, Map<String, Object>> fullLimits = loadGovernorLimits();
-
-        Map<String, Integer> limitsMap = new LinkedHashMap<>();
-        for (Map.Entry<String, Map<String, Object>> entry : fullLimits.entrySet()) {
-            Object apiCalls = entry.getValue().get("apiCallsPerDay");
-            if (apiCalls instanceof Number num) {
-                limitsMap.put(entry.getKey(), num.intValue());
+        Map<String, Integer> limitsMap = TenantContext.callAsPlatform(() -> {
+            Map<String, Map<String, Object>> fullLimits = loadGovernorLimits();
+            Map<String, Integer> out = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, Object>> entry : fullLimits.entrySet()) {
+                Object apiCalls = entry.getValue().get("apiCallsPerDay");
+                if (apiCalls instanceof Number num) {
+                    out.put(entry.getKey(), num.intValue());
+                }
             }
-        }
+            return out;
+        });
 
         log.info("Returning governor limits map with {} entries", limitsMap.size());
         return ResponseEntity.ok(limitsMap);
@@ -145,11 +156,14 @@ public class InternalBootstrapController {
 
         if (tenantId != null && !tenantId.isBlank()) {
             log.debug("Internal lookup: OIDC provider by issuer={} tenant={}", issuer, tenantId);
-            providerOpt = repository.findOidcProviderByIssuerAndTenant(issuer, tenantId);
+            final String tid = tenantId;
+            providerOpt = TenantContext.callWithTenant(tid,
+                    () -> repository.findOidcProviderByIssuerAndTenant(issuer, tid));
         } else {
             log.warn("Internal lookup: OIDC provider by issuer={} WITHOUT tenant scope "
                     + "(cross-tenant risk — gateway should always provide tenantId)", issuer);
-            providerOpt = repository.findOidcProviderByIssuer(issuer);
+            providerOpt = TenantContext.callAsPlatform(
+                    () -> repository.findOidcProviderByIssuer(issuer));
         }
 
         if (providerOpt.isEmpty()) {
@@ -284,13 +298,9 @@ public class InternalBootstrapController {
 
         log.info("JIT provision: email={} tenant={} profileId={}", email, tenantId, profileId);
 
-        // Set tenant context so RLS policies filter correctly
-        TenantContext.set(tenantId);
-        try {
-            return doJitProvisionUser(email, tenantId, firstName, lastName, profileId);
-        } finally {
-            TenantContext.clear();
-        }
+        // Bind tenant context so RLS policies filter correctly during user lookup/insert.
+        return TenantContext.callWithTenant(tenantId,
+                () -> doJitProvisionUser(email, tenantId, firstName, lastName, profileId));
     }
 
     private ResponseEntity<Map<String, Object>> doJitProvisionUser(

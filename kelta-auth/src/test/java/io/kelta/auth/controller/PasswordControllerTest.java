@@ -10,11 +10,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.HashMap;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -93,6 +96,23 @@ class PasswordControllerTest {
         }
 
         @Test
+        @DisplayName("returns 400 when the user's credential row is missing (EmptyResult)")
+        void returns400WhenCredentialRowMissing() {
+            when(authentication.getName()).thenReturn("ghost@test.com");
+            when(jdbcTemplate.queryForObject(contains("password_hash"), eq(String.class), eq("ghost@test.com")))
+                    .thenThrow(new EmptyResultDataAccessException(1));
+
+            var request = new PasswordController.ChangePasswordRequest("anything", "newpassword123");
+            ResponseEntity<Map<String, String>> result = controller.changePassword(request, authentication);
+
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            // Same generic message as a wrong password — don't leak account existence.
+            assertThat(result.getBody().get("error")).contains("incorrect");
+            // No subsequent DB work should have happened.
+            verify(jdbcTemplate, never()).update(anyString(), any(), any(), any(), any());
+        }
+
+        @Test
         @DisplayName("changes password successfully")
         void changesPasswordSuccessfully() {
             when(authentication.getName()).thenReturn("user@test.com");
@@ -163,6 +183,26 @@ class PasswordControllerTest {
             ResponseEntity<Map<String, String>> result = controller.resetPassword(request);
 
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @Test
+        @DisplayName("returns 400 (no NPE) when stored expires_at is NULL")
+        void returns400WhenExpiresAtNull() {
+            // A reset_token row with null expires_at is a DB invariant violation;
+            // we must treat it as invalid rather than NPE on the cast/.toInstant().
+            Map<String, Object> row = new HashMap<>();
+            row.put("user_id", "user-1");
+            row.put("reset_token_expires_at", null);
+            when(jdbcTemplate.queryForList(contains("reset_token"), eq("null-expires-token")))
+                    .thenReturn(List.of(row));
+
+            var request = new PasswordController.ResetPasswordRequest("null-expires-token", "newpassword123");
+            ResponseEntity<Map<String, String>> result = controller.resetPassword(request);
+
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(result.getBody().get("error")).contains("expired");
+            verify(jdbcTemplate, never()).update(contains("password_hash = ?"),
+                    any(), any(), any(), any());
         }
 
         @Test

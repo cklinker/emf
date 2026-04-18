@@ -14,3 +14,10 @@ spring:
       - org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration
       - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
       - org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration
+
+kelta:
+  bulk:
+    processor:
+      enabled: false   # no background workers in migrate mode — process must exit after runners complete
+  scheduler:
+    enabled: false

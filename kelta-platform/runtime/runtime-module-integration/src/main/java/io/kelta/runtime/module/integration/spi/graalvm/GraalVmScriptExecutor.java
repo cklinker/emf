@@ -1,5 +1,6 @@
 package io.kelta.runtime.module.integration.spi.graalvm;
 
+import io.kelta.runtime.context.TenantPropagatingExecutors;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
@@ -69,7 +70,8 @@ public class GraalVmScriptExecutor implements ScriptExecutor {
             .err(OutputStream.nullOutputStream())
             .option("engine.WarnInterpreterOnly", "false")
             .build();
-        this.timeoutExecutor = Executors.newVirtualThreadPerTaskExecutor();
+        this.timeoutExecutor = TenantPropagatingExecutors.decorate(
+                Executors.newVirtualThreadPerTaskExecutor());
         log.info("GraalVM ScriptExecutor initialized with {}s default timeout", defaultTimeoutSeconds);
     }
 

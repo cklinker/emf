@@ -1,5 +1,6 @@
 package io.kelta.worker.listener;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.worker.service.CollectionLifecycleManager;
@@ -63,46 +64,57 @@ public class CollectionSchemaListener {
                 return;
             }
 
-            String collectionId = payload.getId();
-            String collectionName = payload.getName();
-            ChangeType changeType = payload.getChangeType();
-
-            if (changeType == ChangeType.DELETED) {
-                log.info("Collection '{}' (id={}) was deleted, tearing down", collectionName, collectionId);
-                lifecycleManager.teardownCollection(collectionId);
-                return;
-            }
-
-            if (changeType == ChangeType.CREATED) {
-                if (lifecycleManager.getActiveCollections().contains(collectionId)) {
-                    log.debug("Collection '{}' (id={}) already active, ignoring CREATED event",
-                            collectionName, collectionId);
-                    return;
-                }
-                log.info("Collection '{}' (id={}) was created, initializing", collectionName, collectionId);
-                lifecycleManager.initializeCollection(collectionId);
-                return;
-            }
-
-            // UPDATED — refresh the collection definition and migrate schema
-            if (!lifecycleManager.getActiveCollections().contains(collectionId)) {
-                log.info("Collection '{}' (id={}) not yet active, initializing on UPDATED event",
-                        collectionName, collectionId);
-                lifecycleManager.initializeCollection(collectionId);
-                return;
-            }
-
-            log.info("Collection '{}' (id={}) schema changed (type={}), refreshing definition",
-                    collectionName, collectionId, changeType);
-            lifecycleManager.refreshCollection(collectionId);
-
-            // Rebuild search index for the collection (searchable fields may have changed)
-            if (tenantId != null && collectionName != null) {
-                searchIndexService.rebuildCollectionIndexAsync(tenantId, collectionName);
+            Runnable work = () -> processCollectionChange(tenantId, payload);
+            if (tenantId != null && !tenantId.isBlank()) {
+                TenantContext.runWithTenant(tenantId, work);
+            } else {
+                // Collection events without a tenantId are treated as non-tenant-scoped
+                // admin events; the downstream lifecycle manager handles global cases.
+                work.run();
             }
 
         } catch (Exception e) {
             log.error("Error processing collection changed event: {}", e.getMessage(), e);
+        }
+    }
+
+    private void processCollectionChange(String tenantId, CollectionChangedPayload payload) {
+        String collectionId = payload.getId();
+        String collectionName = payload.getName();
+        ChangeType changeType = payload.getChangeType();
+
+        if (changeType == ChangeType.DELETED) {
+            log.info("Collection '{}' (id={}) was deleted, tearing down", collectionName, collectionId);
+            lifecycleManager.teardownCollection(collectionId);
+            return;
+        }
+
+        if (changeType == ChangeType.CREATED) {
+            if (lifecycleManager.getActiveCollections().contains(collectionId)) {
+                log.debug("Collection '{}' (id={}) already active, ignoring CREATED event",
+                        collectionName, collectionId);
+                return;
+            }
+            log.info("Collection '{}' (id={}) was created, initializing", collectionName, collectionId);
+            lifecycleManager.initializeCollection(collectionId);
+            return;
+        }
+
+        // UPDATED — refresh the collection definition and migrate schema
+        if (!lifecycleManager.getActiveCollections().contains(collectionId)) {
+            log.info("Collection '{}' (id={}) not yet active, initializing on UPDATED event",
+                    collectionName, collectionId);
+            lifecycleManager.initializeCollection(collectionId);
+            return;
+        }
+
+        log.info("Collection '{}' (id={}) schema changed (type={}), refreshing definition",
+                collectionName, collectionId, changeType);
+        lifecycleManager.refreshCollection(collectionId);
+
+        // Rebuild search index for the collection (searchable fields may have changed)
+        if (tenantId != null && collectionName != null) {
+            searchIndexService.rebuildCollectionIndexAsync(tenantId, collectionName);
         }
     }
 

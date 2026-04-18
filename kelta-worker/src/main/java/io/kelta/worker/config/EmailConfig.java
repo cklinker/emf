@@ -1,5 +1,6 @@
 package io.kelta.worker.config;
 
+import io.kelta.runtime.context.TenantPropagatingExecutors;
 import io.kelta.runtime.module.integration.spi.EmailService;
 import io.kelta.worker.repository.EmailRepository;
 import io.kelta.worker.service.email.DefaultEmailService;
@@ -82,6 +83,25 @@ public class EmailConfig {
         executor.setMaxPoolSize(5);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("email-");
+        executor.setTaskDecorator(TenantPropagatingExecutors.taskDecorator());
+        executor.initialize();
+        return executor;
+    }
+
+    /**
+     * Default {@code @Async} executor, wired in to propagate the submitter's
+     * {@link io.kelta.runtime.context.TenantContext} into the worker thread so
+     * async methods that omit an explicit {@code TenantContextUtils.withTenant}
+     * still observe the caller's tenant binding at the DB layer.
+     */
+    @Bean(name = "applicationTaskExecutor")
+    public Executor applicationTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(16);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("worker-async-");
+        executor.setTaskDecorator(TenantPropagatingExecutors.taskDecorator());
         executor.initialize();
         return executor;
     }

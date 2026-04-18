@@ -1,5 +1,6 @@
 package io.kelta.worker.module;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.event.ModuleChangeType;
 import io.kelta.runtime.event.ModuleChangedPayload;
 import io.kelta.runtime.module.ModuleStore;
@@ -55,26 +56,33 @@ public class ModuleEventListener {
             log.info("Processing module {} event for '{}' (tenant={})",
                 changeType, moduleId, tenantId);
 
-            switch (changeType) {
-                case INSTALLED, ENABLED -> {
-                    Optional<TenantModuleData> module =
-                        moduleStore.findByTenantAndModuleId(tenantId, moduleId);
-                    if (module.isPresent()) {
-                        runtimeModuleManager.loadModule(tenantId, module.get());
-                    } else {
-                        log.warn("Module '{}' not found in DB for tenant {}", moduleId, tenantId);
-                    }
-                }
-                case DISABLED, UNINSTALLED -> {
-                    Optional<TenantModuleData> module =
-                        moduleStore.findByTenantAndModuleId(tenantId, moduleId);
-                    if (module.isPresent()) {
-                        runtimeModuleManager.unloadModule(tenantId, module.get());
-                    } else {
-                        log.debug("Module '{}' already removed for tenant {}", moduleId, tenantId);
-                    }
-                }
+            if (tenantId == null || tenantId.isBlank()) {
+                log.warn("Dropping module change event with no tenantId: module={}", moduleId);
+                return;
             }
+
+            TenantContext.runWithTenant(tenantId, () -> {
+                switch (changeType) {
+                    case INSTALLED, ENABLED -> {
+                        Optional<TenantModuleData> module =
+                            moduleStore.findByTenantAndModuleId(tenantId, moduleId);
+                        if (module.isPresent()) {
+                            runtimeModuleManager.loadModule(tenantId, module.get());
+                        } else {
+                            log.warn("Module '{}' not found in DB for tenant {}", moduleId, tenantId);
+                        }
+                    }
+                    case DISABLED, UNINSTALLED -> {
+                        Optional<TenantModuleData> module =
+                            moduleStore.findByTenantAndModuleId(tenantId, moduleId);
+                        if (module.isPresent()) {
+                            runtimeModuleManager.unloadModule(tenantId, module.get());
+                        } else {
+                            log.debug("Module '{}' already removed for tenant {}", moduleId, tenantId);
+                        }
+                    }
+                }
+            });
         } catch (Exception e) {
             log.error("Error processing module changed event: {}", e.getMessage(), e);
         }

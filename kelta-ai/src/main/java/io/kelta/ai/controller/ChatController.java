@@ -2,6 +2,7 @@ package io.kelta.ai.controller;
 
 import io.kelta.ai.config.AiConfigProperties;
 import io.kelta.ai.service.ChatService;
+import io.kelta.runtime.context.TenantPropagatingExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -65,10 +66,11 @@ public class ChatController {
 
         SseEmitter emitter = new SseEmitter(config.sseTimeoutMs());
 
-        // Run the streaming in a separate thread to not block
-        Thread.startVirtualThread(() -> chatService.chatStream(
+        // Run the streaming on a virtual thread; propagate the caller's tenant
+        // ScopedValue so downstream DB queries see the right app.current_tenant_id.
+        Thread.startVirtualThread(TenantPropagatingExecutors.wrap(() -> chatService.chatStream(
                 tenantId, userId, conversationId,
-                message, contextType, contextId, emitter));
+                message, contextType, contextId, emitter)));
 
         return emitter;
     }

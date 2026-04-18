@@ -3,51 +3,56 @@ package io.kelta.worker.util;
 import io.kelta.runtime.context.TenantContext;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Helpers for managing {@link TenantContext} lifecycle around background task execution.
+ * Helpers for running background or scheduled work inside a bounded {@link TenantContext}
+ * scope.
  *
- * <p>Use {@link #withTenant} when running scheduled or async work that requires a tenant context
- * to be set for the duration of the operation and reliably cleared afterward.
+ * <p>All variants bind the tenant via {@link ScopedValue} (virtual-thread safe,
+ * automatically cleared on exit). Callers may still use these wrappers as a
+ * convenient bridge from code that receives a tenant ID as a parameter rather than
+ * inheriting one from the caller's scope — e.g. scheduled jobs loaded from the DB,
+ * NATS listeners, and async workers.
  */
 public final class TenantContextUtils {
 
     private TenantContextUtils() {}
 
     /**
-     * Executes {@code task} with the given tenant set in {@link TenantContext}, clearing it in a
-     * {@code finally} block regardless of outcome.
-     *
-     * @param tenantId the tenant ID to set before running the task
-     * @param task     the task to run within tenant context
-     * @throws Exception if the task throws
+     * Executes {@code task} with the given tenant bound in {@link TenantContext}.
      */
     public static void withTenant(String tenantId, ThrowingRunnable task) throws Exception {
-        TenantContext.set(tenantId);
-        try {
-            task.run();
-        } finally {
-            TenantContext.clear();
+        AtomicReference<Exception> failure = new AtomicReference<>();
+        TenantContext.runWithTenant(tenantId, () -> {
+            try {
+                task.run();
+            } catch (Exception e) {
+                failure.set(e);
+            }
+        });
+        if (failure.get() != null) {
+            throw failure.get();
         }
     }
 
     /**
-     * Executes {@code task} with the given tenant set in {@link TenantContext}, clearing it in a
-     * {@code finally} block regardless of outcome.
-     *
-     * @param tenantId the tenant ID to set before running the task
-     * @param task     the task to run within tenant context
-     * @param <T>      the return type of the task
-     * @return the value returned by the task
-     * @throws Exception if the task throws
+     * Callable variant of {@link #withTenant(String, ThrowingRunnable)}.
      */
     public static <T> T withTenant(String tenantId, Callable<T> task) throws Exception {
-        TenantContext.set(tenantId);
-        try {
-            return task.call();
-        } finally {
-            TenantContext.clear();
+        AtomicReference<T> result = new AtomicReference<>();
+        AtomicReference<Exception> failure = new AtomicReference<>();
+        TenantContext.runWithTenant(tenantId, () -> {
+            try {
+                result.set(task.call());
+            } catch (Exception e) {
+                failure.set(e);
+            }
+        });
+        if (failure.get() != null) {
+            throw failure.get();
         }
+        return result.get();
     }
 
     /** A {@link Runnable}-like interface that allows checked exceptions. */

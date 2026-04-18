@@ -1,5 +1,7 @@
 package io.kelta.runtime.flow;
 
+import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.context.TenantPropagatingExecutors;
 import io.kelta.runtime.flow.executor.*;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
 import tools.jackson.databind.ObjectMapper;
@@ -53,7 +55,8 @@ public class FlowEngine {
         this.flowStore = flowStore;
         this.parser = new FlowDefinitionParser(objectMapper);
         this.dataResolver = new StateDataResolver(objectMapper);
-        this.threadPool = Executors.newFixedThreadPool(threadPoolSize);
+        this.threadPool = TenantPropagatingExecutors.decorate(
+                Executors.newFixedThreadPool(threadPoolSize));
         this.listener = listener != null ? listener : FlowExecutionListener.NOOP;
 
         // Register state executors
@@ -94,7 +97,7 @@ public class FlowEngine {
         FlowDefinition definition = parser.parse(definitionJson);
         String executionId = flowStore.createExecution(tenantId, flowId, userId, null, initialInput, isTest);
 
-        threadPool.submit(() -> {
+        threadPool.submit(() -> TenantContext.runWithTenant(tenantId, () -> {
             listener.onExecutionStarted(flowId);
             long start = System.currentTimeMillis();
             try {
@@ -112,7 +115,7 @@ public class FlowEngine {
                     .orElse(FlowExecutionData.STATUS_FAILED);
                 listener.onExecutionCompleted(flowId, finalStatus, duration, isTest);
             }
-        });
+        }));
 
         return executionId;
     }
@@ -155,7 +158,8 @@ public class FlowEngine {
             return;
         }
 
-        threadPool.submit(() -> {
+        final String resumeTenantId = execution.tenantId();
+        threadPool.submit(() -> TenantContext.runWithTenant(resumeTenantId, () -> {
             try {
                 // Re-load to get the current node
                 FlowExecutionData fresh = flowStore.loadExecution(executionId).orElseThrow();
@@ -168,7 +172,7 @@ public class FlowEngine {
             } catch (Exception e) {
                 log.error("Failed to resume execution {}", executionId, e);
             }
-        });
+        }));
     }
 
     /**

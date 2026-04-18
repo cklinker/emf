@@ -2,6 +2,7 @@ package io.kelta.worker.listener;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.service.SupersetDatasetService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,9 @@ public class SupersetCollectionSyncListener {
 
             log.info("Syncing Superset dataset for collection '{}' in tenant '{}'",
                     collectionName, tenantSlug);
-            datasetService.syncDatasetForCollection(tenantId, tenantSlug, collectionId, collectionName);
+            TenantContext.runWithTenant(tenantId, tenantSlug, () ->
+                    datasetService.syncDatasetForCollection(
+                            tenantId, tenantSlug, collectionId, collectionName));
 
         } catch (Exception e) {
             log.error("Failed to process collection change event for Superset sync: {}",

@@ -40,44 +40,23 @@ class KeltaUserDetailsServiceTest {
         RequestContextHolder.resetRequestAttributes();
     }
 
-    // --- No request context (cross-tenant fallback) ---
+    // --- No request context → must fail hard (RLS invariant) ---
 
     @Test
-    void loadUserByUsername_returnsUserDetails() {
-        KeltaUserDetails expectedUser = buildUser("tenant-1");
-
-        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("admin@test.com"), eq("admin@test.com")))
-                .thenReturn(List.of(expectedUser));
-
-        var result = userDetailsService.loadUserByUsername("admin@test.com");
-
-        assertNotNull(result);
-        assertEquals("admin@test.com", result.getUsername());
-        assertTrue(result.isEnabled());
-        assertTrue(result.isAccountNonLocked());
+    void loadUserByUsername_throwsWhenNoRequestContext() {
+        // No RequestContextHolder attributes at all → no session → no tenant
+        assertThrows(UsernameNotFoundException.class,
+                () -> userDetailsService.loadUserByUsername("admin@test.com"));
     }
 
     @Test
-    void loadUserByUsername_returnsUserDetailsByUsername() {
-        KeltaUserDetails expectedUser = buildUser("tenant-1");
-
-        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("test-admin"), eq("test-admin")))
-                .thenReturn(List.of(expectedUser));
-
-        var result = userDetailsService.loadUserByUsername("test-admin");
-
-        assertNotNull(result);
-        assertEquals("admin@test.com", result.getUsername());
-        assertTrue(result.isEnabled());
-    }
-
-    @Test
-    void loadUserByUsername_throwsWhenNotFound() {
-        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("unknown@test.com"), eq("unknown@test.com")))
-                .thenReturn(Collections.emptyList());
+    void loadUserByUsername_throwsWhenNoTenantInSession() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getSession(false)).thenReturn(null);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
 
         assertThrows(UsernameNotFoundException.class,
-                () -> userDetailsService.loadUserByUsername("unknown@test.com"));
+                () -> userDetailsService.loadUserByUsername("admin@test.com"));
     }
 
     // --- Tenant UUID in session → filters query by tenant ---
@@ -134,20 +113,15 @@ class KeltaUserDetailsServiceTest {
     }
 
     @Test
-    void loadUserByUsername_fallsBackToCrossTenantWhenSlugUnknown() {
+    void loadUserByUsername_throwsWhenSlugUnknown() {
         setSessionTenant("unknown-slug");
 
         when(jdbcTemplate.queryForList("SELECT id FROM tenant WHERE slug = ?", String.class, "unknown-slug"))
                 .thenReturn(Collections.emptyList());
 
-        KeltaUserDetails expectedUser = buildUser("tenant-1");
-        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class),
-                eq("admin@test.com"), eq("admin@test.com")))
-                .thenReturn(List.of(expectedUser));
-
-        var result = userDetailsService.loadUserByUsername("admin@test.com");
-
-        assertNotNull(result);
+        // Unknown slug → no tenant context → hard fail (no cross-tenant fallback).
+        assertThrows(UsernameNotFoundException.class,
+                () -> userDetailsService.loadUserByUsername("admin@test.com"));
     }
 
     // --- Helpers ---

@@ -29,51 +29,36 @@ public class KeltaUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String emailOrUsername) throws UsernameNotFoundException {
         String tenantId = resolveTenantFromRequest();
 
-        List<KeltaUserDetails> users;
-        if (tenantId != null) {
-            users = jdbcTemplate.query(
-                    """
-                    SELECT pu.id, pu.email, pu.tenant_id, pu.profile_id,
-                           p.name AS profile_name,
-                           COALESCE(pu.first_name || ' ' || pu.last_name, pu.email) AS display_name,
-                           uc.password_hash,
-                           pu.status,
-                           uc.locked_until,
-                           uc.force_change_on_login
-                    FROM platform_user pu
-                    JOIN user_credential uc ON uc.user_id = pu.id
-                    LEFT JOIN profile p ON p.id = pu.profile_id
-                    WHERE (pu.email = ? OR pu.username = ?)
-                      AND pu.tenant_id = ?
-                      AND pu.status = 'ACTIVE'
-                    """,
-                    userDetailsRowMapper(),
-                    emailOrUsername, emailOrUsername, tenantId
-            );
-        } else {
-            // No tenant context — fall back to cross-tenant lookup (single-tenant deployments)
-            users = jdbcTemplate.query(
-                    """
-                    SELECT pu.id, pu.email, pu.tenant_id, pu.profile_id,
-                           p.name AS profile_name,
-                           COALESCE(pu.first_name || ' ' || pu.last_name, pu.email) AS display_name,
-                           uc.password_hash,
-                           pu.status,
-                           uc.locked_until,
-                           uc.force_change_on_login
-                    FROM platform_user pu
-                    JOIN user_credential uc ON uc.user_id = pu.id
-                    LEFT JOIN profile p ON p.id = pu.profile_id
-                    WHERE (pu.email = ? OR pu.username = ?)
-                      AND pu.status = 'ACTIVE'
-                    """,
-                    userDetailsRowMapper(),
-                    emailOrUsername, emailOrUsername
-            );
-            if (users.size() > 1) {
-                log.warn("Multiple users found for email/username {} across tenants, returning first match", emailOrUsername);
-            }
+        // Tenant context is required. The platform_user table has row-level security on
+        // the public schema scoped by tenant_id; cross-tenant lookups are unsafe because
+        // the same email/username (e.g. admin@kelta.local) can exist in multiple tenants.
+        if (tenantId == null) {
+            log.warn("Refusing to authenticate '{}': no tenant context in session", emailOrUsername);
+            throw new UsernameNotFoundException(
+                    "Tenant context is required to authenticate. "
+                            + "Initiate login via /oauth2/authorize with a tenant-scoped redirect_uri "
+                            + "or pass ?tenant=<slug> to /login.");
         }
+
+        List<KeltaUserDetails> users = jdbcTemplate.query(
+                """
+                SELECT pu.id, pu.email, pu.tenant_id, pu.profile_id,
+                       p.name AS profile_name,
+                       COALESCE(pu.first_name || ' ' || pu.last_name, pu.email) AS display_name,
+                       uc.password_hash,
+                       pu.status,
+                       uc.locked_until,
+                       uc.force_change_on_login
+                FROM platform_user pu
+                JOIN user_credential uc ON uc.user_id = pu.id
+                LEFT JOIN profile p ON p.id = pu.profile_id
+                WHERE (pu.email = ? OR pu.username = ?)
+                  AND pu.tenant_id = ?
+                  AND pu.status = 'ACTIVE'
+                """,
+                userDetailsRowMapper(),
+                emailOrUsername, emailOrUsername, tenantId
+        );
 
         if (users.isEmpty()) {
             throw new UsernameNotFoundException("User not found: " + emailOrUsername);

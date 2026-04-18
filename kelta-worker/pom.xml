@@ -37,6 +37,16 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Testcontainers BOM for postgresql + junit-jupiter modules
+                 used by TenantIsolationIT. Version aligned with the platform
+                 BOM so it matches the rest of the codebase. -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>1.20.4</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <!-- Override protobuf version to resolve conflict between
                  Cerbos SDK (4.26.1) and OTLP metrics registry (gencode 4.32.0) -->
             <dependency>
@@ -214,6 +224,17 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testcontainers for tenant isolation integration tests. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

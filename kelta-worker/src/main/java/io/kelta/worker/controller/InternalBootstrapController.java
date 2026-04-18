@@ -256,6 +256,39 @@ public class InternalBootstrapController {
     }
 
     /**
+     * Resolves a profile by display name within a tenant.
+     *
+     * <p>Used by kelta-auth's federated user mapper to translate the
+     * {@code groups_profile_mapping} config (keyed by profile name) into the
+     * stable profile ID that the JIT endpoint needs. Also used to look up the
+     * "Minimum Access" fallback profile when no group-based match is found.
+     *
+     * @param name     the profile display name (e.g. "Standard User")
+     * @param tenantId the tenant UUID
+     * @return the matching profile's {@code id} and {@code name}, or 404 if
+     *         the tenant has no profile with that name
+     */
+    @GetMapping("/profile/by-name")
+    public ResponseEntity<Map<String, Object>> getProfileByName(
+            @RequestParam String name,
+            @RequestParam String tenantId) {
+        log.debug("Internal profile-by-name lookup: name={} tenant={}", name, tenantId);
+
+        Optional<Map<String, Object>> profile = TenantContext.callWithTenant(tenantId,
+                () -> repository.findProfileByName(name, tenantId));
+
+        if (profile.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Map<String, Object> row = profile.get();
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("id", row.get("id"));
+        response.put("name", row.get("name"));
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Creates or updates a user during JIT (Just-In-Time) provisioning from SSO login.
      *
      * <p>If the user already exists:

@@ -78,6 +78,37 @@ public class WorkerClient {
             String userId, String profileId, String profileName
     ) {}
 
+    public record ProfileInfo(String id, String name) {}
+
+    /**
+     * Resolves a profile by display name, scoped to the tenant. Returns
+     * {@link Optional#empty()} if the tenant has no profile with that name or
+     * if the worker lookup fails — callers treat both as "unknown profile" and
+     * should fall back to PENDING_ACTIVATION or the Minimum Access profile.
+     */
+    public Optional<ProfileInfo> findProfileByName(String name, String tenantId) {
+        if (name == null || name.isBlank() || tenantId == null || tenantId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode response = restClient.get()
+                    .uri("/internal/profile/by-name?name={name}&tenantId={tenantId}", name, tenantId)
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (response == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new ProfileInfo(
+                    response.path("id").asText(null),
+                    response.path("name").asText(null)));
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound nf) {
+            return Optional.empty();
+        } catch (Exception e) {
+            log.warn("Failed to look up profile '{}' for tenant {}: {}", name, tenantId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     public Optional<OidcProviderInfo> findOidcProviderByIssuer(String issuer, String tenantId) {
         try {
             String url = tenantId != null

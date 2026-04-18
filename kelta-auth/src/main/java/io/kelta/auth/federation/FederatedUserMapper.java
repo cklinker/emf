@@ -25,15 +25,26 @@ import java.util.*;
  *   <li>Returns a {@link KeltaUserDetails} for token minting</li>
  * </ol>
  *
- * <p>If no profile can be resolved from groups, the user is created as
- * {@code PENDING_ACTIVATION} and cannot access the platform until an admin
- * assigns a profile.
+ * <p>Profile resolution order: (1) the provider's {@code groups_profile_mapping}
+ * — for any group present on the external token, look up the mapped profile by
+ * name in the tenant's {@code profile} table; (2) fall back to the seeded
+ * {@value #FALLBACK_PROFILE_NAME} profile so every federated user can log in
+ * with a login-only role even if none of their groups are mapped. If the
+ * fallback profile itself is missing (unprovisioned tenant) the user is created
+ * as {@code PENDING_ACTIVATION} and an admin must assign a profile manually.
  */
 @Service
 @ConditionalOnBean(EncryptionService.class)
 public class FederatedUserMapper {
 
     private static final Logger log = LoggerFactory.getLogger(FederatedUserMapper.class);
+
+    /**
+     * Seeded login-only profile from {@code TenantProvisioningHook}. Grants no
+     * data access on its own — admins must layer Permission Sets on top — so
+     * assigning it to every unmapped federated user is safe by default.
+     */
+    static final String FALLBACK_PROFILE_NAME = "Minimum Access";
 
     private final WorkerClient workerClient;
     private final ObjectMapper objectMapper;
@@ -63,9 +74,19 @@ public class FederatedUserMapper {
         String firstName = extractFirstName(oidcUser, displayName);
         String lastName = extractLastName(oidcUser, displayName);
 
-        // Resolve profile from groups
+        // Resolve profile from groups, falling back to the "Minimum Access"
+        // seed profile so unmapped federated users can still log in.
         List<String> groups = extractGroups(oidcUser, provider.groupsClaim());
-        String profileId = resolveProfileFromGroups(groups, provider.groupsProfileMapping());
+        String profileId = resolveProfileFromGroups(groups, provider.groupsProfileMapping(), tenantId);
+        if (profileId == null) {
+            profileId = workerClient.findProfileByName(FALLBACK_PROFILE_NAME, tenantId)
+                    .map(WorkerClient.ProfileInfo::id)
+                    .orElse(null);
+            if (profileId != null) {
+                log.info("No group-based profile match for email={} — assigning {} fallback",
+                        email, FALLBACK_PROFILE_NAME);
+            }
+        }
 
         log.info("Federated user mapping: email={} groups={} profileId={} tenant={}",
                 email, groups, profileId, tenantId);
@@ -142,7 +163,9 @@ public class FederatedUserMapper {
         return List.of();
     }
 
-    private String resolveProfileFromGroups(List<String> groups, String groupsProfileMappingJson) {
+    private String resolveProfileFromGroups(List<String> groups,
+                                             String groupsProfileMappingJson,
+                                             String tenantId) {
         if (groups.isEmpty() || groupsProfileMappingJson == null || groupsProfileMappingJson.isBlank()) {
             return null;
         }
@@ -154,14 +177,16 @@ public class FederatedUserMapper {
             // Priority: System Administrator first
             for (Map.Entry<String, String> entry : mapping.entrySet()) {
                 if (groups.contains(entry.getKey()) && "System Administrator".equals(entry.getValue())) {
-                    return lookupProfileId(entry.getValue());
+                    String id = lookupProfileId(entry.getValue(), tenantId);
+                    if (id != null) return id;
                 }
             }
 
             // First matching group
             for (Map.Entry<String, String> entry : mapping.entrySet()) {
                 if (groups.contains(entry.getKey())) {
-                    return lookupProfileId(entry.getValue());
+                    String id = lookupProfileId(entry.getValue(), tenantId);
+                    if (id != null) return id;
                 }
             }
         } catch (Exception e) {
@@ -171,10 +196,14 @@ public class FederatedUserMapper {
         return null;
     }
 
-    private String lookupProfileId(String profileName) {
-        // For now, return the profile name and let the JIT endpoint resolve it
-        // TODO: Add profile lookup by name to WorkerClient
-        return null;
+    private String lookupProfileId(String profileName, String tenantId) {
+        return workerClient.findProfileByName(profileName, tenantId)
+                .map(WorkerClient.ProfileInfo::id)
+                .orElseGet(() -> {
+                    log.warn("Group mapping refers to profile '{}' which is not present in tenant {}",
+                            profileName, tenantId);
+                    return null;
+                });
     }
 
     private String extractFirstName(OidcUser oidcUser, String displayName) {

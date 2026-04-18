@@ -106,6 +106,12 @@ public class BootstrapRepository {
             WHERE member_type = 'USER' AND member_id = ?
             """;
 
+    private static final String SELECT_PROFILE_BY_NAME = """
+            SELECT id, name FROM profile
+            WHERE tenant_id = ? AND name = ?
+            LIMIT 1
+            """;
+
     private final JdbcTemplate jdbcTemplate;
 
     public BootstrapRepository(JdbcTemplate jdbcTemplate) {
@@ -181,6 +187,18 @@ public class BootstrapRepository {
     public Optional<Map<String, Object>> findUserIdentity(String email, String tenantId) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 SELECT_USER_IDENTITY, email, tenantId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    /**
+     * Resolves a profile by its display name, scoped to the given tenant. Used
+     * by kelta-auth's {@link io.kelta.auth.federation.FederatedUserMapper} to
+     * translate OIDC group-to-profile mapping values into stable profile IDs
+     * before JIT-provisioning a user.
+     */
+    public Optional<Map<String, Object>> findProfileByName(String name, String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                SELECT_PROFILE_BY_NAME, tenantId, name);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 }

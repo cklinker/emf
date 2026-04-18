@@ -5,8 +5,11 @@ import tools.jackson.databind.ObjectMapper;
 import io.kelta.auth.config.AuthProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -26,10 +29,22 @@ public class WorkerClient {
 
     public WorkerClient(AuthProperties properties,
                         ObjectMapper objectMapper,
-                        @Value("${kelta.internal.token:}") String internalToken) {
-        this.restClient = RestClient.builder()
-                .baseUrl(properties.getWorkerUrl())
-                .build();
+                        @Value("${kelta.internal.token:}") String internalToken,
+                        @Autowired(required = false) @Qualifier("internalWorkerRestClient")
+                        @Nullable RestClient internalRestClient) {
+        // When the internal-auth rollout flag is on, InternalWorkerClientConfig
+        // provides a RestClient pre-wired with a client_credentials interceptor
+        // that attaches a bearer token to every /internal/** request. Fall back
+        // to a plain RestClient otherwise so the service keeps working while
+        // the flag is off or during rollout.
+        if (internalRestClient != null) {
+            log.info("WorkerClient using OAuth2 client_credentials for /internal/** calls");
+            this.restClient = internalRestClient;
+        } else {
+            this.restClient = RestClient.builder()
+                    .baseUrl(properties.getWorkerUrl())
+                    .build();
+        }
         this.objectMapper = objectMapper;
         this.internalToken = internalToken;
     }

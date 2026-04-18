@@ -43,6 +43,7 @@ import io.kelta.runtime.event.PlatformEventPublisher;
 
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Spring configuration for the flow execution engine and module system.
@@ -116,12 +117,35 @@ public class FlowConfig {
     // JARs outside the worker's component-scan package.
     // ---------------------------------------------------------------------------
 
+    /**
+     * Tenant slug grammar for schema creation. Must start with a lowercase
+     * letter, followed by lowercase letters / digits / hyphens only, and
+     * bounded at 63 chars — Postgres's identifier length limit. Mirrors the
+     * upstream validation in {@code TenantLifecycleHook.beforeCreate}, so a
+     * slug that passed the lifecycle hook will pass here too; this regex is
+     * defense-in-depth against any callback wiring that bypasses the hook.
+     */
+    private static final Pattern TENANT_SLUG_PATTERN =
+            Pattern.compile("^[a-z][a-z0-9-]{0,62}$");
+
     @Bean
     public SchemaLifecycleModule schemaLifecycleModule(JdbcTemplate jdbcTemplate) {
         log.info("Schema-per-tenant active — tenant creation will auto-create PostgreSQL schemas");
         return new SchemaLifecycleModule(slug -> {
-            String safeName = slug.replaceAll("[^a-z0-9_-]", "");
-            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS \"" + safeName + "\"");
+            if (slug == null || !TENANT_SLUG_PATTERN.matcher(slug).matches()) {
+                // Fail loudly rather than silently creating a schema with a
+                // truncated / empty / surprising name. The upstream hook already
+                // validated the slug before calling us, so hitting this branch
+                // means a platform invariant was broken somewhere.
+                throw new IllegalArgumentException(
+                        "Tenant slug '" + slug + "' does not match required pattern "
+                                + TENANT_SLUG_PATTERN.pattern()
+                                + " — refusing to CREATE SCHEMA");
+            }
+            // The regex guarantees the slug contains no double-quotes, but
+            // double any defensively before splicing into the DDL string.
+            String escaped = slug.replace("\"", "\"\"");
+            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS \"" + escaped + "\"");
         });
     }
 

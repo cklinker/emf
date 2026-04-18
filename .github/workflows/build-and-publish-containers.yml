@@ -138,6 +138,9 @@ jobs:
           - service: worker
             dockerfile: kelta-worker/Dockerfile
             image: kelta-worker
+          - service: worker-migrate
+            dockerfile: kelta-worker/Dockerfile.migrate
+            image: kelta-worker-migrate
           - service: auth
             dockerfile: kelta-auth/Dockerfile
             image: kelta-auth
@@ -246,9 +249,9 @@ jobs:
                 sed -i "s|image: .*${PREFIX}-worker:.*|image: harbor.rzware.com/emf/${PREFIX}-worker:${IMAGE_TAG}|g" "$DIR/worker-deployment.yaml"
               fi
 
-              # Update worker migration Job (PreSync hook — must stay in sync with Deployment image)
+              # Update worker migration Job (uses a separate JVM-based image — not the native worker binary)
               if [ -f "$DIR/worker-migrate-job.yaml" ]; then
-                sed -i "s|image: .*${PREFIX}-worker:.*|image: harbor.rzware.com/emf/${PREFIX}-worker:${IMAGE_TAG}|g" "$DIR/worker-migrate-job.yaml"
+                sed -i "s|image: .*${PREFIX}-worker-migrate:.*|image: harbor.rzware.com/emf/${PREFIX}-worker-migrate:${IMAGE_TAG}|g" "$DIR/worker-migrate-job.yaml"
               fi
 
               # Update auth server deployment

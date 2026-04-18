@@ -91,18 +91,40 @@ public class SecurityConfig {
 
     /**
      * Configures the security filter chain.
-     * Since we're using a custom GlobalFilter for authentication,
-     * we disable the default Spring Security filters to avoid conflicts.
-     * CORS is enabled and delegates to the CorsConfigurationSource bean.
+     *
+     * <p>API auth is still handled by the custom {@code GlobalFilter}s
+     * ({@code JwtAuthenticationFilter}, {@code CerbosAuthorizationFilter}, …)
+     * rather than by Spring Security, so {@code anyExchange().permitAll()}
+     * stays the default — a regression that bypasses those filters still gets
+     * caught downstream, but Spring Security itself does not re-authenticate
+     * API traffic.
+     *
+     * <p>The exception is Spring Boot Actuator. {@code /actuator/health}
+     * (Kubernetes liveness/readiness probes) and {@code /actuator/info} stay
+     * public; everything else under {@code /actuator/**} — {@code metrics},
+     * {@code env}, {@code loggers}, etc. — now requires an OAuth2 bearer
+     * token, validated by the platform's existing {@link ReactiveJwtDecoder}
+     * via the {@code oauth2ResourceServer} DSL. Closes the
+     * "SecurityConfig permits all exchanges" defense-in-depth gap flagged in
+     * {@code concerns.md}: even if actuator exposure was accidentally widened
+     * in the management config, it can no longer be scraped anonymously.
+     *
+     * <p>CORS is enabled and delegates to the {@link CorsConfigurationSource}
+     * bean so error responses that short-circuit before gateway routing still
+     * carry CORS headers.
      */
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http,
+                                                          ReactiveJwtDecoder reactiveJwtDecoder) {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeExchange(exchanges -> exchanges
+                .pathMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                .pathMatchers("/actuator/**").authenticated()
                 .anyExchange().permitAll()
             )
+            .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtDecoder(reactiveJwtDecoder)))
             .build();
     }
 

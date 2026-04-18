@@ -19,6 +19,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.zip.CRC32;
 
 /**
  * Storage adapter that maps each collection to a physical PostgreSQL table
@@ -102,9 +104,33 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         TableRef tableRef = getTableRef(definition);
         String qualifiedName = tableRef.toSql();
 
-        // Ensure the tenant schema exists before creating the table
+        // Ensure the tenant schema exists before creating the table. Use
+        // information_schema to verify the CREATE actually took effect — a
+        // permission error on CREATE would bubble out of jdbcTemplate.execute,
+        // but a post-condition check turns a silently-missing schema (e.g.
+        // CREATE raced against a concurrent DROP) into an explicit, actionable
+        // StorageException instead of a confusing "relation does not exist"
+        // failure later during the CREATE TABLE itself.
         if (!tableRef.isPublicSchema()) {
-            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS \"" + tableRef.schema() + "\"");
+            String schemaName = tableRef.schema();
+            try {
+                jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS \""
+                        + schemaName.replace("\"", "\"\"") + "\"");
+            } catch (DataAccessException e) {
+                throw new StorageException(
+                        "Failed to create tenant schema '" + schemaName
+                                + "' (check the worker's DB role has CREATE on the target database): "
+                                + e.getMessage(), e);
+            }
+            Integer exists = jdbcTemplate.queryForObject(
+                    "SELECT 1 FROM information_schema.schemata WHERE schema_name = ?",
+                    Integer.class, schemaName);
+            if (exists == null) {
+                throw new StorageException(
+                        "Tenant schema '" + schemaName + "' was not created and is not visible "
+                                + "to the worker's DB role — refusing to create table '"
+                                + tableRef.tableName() + "'");
+            }
         }
 
         StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ");
@@ -154,8 +180,9 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
             // Unique index for EXTERNAL_ID
             if (field.type() == FieldType.EXTERNAL_ID) {
-                String idxName = "idx_" + sanitizeIdentifier(getBaseTableName(definition))
-                    + "_" + sanitizeIdentifier(columnName);
+                String idxName = buildBoundedIdentifier(
+                        "idx_", sanitizeIdentifier(getBaseTableName(definition)),
+                        sanitizeIdentifier(columnName));
                 postCreateStatements.add(
                     "CREATE UNIQUE INDEX IF NOT EXISTS " + idxName
                     + " ON " + qualifiedName + "(" + sanitizeIdentifier(columnName) + ")"
@@ -172,7 +199,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                         ? TableRef.publicSchema(targetTableName)
                         : TableRef.tenantSchema(tableRef.schema(), targetTableName);
                 String targetCol = sanitizeIdentifier(field.referenceConfig().targetField());
-                String fkName = "fk_" + sanitizeIdentifier(baseName) + "_" + sanitizeIdentifier(columnName);
+                String fkName = buildBoundedIdentifier(
+                        "fk_", sanitizeIdentifier(baseName), sanitizeIdentifier(columnName));
                 String onDelete = field.type() == FieldType.MASTER_DETAIL
                         ? "ON DELETE CASCADE" : "ON DELETE SET NULL";
 
@@ -603,6 +631,37 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             throw new IllegalArgumentException("Invalid identifier: " + identifier);
         }
         return identifier;
+    }
+
+    /** PostgreSQL's identifier length limit. Longer names are silently truncated. */
+    private static final int PG_IDENT_MAX_LEN = 63;
+
+    /**
+     * Builds a deterministic identifier of the form
+     * {@code prefix + baseName + "_" + suffix}, rewriting to
+     * {@code prefix + trunc + "_" + crc} when the plain join would exceed
+     * PostgreSQL's 63-char identifier limit.
+     *
+     * <p>Without this, two FK constraints on long collection+field pairs would
+     * truncate to identical server-side names — the first {@code IF NOT EXISTS}
+     * check would match the wrong constraint and the second FK would silently
+     * never be created. Using CRC32 of the full joined name as a stable 8-hex
+     * suffix guarantees uniqueness while keeping the result recognisable.
+     */
+    static String buildBoundedIdentifier(String prefix, String baseName, String suffix) {
+        String full = prefix + baseName + "_" + suffix;
+        if (full.length() <= PG_IDENT_MAX_LEN) {
+            return full;
+        }
+        CRC32 crc = new CRC32();
+        crc.update((baseName + "_" + suffix).getBytes(StandardCharsets.UTF_8));
+        String hashSuffix = String.format("_%08x", crc.getValue());
+        // Budget: prefix + truncated-baseName + hashSuffix, exactly 63 chars.
+        int budget = PG_IDENT_MAX_LEN - prefix.length() - hashSuffix.length();
+        String trimmedBase = baseName.length() <= budget
+                ? baseName
+                : baseName.substring(0, Math.max(0, budget));
+        return prefix + trimmedBase + hashSuffix;
     }
 
     /**

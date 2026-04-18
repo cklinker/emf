@@ -68,7 +68,7 @@ RUN mvn package -DskipTests -B
 # =============================================================================
 # Stage 3: JRE runtime
 # =============================================================================
-FROM eclipse-temurin:25-jre-slim
+FROM eclipse-temurin:25-jre
 
 WORKDIR /app
 

@@ -79,24 +79,24 @@ public class SearchIndexListener {
                 return;
             }
 
-            TenantContext.set(tenantId);
-            try {
-                switch (changeType) {
+            final String boundCollection = collectionName;
+            final String boundRecord = recordId;
+            final ChangeType boundChange = changeType;
+            final Map<String, Object> boundData = payload.getData();
+            TenantContext.runWithTenant(tenantId, () -> {
+                switch (boundChange) {
                     case CREATED, UPDATED -> {
-                        Map<String, Object> data = payload.getData();
-                        if (data != null && !data.isEmpty()) {
-                            String collectionId = lifecycleManager.getCollectionIdByName(collectionName);
+                        if (boundData != null && !boundData.isEmpty()) {
+                            String collectionId = lifecycleManager.getCollectionIdByName(boundCollection);
                             if (collectionId != null) {
                                 searchIndexService.indexRecord(
-                                        tenantId, collectionId, collectionName, recordId, data);
+                                        tenantId, collectionId, boundCollection, boundRecord, boundData);
                             }
                         }
                     }
-                    case DELETED -> searchIndexService.removeRecord(tenantId, collectionName, recordId);
+                    case DELETED -> searchIndexService.removeRecord(tenantId, boundCollection, boundRecord);
                 }
-            } finally {
-                TenantContext.clear();
-            }
+            });
 
         } catch (Exception e) {
             log.error("Error processing record change for search index: {}", e.getMessage(), e);

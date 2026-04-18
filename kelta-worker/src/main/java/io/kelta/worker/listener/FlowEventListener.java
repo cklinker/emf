@@ -1,5 +1,6 @@
 package io.kelta.worker.listener;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.flow.FlowEngine;
@@ -78,6 +79,10 @@ public class FlowEventListener {
         try {
             var tree = objectMapper.readTree(message);
             String tenantId = tree.path("tenantId").asText(null);
+            if (tenantId == null || tenantId.isBlank()) {
+                log.debug("Dropping flow event with no tenantId");
+                return;
+            }
             String userId = tree.path("userId").asText(null);
             Instant timestamp = parseTimestamp(tree.path("timestamp"));
 
@@ -98,34 +103,37 @@ public class FlowEventListener {
             log.debug("Flow listener received record change: collection={}, recordId={}, changeType={}",
                     payload.getCollectionName(), payload.getRecordId(), payload.getChangeType());
 
-            List<FlowTriggerConfig> configs = getActiveFlowConfigs(tenantId);
-            if (configs.isEmpty()) {
-                return;
-            }
-
-            for (FlowTriggerConfig config : configs) {
-                try {
-                    if (triggerEvaluator.matchesRecordTrigger(event, config.triggerConfig())) {
-                        String executionId = UUID.randomUUID().toString();
-                        Map<String, Object> initialState = initialStateBuilder.buildFromRecordEvent(
-                                event, config.flowId(), executionId);
-
-                        log.info("Starting flow execution: flowId={}, executionId={}, trigger=RECORD_CHANGE",
-                                config.flowId(), executionId);
-
-                        flowEngine.startExecution(
-                                tenantId,
-                                config.flowId(),
-                                config.definitionJson(),
-                                initialState,
-                                userId,
-                                false);
-                    }
-                } catch (Exception e) {
-                    log.error("Error evaluating flow trigger for flowId={}: {}",
-                            config.flowId(), e.getMessage(), e);
+            final String boundUserId = userId;
+            TenantContext.runWithTenant(tenantId, () -> {
+                List<FlowTriggerConfig> configs = getActiveFlowConfigs(tenantId);
+                if (configs.isEmpty()) {
+                    return;
                 }
-            }
+
+                for (FlowTriggerConfig config : configs) {
+                    try {
+                        if (triggerEvaluator.matchesRecordTrigger(event, config.triggerConfig())) {
+                            String executionId = UUID.randomUUID().toString();
+                            Map<String, Object> initialState = initialStateBuilder.buildFromRecordEvent(
+                                    event, config.flowId(), executionId);
+
+                            log.info("Starting flow execution: flowId={}, executionId={}, trigger=RECORD_CHANGE",
+                                    config.flowId(), executionId);
+
+                            flowEngine.startExecution(
+                                    tenantId,
+                                    config.flowId(),
+                                    config.definitionJson(),
+                                    initialState,
+                                    boundUserId,
+                                    false);
+                        }
+                    } catch (Exception e) {
+                        log.error("Error evaluating flow trigger for flowId={}: {}",
+                                config.flowId(), e.getMessage(), e);
+                    }
+                }
+            });
 
         } catch (Exception e) {
             log.error("Error processing record change event for flow evaluation: {}",

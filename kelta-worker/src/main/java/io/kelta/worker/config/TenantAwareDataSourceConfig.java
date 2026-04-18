@@ -15,22 +15,31 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
- * Configures a tenant-aware DataSource wrapper that sets the PostgreSQL session variable
- * {@code app.current_tenant_id} on each connection obtained from the pool.
+ * Configures a tenant-aware {@link DataSource} that binds the PostgreSQL session
+ * variable {@code app.current_tenant_id} on every connection checkout, so Row
+ * Level Security policies on shared system tables filter rows by tenant.
  *
- * <p>This enables Row Level Security (RLS) policies on shared system tables to enforce
- * tenant isolation at the database level. RLS policies use
- * {@code current_setting('app.current_tenant_id', true)} to filter rows by tenant.
+ * <h3>Fail-closed semantics</h3>
  *
- * <p>The tenant ID is read from {@link TenantContext} (ThreadLocal), which is set by
- * the DynamicCollectionRouter from the {@code X-Tenant-ID} request header.
+ * If {@link TenantContext#get()} is {@code null} or blank at checkout time this
+ * wrapper throws {@link IllegalStateException}. That guarantees no connection
+ * ever reaches application code while bound to a permissive fallback value —
+ * callers that legitimately operate across tenants must opt in explicitly via
+ * {@link TenantContext#runAsPlatform(Runnable)}, which binds the reserved
+ * {@code __platform__} sentinel.
  *
- * <p>When no tenant context is set (e.g., during Flyway migrations or internal operations),
- * the variable is set to an empty string, which matches the {@code admin_bypass} RLS policy.
+ * <p>Combined with the {@code platform_bypass} RLS policy introduced in the
+ * V126 migration (which matches only that sentinel), blank or forgotten tenant
+ * contexts cannot silently leak data across tenants.
  *
- * <p>Uses a {@link BeanPostProcessor} to wrap the auto-configured DataSource, avoiding
- * circular dependency issues that arise from declaring a {@code @Primary @Bean} DataSource
- * that injects another DataSource.
+ * <h3>Tenant values</h3>
+ * <ul>
+ *   <li><b>real UUID / slug</b> — bound by {@code TenantContextFilter} or
+ *       explicit {@link TenantContext#runWithTenant}; RLS filters to that tenant.</li>
+ *   <li><b>{@link TenantContext#PLATFORM_SENTINEL}</b> — bound by
+ *       {@link TenantContext#runAsPlatform}; matches {@code platform_bypass}.</li>
+ *   <li><b>blank / null</b> — rejected with {@link IllegalStateException}.</li>
+ * </ul>
  *
  * @since 1.0.0
  */
@@ -46,7 +55,7 @@ public class TenantAwareDataSourceConfig {
             public Object postProcessAfterInitialization(Object bean, String beanName)
                     throws BeansException {
                 if ("dataSource".equals(beanName) && bean instanceof DataSource ds) {
-                    log.info("Wrapping DataSource with tenant-aware RLS support");
+                    log.info("Wrapping DataSource with fail-closed tenant-aware RLS support");
                     return new TenantAwareDataSource(ds);
                 }
                 return bean;
@@ -55,7 +64,8 @@ public class TenantAwareDataSourceConfig {
     }
 
     /**
-     * DataSource decorator that sets {@code app.current_tenant_id} on each connection.
+     * DataSource decorator that binds {@code app.current_tenant_id} on each connection
+     * or fails closed when no tenant context is in scope.
      */
     static class TenantAwareDataSource implements DataSource {
 
@@ -68,25 +78,42 @@ public class TenantAwareDataSourceConfig {
         @Override
         public Connection getConnection() throws SQLException {
             Connection conn = delegate.getConnection();
-            setTenantVariable(conn);
+            try {
+                setTenantVariable(conn);
+            } catch (RuntimeException | SQLException e) {
+                // Always return the connection to the pool — leaking it would
+                // starve the pool under a storm of missing-context errors.
+                try { conn.close(); } catch (SQLException ignored) {}
+                throw e;
+            }
             return conn;
         }
 
         @Override
         public Connection getConnection(String username, String password) throws SQLException {
             Connection conn = delegate.getConnection(username, password);
-            setTenantVariable(conn);
+            try {
+                setTenantVariable(conn);
+            } catch (RuntimeException | SQLException e) {
+                try { conn.close(); } catch (SQLException ignored) {}
+                throw e;
+            }
             return conn;
         }
 
         private void setTenantVariable(Connection conn) throws SQLException {
             String tenantId = TenantContext.get();
-            // Use empty string when no tenant context is set — this matches the admin_bypass policy
-            String value = (tenantId != null && !tenantId.isBlank()) ? tenantId : "";
+            if (tenantId == null || tenantId.isBlank()) {
+                throw new IllegalStateException(
+                        "DB connection checkout requires a bound TenantContext. "
+                        + "Wrap the caller in TenantContext.runWithTenant(...) for tenant-scoped "
+                        + "work or TenantContext.runAsPlatform(...) for explicit cross-tenant access.");
+            }
+            // Tenant IDs are UUIDs or the platform sentinel; we still escape
+            // defensively in case a caller passes a value that carries single
+            // quotes (PostgreSQL's SET VALUE syntax does not parameterize).
             try (Statement stmt = conn.createStatement()) {
-                // Use SET SESSION so the variable persists for the duration of the connection use.
-                // The variable is SQL-injection safe because tenant IDs are UUIDs validated upstream.
-                stmt.execute("SET app.current_tenant_id = '" + value.replace("'", "''") + "'");
+                stmt.execute("SET app.current_tenant_id = '" + tenantId.replace("'", "''") + "'");
             }
         }
 

@@ -1,6 +1,7 @@
 package io.kelta.worker.service;
 
 import tools.jackson.databind.ObjectMapper;
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.flow.FlowEngine;
 import io.kelta.worker.util.TenantContextUtils;
 import io.kelta.runtime.flow.InitialStateBuilder;
@@ -74,7 +75,11 @@ public class ScheduledJobExecutorService {
      */
     @SuppressWarnings("unchecked")
     public void executeAll() {
-        List<Map<String, Object>> dueJobs = repository.findDueJobs();
+        // Polling `scheduled_job` spans every tenant (leader election via
+        // SELECT … FOR UPDATE SKIP LOCKED). Bind the platform sentinel so the
+        // cross-tenant read bypasses RLS explicitly — per-job execution below
+        // rebinds the job's real tenantId before any tenant-scoped work.
+        List<Map<String, Object>> dueJobs = TenantContext.callAsPlatform(repository::findDueJobs);
         if (dueJobs.isEmpty()) {
             return;
         }

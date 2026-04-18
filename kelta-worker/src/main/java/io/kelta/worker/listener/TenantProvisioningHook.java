@@ -65,20 +65,21 @@ public class TenantProvisioningHook implements BeforeSaveHook {
             return;
         }
 
-        // Set tenant context so RLS policies filter correctly for the new tenant
-        TenantContext.set(id);
-        try {
-            seedDefaultProfiles(id);
-            seedOidcProvider(id);
-            seedAdminUser(id, slug);
-            activateTenant(id);
-            log.info("Tenant provisioning complete for tenant '{}' (slug={})", id, slug);
-        } catch (Exception e) {
-            log.error("Tenant provisioning failed for tenant '{}' (slug={}): {}",
-                    id, slug, e.getMessage(), e);
-        } finally {
-            TenantContext.clear();
-        }
+        // Bind the new tenant's ID so RLS policies filter correctly for the
+        // inserts below. Tenant table writes (activateTenant) don't carry RLS
+        // but the dependent rows (profile, platform_user, oidc_provider) do.
+        TenantContext.runWithTenant(id, () -> {
+            try {
+                seedDefaultProfiles(id);
+                seedOidcProvider(id);
+                seedAdminUser(id, slug);
+                activateTenant(id);
+                log.info("Tenant provisioning complete for tenant '{}' (slug={})", id, slug);
+            } catch (Exception e) {
+                log.error("Tenant provisioning failed for tenant '{}' (slug={}): {}",
+                        id, slug, e.getMessage(), e);
+            }
+        });
     }
 
     /**

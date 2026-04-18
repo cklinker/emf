@@ -23,20 +23,34 @@ public final class AuthFixture {
     }
 
     /**
-     * Logs in as the seeded admin user and returns the raw access token string.
+     * Logs in as the seeded {@code admin@kelta.local} user in the {@code default}
+     * tenant. The {@code admin@kelta.local} account is seeded per-tenant by V102,
+     * so the caller must specify which tenant the token should be scoped to —
+     * kelta-auth refuses to authenticate without a tenant context because the
+     * platform_user table is RLS-scoped.
+     */
+    public String loginAsAdmin() {
+        return loginAsAdmin(TenantFixture.DEFAULT_SLUG);
+    }
+
+    /**
+     * Logs in as {@code admin@kelta.local} in the specified tenant and returns
+     * the raw access token string.
      *
-     * <p>The {@code admin@kelta.local} user exists for both the {@code default}
-     * and {@code threadline-clothing} tenants (seeded by V102). The first DB match
-     * is returned — the caller should not depend on which tenant is selected.
-     *
-     * @return a valid RS256 JWT access token
+     * @param tenantSlug the slug of the tenant to scope the login to (e.g.
+     *                   {@code "default"} or {@code "threadline-clothing"})
+     * @return a valid RS256 JWT access token whose {@code tenant_id} claim
+     *         matches the tenant identified by {@code tenantSlug}
      */
     @SuppressWarnings("unchecked")
-    public String loginAsAdmin() {
+    public String loginAsAdmin(String tenantSlug) {
         Map<String, Object> response = client.post()
                 .uri("/auth/direct-login")
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .body(Map.of("username", "admin@kelta.local", "password", "password"))
+                .body(Map.of(
+                        "username", "admin@kelta.local",
+                        "password", "password",
+                        "tenantSlug", tenantSlug))
                 .retrieve()
                 .body(Map.class);
 

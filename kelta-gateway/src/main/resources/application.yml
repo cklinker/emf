@@ -78,6 +78,10 @@ kelta:
     security:
       jwt-clock-skew-seconds: 30   # Tolerance for clock drift between gateway and IdP
       single-issuer: ${SINGLE_ISSUER:true}   # When true, all tokens must come from kelta-auth (recommended)
+      # Internal kelta-auth issuer URI — used for the JWKS shortcut so kelta-auth tokens
+      # always validate without a worker DB lookup, even when OIDC_ISSUER_URI points to
+      # an external provider (e.g. Authentik). Defaults to OIDC_ISSUER_URI if not set.
+      internal-issuer-uri: ${KELTA_AUTH_ISSUER_URI:${OIDC_ISSUER_URI:http://localhost:8080}}
       permissions-enabled: ${PERMISSIONS_ENABLED:true}   # Object-level permission enforcement (default: enabled)
       permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}   # Redis cache TTL for resolved permissions
       # Paths accessible without authentication (GET/HEAD only).

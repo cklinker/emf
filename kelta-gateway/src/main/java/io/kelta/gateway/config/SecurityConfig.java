@@ -42,6 +42,9 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
     private String issuerUri;
 
+    @Value("${kelta.gateway.security.internal-issuer-uri:#{null}}")
+    private String internalIssuerUri;
+
     @Value("${kelta.gateway.worker-service-url:http://kelta-worker:80}")
     private String workerServiceUrl;
 
@@ -125,7 +128,13 @@ public class SecurityConfig {
         WebClient workerClient = WebClient.builder()
                 .baseUrl(workerServiceUrl)
                 .build();
-        return new DynamicReactiveJwtDecoder(workerClient, redisTemplate, issuerUri,
+        // Use the dedicated internal-issuer-uri for the kelta-auth JWKS shortcut so it
+        // works even when OIDC_ISSUER_URI points to an external provider (e.g. Authentik).
+        String fallback = (internalIssuerUri != null && !internalIssuerUri.isBlank()) ? internalIssuerUri : issuerUri;
+        if (!fallback.equals(issuerUri)) {
+            log.info("Gateway internal kelta-auth issuer: {} (primary OIDC: {})", fallback, issuerUri);
+        }
+        return new DynamicReactiveJwtDecoder(workerClient, redisTemplate, fallback,
                 Duration.ofSeconds(jwtClockSkewSeconds));
     }
 }

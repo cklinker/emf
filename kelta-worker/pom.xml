@@ -125,6 +125,14 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- OAuth2 resource server — validates short-lived JWT bearer tokens
+             on /internal/** calls from gateway, auth, and ai. Tokens are
+             issued by kelta-auth via the client_credentials grant. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <!-- Structured JSON logging -->
         <dependency>
             <groupId>net.logstash.logback</groupId>

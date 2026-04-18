@@ -12,13 +12,16 @@ import static org.mockito.Mockito.*;
 @DisplayName("SupersetDatabaseUserService")
 class SupersetDatabaseUserServiceTest {
 
+    private static final String TENANT_UUID = "11111111-2222-3333-4444-555555555555";
+    private static final String DATABASE_NAME = "emf_control_plane";
+
     private JdbcTemplate jdbcTemplate;
     private SupersetDatabaseUserService service;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
-        service = new SupersetDatabaseUserService(jdbcTemplate);
+        service = new SupersetDatabaseUserService(jdbcTemplate, DATABASE_NAME);
     }
 
     @Test
@@ -38,7 +41,7 @@ class SupersetDatabaseUserServiceTest {
                 eq(Boolean.class), eq("superset_acme")))
                 .thenReturn(false);
 
-        String password = service.ensureTenantUser("tenant-uuid", "acme");
+        String password = service.ensureTenantUser(TENANT_UUID, "acme");
 
         assertNotNull(password);
         assertFalse(password.isEmpty());
@@ -59,6 +62,9 @@ class SupersetDatabaseUserServiceTest {
         // Verify SELECT grants
         verify(jdbcTemplate).execute(contains("GRANT SELECT ON ALL TABLES IN SCHEMA public"));
         verify(jdbcTemplate).execute(contains("GRANT SELECT ON ALL TABLES IN SCHEMA \"acme\""));
+
+        // Verify database name is quoted and matches the configured value
+        verify(jdbcTemplate).execute(contains("GRANT CONNECT ON DATABASE \"emf_control_plane\""));
     }
 
     @Test
@@ -69,7 +75,7 @@ class SupersetDatabaseUserServiceTest {
                 eq(Boolean.class), eq("superset_acme")))
                 .thenReturn(true);
 
-        String password = service.ensureTenantUser("tenant-uuid", "acme");
+        String password = service.ensureTenantUser(TENANT_UUID, "acme");
 
         assertNotNull(password);
 
@@ -113,9 +119,71 @@ class SupersetDatabaseUserServiceTest {
         when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), anyString()))
                 .thenReturn(false);
 
-        String password1 = service.ensureTenantUser("tenant-1", "acme");
-        String password2 = service.ensureTenantUser("tenant-2", "other");
+        String password1 = service.ensureTenantUser(TENANT_UUID, "acme");
+        String password2 = service.ensureTenantUser(
+                "22222222-3333-4444-5555-666666666666", "other");
 
         assertNotEquals(password1, password2);
+    }
+
+    // =========================================================================
+    // Injection-safety tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("rejects tenant slug containing SQL injection attempt")
+    void rejectsSlugWithInjectionAttempt() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ensureTenantUser(TENANT_UUID, "acme\"; DROP ROLE postgres; --"));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ensureTenantUser(TENANT_UUID, "acme'; --"));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ensureTenantUser(TENANT_UUID, "ACME")); // uppercase
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ensureTenantUser(TENANT_UUID, "")); // empty
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ensureTenantUser(TENANT_UUID, null));
+
+        verifyNoInteractions(jdbcTemplate);
+    }
+
+    @Test
+    @DisplayName("rejects non-UUID tenant id")
+    void rejectsInvalidTenantId() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ensureTenantUser("not-a-uuid", "acme"));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ensureTenantUser("'; DROP TABLE tenant; --", "acme"));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.ensureTenantUser(null, "acme"));
+
+        verifyNoInteractions(jdbcTemplate);
+    }
+
+    @Test
+    @DisplayName("rejects invalid database name at construction time")
+    void rejectsInvalidDatabaseName() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new SupersetDatabaseUserService(jdbcTemplate, "db\"; DROP--"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SupersetDatabaseUserService(jdbcTemplate, ""));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SupersetDatabaseUserService(jdbcTemplate, null));
+    }
+
+    @Test
+    @DisplayName("quoteIdent doubles internal double quotes")
+    void quoteIdentEscapesQuotes() {
+        assertEquals("\"plain\"", SupersetDatabaseUserService.quoteIdent("plain"));
+        assertEquals("\"with\"\"quote\"", SupersetDatabaseUserService.quoteIdent("with\"quote"));
+    }
+
+    @Test
+    @DisplayName("quoteLiteral doubles internal single quotes")
+    void quoteLiteralEscapesQuotes() {
+        assertEquals("'plain'", SupersetDatabaseUserService.quoteLiteral("plain"));
+        assertEquals("'it''s'", SupersetDatabaseUserService.quoteLiteral("it's"));
+        assertEquals("'''; DROP--'",
+                SupersetDatabaseUserService.quoteLiteral("'; DROP--"));
     }
 }

@@ -55,8 +55,12 @@ public class SupersetConfig {
     }
 
     @Bean
-    public SupersetDatabaseUserService supersetDatabaseUserService(JdbcTemplate jdbcTemplate) {
-        return new SupersetDatabaseUserService(jdbcTemplate);
+    public SupersetDatabaseUserService supersetDatabaseUserService(
+            JdbcTemplate jdbcTemplate,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${kelta.worker.superset.database-name:${spring.datasource.name:emf_control_plane}}")
+            String databaseName) {
+        return new SupersetDatabaseUserService(jdbcTemplate, databaseName);
     }
 
     @Bean

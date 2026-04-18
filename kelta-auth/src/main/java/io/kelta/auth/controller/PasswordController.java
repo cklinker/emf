@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
@@ -66,13 +67,22 @@ public class PasswordController {
 
         String email = authentication.getName();
 
-        // Verify current password
-        String currentHash = jdbcTemplate.queryForObject(
-                "SELECT uc.password_hash FROM user_credential uc " +
-                        "JOIN platform_user pu ON pu.id = uc.user_id " +
-                        "WHERE pu.email = ?",
-                String.class, email
-        );
+        // Verify current password. If no user/credential row matches the
+        // authenticated principal — shouldn't happen in normal flows but can if
+        // the account was deleted mid-session — return the same generic error
+        // as a wrong password rather than bubbling an unchecked 500.
+        String currentHash;
+        try {
+            currentHash = jdbcTemplate.queryForObject(
+                    "SELECT uc.password_hash FROM user_credential uc " +
+                            "JOIN platform_user pu ON pu.id = uc.user_id " +
+                            "WHERE pu.email = ?",
+                    String.class, email
+            );
+        } catch (EmptyResultDataAccessException e) {
+            log.warn("Password change attempted for unknown email: {}", email);
+            return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect"));
+        }
 
         if (currentHash == null || !passwordEncoder.matches(request.currentPassword(), currentHash)) {
             return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect"));
@@ -168,7 +178,15 @@ public class PasswordController {
         }
 
         var row = results.get(0);
-        Instant expiresAt = ((java.sql.Timestamp) row.get("reset_token_expires_at")).toInstant();
+        // Defensive: a row with a reset_token but no expires_at is an invariant
+        // violation. Treat it as invalid rather than NPE on the .toInstant() cast.
+        java.sql.Timestamp expiresTs = (java.sql.Timestamp) row.get("reset_token_expires_at");
+        if (expiresTs == null) {
+            log.warn("Reset token row has null expires_at — treating as invalid (user_id={})",
+                    row.get("user_id"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired reset token"));
+        }
+        Instant expiresAt = expiresTs.toInstant();
         if (Instant.now().isAfter(expiresAt)) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired reset token"));
         }

@@ -119,13 +119,16 @@ public class SecurityConfig {
     @Bean
     public DynamicReactiveJwtDecoder jwtDecoder(
             @Nullable ReactiveStringRedisTemplate redisTemplate,
+            WebClient.Builder webClientBuilder,
             @Value("${kelta.gateway.security.single-issuer:true}") boolean singleIssuer) {
 
         if (singleIssuer) {
             log.info("Gateway configured for single-issuer mode: {}", issuerUri);
         }
 
-        WebClient workerClient = WebClient.builder()
+        // Use the shared builder so /internal/oidc/by-issuer lookups inherit the
+        // internal-auth bearer filter when the rollout flag is enabled.
+        WebClient workerClient = webClientBuilder
                 .baseUrl(workerServiceUrl)
                 .build();
         // Use the dedicated internal-issuer-uri for the kelta-auth JWKS shortcut so it

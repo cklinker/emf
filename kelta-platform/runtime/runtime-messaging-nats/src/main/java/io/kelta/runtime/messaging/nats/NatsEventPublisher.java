@@ -36,6 +36,17 @@ public class NatsEventPublisher implements PlatformEventPublisher {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Name of the NATS header that carries the publishing tenant's ID.
+     *
+     * <p>Consumers can use this for tenant-scoped routing, filtering, or
+     * cross-checking against the body's {@code tenantId} field as a
+     * tamper-resistance signal. Set for every event that carries a tenant
+     * context; events that are explicitly global (tenantId null/blank) omit
+     * the header so receivers can distinguish them.
+     */
+    public static final String TENANT_ID_HEADER = "X-Tenant-Id";
+
     @Override
     public void publish(String subject, PlatformEvent<?> event) {
         try {
@@ -44,6 +55,10 @@ public class NatsEventPublisher implements PlatformEventPublisher {
 
             Headers headers = new Headers();
             headers.add("Nats-Msg-Id", event.getEventId());
+            String tenantId = event.getTenantId();
+            if (tenantId != null && !tenantId.isBlank()) {
+                headers.add(TENANT_ID_HEADER, tenantId);
+            }
 
             NatsMessage message = NatsMessage.builder()
                     .subject(subject)

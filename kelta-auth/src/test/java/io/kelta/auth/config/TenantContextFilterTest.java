@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
 import static org.mockito.Mockito.*;
 
@@ -105,6 +106,42 @@ class TenantContextFilterTest {
         filter.doFilterInternal(request, response, filterChain);
 
         verify(session, never()).setAttribute(anyString(), any());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("should clear Spring Security context when tenant slug changes")
+    void shouldClearSecurityContextWhenTenantChanges() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/oauth2/authorize");
+        when(request.getParameter("redirect_uri"))
+                .thenReturn("https://app.rzware.com/default/auth/callback");
+        when(request.getSession()).thenReturn(session);
+        when(session.getAttribute("tenantId")).thenReturn("threadline-clothing");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(session).removeAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        verify(session).setAttribute("tenantId", "default");
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("should not clear Spring Security context when tenant slug is unchanged")
+    void shouldNotClearSecurityContextWhenTenantSame() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/oauth2/authorize");
+        when(request.getParameter("redirect_uri"))
+                .thenReturn("https://app.rzware.com/default/auth/callback");
+        when(request.getSession()).thenReturn(session);
+        when(session.getAttribute("tenantId")).thenReturn("default");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(session, never()).removeAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        verify(session).setAttribute("tenantId", "default");
         verify(filterChain).doFilter(request, response);
     }
 }

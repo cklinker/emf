@@ -11,10 +11,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Extracts tenant context from gateway-provided headers and sets ThreadLocal.
- * Same pattern as kelta-worker's TenantContextFilter.
+ * Extracts tenant context from gateway-provided headers and binds it for the
+ * duration of the request via {@link ScopedValue}. Mirrors the pattern used by
+ * kelta-worker's {@code TenantContextFilter}.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -26,20 +28,44 @@ public class TenantContextFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        try {
-            String tenantId = request.getHeader(X_TENANT_ID_HEADER);
-            String tenantSlug = request.getHeader(X_TENANT_SLUG_HEADER);
+        String tenantId = request.getHeader(X_TENANT_ID_HEADER);
+        String tenantSlug = request.getHeader(X_TENANT_SLUG_HEADER);
 
-            if (tenantId != null && !tenantId.isBlank()) {
-                TenantContext.set(tenantId);
-            }
-            if (tenantSlug != null && !tenantSlug.isBlank()) {
-                TenantContext.setSlug(tenantSlug);
-            }
+        boolean hasTenant = tenantId != null && !tenantId.isBlank();
+        boolean hasSlug = tenantSlug != null && !tenantSlug.isBlank();
 
+        if (!hasTenant && !hasSlug) {
             filterChain.doFilter(request, response);
-        } finally {
-            TenantContext.clear();
+            return;
+        }
+
+        ScopedValue.Carrier carrier = hasTenant
+                ? ScopedValue.where(TenantContext.CURRENT_TENANT, tenantId)
+                : null;
+        if (hasSlug) {
+            carrier = (carrier == null)
+                    ? ScopedValue.where(TenantContext.CURRENT_TENANT_SLUG, tenantSlug)
+                    : carrier.where(TenantContext.CURRENT_TENANT_SLUG, tenantSlug);
+        }
+
+        AtomicReference<IOException> ioErr = new AtomicReference<>();
+        AtomicReference<ServletException> servletErr = new AtomicReference<>();
+
+        carrier.run(() -> {
+            try {
+                filterChain.doFilter(request, response);
+            } catch (IOException e) {
+                ioErr.set(e);
+            } catch (ServletException e) {
+                servletErr.set(e);
+            }
+        });
+
+        if (ioErr.get() != null) {
+            throw ioErr.get();
+        }
+        if (servletErr.get() != null) {
+            throw servletErr.get();
         }
     }
 }

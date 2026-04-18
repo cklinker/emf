@@ -11,8 +11,22 @@ package io.kelta.runtime.context;
  * <p>
  * <b>Legacy usage:</b> {@link #set}/{@link #clear} still work via ThreadLocal
  * but are deprecated and will be removed in a future release.
+ * <p>
+ * <b>Platform scope:</b> A small number of internal entry points — Flyway migrations,
+ * bootstrap controllers, and scheduled cross-tenant jobs — legitimately need to bypass
+ * tenant isolation. These paths use {@link #runAsPlatform} / {@link #callAsPlatform},
+ * which binds the reserved {@value #PLATFORM_SENTINEL} value. The matching RLS policy
+ * grants full access only when this sentinel is bound; any blank/unset context is
+ * rejected by {@code TenantAwareDataSource} before a query can run.
  */
 public final class TenantContext {
+
+    /**
+     * Reserved tenant-ID value that identifies platform-internal execution. The
+     * database RLS policies explicitly match against this sentinel — an empty or
+     * null {@code current_tenant_id} does <em>not</em> grant access.
+     */
+    public static final String PLATFORM_SENTINEL = "__platform__";
 
     // ScopedValue-based (preferred, virtual-thread safe)
     public static final ScopedValue<String> CURRENT_TENANT = ScopedValue.newInstance();
@@ -36,6 +50,13 @@ public final class TenantContext {
      */
     public static String getSlug() {
         return CURRENT_TENANT_SLUG.isBound() ? CURRENT_TENANT_SLUG.get() : LEGACY_TENANT_SLUG.get();
+    }
+
+    /**
+     * Returns true if the current scope is running under the reserved platform sentinel.
+     */
+    public static boolean isPlatform() {
+        return PLATFORM_SENTINEL.equals(get());
     }
 
     // ── Modern ScopedValue API (preferred) ──────────────────────────────
@@ -71,6 +92,23 @@ public final class TenantContext {
         return ScopedValue.where(CURRENT_TENANT, tenantId)
                           .where(CURRENT_TENANT_SLUG, tenantSlug)
                           .call(operation);
+    }
+
+    /**
+     * Executes {@code operation} under the reserved platform sentinel, granting
+     * cross-tenant access via the {@code platform_bypass} RLS policy. Reserve this
+     * for Flyway, bootstrap, and scheduled jobs that genuinely operate across
+     * all tenants — never for code paths that receive a real tenant ID.
+     */
+    public static void runAsPlatform(Runnable operation) {
+        ScopedValue.where(CURRENT_TENANT, PLATFORM_SENTINEL).run(operation);
+    }
+
+    /**
+     * Callable variant of {@link #runAsPlatform}.
+     */
+    public static <T> T callAsPlatform(ScopedValue.CallableOp<T, RuntimeException> operation) {
+        return ScopedValue.where(CURRENT_TENANT, PLATFORM_SENTINEL).call(operation);
     }
 
     // ── Legacy ThreadLocal API (deprecated) ─────────────────────────────

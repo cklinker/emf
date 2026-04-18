@@ -11,19 +11,21 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Servlet filter that extracts tenant context from gateway-provided headers
- * and sets it in the ThreadLocal {@link TenantContext}.
+ * Servlet filter that binds tenant context for the duration of the request
+ * using {@link TenantContext#CURRENT_TENANT} / {@link TenantContext#CURRENT_TENANT_SLUG}
+ * (Java {@link ScopedValue}), rather than ThreadLocal.
  *
  * <p>The gateway's HeaderTransformationFilter adds {@code X-Tenant-ID} and
  * {@code X-Tenant-Slug} headers to all proxied requests. This filter reads
- * those headers and makes them available to controllers via TenantContext.
+ * those headers and makes them available to controllers via TenantContext,
+ * propagating correctly into any virtual threads / {@code StructuredTaskScope}
+ * fan-out started within the request.
  *
  * <p>Runs with highest precedence so TenantContext is available to all
  * downstream filters and controllers.
- *
- * @since 1.0.0
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -35,20 +37,44 @@ public class TenantContextFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        try {
-            String tenantId = request.getHeader(X_TENANT_ID_HEADER);
-            String tenantSlug = request.getHeader(X_TENANT_SLUG_HEADER);
+        String tenantId = request.getHeader(X_TENANT_ID_HEADER);
+        String tenantSlug = request.getHeader(X_TENANT_SLUG_HEADER);
 
-            if (tenantId != null && !tenantId.isBlank()) {
-                TenantContext.set(tenantId);
-            }
-            if (tenantSlug != null && !tenantSlug.isBlank()) {
-                TenantContext.setSlug(tenantSlug);
-            }
+        boolean hasTenant = tenantId != null && !tenantId.isBlank();
+        boolean hasSlug = tenantSlug != null && !tenantSlug.isBlank();
 
+        if (!hasTenant && !hasSlug) {
             filterChain.doFilter(request, response);
-        } finally {
-            TenantContext.clear();
+            return;
+        }
+
+        ScopedValue.Carrier carrier = hasTenant
+                ? ScopedValue.where(TenantContext.CURRENT_TENANT, tenantId)
+                : null;
+        if (hasSlug) {
+            carrier = (carrier == null)
+                    ? ScopedValue.where(TenantContext.CURRENT_TENANT_SLUG, tenantSlug)
+                    : carrier.where(TenantContext.CURRENT_TENANT_SLUG, tenantSlug);
+        }
+
+        AtomicReference<IOException> ioErr = new AtomicReference<>();
+        AtomicReference<ServletException> servletErr = new AtomicReference<>();
+
+        carrier.run(() -> {
+            try {
+                filterChain.doFilter(request, response);
+            } catch (IOException e) {
+                ioErr.set(e);
+            } catch (ServletException e) {
+                servletErr.set(e);
+            }
+        });
+
+        if (ioErr.get() != null) {
+            throw ioErr.get();
+        }
+        if (servletErr.get() != null) {
+            throw servletErr.get();
         }
     }
 }

@@ -94,10 +94,10 @@ export function AppHomePage(): React.ReactElement {
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       {/* Welcome header */}
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-[26px] font-bold tracking-[-0.01em] text-foreground">
           {greeting}, {firstName}
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           Here&apos;s an overview of your recent activity.
         </p>
       </div>
@@ -105,7 +105,7 @@ export function AppHomePage(): React.ReactElement {
       {/* Quick Actions */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Quick Actions</CardTitle>
+          <CardTitle className="text-base">Quick actions</CardTitle>
           <CardDescription>Create new records or navigate to collections</CardDescription>
         </CardHeader>
         <CardContent>
@@ -150,7 +150,7 @@ export function AppHomePage(): React.ReactElement {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              Recent Items
+              Recent items
             </CardTitle>
           </CardHeader>
           <CardContent>

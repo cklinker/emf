@@ -83,7 +83,7 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
           )}
           {!isMobile && (
             <h1
-              className="m-0 text-xl font-semibold text-[var(--app-shell-text,var(--color-text,#1a1a1a))] whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] md:max-lg:max-w-[200px]"
+              className="m-0 max-w-[300px] overflow-hidden text-ellipsis whitespace-nowrap text-xl font-semibold text-foreground md:max-lg:max-w-[200px]"
               data-testid="header-app-name"
             >
               {branding.applicationName}
@@ -91,20 +91,20 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
           )}
           <button
             type="button"
-            className="flex items-center gap-1 py-1 px-2 bg-transparent border border-[var(--app-shell-border,var(--color-border,#e0e0e0))] rounded cursor-pointer text-[var(--color-text-secondary,#666666)] text-[0.8125rem] font-medium whitespace-nowrap transition-[background-color,border-color] duration-150 ease-in-out hover:bg-[var(--color-surface-hover,rgba(0,0,0,0.05))] hover:border-[var(--color-text-secondary,#999999)] hover:text-[var(--app-shell-text,var(--color-text,#1a1a1a))] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-2 [&:focus:not(:focus-visible)]:outline-none"
+            className="flex cursor-pointer items-center gap-1 whitespace-nowrap rounded border border-border bg-transparent px-2 py-1 text-[0.8125rem] font-medium text-muted-foreground transition-colors duration-150 ease-in-out hover:border-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             onClick={() => navigate(`/${tenantSlug}/app`)}
             aria-label="Back to application"
             data-testid="back-to-app-button"
           >
             <ArrowLeft size={14} aria-hidden="true" />
-            {!isMobile && <span>Back to App</span>}
+            {!isMobile && <span>Back to app</span>}
           </button>
         </div>
 
         {/* Search trigger */}
         <button
           type="button"
-          className="flex items-center gap-2 py-1 px-4 bg-[var(--color-surface-hover,rgba(0,0,0,0.03))] border border-[var(--app-shell-border,var(--color-border,#e0e0e0))] rounded cursor-pointer text-[var(--color-text-secondary,#666666)] text-sm min-w-[200px] transition-[border-color] duration-150 ease-in-out hover:border-[var(--color-text-secondary,#999999)] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-2 [&:focus:not(:focus-visible)]:outline-none max-md:min-w-0 max-md:py-1 max-md:px-2 motion-reduce:transition-none"
+          className="flex min-w-[200px] cursor-pointer items-center gap-2 rounded border border-border bg-muted/40 px-4 py-1 text-sm text-muted-foreground transition-colors duration-150 ease-in-out hover:border-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none max-md:min-w-0 max-md:px-2 max-md:py-1"
           onClick={() => setSearchOpen(true)}
           aria-label="Search (Cmd+K)"
           data-testid="search-trigger"
@@ -113,9 +113,9 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
             <Search size={16} />
           </span>
           {!isMobile && (
-            <span className="flex items-center gap-4 flex-1">
+            <span className="flex flex-1 items-center gap-4">
               Search...
-              <kbd className="ml-auto inline-flex items-center py-px px-[5px] text-[0.6875rem] font-[inherit] text-[var(--color-text-secondary,#999999)] bg-[var(--app-shell-surface,var(--color-surface,#ffffff))] border border-[var(--app-shell-border,var(--color-border,#e0e0e0))] rounded-[3px]">
+              <kbd className="ml-auto inline-flex items-center rounded-[3px] border border-border bg-background px-[5px] py-px text-[0.6875rem] font-[inherit] text-muted-foreground">
                 &#x2318;K
               </kbd>
             </span>

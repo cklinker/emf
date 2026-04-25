@@ -88,9 +88,7 @@ export function DetailSection({
 
                 return (
                   <div key={field.name} className="space-y-1">
-                    <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {field.displayName || field.name}
-                    </dt>
+                    <dt className="kelta-field-label">{field.displayName || field.name}</dt>
                     <dd className="text-sm">
                       <FieldRenderer
                         type={field.type}

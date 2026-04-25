@@ -216,10 +216,10 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
           to={item.path}
           className={({ isActive: linkActive }) =>
             cn(
-              'flex items-center gap-2 w-full py-2 px-4 bg-transparent border-none rounded text-[var(--app-shell-text,var(--color-text,#1a1a1a))] text-sm font-medium no-underline text-left cursor-pointer transition-[background-color,color] duration-150 ease-in-out hover:bg-[var(--color-surface-hover,rgba(0,0,0,0.05))] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-[-2px] [&:focus:not(:focus-visible)]:outline-none motion-reduce:transition-none forced-colors:focus:outline-2 forced-colors:focus:outline-current',
+              'flex w-full cursor-pointer items-center gap-2 rounded border-none bg-transparent px-4 py-2 text-left text-sm font-medium text-foreground no-underline transition-colors duration-150 ease-in-out hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none forced-colors:focus:outline-2 forced-colors:focus:outline-current',
               linkActive &&
-                'bg-[var(--color-primary-light,rgba(0,102,204,0.1))] text-[var(--app-shell-primary,var(--color-primary,#0066cc))] font-semibold hover:bg-[var(--color-primary-light,rgba(0,102,204,0.15))] forced-colors:border-2 forced-colors:border-current menuItemContent--active',
-              collapsed && 'justify-center p-2 w-10 h-10'
+                'menuItemContent--active bg-primary/10 font-semibold text-primary hover:bg-primary/15 forced-colors:border-2 forced-colors:border-current',
+              collapsed && 'h-10 w-10 justify-center p-2'
             )
           }
           onClick={handleClick}
@@ -258,8 +258,8 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
         <button
           type="button"
           className={cn(
-            'flex items-center gap-2 w-full py-2 px-4 bg-transparent border-none rounded text-[var(--app-shell-text,var(--color-text,#1a1a1a))] text-sm font-medium no-underline text-left cursor-pointer transition-[background-color,color] duration-150 ease-in-out hover:bg-[var(--color-surface-hover,rgba(0,0,0,0.05))] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-[-2px] [&:focus:not(:focus-visible)]:outline-none motion-reduce:transition-none forced-colors:focus:outline-2 forced-colors:focus:outline-current',
-            collapsed && 'justify-center p-2 w-10 h-10'
+            'flex w-full cursor-pointer items-center gap-2 rounded border-none bg-transparent px-4 py-2 text-left text-sm font-medium text-foreground no-underline transition-colors duration-150 ease-in-out hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none forced-colors:focus:outline-2 forced-colors:focus:outline-current',
+            collapsed && 'h-10 w-10 justify-center p-2'
           )}
           onClick={handleToggle}
           aria-expanded={isExpanded}
@@ -324,8 +324,8 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
     >
       <span
         className={cn(
-          'flex items-center gap-2 w-full py-2 px-4 bg-transparent border-none rounded text-[var(--app-shell-text,var(--color-text,#1a1a1a))] text-sm font-medium no-underline text-left cursor-pointer',
-          collapsed && 'justify-center p-2 w-10 h-10'
+          'flex w-full cursor-pointer items-center gap-2 rounded border-none bg-transparent px-4 py-2 text-left text-sm font-medium text-foreground no-underline',
+          collapsed && 'h-10 w-10 justify-center p-2'
         )}
         title={collapsed ? item.label : undefined}
       >
@@ -443,7 +443,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       {/* ==================== MY WORKSPACE ==================== */}
       <div className="mb-4 last:mb-0" data-testid="workspace-section">
         {!collapsed && (
-          <h2 className="m-0 py-2 px-4 text-[0.6875rem] font-semibold uppercase tracking-wider text-[var(--color-text-secondary,#666666)] whitespace-nowrap overflow-hidden text-ellipsis">
+          <h2 className="m-0 overflow-hidden text-ellipsis whitespace-nowrap px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
             {t('sidebar.workspace')}
           </h2>
         )}
@@ -493,7 +493,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       {/* ==================== TOOLS ==================== */}
       <div className="mb-4 last:mb-0" data-testid="tools-section">
         {!collapsed && (
-          <h2 className="m-0 py-2 px-4 text-[0.6875rem] font-semibold uppercase tracking-wider text-[var(--color-text-secondary,#666666)] whitespace-nowrap overflow-hidden text-ellipsis">
+          <h2 className="m-0 overflow-hidden text-ellipsis whitespace-nowrap px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
             {t('sidebar.tools')}
           </h2>
         )}
@@ -517,14 +517,14 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
         {!collapsed && (
           <button
             type="button"
-            className="flex items-center gap-2 w-full py-2 px-4 bg-transparent border-none cursor-pointer text-[var(--color-text-secondary,#666666)] transition-colors duration-150 ease-in-out hover:text-[var(--app-shell-text,var(--color-text,#1a1a1a))] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-[-2px] [&:focus:not(:focus-visible)]:outline-none"
+            className="flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-4 py-2 text-muted-foreground transition-colors duration-150 ease-in-out hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={toggleSetup}
             aria-expanded={setupExpanded}
           >
             <span className="text-sm" aria-hidden="true">
               {getIcon('settings')}
             </span>
-            <span className="m-0 p-0 flex-1 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-[var(--color-text-secondary,#666666)] whitespace-nowrap overflow-hidden text-ellipsis">
+            <span className="m-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap p-0 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
               {t('sidebar.setup')}
             </span>
             <span
@@ -541,7 +541,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
         {collapsed && (
           <button
             type="button"
-            className="flex items-center gap-2 w-full py-2 px-4 bg-transparent border-none rounded text-[var(--app-shell-text,var(--color-text,#1a1a1a))] text-sm font-medium no-underline text-left cursor-pointer justify-center p-2 w-10 h-10"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center gap-2 rounded border-none bg-transparent p-2 text-left text-sm font-medium text-foreground no-underline"
             onClick={toggleSetup}
             title={t('sidebar.setup')}
           >
@@ -555,12 +555,12 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
         )}
 
         {setupExpanded && !collapsed && (
-          <div className="border-t border-[var(--color-border,rgba(0,0,0,0.08))] pt-2 mt-1">
+          <div className="mt-1 border-t border-border pt-2">
             {/* Render bootstrap menus as setup subsections */}
             {menus.map((menu) => (
               <div key={menu.id} className="mb-2">
                 {menu.name && (
-                  <h3 className="m-0 py-1 px-4 text-[0.625rem] font-semibold uppercase tracking-wider text-[var(--color-text-secondary,#999999)]">
+                  <h3 className="m-0 px-4 py-1 text-[0.625rem] font-semibold uppercase tracking-wider text-muted-foreground">
                     {menu.name}
                   </h3>
                 )}
@@ -609,9 +609,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
           data-testid="sidebar-empty"
         >
           {!collapsed && (
-            <p className="m-0 text-sm text-[var(--color-text-secondary,#666666)]">
-              {t('navigation.noMenus')}
-            </p>
+            <p className="m-0 text-sm text-muted-foreground">{t('navigation.noMenus')}</p>
           )}
         </div>
       )}

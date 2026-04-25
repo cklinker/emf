@@ -32,8 +32,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { FieldLabel } from '@/components/kelta'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import { LookupSelect } from '@/components/LookupSelect'
@@ -152,10 +152,10 @@ function FormField({
   const fieldId = `field-${field.name}`
 
   const labelEl = (
-    <Label htmlFor={fieldId} className="text-sm font-medium">
+    <FieldLabel htmlFor={fieldId}>
       {field.displayName || field.name}
       {field.required && <span className="ml-1 text-destructive">*</span>}
-    </Label>
+    </FieldLabel>
   )
 
   const errorEl = error ? (
@@ -196,10 +196,10 @@ function FormField({
             onCheckedChange={(checked) => onChange(field.name, checked)}
             disabled={isReadOnly}
           />
-          <Label htmlFor={fieldId} className="text-sm font-medium">
+          <FieldLabel htmlFor={fieldId} className="mb-0">
             {field.displayName || field.name}
             {field.required && <span className="ml-1 text-destructive">*</span>}
-          </Label>
+          </FieldLabel>
         </div>
         {errorEl}
       </div>
@@ -572,9 +572,9 @@ function ObjectFormBody({
         <Card data-testid="record-type-selector">
           <CardContent className="py-3">
             <div className="flex items-center gap-4">
-              <Label htmlFor="recordType" className="text-sm font-medium whitespace-nowrap">
-                Record Type
-              </Label>
+              <FieldLabel htmlFor="recordType" className="mb-0 whitespace-nowrap">
+                Record type
+              </FieldLabel>
               <select
                 id="recordType"
                 data-testid="record-type-select"

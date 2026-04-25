@@ -1,8 +1,8 @@
 // EmptyValue.tsx — render an em-dash for null / undefined / empty values
-import * as React from 'react';
-import { cn } from '@/lib/utils';
+import * as React from 'react'
+import { cn } from '@/lib/utils'
 
-export interface EmptyValueProps extends React.HTMLAttributes<HTMLSpanElement> {}
+export type EmptyValueProps = React.HTMLAttributes<HTMLSpanElement>
 
 /**
  * Renders the Kelta empty-value glyph (em-dash). Use anywhere a value
@@ -21,7 +21,7 @@ export const EmptyValue = React.forwardRef<HTMLSpanElement, EmptyValueProps>(
     >
       —
     </span>
-  ),
-);
+  )
+)
 
-EmptyValue.displayName = 'EmptyValue';
+EmptyValue.displayName = 'EmptyValue'

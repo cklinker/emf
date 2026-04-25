@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { EmptyValue } from '@/components/kelta'
 import { cn } from '@/lib/utils'
 import { componentRegistry } from '@/services/componentRegistry'
 import { PluginErrorBoundary } from '@/components/PluginErrorBoundary'
@@ -165,14 +166,7 @@ export function FieldRenderer({
 }: FieldRendererProps): React.ReactElement {
   // Null/undefined values
   if (value === null || value === undefined) {
-    return (
-      <span
-        className={cn('text-muted-foreground', className)}
-        aria-label={`${displayName || fieldName}: empty`}
-      >
-        —
-      </span>
-    )
+    return <EmptyValue className={className} aria-label={`${displayName || fieldName}: empty`} />
   }
 
   // Check for plugin-provided custom field renderer
@@ -214,7 +208,7 @@ export function FieldRenderer({
     }
 
     case 'number': {
-      return <span className={className}>{formatNumber(value)}</span>
+      return <span className={cn('font-mono tabular-nums', className)}>{formatNumber(value)}</span>
     }
 
     case 'boolean': {
@@ -256,11 +250,13 @@ export function FieldRenderer({
     }
 
     case 'currency': {
-      return <span className={className}>{formatCurrency(value)}</span>
+      return (
+        <span className={cn('font-mono tabular-nums', className)}>{formatCurrency(value)}</span>
+      )
     }
 
     case 'percent': {
-      return <span className={className}>{formatPercent(value)}</span>
+      return <span className={cn('font-mono tabular-nums', className)}>{formatPercent(value)}</span>
     }
 
     case 'email': {
@@ -404,7 +400,7 @@ export function FieldRenderer({
 
     case 'rollup_summary': {
       return (
-        <span className={cn('inline-flex items-center gap-1', className)}>
+        <span className={cn('inline-flex items-center gap-1 font-mono tabular-nums', className)}>
           <Sigma className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
           {formatNumber(value)}
         </span>

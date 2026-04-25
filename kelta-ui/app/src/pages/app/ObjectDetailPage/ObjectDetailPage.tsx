@@ -521,7 +521,7 @@ export function ObjectDetailPage(): React.ReactElement {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
+            <h1 className="truncate text-[26px] font-bold tracking-[-0.01em] text-foreground">
               {recordTitle}
             </h1>
             {mutations.remove.isPending && (

@@ -61,10 +61,12 @@ export function ListViewToolbar({
     <div className="space-y-2">
       {/* Main toolbar row */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-[26px] font-bold tracking-[-0.01em] text-foreground">
           {collectionLabel}
           {totalCount > 0 && (
-            <span className="ml-2 text-sm font-normal text-muted-foreground">({totalCount})</span>
+            <span className="ml-2 font-mono text-sm font-normal tabular-nums text-muted-foreground">
+              ({totalCount.toLocaleString()})
+            </span>
           )}
         </h1>
 

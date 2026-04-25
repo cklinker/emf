@@ -145,7 +145,10 @@ function DataRow({
   return (
     <TableRow
       key={record.id}
-      className={cn('cursor-pointer', rowProps['data-focused'] && 'ring-2 ring-inset ring-ring')}
+      className={cn(
+        'cursor-pointer even:bg-muted/40 hover:bg-primary/10',
+        rowProps['data-focused'] && 'ring-2 ring-inset ring-ring'
+      )}
       data-state={isSelected ? 'selected' : undefined}
       tabIndex={rowProps.tabIndex}
       aria-selected={rowProps['aria-selected']}
@@ -330,10 +333,11 @@ export function ObjectDataTable({
     [sort]
   )
 
-  // Shared table header
+  // Shared table header — kelta-table-header applies the DESIGN.md §5 head styling
+  // (uppercase 11px, distinct background, tracking-0.09em).
   const tableHeader = (
     <TableHeader>
-      <TableRow>
+      <TableRow className="kelta-table-header hover:bg-transparent">
         {/* Checkbox column */}
         <TableHead className="w-[40px]">
           <Checkbox
@@ -382,7 +386,7 @@ export function ObjectDataTable({
 
     if (records.length === 0) {
       return (
-        <TableRow>
+        <TableRow className="hover:bg-transparent">
           <TableCell colSpan={fields.length + 2} className="h-24 text-center text-muted-foreground">
             No records found.
           </TableCell>
@@ -467,7 +471,7 @@ export function ObjectDataTable({
   if (useVirtual) {
     return (
       <div
-        className="rounded-md border"
+        className="overflow-hidden rounded-[10px] border border-border bg-card"
         ref={tableRef}
         onKeyDown={handleKeyDown}
         role="grid"

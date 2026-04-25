@@ -22,7 +22,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel, StatusBadge } from '@/components/kelta'
 
 export interface WebhooksPageProps {
   testId?: string
@@ -198,7 +198,7 @@ function EndpointList({ onSelect }: { onSelect: (ep: EndpointOut) => void }) {
                 <span className="font-medium text-foreground truncate">
                   {ep.description || ep.url}
                 </span>
-                {ep.disabled && <Badge variant="secondary">Disabled</Badge>}
+                {ep.disabled && <StatusBadge variant="inactive" label="Disabled" />}
               </div>
               <p className="mt-1 text-sm text-muted-foreground truncate">{ep.url}</p>
               {ep.filterTypes && ep.filterTypes.length > 0 && (
@@ -322,7 +322,7 @@ function EndpointDetail({ endpoint, onBack }: { endpoint: EndpointOut; onBack: (
         <InfoCard label="Created" value={new Date(endpoint.createdAt).toLocaleString()} />
         {endpoint.filterTypes && endpoint.filterTypes.length > 0 && (
           <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm font-medium text-muted-foreground">Event Types</p>
+            <p className="kelta-field-label">Event types</p>
             <div className="mt-1 flex flex-wrap gap-1">
               {endpoint.filterTypes.map((t) => (
                 <Badge key={t} variant="outline" className="text-xs">
@@ -334,7 +334,7 @@ function EndpointDetail({ endpoint, onBack }: { endpoint: EndpointOut; onBack: (
         )}
         {endpoint.channels && endpoint.channels.length > 0 && (
           <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm font-medium text-muted-foreground">Collection Filter</p>
+            <p className="kelta-field-label">Collection filter</p>
             <div className="mt-1 flex flex-wrap gap-1">
               {endpoint.channels.map((ch) => (
                 <Badge key={ch} variant="secondary" className="text-xs">
@@ -349,7 +349,7 @@ function EndpointDetail({ endpoint, onBack }: { endpoint: EndpointOut; onBack: (
       {/* Message attempts */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-medium text-foreground">Recent Deliveries</h3>
+          <h3 className="text-lg font-medium text-foreground">Recent deliveries</h3>
           <Button variant="ghost" size="sm" onClick={attempts.reload}>
             Refresh
           </Button>
@@ -361,7 +361,7 @@ function EndpointDetail({ endpoint, onBack }: { endpoint: EndpointOut; onBack: (
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Endpoint</DialogTitle>
+            <DialogTitle>Delete endpoint</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this endpoint? This action cannot be undone. All
               future webhook deliveries to this URL will stop.
@@ -422,7 +422,7 @@ function AttemptTable({ attempts }: { attempts: ReturnType<typeof useEndpointMes
           <thead className="border-b bg-muted/50">
             <tr>
               <th className="px-4 py-2 text-left font-medium text-muted-foreground">Status</th>
-              <th className="px-4 py-2 text-left font-medium text-muted-foreground">Event Type</th>
+              <th className="px-4 py-2 text-left font-medium text-muted-foreground">Event type</th>
               <th className="px-4 py-2 text-left font-medium text-muted-foreground">Response</th>
               <th className="px-4 py-2 text-left font-medium text-muted-foreground">Timestamp</th>
             </tr>
@@ -474,27 +474,15 @@ function AttemptStatusBadge({ status }: { status: number }) {
   // Svix MessageStatus: 0 = Success, 1 = Pending, 2 = Fail, 3 = Sending
   switch (status) {
     case 0:
-      return (
-        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-          Success
-        </Badge>
-      )
+      return <StatusBadge variant="active" label="Success" />
     case 1:
-      return (
-        <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-          Pending
-        </Badge>
-      )
+      return <StatusBadge variant="pending" label="Pending" />
     case 2:
-      return <Badge variant="destructive">Failed</Badge>
+      return <StatusBadge variant="failed" label="Failed" />
     case 3:
-      return (
-        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-          Sending
-        </Badge>
-      )
+      return <StatusBadge variant="pending" label="Sending" />
     default:
-      return <Badge variant="secondary">Unknown</Badge>
+      return <StatusBadge variant="inactive" label="Unknown" />
   }
 }
 
@@ -572,7 +560,7 @@ function CreateEndpointDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Webhook Endpoint</DialogTitle>
+          <DialogTitle>Add webhook endpoint</DialogTitle>
           <DialogDescription>
             Create a new endpoint to receive webhook notifications.
           </DialogDescription>
@@ -580,7 +568,7 @@ function CreateEndpointDialog({
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="endpoint-url">Endpoint URL</Label>
+            <FieldLabel htmlFor="endpoint-url">Endpoint URL</FieldLabel>
             <Input
               id="endpoint-url"
               placeholder="https://example.com/webhooks"
@@ -590,7 +578,7 @@ function CreateEndpointDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="endpoint-description">Description</Label>
+            <FieldLabel htmlFor="endpoint-description">Description</FieldLabel>
             <Input
               id="endpoint-description"
               placeholder="My webhook endpoint"
@@ -601,7 +589,7 @@ function CreateEndpointDialog({
 
           {eventTypes.data && eventTypes.data.length > 0 && (
             <div className="space-y-2">
-              <Label>Event Types</Label>
+              <FieldLabel>Event types</FieldLabel>
               <p className="text-xs text-muted-foreground">
                 Select which events this endpoint should receive. Leave empty for all events.
               </p>
@@ -635,7 +623,7 @@ function CreateEndpointDialog({
 
           {collections && collections.length > 0 && (
             <div className="space-y-2">
-              <Label>Collection Filter</Label>
+              <FieldLabel>Collection filter</FieldLabel>
               <p className="text-xs text-muted-foreground">
                 Only receive events for selected collections. Leave empty for all collections.
               </p>

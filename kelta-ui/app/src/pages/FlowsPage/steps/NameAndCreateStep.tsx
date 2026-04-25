@@ -1,7 +1,7 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { FieldLabel } from '@/components/kelta'
 import { Database, Clock, Globe, Radio } from 'lucide-react'
 import type { FlowType } from '@/pages/FlowDesignerPage/types'
 
@@ -14,10 +14,10 @@ interface NameAndCreateStepProps {
 }
 
 const FLOW_TYPE_META: Record<FlowType, { label: string; icon: React.ElementType }> = {
-  RECORD_TRIGGERED: { label: 'Record Change', icon: Database },
+  RECORD_TRIGGERED: { label: 'Record change', icon: Database },
   SCHEDULED: { label: 'Scheduled', icon: Clock },
-  AUTOLAUNCHED: { label: 'API / Webhook', icon: Globe },
-  KAFKA_TRIGGERED: { label: 'Kafka Event', icon: Radio },
+  AUTOLAUNCHED: { label: 'API / webhook', icon: Globe },
+  KAFKA_TRIGGERED: { label: 'Kafka event', icon: Radio },
 }
 
 export function NameAndCreateStep({
@@ -41,13 +41,13 @@ export function NameAndCreateStep({
 
       <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3">
         <Icon className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">{meta.label} Flow</span>
+        <span className="text-sm text-muted-foreground">{meta.label} flow</span>
       </div>
 
       <div>
-        <Label htmlFor="wizard-flow-name" className="text-sm">
+        <FieldLabel htmlFor="wizard-flow-name">
           Name <span className="text-destructive">*</span>
-        </Label>
+        </FieldLabel>
         <Input
           id="wizard-flow-name"
           value={name}
@@ -58,9 +58,7 @@ export function NameAndCreateStep({
       </div>
 
       <div>
-        <Label htmlFor="wizard-flow-description" className="text-sm">
-          Description
-        </Label>
+        <FieldLabel htmlFor="wizard-flow-description">Description</FieldLabel>
         <Textarea
           id="wizard-flow-description"
           value={description}

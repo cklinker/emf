@@ -56,7 +56,7 @@ describe('CustomPage', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Page Not Found')).toBeDefined()
+      expect(screen.getByText('Page not found')).toBeDefined()
     })
   })
 
@@ -79,7 +79,7 @@ describe('CustomPage', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Component Not Available')).toBeDefined()
+      expect(screen.getByText('Component not available')).toBeDefined()
     })
   })
 
@@ -152,9 +152,9 @@ describe('CustomPage', () => {
       </TestWrapper>
     )
 
-    // When the API fails, the query catch returns null, so we get "Page Not Found"
+    // When the API fails, the query catch returns null, so we get "Page not found"
     await waitFor(() => {
-      expect(screen.getByText('Page Not Found')).toBeDefined()
+      expect(screen.getByText('Page not found')).toBeDefined()
     })
   })
 })

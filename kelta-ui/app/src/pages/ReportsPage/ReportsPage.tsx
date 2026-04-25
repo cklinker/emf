@@ -955,7 +955,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
     const renderStep2Columns = () => (
       <div>
-        <h2 className="text-xl font-semibold text-foreground mb-2">Select Columns</h2>
+        <h2 className="mb-2 text-xl font-semibold text-foreground">Select columns</h2>
         <p className="text-sm text-muted-foreground mb-6">
           Choose which fields to display in the report. At least one column is required.
         </p>

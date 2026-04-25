@@ -726,7 +726,7 @@ export function ConnectedAppsPage({
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
       <header className="flex items-center justify-between">
-        <h1 className="m-0 text-2xl font-semibold text-foreground">Connected Apps</h1>
+        <h1 className="m-0 text-2xl font-semibold text-foreground">Connected apps</h1>
         <button
           type="button"
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"

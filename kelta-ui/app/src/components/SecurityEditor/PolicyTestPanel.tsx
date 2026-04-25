@@ -85,7 +85,7 @@ export function PolicyTestPanel({
 
   return (
     <div className="space-y-4" data-testid={testId}>
-      <h3 className="text-sm font-medium text-foreground">Test Policy</h3>
+      <h3 className="text-sm font-medium text-foreground">Test policy</h3>
 
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div className="grid grid-cols-2 gap-3">

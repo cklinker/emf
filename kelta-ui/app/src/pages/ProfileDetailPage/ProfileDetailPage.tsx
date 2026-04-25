@@ -794,7 +794,7 @@ export function ProfileDetailPage({
       {/* Custom Authorization Rules */}
       {isEditable && (
         <section data-testid="custom-rules-section">
-          <h2 className="mb-4 text-lg font-semibold text-foreground">Custom Authorization Rules</h2>
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Custom authorization rules</h2>
           <CustomPolicyEditor
             profileId={id!}
             tenantId=""

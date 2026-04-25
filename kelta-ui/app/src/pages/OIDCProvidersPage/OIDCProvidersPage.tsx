@@ -683,7 +683,7 @@ function OIDCProviderForm({
 
             {/* OIDC Discovery Endpoint Overrides */}
             <div className="mt-2 border-t border-border pt-4">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">Endpoint Overrides</h3>
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Endpoint overrides</h3>
               <p className="mb-3 text-xs text-muted-foreground">
                 Leave blank to auto-discover from the issuer URL. Override when Discovery is
                 unavailable.

@@ -584,7 +584,7 @@ export function ScheduledJobsPage({
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">Scheduled Jobs</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Scheduled jobs</h1>
         <Button
           type="button"
           onClick={handleCreate}

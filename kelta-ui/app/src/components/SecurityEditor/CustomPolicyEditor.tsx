@@ -231,7 +231,7 @@ export function CustomPolicyEditor({
   return (
     <div className="space-y-4" data-testid={testId}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground">Custom Authorization Rules</h3>
+        <h3 className="text-sm font-medium text-foreground">Custom authorization rules</h3>
         {!readOnly && (
           <Button
             variant="outline"

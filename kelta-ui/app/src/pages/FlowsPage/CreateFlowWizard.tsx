@@ -115,7 +115,7 @@ export function CreateFlowWizard({ open, onOpenChange }: CreateFlowWizardProps) 
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-[640px]">
         <DialogHeader>
-          <DialogTitle>Create Flow</DialogTitle>
+          <DialogTitle>Create flow</DialogTitle>
         </DialogHeader>
 
         {/* Step indicator */}

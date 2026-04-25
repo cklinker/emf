@@ -12,17 +12,19 @@
  * Usage:  <label class="kelta-field-label">Email</label>
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Fonts (Inter, JetBrains Mono) are loaded via <link> in app/index.html
+ * for better load performance (preconnect + parallel discovery). */
 
 :root {
   --kelta-font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --kelta-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* The brand gradient. Use ONLY on the logo mark and the AI assistant FAB. */
-  --kelta-gradient: linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%);
+  --kelta-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
 }
 
-html, body {
+html,
+body {
   font-family: var(--kelta-font-sans);
 }
 
@@ -53,8 +55,10 @@ html, body {
 
 .dark .kelta-card {
   border-color: #334155;
-  background: #111C2E;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 28px -16px rgba(0, 0, 0, 0.7);
+  background: #111c2e;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 12px 28px -16px rgba(0, 0, 0, 0.7);
 }
 
 /* Header band for collapsible sections / table tops */
@@ -79,7 +83,7 @@ html, body {
 }
 
 .dark .kelta-table-header {
-  background: #16243A;
+  background: #16243a;
 }
 
 .kelta-table-header th {

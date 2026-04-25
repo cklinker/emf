@@ -86,7 +86,7 @@ export function SecurityAuditPage({ className }: SecurityAuditPageProps): React.
     <div className={cn('mx-auto max-w-[1200px] p-6', className)}>
       <header className="mb-6 flex items-center gap-3">
         <Shield className="h-6 w-6 text-muted-foreground" />
-        <h1 className="m-0 text-2xl font-semibold">Security Audit Log</h1>
+        <h1 className="m-0 text-2xl font-semibold">Security audit log</h1>
       </header>
 
       {isLoading ? (

@@ -51,7 +51,7 @@ export function InsufficientPrivileges({
               <ShieldAlert className="h-6 w-6 text-destructive" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold text-foreground">Insufficient Privileges</h2>
+              <h2 className="text-lg font-semibold text-foreground">Insufficient privileges</h2>
               <p className="text-sm text-muted-foreground">{displayMessage}</p>
             </div>
             <Button variant="outline" onClick={handleGoBack}>

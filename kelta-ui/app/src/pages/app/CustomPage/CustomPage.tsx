@@ -157,7 +157,7 @@ export function CustomPage(): React.ReactElement {
           <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
             <FileQuestion className="h-12 w-12 text-muted-foreground" />
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold text-foreground">Page Not Found</h2>
+              <h2 className="text-lg font-semibold text-foreground">Page not found</h2>
               <p className="text-sm text-muted-foreground">
                 The page &quot;{pageSlug}&quot; is not configured. Check the page definition in
                 Setup or contact your administrator.
@@ -190,7 +190,7 @@ export function CustomPage(): React.ReactElement {
           <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
             <FileQuestion className="h-12 w-12 text-muted-foreground" />
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold text-foreground">Component Not Available</h2>
+              <h2 className="text-lg font-semibold text-foreground">Component not available</h2>
               <p className="text-sm text-muted-foreground">
                 The component &quot;{pageDefinition.component}&quot; required by this page is not
                 registered. It may need to be installed via a plugin.

@@ -131,7 +131,7 @@ export function MfaPolicyPanel(): React.ReactElement {
 
         {/* Grace Period */}
         <section className="rounded-lg border border-border p-6 space-y-4">
-          <h2 className="text-lg font-medium text-foreground">Enrollment Grace Period</h2>
+          <h2 className="text-lg font-medium text-foreground">Enrollment grace period</h2>
           <div>
             <label htmlFor="gracePeriodDays" className="block text-sm font-medium text-foreground">
               Grace period (days, empty = immediate enforcement)

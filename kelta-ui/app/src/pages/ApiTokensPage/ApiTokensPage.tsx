@@ -370,7 +370,7 @@ function TokenCreatedDialog({
         data-testid="token-created-dialog-modal"
       >
         <div className="flex items-center justify-between border-b border-border p-6">
-          <h2 className="m-0 text-xl font-semibold text-foreground">Token Created</h2>
+          <h2 className="m-0 text-xl font-semibold text-foreground">Token created</h2>
           <button
             type="button"
             className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground"

@@ -7,8 +7,8 @@ import { LoadingSpinner, ErrorMessage } from '../../components'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { FieldLabel, StatusBadge } from '@/components/kelta'
 import {
   Select,
   SelectContent,
@@ -92,16 +92,16 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
         <div className="flex items-center gap-3">
           <Bot className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">AI Settings</h1>
+            <h1 className="text-[26px] font-bold tracking-[-0.01em]">AI settings</h1>
             <p className="text-sm text-muted-foreground">
-              Configure AI assistant model, limits, and monitoring
+              Configure AI assistant model, limits, and monitoring.
             </p>
           </div>
         </div>
         {canManage && !isEditing && (
           <Button onClick={() => setEditConfig(config ?? null)}>
             <Settings className="mr-2 h-4 w-4" />
-            Edit Settings
+            Edit settings
           </Button>
         )}
       </div>
@@ -110,12 +110,12 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
         {/* Model Configuration */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Model Configuration</CardTitle>
-            <CardDescription>Select the AI model and parameters</CardDescription>
+            <CardTitle className="text-base">Model configuration</CardTitle>
+            <CardDescription>Select the AI model and parameters.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Model</Label>
+              <FieldLabel>Model</FieldLabel>
               {isEditing ? (
                 <Select
                   value={currentConfig?.model}
@@ -143,7 +143,7 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
             </div>
 
             <div className="space-y-2">
-              <Label>Max Tokens</Label>
+              <FieldLabel>Max tokens</FieldLabel>
               {isEditing ? (
                 <Input
                   type="number"
@@ -158,7 +158,7 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
             </div>
 
             <div className="space-y-2">
-              <Label>Temperature</Label>
+              <FieldLabel>Temperature</FieldLabel>
               {isEditing ? (
                 <Input
                   type="number"
@@ -182,12 +182,12 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
         {/* Token Limits */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Token Limits</CardTitle>
-            <CardDescription>Configure monthly token usage limits</CardDescription>
+            <CardTitle className="text-base">Token limits</CardTitle>
+            <CardDescription>Configure monthly token usage limits.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>AI Enabled</Label>
+              <FieldLabel className="mb-0">AI enabled</FieldLabel>
               {isEditing ? (
                 <Switch
                   checked={currentConfig?.aiEnabled === 'true'}
@@ -195,22 +195,15 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
                     setEditConfig((prev) => (prev ? { ...prev, aiEnabled: String(checked) } : null))
                   }
                 />
+              ) : currentConfig?.aiEnabled === 'true' ? (
+                <StatusBadge variant="active" label="Enabled" />
               ) : (
-                <span
-                  className={cn(
-                    'rounded-full px-2 py-0.5 text-xs font-medium',
-                    currentConfig?.aiEnabled === 'true'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  )}
-                >
-                  {currentConfig?.aiEnabled === 'true' ? 'Enabled' : 'Disabled'}
-                </span>
+                <StatusBadge variant="inactive" label="Disabled" />
               )}
             </div>
 
             <div className="space-y-2">
-              <Label>Monthly Token Limit</Label>
+              <FieldLabel>Monthly token limit</FieldLabel>
               {isEditing ? (
                 <Input
                   type="number"
@@ -235,7 +228,7 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Zap className="h-4 w-4" />
-              Current Month Usage
+              Current month usage
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -244,8 +237,8 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
             ) : usage ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Tokens Used</span>
-                  <span className="text-lg font-semibold">
+                  <span className="text-sm text-muted-foreground">Tokens used</span>
+                  <span className="font-mono text-lg font-semibold tabular-nums">
                     {formatTokenCount(usage.currentMonthUsage)} /{' '}
                     {formatTokenCount(usage.tokenLimit)}
                   </span>
@@ -270,16 +263,18 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
                 {/* Monthly history */}
                 {Object.keys(usage.history).length > 0 && (
                   <div className="mt-4">
-                    <h4 className="text-sm font-medium mb-2">Monthly History</h4>
+                    <h4 className="mb-2 text-sm font-medium">Monthly history</h4>
                     <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div className="font-medium text-muted-foreground">Month</div>
-                      <div className="font-medium text-muted-foreground">Tokens</div>
-                      <div className="font-medium text-muted-foreground">Requests</div>
+                      <div className="kelta-field-label !mb-0">Month</div>
+                      <div className="kelta-field-label !mb-0">Tokens</div>
+                      <div className="kelta-field-label !mb-0">Requests</div>
                       {Object.entries(usage.history).map(([month, data]) => (
                         <React.Fragment key={month}>
                           <div>{month}</div>
-                          <div>{formatTokenCount(data.inputTokens + data.outputTokens)}</div>
-                          <div>{data.requestCount}</div>
+                          <div className="font-mono tabular-nums">
+                            {formatTokenCount(data.inputTokens + data.outputTokens)}
+                          </div>
+                          <div className="font-mono tabular-nums">{data.requestCount}</div>
                         </React.Fragment>
                       ))}
                     </div>
@@ -303,7 +298,7 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
             onClick={() => editConfig && saveMutation.mutate(editConfig)}
             disabled={saveMutation.isPending}
           >
-            {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
+            {saveMutation.isPending ? 'Saving...' : 'Save changes'}
           </Button>
         </div>
       )}

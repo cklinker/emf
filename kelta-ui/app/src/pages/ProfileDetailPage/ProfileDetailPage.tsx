@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 
 interface ProfileDetail {
   id: string
@@ -518,9 +518,7 @@ export function ProfileDetailPage({
             {isEditingBasicInfo ? (
               <div className="space-y-2">
                 <div>
-                  <Label htmlFor="edit-profile-name" className="text-xs text-muted-foreground">
-                    Name
-                  </Label>
+                  <FieldLabel htmlFor="edit-profile-name">Name</FieldLabel>
                   <Input
                     id="edit-profile-name"
                     value={editName}
@@ -530,12 +528,7 @@ export function ProfileDetailPage({
                   />
                 </div>
                 <div>
-                  <Label
-                    htmlFor="edit-profile-description"
-                    className="text-xs text-muted-foreground"
-                  >
-                    Description
-                  </Label>
+                  <FieldLabel htmlFor="edit-profile-description">Description</FieldLabel>
                   <Textarea
                     id="edit-profile-description"
                     value={editDescription}

@@ -1,34 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="Enterprise microservice framework icon">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="g2" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="#0f62fe"/>
-      <stop offset="1" stop-color="#00bfa6"/>
+    <linearGradient id="kelta-grad" x1="0%" y1="0%" x2="100%" y2="100%" gradientTransform="rotate(135)">
+      <stop offset="0%" stop-color="#06B6D4"></stop>
+      <stop offset="100%" stop-color="#3B82F6"></stop>
     </linearGradient>
   </defs>
-
-  <!-- outer rounded square -->
-  <rect x="8" y="8" width="144" height="144" rx="18" fill="#071233" opacity="0.06"/>
-
-  <!-- centre circle -->
-  <circle cx="80" cy="58" r="26" fill="url(#g2)"/>
-
-  <!-- nodes -->
-  <g stroke="#022045" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="#ffffff">
-    <circle cx="80" cy="58" r="9" />
-    <circle cx="44" cy="98" r="7" />
-    <circle cx="116" cy="98" r="7" />
-  </g>
-
-  <!-- connections -->
-  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
-    <path d="M80 67 L52 92" />
-    <path d="M80 67 L108 92" />
-    <path d="M52 92 L108 92" stroke-dasharray="4 5" stroke-opacity="0.75"/>
-  </g>
-
-  <!-- small enterprise gear hint -->
-  <g transform="translate(124,14) rotate(15)">
-    <circle cx="0" cy="0" r="10" fill="#0f62fe" opacity="0.12"/>
-    <path d="M-6 -2 L-10 -2 L-8 -6 L-10 -10 L-6 -8 L-2 -10 L-2 -6 L6 -6 L6 -2 L2 -2 L2 6 L-2 6 L-2 2 L-6 2 Z" fill="#0f62fe" opacity="0.22"/>
-  </g>
+  
+  <rect x="12" y="8" width="8" height="48" rx="3" fill="url(#kelta-grad)"></rect>
+  <polygon points="20,32 44,8 52,8 28,32" fill="url(#kelta-grad)"></polygon>
+  <polygon points="20,32 44,56 52,56 28,32" fill="url(#kelta-grad)"></polygon>
+  <circle cx="46" cy="12" r="5" fill="#06B6D4"></circle>
+  <circle cx="46" cy="52" r="5" fill="#3B82F6"></circle>
 </svg>

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import type { WaitMode } from '../../types'
 
 interface WaitPropertiesProps {
@@ -30,10 +30,12 @@ export function WaitProperties({ nodeId, data, onUpdate }: WaitPropertiesProps) 
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <Label className="text-xs">Wait Mode</Label>
+        <FieldLabel className="text-xs">Wait Mode</FieldLabel>
         <div className="mt-1 flex flex-col gap-1.5">
           {WAIT_MODES.map((mode) => (
-            <Label
+            // jsx-a11y rule can't see the htmlFor↔id pairing across the dynamic key
+            // eslint-disable-next-line jsx-a11y/label-has-associated-control
+            <label
               key={mode.value}
               htmlFor={`wait-mode-${nodeId}-${mode.value}`}
               className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2 font-normal transition-colors hover:bg-muted has-[:checked]:border-primary has-[:checked]:bg-primary/5"
@@ -51,16 +53,16 @@ export function WaitProperties({ nodeId, data, onUpdate }: WaitPropertiesProps) 
                 <span className="text-xs font-medium">{mode.label}</span>
                 <span className="block text-[10px] text-muted-foreground">{mode.description}</span>
               </span>
-            </Label>
+            </label>
           ))}
         </div>
       </div>
 
       {waitMode === 'seconds' && (
         <div>
-          <Label htmlFor={`wait-seconds-${nodeId}`} className="text-xs">
+          <FieldLabel htmlFor={`wait-seconds-${nodeId}`} className="text-xs">
             Seconds
-          </Label>
+          </FieldLabel>
           <Input
             id={`wait-seconds-${nodeId}`}
             type="number"
@@ -77,9 +79,9 @@ export function WaitProperties({ nodeId, data, onUpdate }: WaitPropertiesProps) 
 
       {waitMode === 'timestamp' && (
         <div>
-          <Label htmlFor={`wait-timestamp-${nodeId}`} className="text-xs">
+          <FieldLabel htmlFor={`wait-timestamp-${nodeId}`} className="text-xs">
             Timestamp (ISO 8601)
-          </Label>
+          </FieldLabel>
           <Input
             id={`wait-timestamp-${nodeId}`}
             value={(data.timestamp as string) || ''}
@@ -92,9 +94,9 @@ export function WaitProperties({ nodeId, data, onUpdate }: WaitPropertiesProps) 
 
       {waitMode === 'timestampPath' && (
         <div>
-          <Label htmlFor={`wait-timestamp-path-${nodeId}`} className="text-xs">
+          <FieldLabel htmlFor={`wait-timestamp-path-${nodeId}`} className="text-xs">
             Timestamp Path
-          </Label>
+          </FieldLabel>
           <Input
             id={`wait-timestamp-path-${nodeId}`}
             value={(data.timestampPath as string) || ''}
@@ -107,9 +109,9 @@ export function WaitProperties({ nodeId, data, onUpdate }: WaitPropertiesProps) 
 
       {waitMode === 'eventName' && (
         <div>
-          <Label htmlFor={`wait-event-${nodeId}`} className="text-xs">
+          <FieldLabel htmlFor={`wait-event-${nodeId}`} className="text-xs">
             Event Name
-          </Label>
+          </FieldLabel>
           <Input
             id={`wait-event-${nodeId}`}
             value={(data.eventName as string) || ''}

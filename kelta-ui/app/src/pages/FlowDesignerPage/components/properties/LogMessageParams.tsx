@@ -1,5 +1,5 @@
 import React from 'react'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Textarea } from '@/components/ui/textarea'
 
 const LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
@@ -25,7 +25,7 @@ export function LogMessageParams({ parameters, onUpdate }: LogMessageParamsProps
       </span>
 
       <div>
-        <Label className="text-[10px]">Message</Label>
+        <FieldLabel className="text-[10px]">Message</FieldLabel>
         <Textarea
           value={message}
           onChange={(e) => update('message', e.target.value)}
@@ -36,7 +36,7 @@ export function LogMessageParams({ parameters, onUpdate }: LogMessageParamsProps
       </div>
 
       <div>
-        <Label className="text-[10px]">Level</Label>
+        <FieldLabel className="text-[10px]">Level</FieldLabel>
         <select
           value={level}
           onChange={(e) => update('level', e.target.value)}

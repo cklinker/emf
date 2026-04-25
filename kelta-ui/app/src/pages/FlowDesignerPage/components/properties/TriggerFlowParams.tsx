@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 
 interface TriggerFlowParamsProps {
   parameters?: Record<string, unknown>
@@ -22,7 +22,7 @@ export function TriggerFlowParams({ parameters, onUpdate }: TriggerFlowParamsPro
       </span>
 
       <div>
-        <Label className="text-[10px]">Flow ID</Label>
+        <FieldLabel className="text-[10px]">Flow ID</FieldLabel>
         <Input
           value={flowId}
           onChange={(e) => update('flowId', e.target.value)}

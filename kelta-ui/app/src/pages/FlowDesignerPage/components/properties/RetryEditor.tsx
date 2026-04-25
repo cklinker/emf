@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -57,7 +57,7 @@ export function RetryEditor({ retry, onUpdate }: RetryEditorProps) {
                 </Button>
               </div>
               <div>
-                <Label className="text-[10px]">Error Equals (comma-separated)</Label>
+                <FieldLabel className="text-[10px]">Error Equals (comma-separated)</FieldLabel>
                 <Input
                   value={rule.errorEquals.join(', ')}
                   onChange={(e) =>
@@ -73,7 +73,7 @@ export function RetryEditor({ retry, onUpdate }: RetryEditorProps) {
               </div>
               <div className="grid grid-cols-3 gap-1.5">
                 <div>
-                  <Label className="text-[10px]">Interval (s)</Label>
+                  <FieldLabel className="text-[10px]">Interval (s)</FieldLabel>
                   <Input
                     type="number"
                     value={rule.intervalSeconds}
@@ -85,7 +85,7 @@ export function RetryEditor({ retry, onUpdate }: RetryEditorProps) {
                   />
                 </div>
                 <div>
-                  <Label className="text-[10px]">Max Attempts</Label>
+                  <FieldLabel className="text-[10px]">Max Attempts</FieldLabel>
                   <Input
                     type="number"
                     value={rule.maxAttempts}
@@ -95,7 +95,7 @@ export function RetryEditor({ retry, onUpdate }: RetryEditorProps) {
                   />
                 </div>
                 <div>
-                  <Label className="text-[10px]">Backoff</Label>
+                  <FieldLabel className="text-[10px]">Backoff</FieldLabel>
                   <Input
                     type="number"
                     value={rule.backoffRate}

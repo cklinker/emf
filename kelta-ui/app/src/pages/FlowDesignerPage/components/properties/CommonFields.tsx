@@ -1,8 +1,8 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { FieldLabel } from '@/components/kelta'
 
 interface CommonFieldsProps {
   nodeId: string
@@ -34,26 +34,26 @@ export function CommonFields({ nodeId, stateType, label, comment, onUpdate }: Co
       </div>
 
       <div>
-        <Label htmlFor={`node-name-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`node-name-${nodeId}`} className="mb-1">
           Name
-        </Label>
+        </FieldLabel>
         <Input
           id={`node-name-${nodeId}`}
           value={label}
           onChange={(e) => onUpdate({ label: e.target.value })}
-          className="mt-1 h-8 text-sm"
+          className="h-8 text-sm"
         />
       </div>
 
       <div>
-        <Label htmlFor={`node-comment-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`node-comment-${nodeId}`} className="mb-1">
           Comment
-        </Label>
+        </FieldLabel>
         <Textarea
           id={`node-comment-${nodeId}`}
           value={comment}
           onChange={(e) => onUpdate({ comment: e.target.value })}
-          className="mt-1 min-h-[60px] text-sm"
+          className="min-h-[60px] text-sm"
           placeholder="Optional description"
           rows={2}
         />

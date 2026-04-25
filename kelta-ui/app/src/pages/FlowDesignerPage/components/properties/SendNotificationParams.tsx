@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Textarea } from '@/components/ui/textarea'
 
 const NOTIFICATION_LEVELS = ['INFO', 'WARNING', 'ERROR']
@@ -28,7 +28,7 @@ export function SendNotificationParams({ parameters, onUpdate }: SendNotificatio
       </span>
 
       <div>
-        <Label className="text-[10px]">User ID</Label>
+        <FieldLabel className="text-[10px]">User ID</FieldLabel>
         <Input
           value={userId}
           onChange={(e) => update('userId', e.target.value)}
@@ -38,7 +38,7 @@ export function SendNotificationParams({ parameters, onUpdate }: SendNotificatio
       </div>
 
       <div>
-        <Label className="text-[10px]">Title</Label>
+        <FieldLabel className="text-[10px]">Title</FieldLabel>
         <Input
           value={title}
           onChange={(e) => update('title', e.target.value)}
@@ -48,7 +48,7 @@ export function SendNotificationParams({ parameters, onUpdate }: SendNotificatio
       </div>
 
       <div>
-        <Label className="text-[10px]">Message</Label>
+        <FieldLabel className="text-[10px]">Message</FieldLabel>
         <Textarea
           value={message}
           onChange={(e) => update('message', e.target.value)}
@@ -59,7 +59,7 @@ export function SendNotificationParams({ parameters, onUpdate }: SendNotificatio
       </div>
 
       <div>
-        <Label className="text-[10px]">Level</Label>
+        <FieldLabel className="text-[10px]">Level</FieldLabel>
         <select
           value={level}
           onChange={(e) => update('level', e.target.value)}

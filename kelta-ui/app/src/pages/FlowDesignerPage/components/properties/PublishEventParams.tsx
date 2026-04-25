@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Textarea } from '@/components/ui/textarea'
 
 interface PublishEventParamsProps {
@@ -47,7 +47,7 @@ export function PublishEventParams({ parameters, onUpdate }: PublishEventParamsP
       </span>
 
       <div>
-        <Label className="text-[10px]">Topic</Label>
+        <FieldLabel className="text-[10px]">Topic</FieldLabel>
         <Input
           value={topic}
           onChange={(e) => update('topic', e.target.value)}
@@ -57,7 +57,7 @@ export function PublishEventParams({ parameters, onUpdate }: PublishEventParamsP
       </div>
 
       <div>
-        <Label className="text-[10px]">Event Type</Label>
+        <FieldLabel className="text-[10px]">Event Type</FieldLabel>
         <Input
           value={eventType}
           onChange={(e) => update('eventType', e.target.value)}
@@ -67,7 +67,7 @@ export function PublishEventParams({ parameters, onUpdate }: PublishEventParamsP
       </div>
 
       <div>
-        <Label className="text-[10px]">Data Payload (JSON)</Label>
+        <FieldLabel className="text-[10px]">Data Payload (JSON)</FieldLabel>
         <Textarea
           value={dataPayloadStr}
           onChange={(e) => updateDataPayload(e.target.value)}

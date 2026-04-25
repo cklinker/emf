@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { DataPathFields } from './DataPathFields'
 
 interface MapPropertiesProps {
@@ -13,9 +13,9 @@ export function MapProperties({ nodeId, data, onUpdate }: MapPropertiesProps) {
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <Label htmlFor={`items-path-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`items-path-${nodeId}`} className="text-xs">
           Items Path
-        </Label>
+        </FieldLabel>
         <Input
           id={`items-path-${nodeId}`}
           value={(data.itemsPath as string) || ''}
@@ -26,9 +26,9 @@ export function MapProperties({ nodeId, data, onUpdate }: MapPropertiesProps) {
       </div>
 
       <div>
-        <Label htmlFor={`max-concurrency-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`max-concurrency-${nodeId}`} className="text-xs">
           Max Concurrency
-        </Label>
+        </FieldLabel>
         <Input
           id={`max-concurrency-${nodeId}`}
           type="number"

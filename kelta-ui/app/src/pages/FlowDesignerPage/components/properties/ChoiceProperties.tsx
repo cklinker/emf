@@ -1,5 +1,5 @@
 import React from 'react'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import type { ChoiceRuleUI } from '../../types'
@@ -40,9 +40,9 @@ export function ChoiceProperties({ nodeId, data, allNodeIds, onUpdate }: ChoiceP
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <Label htmlFor={`default-state-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`default-state-${nodeId}`} className="text-xs">
           Default State
-        </Label>
+        </FieldLabel>
         <select
           id={`default-state-${nodeId}`}
           value={defaultState}

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -72,7 +72,7 @@ export function HttpCalloutParams({ parameters, onUpdate }: HttpCalloutParamsPro
       </span>
 
       <div>
-        <Label className="text-[10px]">URL</Label>
+        <FieldLabel className="text-[10px]">URL</FieldLabel>
         <Input
           value={url}
           onChange={(e) => update('url', e.target.value)}
@@ -82,7 +82,7 @@ export function HttpCalloutParams({ parameters, onUpdate }: HttpCalloutParamsPro
       </div>
 
       <div>
-        <Label className="text-[10px]">Method</Label>
+        <FieldLabel className="text-[10px]">Method</FieldLabel>
         <select
           value={method}
           onChange={(e) => update('method', e.target.value)}
@@ -121,7 +121,7 @@ export function HttpCalloutParams({ parameters, onUpdate }: HttpCalloutParamsPro
                 </div>
                 <div className="grid grid-cols-2 gap-1">
                   <div>
-                    <Label className="text-[9px]">Key</Label>
+                    <FieldLabel className="text-[9px]">Key</FieldLabel>
                     <Input
                       value={header.key}
                       onChange={(e) => updateHeader(i, 'key', e.target.value)}
@@ -130,7 +130,7 @@ export function HttpCalloutParams({ parameters, onUpdate }: HttpCalloutParamsPro
                     />
                   </div>
                   <div>
-                    <Label className="text-[9px]">Value</Label>
+                    <FieldLabel className="text-[9px]">Value</FieldLabel>
                     <Input
                       value={header.value}
                       onChange={(e) => updateHeader(i, 'value', e.target.value)}
@@ -150,7 +150,7 @@ export function HttpCalloutParams({ parameters, onUpdate }: HttpCalloutParamsPro
       </Accordion>
 
       <div>
-        <Label className="text-[10px]">Body</Label>
+        <FieldLabel className="text-[10px]">Body</FieldLabel>
         <Textarea
           value={body}
           onChange={(e) => update('body', e.target.value)}

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Input } from '@/components/ui/input'
 import { RESOURCE_GROUPS } from '../../types'
 import type { RetryRule, CatchRule } from '../../types'
@@ -31,9 +31,9 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <Label htmlFor={`resource-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`resource-${nodeId}`} className="text-xs">
           Resource
-        </Label>
+        </FieldLabel>
         <select
           id={`resource-${nodeId}`}
           value={resource}
@@ -122,9 +122,9 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
       )}
 
       <div>
-        <Label htmlFor={`timeout-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`timeout-${nodeId}`} className="text-xs">
           Timeout (seconds)
-        </Label>
+        </FieldLabel>
         <Input
           id={`timeout-${nodeId}`}
           type="number"

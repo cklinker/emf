@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Textarea } from '@/components/ui/textarea'
 
 interface EmailAlertParamsProps {
@@ -26,7 +26,7 @@ export function EmailAlertParams({ parameters, onUpdate }: EmailAlertParamsProps
       </span>
 
       <div>
-        <Label className="text-[10px]">To</Label>
+        <FieldLabel className="text-[10px]">To</FieldLabel>
         <Input
           value={to}
           onChange={(e) => update('to', e.target.value)}
@@ -36,7 +36,7 @@ export function EmailAlertParams({ parameters, onUpdate }: EmailAlertParamsProps
       </div>
 
       <div>
-        <Label className="text-[10px]">Subject</Label>
+        <FieldLabel className="text-[10px]">Subject</FieldLabel>
         <Input
           value={subject}
           onChange={(e) => update('subject', e.target.value)}
@@ -46,7 +46,7 @@ export function EmailAlertParams({ parameters, onUpdate }: EmailAlertParamsProps
       </div>
 
       <div>
-        <Label className="text-[10px]">Body</Label>
+        <FieldLabel className="text-[10px]">Body</FieldLabel>
         <Textarea
           value={body}
           onChange={(e) => update('body', e.target.value)}
@@ -57,7 +57,7 @@ export function EmailAlertParams({ parameters, onUpdate }: EmailAlertParamsProps
       </div>
 
       <div>
-        <Label className="text-[10px]">Template ID (optional)</Label>
+        <FieldLabel className="text-[10px]">Template ID (optional)</FieldLabel>
         <Input
           value={templateId}
           onChange={(e) => update('templateId', e.target.value)}

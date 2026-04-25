@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -85,7 +85,7 @@ export function UpdateRecordParams({ parameters, onUpdate }: UpdateRecordParamsP
       </span>
 
       <div>
-        <Label className="text-[10px]">Target Collection</Label>
+        <FieldLabel className="text-[10px]">Target Collection</FieldLabel>
         <Input
           value={targetCollectionName}
           onChange={(e) => update('targetCollectionName', e.target.value)}
@@ -96,7 +96,7 @@ export function UpdateRecordParams({ parameters, onUpdate }: UpdateRecordParamsP
 
       {/* Record ID Source */}
       <div>
-        <Label className="text-[10px]">Record ID Source</Label>
+        <FieldLabel className="text-[10px]">Record ID Source</FieldLabel>
         <div className="mt-1 flex gap-2">
           <label className="flex items-center gap-1 text-[10px]">
             <input
@@ -162,7 +162,7 @@ export function UpdateRecordParams({ parameters, onUpdate }: UpdateRecordParamsP
                     </Button>
                   </div>
                   <div>
-                    <Label className="text-[9px]">Target Field</Label>
+                    <FieldLabel className="text-[9px]">Target Field</FieldLabel>
                     <Input
                       value={upd.field}
                       onChange={(e) => updateFieldUpdate(i, 'field', e.target.value)}
@@ -192,7 +192,7 @@ export function UpdateRecordParams({ parameters, onUpdate }: UpdateRecordParamsP
                   </div>
                   {isSourceMode ? (
                     <div>
-                      <Label className="text-[9px]">Source Field</Label>
+                      <FieldLabel className="text-[9px]">Source Field</FieldLabel>
                       <Input
                         value={upd.sourceField || ''}
                         onChange={(e) => updateFieldUpdate(i, 'sourceField', e.target.value)}
@@ -202,7 +202,7 @@ export function UpdateRecordParams({ parameters, onUpdate }: UpdateRecordParamsP
                     </div>
                   ) : (
                     <div>
-                      <Label className="text-[9px]">Value</Label>
+                      <FieldLabel className="text-[9px]">Value</FieldLabel>
                       <Input
                         value={upd.value || ''}
                         onChange={(e) => updateFieldUpdate(i, 'value', e.target.value)}

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import type { RetryRule, CatchRule } from '../../types'
 import { DataPathFields } from './DataPathFields'
 import { RetryEditor } from './RetryEditor'
@@ -23,7 +23,7 @@ export function ParallelProperties({
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <Label className="text-xs">Branches</Label>
+        <FieldLabel className="text-xs">Branches</FieldLabel>
         <div className="mt-1 rounded-md border border-border bg-muted/50 p-2 text-xs text-muted-foreground">
           {branchCount} branch{branchCount !== 1 ? 'es' : ''} defined
         </div>

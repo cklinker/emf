@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -93,7 +93,7 @@ export function FieldUpdateParams({ parameters, onUpdate }: FieldUpdateParamsPro
                     </Button>
                   </div>
                   <div>
-                    <Label className="text-[9px]">Field Name</Label>
+                    <FieldLabel className="text-[9px]">Field Name</FieldLabel>
                     <Input
                       value={entry.field}
                       onChange={(e) => updateEntry(i, 'field', e.target.value)}
@@ -123,7 +123,7 @@ export function FieldUpdateParams({ parameters, onUpdate }: FieldUpdateParamsPro
                   </div>
                   {isSourceMode ? (
                     <div>
-                      <Label className="text-[9px]">Source Field</Label>
+                      <FieldLabel className="text-[9px]">Source Field</FieldLabel>
                       <Input
                         value={entry.sourceField || ''}
                         onChange={(e) => updateEntry(i, 'sourceField', e.target.value)}
@@ -133,7 +133,7 @@ export function FieldUpdateParams({ parameters, onUpdate }: FieldUpdateParamsPro
                     </div>
                   ) : (
                     <div>
-                      <Label className="text-[9px]">Value</Label>
+                      <FieldLabel className="text-[9px]">Value</FieldLabel>
                       <Input
                         value={entry.value || ''}
                         onChange={(e) => updateEntry(i, 'value', e.target.value)}

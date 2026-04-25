@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -69,7 +69,7 @@ export function CreateRecordParams({ parameters, onUpdate }: CreateRecordParamsP
       </span>
 
       <div>
-        <Label className="text-[10px]">Target Collection Name</Label>
+        <FieldLabel className="text-[10px]">Target Collection Name</FieldLabel>
         <Input
           value={targetCollectionName}
           onChange={(e) => update('targetCollectionName', e.target.value)}
@@ -104,7 +104,7 @@ export function CreateRecordParams({ parameters, onUpdate }: CreateRecordParamsP
                     </Button>
                   </div>
                   <div>
-                    <Label className="text-[9px]">Field Name</Label>
+                    <FieldLabel className="text-[9px]">Field Name</FieldLabel>
                     <Input
                       value={mapping.field}
                       onChange={(e) => updateMapping(i, 'field', e.target.value)}
@@ -134,7 +134,7 @@ export function CreateRecordParams({ parameters, onUpdate }: CreateRecordParamsP
                   </div>
                   {isSourceMode ? (
                     <div>
-                      <Label className="text-[9px]">Source Field</Label>
+                      <FieldLabel className="text-[9px]">Source Field</FieldLabel>
                       <Input
                         value={mapping.sourceField || ''}
                         onChange={(e) => updateMapping(i, 'sourceField', e.target.value)}
@@ -144,7 +144,7 @@ export function CreateRecordParams({ parameters, onUpdate }: CreateRecordParamsP
                     </div>
                   ) : (
                     <div>
-                      <Label className="text-[9px]">Value</Label>
+                      <FieldLabel className="text-[9px]">Value</FieldLabel>
                       <Input
                         value={mapping.value || ''}
                         onChange={(e) => updateMapping(i, 'value', e.target.value)}

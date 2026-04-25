@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 
 interface DeleteRecordParamsProps {
   parameters?: Record<string, unknown>
@@ -37,7 +37,7 @@ export function DeleteRecordParams({ parameters, onUpdate }: DeleteRecordParamsP
       </span>
 
       <div>
-        <Label className="text-[10px]">Target Collection Name</Label>
+        <FieldLabel className="text-[10px]">Target Collection Name</FieldLabel>
         <Input
           value={targetCollectionName}
           onChange={(e) => update('targetCollectionName', e.target.value)}
@@ -48,7 +48,7 @@ export function DeleteRecordParams({ parameters, onUpdate }: DeleteRecordParamsP
 
       {/* Record ID Source */}
       <div>
-        <Label className="text-[10px]">Record ID Source</Label>
+        <FieldLabel className="text-[10px]">Record ID Source</FieldLabel>
         <div className="mt-1 flex gap-2">
           <label className="flex items-center gap-1 text-[10px]">
             <input

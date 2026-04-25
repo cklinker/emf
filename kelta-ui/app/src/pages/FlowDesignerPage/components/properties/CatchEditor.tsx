@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -57,7 +57,7 @@ export function CatchEditor({ catches, allNodeIds, onUpdate }: CatchEditorProps)
                 </Button>
               </div>
               <div>
-                <Label className="text-[10px]">Error Equals (comma-separated)</Label>
+                <FieldLabel className="text-[10px]">Error Equals (comma-separated)</FieldLabel>
                 <Input
                   value={rule.errorEquals.join(', ')}
                   onChange={(e) =>
@@ -72,7 +72,7 @@ export function CatchEditor({ catches, allNodeIds, onUpdate }: CatchEditorProps)
                 />
               </div>
               <div>
-                <Label className="text-[10px]">Result Path</Label>
+                <FieldLabel className="text-[10px]">Result Path</FieldLabel>
                 <Input
                   value={rule.resultPath}
                   onChange={(e) => updateCatch(i, 'resultPath', e.target.value)}
@@ -81,7 +81,7 @@ export function CatchEditor({ catches, allNodeIds, onUpdate }: CatchEditorProps)
                 />
               </div>
               <div>
-                <Label className="text-[10px]">Next State</Label>
+                <FieldLabel className="text-[10px]">Next State</FieldLabel>
                 <select
                   value={rule.next}
                   onChange={(e) => updateCatch(i, 'next', e.target.value)}

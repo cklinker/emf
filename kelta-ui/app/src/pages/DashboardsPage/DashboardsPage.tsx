@@ -1603,7 +1603,7 @@ function DashboardEditorInner({
                   <div className="p-3.5">
                     <div className="mb-1 text-sm font-semibold text-foreground">{comp.title}</div>
                     <div className="text-xs text-muted-foreground">
-                      Collection: {(comp.config.collection as string) || 'N/A'}
+                      Collection: {(comp.config.collection as string) || '—'}
                     </div>
                   </div>
                 </div>

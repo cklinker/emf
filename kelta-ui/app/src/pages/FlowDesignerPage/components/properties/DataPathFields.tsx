@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import {
   Accordion,
   AccordionContent,
@@ -31,9 +31,9 @@ export function DataPathFields({
         </AccordionTrigger>
         <AccordionContent className="flex flex-col gap-3 pb-0">
           <div>
-            <Label htmlFor={`input-path-${nodeId}`} className="text-xs">
+            <FieldLabel htmlFor={`input-path-${nodeId}`} className="text-xs">
               InputPath
-            </Label>
+            </FieldLabel>
             <Input
               id={`input-path-${nodeId}`}
               value={inputPath}
@@ -43,9 +43,9 @@ export function DataPathFields({
             />
           </div>
           <div>
-            <Label htmlFor={`output-path-${nodeId}`} className="text-xs">
+            <FieldLabel htmlFor={`output-path-${nodeId}`} className="text-xs">
               OutputPath
-            </Label>
+            </FieldLabel>
             <Input
               id={`output-path-${nodeId}`}
               value={outputPath}
@@ -55,9 +55,9 @@ export function DataPathFields({
             />
           </div>
           <div>
-            <Label htmlFor={`result-path-${nodeId}`} className="text-xs">
+            <FieldLabel htmlFor={`result-path-${nodeId}`} className="text-xs">
               ResultPath
-            </Label>
+            </FieldLabel>
             <Input
               id={`result-path-${nodeId}`}
               value={resultPath}

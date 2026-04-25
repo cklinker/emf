@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import { Trash2 } from 'lucide-react'
 import type { ChoiceRuleUI, ChoiceOperator } from '../../types'
@@ -50,7 +50,7 @@ export function ChoiceRuleEditor({
       </div>
 
       <div>
-        <Label className="text-[10px]">Variable</Label>
+        <FieldLabel className="text-[10px]">Variable</FieldLabel>
         <Input
           value={rule.variable}
           onChange={(e) => onUpdate({ ...rule, variable: e.target.value })}
@@ -60,7 +60,7 @@ export function ChoiceRuleEditor({
       </div>
 
       <div>
-        <Label className="text-[10px]">Operator</Label>
+        <FieldLabel className="text-[10px]">Operator</FieldLabel>
         <select
           value={rule.operator}
           onChange={(e) => onUpdate({ ...rule, operator: e.target.value as ChoiceOperator })}
@@ -75,7 +75,7 @@ export function ChoiceRuleEditor({
       </div>
 
       <div>
-        <Label className="text-[10px]">Value</Label>
+        <FieldLabel className="text-[10px]">Value</FieldLabel>
         <Input
           value={rule.value}
           onChange={(e) => onUpdate({ ...rule, value: e.target.value })}
@@ -85,7 +85,7 @@ export function ChoiceRuleEditor({
       </div>
 
       <div>
-        <Label className="text-[10px]">Next State</Label>
+        <FieldLabel className="text-[10px]">Next State</FieldLabel>
         <select
           value={rule.next}
           onChange={(e) => onUpdate({ ...rule, next: e.target.value })}

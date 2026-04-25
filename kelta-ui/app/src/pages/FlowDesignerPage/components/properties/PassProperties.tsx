@@ -1,5 +1,5 @@
 import React from 'react'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Textarea } from '@/components/ui/textarea'
 import { DataPathFields } from './DataPathFields'
 
@@ -13,9 +13,9 @@ export function PassProperties({ nodeId, data, onUpdate }: PassPropertiesProps) 
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <Label htmlFor={`result-json-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`result-json-${nodeId}`} className="text-xs">
           Result (JSON)
-        </Label>
+        </FieldLabel>
         <Textarea
           id={`result-json-${nodeId}`}
           value={(data.result as string) || ''}

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Textarea } from '@/components/ui/textarea'
 
 interface FailPropertiesProps {
@@ -13,9 +13,9 @@ export function FailProperties({ nodeId, data, onUpdate }: FailPropertiesProps) 
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <Label htmlFor={`error-code-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`error-code-${nodeId}`} className="text-xs">
           Error Code
-        </Label>
+        </FieldLabel>
         <Input
           id={`error-code-${nodeId}`}
           value={(data.error as string) || ''}
@@ -26,9 +26,9 @@ export function FailProperties({ nodeId, data, onUpdate }: FailPropertiesProps) 
       </div>
 
       <div>
-        <Label htmlFor={`cause-${nodeId}`} className="text-xs">
+        <FieldLabel htmlFor={`cause-${nodeId}`} className="text-xs">
           Cause
-        </Label>
+        </FieldLabel>
         <Textarea
           id={`cause-${nodeId}`}
           value={(data.cause as string) || ''}

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -88,7 +88,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
       </span>
 
       <div>
-        <Label className="text-[10px]">Collection Name</Label>
+        <FieldLabel className="text-[10px]">Collection Name</FieldLabel>
         <Input
           value={targetCollectionName}
           onChange={(e) => update('targetCollectionName', e.target.value)}
@@ -122,7 +122,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
                 </div>
                 <div className="grid grid-cols-3 gap-1">
                   <div>
-                    <Label className="text-[9px]">Field</Label>
+                    <FieldLabel className="text-[9px]">Field</FieldLabel>
                     <Input
                       value={filter.field}
                       onChange={(e) => updateFilter(i, 'field', e.target.value)}
@@ -131,7 +131,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
                     />
                   </div>
                   <div>
-                    <Label className="text-[9px]">Operator</Label>
+                    <FieldLabel className="text-[9px]">Operator</FieldLabel>
                     <select
                       value={filter.operator}
                       onChange={(e) => updateFilter(i, 'operator', e.target.value)}
@@ -145,7 +145,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
                     </select>
                   </div>
                   <div>
-                    <Label className="text-[9px]">Value</Label>
+                    <FieldLabel className="text-[9px]">Value</FieldLabel>
                     <Input
                       value={filter.value}
                       onChange={(e) => updateFilter(i, 'value', e.target.value)}
@@ -167,7 +167,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
       {/* Sort & Page Size */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <Label className="text-[10px]">Sort</Label>
+          <FieldLabel className="text-[10px]">Sort</FieldLabel>
           <Input
             value={sort}
             onChange={(e) => update('sort', e.target.value)}
@@ -176,7 +176,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
           />
         </div>
         <div>
-          <Label className="text-[10px]">Page Size</Label>
+          <FieldLabel className="text-[10px]">Page Size</FieldLabel>
           <Input
             type="number"
             value={pageSize}
@@ -213,7 +213,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
                 </div>
                 <div className="grid grid-cols-3 gap-1">
                   <div>
-                    <Label className="text-[9px]">Function</Label>
+                    <FieldLabel className="text-[9px]">Function</FieldLabel>
                     <select
                       value={agg.function}
                       onChange={(e) => updateAgg(i, 'function', e.target.value)}
@@ -227,7 +227,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
                     </select>
                   </div>
                   <div>
-                    <Label className="text-[9px]">Field</Label>
+                    <FieldLabel className="text-[9px]">Field</FieldLabel>
                     <Input
                       value={agg.field || ''}
                       onChange={(e) => updateAgg(i, 'field', e.target.value)}
@@ -236,7 +236,7 @@ export function QueryRecordsParams({ parameters, onUpdate }: QueryRecordsParamsP
                     />
                   </div>
                   <div>
-                    <Label className="text-[9px]">Alias</Label>
+                    <FieldLabel className="text-[9px]">Alias</FieldLabel>
                     <Input
                       value={agg.alias}
                       onChange={(e) => updateAgg(i, 'alias', e.target.value)}

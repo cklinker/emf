@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
+import { FieldLabel } from '@/components/kelta'
 import { Play } from 'lucide-react'
 
 interface TestFlowDialogProps {
@@ -113,7 +113,7 @@ export function TestFlowDialog({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Initial State (JSON)</Label>
+            <FieldLabel className="text-xs">Initial State (JSON)</FieldLabel>
             <Textarea
               value={jsonValue}
               onChange={handleJsonChange}

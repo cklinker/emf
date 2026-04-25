@@ -103,3 +103,7 @@ npm run test:coverage    # With coverage report
 - Vitest 4.0.18, Testing Library, MSW 2.12.7
 - ESLint 9.39.1 (with jsx-a11y), Prettier 3.8.1
 - @kelta/sdk, @kelta/components, @kelta/plugin-sdk
+
+## Design
+See [DESIGN.md](./DESIGN.md) for visual rules, component patterns, and the
+field-label / empty-value / gradient conventions.

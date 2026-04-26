@@ -2,23 +2,26 @@ package io.kelta.worker.listener;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import com.svix.Svix;
-import com.svix.models.MessageIn;
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.PlatformEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.RestClient;
+
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Kafka consumer that bridges collection change events to Svix for
- * outbound webhook delivery.
+ * Bridges collection-change platform events to Svix for outbound webhook
+ * delivery, scoped to the appropriate tenant.
  *
- * <p>Listens to the {@code kelta.config.collection.changed} topic and
- * publishes webhook messages to Svix, scoped to the appropriate tenant.
+ * <p>Talks to the Svix REST API directly via {@link RestClient} rather than
+ * the Svix Java SDK 1.68.0 — the SDK ships Jackson-2 model annotations and
+ * doesn't deserialize cleanly under Spring Boot 4 / Jackson 3.
  *
  * @since 1.0.0
  */
@@ -31,11 +34,11 @@ public class SvixWebhookPublisher {
             ChangeType.UPDATED, "collection.updated"
     );
 
-    private final Svix svix;
+    private final RestClient svixRestClient;
     private final ObjectMapper objectMapper;
 
-    public SvixWebhookPublisher(Svix svix, ObjectMapper objectMapper) {
-        this.svix = svix;
+    public SvixWebhookPublisher(RestClient svixRestClient, ObjectMapper objectMapper) {
+        this.svixRestClient = svixRestClient;
         this.objectMapper = objectMapper;
     }
 
@@ -71,19 +74,21 @@ public class SvixWebhookPublisher {
             webhookPayload.put("changeType", payload.getChangeType().name());
             webhookPayload.put("timestamp", event.getTimestamp() != null ? event.getTimestamp().toString() : null);
 
-            String payloadJson = objectMapper.writeValueAsString(webhookPayload);
-
-            var messageIn = new MessageIn();
-            messageIn.setEventType(eventType);
-            messageIn.setPayload(payloadJson);
-            messageIn.setEventId(event.getEventId());
-
-            // Include collection name as a channel so endpoints can filter by collection
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("eventType", eventType);
+            body.put("payload", webhookPayload);
+            body.put("eventId", event.getEventId());
             if (payload.getName() != null && !payload.getName().isBlank()) {
-                messageIn.setChannels(Set.of(payload.getName()));
+                body.put("channels", Set.of(payload.getName()));
             }
 
-            svix.getMessage().create(tenantId, messageIn);
+            svixRestClient.post()
+                    .uri("/api/v1/app/{appId}/msg/", tenantId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+
             log.info("Published Svix webhook: type={}, tenant={}, collection={}",
                     eventType, tenantId, payload.getName());
 

@@ -1,8 +1,6 @@
 package io.kelta.worker.config;
 
 import tools.jackson.databind.ObjectMapper;
-import com.svix.Svix;
-import com.svix.models.EventTypeIn;
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
 import io.kelta.worker.listener.SvixTenantLifecycleHook;
 import io.kelta.worker.listener.SvixWebhookPublisher;
@@ -16,15 +14,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Spring configuration for the Svix webhook service client.
  *
- * <p>Creates a {@link Svix} client bean and registers webhook event types
- * on application startup.
+ * <p>Builds a {@link RestClient} bean pre-authenticated against the Svix
+ * server and registers webhook event types on application startup.
+ *
+ * <p>Talks to the Svix REST API directly rather than using the Svix Java
+ * SDK 1.68.0 — the SDK ships Jackson-2 model annotations and doesn't
+ * deserialize cleanly under Spring Boot 4 / Jackson 3.
  *
  * <p>Enabled when {@code kelta.svix.auth-token} is set.
  *
@@ -47,23 +51,16 @@ public class SvixConfig {
     @Value("${kelta.svix.auth-token}")
     private String authToken;
 
-    private Svix svixClient;
-
-    @Bean
-    public Svix svix() {
-        log.info("Configuring Svix client with server URL: {}", serverUrl);
-        var options = new com.svix.SvixOptions();
-        options.setServerUrl(serverUrl);
-        this.svixClient = new Svix(authToken, options);
-        return this.svixClient;
-    }
+    private RestClient svixRestClient;
 
     @Bean("svixRestClient")
     public RestClient svixRestClient() {
-        return RestClient.builder()
+        log.info("Configuring Svix RestClient with server URL: {}", serverUrl);
+        this.svixRestClient = RestClient.builder()
                 .baseUrl(serverUrl)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + authToken)
                 .build();
+        return this.svixRestClient;
     }
 
     @Bean
@@ -81,30 +78,34 @@ public class SvixConfig {
     }
 
     @Bean
-    public SvixWebhookPublisher svixWebhookPublisher(Svix svix, ObjectMapper objectMapper) {
-        return new SvixWebhookPublisher(svix, objectMapper);
+    public SvixWebhookPublisher svixWebhookPublisher(RestClient svixRestClient, ObjectMapper objectMapper) {
+        return new SvixWebhookPublisher(svixRestClient, objectMapper);
     }
 
     /**
-     * Registers webhook event types with Svix on startup.
-     * Idempotent — Svix allows re-registering existing types.
+     * Registers webhook event types with Svix on startup. Idempotent —
+     * Svix returns 409 for an existing type, which we log and ignore.
      */
     @EventListener(ApplicationReadyEvent.class)
     public void registerEventTypes() {
-        if (svixClient == null) {
-            log.warn("Svix client not initialized — skipping event type registration");
+        if (svixRestClient == null) {
+            log.warn("Svix RestClient not initialized — skipping event type registration");
             return;
         }
-
         for (String eventType : EVENT_TYPES) {
             try {
-                var eventTypeIn = new EventTypeIn();
-                eventTypeIn.setName(eventType);
-                eventTypeIn.setDescription("Collection " + eventType.split("\\.")[1] + " event");
-                svixClient.getEventType().create(eventTypeIn);
+                Map<String, Object> body = Map.of(
+                        "name", eventType,
+                        "description", "Collection " + eventType.split("\\.")[1] + " event"
+                );
+                svixRestClient.post()
+                        .uri("/api/v1/event-type/")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(body)
+                        .retrieve()
+                        .toBodilessEntity();
                 log.info("Registered Svix event type: {}", eventType);
             } catch (Exception e) {
-                // Svix returns 409 if event type already exists — this is expected
                 log.debug("Svix event type '{}' already exists or registration failed: {}",
                         eventType, e.getMessage());
             }

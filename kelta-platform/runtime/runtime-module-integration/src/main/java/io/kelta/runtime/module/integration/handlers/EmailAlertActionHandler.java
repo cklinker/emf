@@ -1,5 +1,7 @@
 package io.kelta.runtime.module.integration.handlers;
 
+import io.kelta.runtime.module.integration.mapping.PayloadMapperException;
+import io.kelta.runtime.module.integration.mapping.PayloadMapperService;
 import io.kelta.runtime.module.integration.spi.EmailService;
 import io.kelta.runtime.workflow.ActionContext;
 import io.kelta.runtime.workflow.ActionHandler;
@@ -9,6 +11,7 @@ import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -38,10 +41,17 @@ public class EmailAlertActionHandler implements ActionHandler {
 
     private final ObjectMapper objectMapper;
     private final EmailService emailService;
+    private final PayloadMapperService payloadMapper;
 
     public EmailAlertActionHandler(ObjectMapper objectMapper, EmailService emailService) {
+        this(objectMapper, emailService, null);
+    }
+
+    public EmailAlertActionHandler(ObjectMapper objectMapper, EmailService emailService,
+                                    PayloadMapperService payloadMapper) {
         this.objectMapper = objectMapper;
         this.emailService = emailService;
+        this.payloadMapper = payloadMapper;
     }
 
     @Override
@@ -84,6 +94,24 @@ public class EmailAlertActionHandler implements ActionHandler {
                 return ActionResult.failure("Email 'subject' is required");
             }
 
+            // PR 5: pass subject + body through the payload mapper so users
+            // can write ${$.path} placeholders or =jsonata expressions in
+            // either field. Falls back to the unresolved string when the
+            // mapper isn't wired (legacy installs).
+            if (payloadMapper != null) {
+                Map<String, Object> stateData = mappingState(context);
+                try {
+                    Object subjectMapped = payloadMapper.map(subject, stateData);
+                    if (subjectMapped instanceof String s) subject = s;
+                    if (body != null) {
+                        Object bodyMapped = payloadMapper.map(body, stateData);
+                        if (bodyMapped instanceof String s) body = s;
+                    }
+                } catch (PayloadMapperException e) {
+                    return ActionResult.failure("Mapper.Failure: " + e.getMessage());
+                }
+            }
+
             String emailLogId = emailService.queueEmail(
                 context.tenantId(), to, subject, body != null ? body : "",
                 "WORKFLOW", context.workflowRuleId()
@@ -102,6 +130,12 @@ public class EmailAlertActionHandler implements ActionHandler {
             log.error("Failed to execute email alert action: {}", e.getMessage(), e);
             return ActionResult.failure(e);
         }
+    }
+
+    private Map<String, Object> mappingState(ActionContext context) {
+        Map<String, Object> base = context.resolvedData() != null
+            ? context.resolvedData() : context.data();
+        return base != null ? base : new HashMap<>();
     }
 
     @Override

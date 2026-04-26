@@ -6,6 +6,7 @@ import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.flow.FlowEngine;
 import io.kelta.runtime.flow.FlowTriggerEvaluator;
 import io.kelta.runtime.flow.InitialStateBuilder;
+import io.kelta.worker.service.TenantSlugResolver;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -42,6 +43,7 @@ public class FlowEventListener {
     private final InitialStateBuilder initialStateBuilder;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final TenantSlugResolver tenantSlugResolver;
 
     /**
      * Cache: tenantId → list of active flow trigger configs.
@@ -62,12 +64,14 @@ public class FlowEventListener {
                               FlowTriggerEvaluator triggerEvaluator,
                               InitialStateBuilder initialStateBuilder,
                               JdbcTemplate jdbcTemplate,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              TenantSlugResolver tenantSlugResolver) {
         this.flowEngine = flowEngine;
         this.triggerEvaluator = triggerEvaluator;
         this.initialStateBuilder = initialStateBuilder;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.tenantSlugResolver = tenantSlugResolver;
     }
 
     /**
@@ -104,7 +108,12 @@ public class FlowEventListener {
                     payload.getCollectionName(), payload.getRecordId(), payload.getChangeType());
 
             final String boundUserId = userId;
-            TenantContext.runWithTenant(tenantId, () -> {
+            String tenantSlug = tenantSlugResolver.resolveSlug(tenantId).orElse(null);
+            if (tenantSlug == null) {
+                log.warn("Could not resolve slug for tenant {} — flow execution will fall back to public schema",
+                        tenantId);
+            }
+            TenantContext.runWithTenant(tenantId, tenantSlug, () -> {
                 List<FlowTriggerConfig> configs = getActiveFlowConfigs(tenantId);
                 if (configs.isEmpty()) {
                     return;

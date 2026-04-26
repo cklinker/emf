@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../../../context/ApiContext'
 import { useToast, LoadingSpinner } from '../../../components'
+import { unwrapCollection } from '../../../utils/jsonapi'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -109,8 +110,8 @@ export function ExecutionsTab({ flowId, onViewExecution }: ExecutionsTabProps) {
     queryFn: async () => {
       const resp = await apiClient.fetch(`/api/flows/${flowId}/flow-executions?limit=100`)
       if (!resp.ok) throw new Error('Failed to load executions')
-      const json = (await resp.json()) as { executions: FlowExecution[] }
-      return json.executions || []
+      const json = await resp.json()
+      return unwrapCollection<FlowExecution>(json).data
     },
     refetchInterval: 5000,
   })

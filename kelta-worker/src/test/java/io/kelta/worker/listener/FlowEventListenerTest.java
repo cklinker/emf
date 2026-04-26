@@ -7,6 +7,7 @@ import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.flow.FlowEngine;
 import io.kelta.runtime.flow.FlowTriggerEvaluator;
 import io.kelta.runtime.flow.InitialStateBuilder;
+import io.kelta.worker.service.TenantSlugResolver;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +19,7 @@ import org.springframework.jdbc.core.RowMapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -31,6 +33,7 @@ class FlowEventListenerTest {
     private InitialStateBuilder initialStateBuilder;
     private JdbcTemplate jdbcTemplate;
     private ObjectMapper objectMapper;
+    private TenantSlugResolver tenantSlugResolver;
     private FlowEventListener listener;
 
     @BeforeEach
@@ -40,7 +43,10 @@ class FlowEventListenerTest {
         initialStateBuilder = mock(InitialStateBuilder.class);
         jdbcTemplate = mock(JdbcTemplate.class);
         objectMapper = new ObjectMapper();
-        listener = new FlowEventListener(flowEngine, triggerEvaluator, initialStateBuilder, jdbcTemplate, objectMapper);
+        tenantSlugResolver = mock(TenantSlugResolver.class);
+        when(tenantSlugResolver.resolveSlug(anyString())).thenReturn(Optional.of("acme-corp"));
+        listener = new FlowEventListener(flowEngine, triggerEvaluator, initialStateBuilder,
+                jdbcTemplate, objectMapper, tenantSlugResolver);
     }
 
     @Nested
@@ -192,6 +198,58 @@ class FlowEventListenerTest {
 
             // The trigger evaluator should still be called (with empty map from the catch block)
             verify(triggerEvaluator).matchesRecordTrigger(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("tenant slug binding")
+    class TenantSlugBinding {
+
+        @Test
+        @DisplayName("Should resolve and bind tenant slug so flow execution sees correct schema")
+        @SuppressWarnings("unchecked")
+        void shouldBindTenantSlugDuringFlowExecution() throws Exception {
+            String plainConfig = """
+                {"events": ["UPDATED"], "collection": "orders"}
+                """;
+
+            stubJdbcWithTriggerConfig(plainConfig);
+            when(tenantSlugResolver.resolveSlug("tenant-1")).thenReturn(Optional.of("threadline-clothing"));
+            when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(true);
+            when(initialStateBuilder.buildFromRecordEvent(any(), any(), any())).thenReturn(Map.of());
+
+            // Capture the slug seen by TenantContext at the moment startExecution is invoked.
+            java.util.concurrent.atomic.AtomicReference<String> seenSlug = new java.util.concurrent.atomic.AtomicReference<>();
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean()))
+                    .thenAnswer(invocation -> {
+                        seenSlug.set(io.kelta.runtime.context.TenantContext.getSlug());
+                        return "exec-1";
+                    });
+
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.UPDATED));
+
+            verify(tenantSlugResolver).resolveSlug("tenant-1");
+            assertThat(seenSlug.get()).isEqualTo("threadline-clothing");
+        }
+
+        @Test
+        @DisplayName("Should still execute when slug cannot be resolved (logs warning and falls back)")
+        @SuppressWarnings("unchecked")
+        void shouldExecuteWithoutSlugWhenUnresolvable() throws Exception {
+            String plainConfig = """
+                {"events": ["UPDATED"], "collection": "orders"}
+                """;
+
+            stubJdbcWithTriggerConfig(plainConfig);
+            when(tenantSlugResolver.resolveSlug("tenant-1")).thenReturn(Optional.empty());
+            when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(true);
+            when(initialStateBuilder.buildFromRecordEvent(any(), any(), any())).thenReturn(Map.of());
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
+
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.UPDATED));
+
+            // Execution still attempted — degraded behaviour, but trigger evaluation still happens
+            verify(flowEngine).startExecution(eq("tenant-1"), any(), any(), any(), any(), anyBoolean());
         }
     }
 

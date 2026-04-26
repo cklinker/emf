@@ -35,7 +35,8 @@ public class TenantProvisioningHook implements BeforeSaveHook {
             "VIEW_SETUP", "CUSTOMIZE_APPLICATION", "MANAGE_USERS", "MANAGE_GROUPS",
             "MANAGE_SHARING", "MANAGE_WORKFLOWS", "MANAGE_REPORTS", "MANAGE_EMAIL_TEMPLATES",
             "MANAGE_CONNECTED_APPS", "MANAGE_DATA", "API_ACCESS", "VIEW_ALL_DATA",
-            "MODIFY_ALL_DATA", "MANAGE_APPROVALS", "MANAGE_LISTVIEWS", "MANAGE_TENANTS"
+            "MODIFY_ALL_DATA", "MANAGE_APPROVALS", "MANAGE_LISTVIEWS", "MANAGE_TENANTS",
+            "MANAGE_CREDENTIALS", "VIEW_CREDENTIALS"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -102,10 +103,11 @@ public class TenantProvisioningHook implements BeforeSaveHook {
                         Set.of("VIEW_SETUP", "CUSTOMIZE_APPLICATION", "MANAGE_USERS", "MANAGE_GROUPS",
                                 "MANAGE_SHARING", "MANAGE_WORKFLOWS", "MANAGE_REPORTS", "MANAGE_EMAIL_TEMPLATES",
                                 "MANAGE_CONNECTED_APPS", "MANAGE_DATA", "API_ACCESS", "VIEW_ALL_DATA",
-                                "MODIFY_ALL_DATA", "MANAGE_APPROVALS", "MANAGE_LISTVIEWS")),
+                                "MODIFY_ALL_DATA", "MANAGE_APPROVALS", "MANAGE_LISTVIEWS",
+                                "MANAGE_CREDENTIALS", "VIEW_CREDENTIALS")),
                 new ProfileDef("Standard User",
                         "Read, create, and edit records in all collections",
-                        Set.of("API_ACCESS", "MANAGE_LISTVIEWS")),
+                        Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "VIEW_CREDENTIALS")),
                 new ProfileDef("Read Only",
                         "View all records and reports, no create/edit/delete capability",
                         Set.of("VIEW_ALL_DATA")),

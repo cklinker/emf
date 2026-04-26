@@ -205,6 +205,10 @@ export type { WebhooksPageProps } from './WebhooksPage'
 export { ConnectedAppsPage } from './ConnectedAppsPage'
 export type { ConnectedAppsPageProps } from './ConnectedAppsPage'
 
+// CredentialsPage - Tenant-managed credentials (PR 1)
+export { CredentialsPage } from './CredentialsPage'
+export type { CredentialsPageProps } from './CredentialsPage'
+
 // ApiTokensPage - Personal access token management page
 export { ApiTokensPage } from './ApiTokensPage'
 export type { ApiTokensPageProps } from './ApiTokensPage'

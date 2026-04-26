@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SMTP",
+  "type": "object",
+  "required": ["host", "port", "username", "password"],
+  "properties": {
+    "host": {
+      "type": "string",
+      "title": "Host",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "port": {
+      "type": "integer",
+      "title": "Port",
+      "minimum": 1,
+      "maximum": 65535,
+      "default": 587
+    },
+    "username": {
+      "type": "string",
+      "title": "Username",
+      "minLength": 1
+    },
+    "password": {
+      "type": "string",
+      "format": "secret",
+      "title": "Password",
+      "minLength": 1
+    },
+    "useTls": {
+      "type": "boolean",
+      "default": true,
+      "title": "Use implicit TLS (SMTPS)",
+      "description": "When true, connect via TLS from the start (typically port 465)."
+    },
+    "useStartTls": {
+      "type": "boolean",
+      "default": true,
+      "title": "Use STARTTLS",
+      "description": "When true, upgrade plaintext to TLS via STARTTLS (typically port 587)."
+    },
+    "fromAddress": {
+      "type": "string",
+      "format": "email",
+      "title": "Default 'From' address",
+      "description": "Address used as the sender when a message does not provide one."
+    }
+  }
+}

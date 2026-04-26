@@ -1,0 +1,10 @@
+{
+  "key": "salesforce",
+  "name": "Salesforce",
+  "type": "oauth2_authorization_code",
+  "defaults": {
+    "authorizationUrl": "https://login.salesforce.com/services/oauth2/authorize",
+    "tokenUrl": "https://login.salesforce.com/services/oauth2/token",
+    "scopes": ["api", "refresh_token", "offline_access"]
+  }
+}

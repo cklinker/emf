@@ -1,0 +1,10 @@
+{
+  "key": "slack",
+  "name": "Slack",
+  "type": "oauth2_authorization_code",
+  "defaults": {
+    "authorizationUrl": "https://slack.com/oauth/v2/authorize",
+    "tokenUrl": "https://slack.com/api/oauth.v2.access",
+    "scopes": ["chat:write", "channels:read", "users:read"]
+  }
+}

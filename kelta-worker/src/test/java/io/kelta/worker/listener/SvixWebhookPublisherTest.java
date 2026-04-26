@@ -1,44 +1,42 @@
 package io.kelta.worker.listener;
 
 import tools.jackson.databind.ObjectMapper;
-import com.svix.Svix;
-import com.svix.api.Message;
-import com.svix.models.MessageIn;
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.PlatformEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
-import java.util.Set;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 @DisplayName("SvixWebhookPublisher")
 class SvixWebhookPublisherTest {
 
-    private Svix svix;
-    private Message messageApi;
+    private MockRestServiceServer server;
     private ObjectMapper objectMapper;
     private SvixWebhookPublisher publisher;
 
     @BeforeEach
     void setUp() {
-        svix = mock(Svix.class);
-        messageApi = mock(Message.class);
-        when(svix.getMessage()).thenReturn(messageApi);
+        var builder = RestClient.builder()
+                .baseUrl("http://svix.test")
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer test-token");
+        server = MockRestServiceServer.bindTo(builder).build();
         objectMapper = new ObjectMapper();
-        publisher = new SvixWebhookPublisher(svix, objectMapper);
+        publisher = new SvixWebhookPublisher(builder.build(), objectMapper);
     }
 
-    private String buildEventJson(String tenantId, String collectionName, ChangeType changeType) throws Exception {
+    private String buildEventJson(String tenantId, String collectionName, ChangeType changeType) {
         var payload = new CollectionChangedPayload();
         payload.setId(UUID.randomUUID().toString());
         payload.setName(collectionName);
@@ -56,69 +54,84 @@ class SvixWebhookPublisherTest {
 
     @Test
     @DisplayName("publishes collection name as channel on the message")
-    void publishesCollectionNameAsChannel() throws Exception {
+    void publishesCollectionNameAsChannel() {
         String json = buildEventJson("tenant-1", "accounts", ChangeType.CREATED);
+
+        server.expect(requestTo("http://svix.test/api/v1/app/tenant-1/msg/"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-token"))
+                .andExpect(jsonPath("$.eventType").value("collection.created"))
+                .andExpect(jsonPath("$.channels[0]").value("accounts"))
+                .andExpect(jsonPath("$.payload.collectionName").value("accounts"))
+                .andRespond(withSuccess());
 
         publisher.onCollectionChanged(json);
 
-        ArgumentCaptor<MessageIn> captor = ArgumentCaptor.forClass(MessageIn.class);
-        verify(messageApi).create(eq("tenant-1"), captor.capture());
-
-        MessageIn sent = captor.getValue();
-        assertEquals("collection.created", sent.getEventType());
-        assertNotNull(sent.getChannels());
-        assertTrue(sent.getChannels().contains("accounts"));
+        server.verify();
     }
 
     @Test
     @DisplayName("publishes updated event with collection channel")
-    void publishesUpdatedEventWithChannel() throws Exception {
+    void publishesUpdatedEventWithChannel() {
         String json = buildEventJson("tenant-2", "contacts", ChangeType.UPDATED);
+
+        server.expect(requestTo("http://svix.test/api/v1/app/tenant-2/msg/"))
+                .andExpect(jsonPath("$.eventType").value("collection.updated"))
+                .andExpect(jsonPath("$.channels[0]").value("contacts"))
+                .andRespond(withSuccess());
 
         publisher.onCollectionChanged(json);
 
-        ArgumentCaptor<MessageIn> captor = ArgumentCaptor.forClass(MessageIn.class);
-        verify(messageApi).create(eq("tenant-2"), captor.capture());
-
-        MessageIn sent = captor.getValue();
-        assertEquals("collection.updated", sent.getEventType());
-        assertEquals(Set.of("contacts"), sent.getChannels());
+        server.verify();
     }
 
     @Test
     @DisplayName("does not publish when tenant ID is missing")
-    void skipsMissingTenantId() throws Exception {
+    void skipsMissingTenantId() {
         String json = buildEventJson(null, "accounts", ChangeType.CREATED);
 
         publisher.onCollectionChanged(json);
 
-        verify(messageApi, never()).create(anyString(), any(MessageIn.class));
+        server.verify();
     }
 
     @Test
     @DisplayName("does not publish for unhandled change type")
-    void skipsUnhandledChangeType() throws Exception {
+    void skipsUnhandledChangeType() {
         String json = buildEventJson("tenant-1", "accounts", ChangeType.DELETED);
 
         publisher.onCollectionChanged(json);
 
-        verify(messageApi, never()).create(anyString(), any(MessageIn.class));
+        server.verify();
     }
 
     @Test
     @DisplayName("payload contains collection metadata")
-    void payloadContainsCollectionMetadata() throws Exception {
+    void payloadContainsCollectionMetadata() {
         String json = buildEventJson("tenant-1", "orders", ChangeType.CREATED);
+
+        server.expect(requestTo("http://svix.test/api/v1/app/tenant-1/msg/"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.payload.collectionName").value("orders"))
+                .andExpect(jsonPath("$.payload.displayName").value("orders"))
+                .andExpect(jsonPath("$.payload.changeType").value("CREATED"))
+                .andRespond(withSuccess());
 
         publisher.onCollectionChanged(json);
 
-        ArgumentCaptor<MessageIn> captor = ArgumentCaptor.forClass(MessageIn.class);
-        verify(messageApi).create(eq("tenant-1"), captor.capture());
+        server.verify();
+    }
 
-        String payloadJson = captor.getValue().getPayload();
-        var payloadMap = objectMapper.readValue(payloadJson, java.util.Map.class);
-        assertEquals("orders", payloadMap.get("collectionName"));
-        assertEquals("orders", payloadMap.get("displayName"));
-        assertEquals("CREATED", payloadMap.get("changeType"));
+    @Test
+    @DisplayName("swallows Svix errors and does not throw")
+    void swallowsErrors() {
+        String json = buildEventJson("tenant-1", "accounts", ChangeType.CREATED);
+
+        server.expect(requestTo("http://svix.test/api/v1/app/tenant-1/msg/"))
+                .andRespond(withServerError());
+
+        publisher.onCollectionChanged(json);
+
+        server.verify();
     }
 }

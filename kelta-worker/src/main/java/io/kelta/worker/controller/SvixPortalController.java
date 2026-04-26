@@ -1,15 +1,15 @@
 package io.kelta.worker.controller;
 
-import com.svix.Svix;
-import com.svix.models.AppPortalAccessIn;
 import io.kelta.worker.service.SvixTenantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClientResponseException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
@@ -31,14 +31,11 @@ public class SvixPortalController {
 
     private static final Logger log = LoggerFactory.getLogger(SvixPortalController.class);
 
-    private final Svix svix;
     private final SvixTenantService svixTenantService;
     private final String svixServerUrl;
 
-    public SvixPortalController(Svix svix,
-                                SvixTenantService svixTenantService,
+    public SvixPortalController(SvixTenantService svixTenantService,
                                 @Value("${kelta.svix.public-url:${kelta.svix.server-url}}") String svixServerUrl) {
-        this.svix = svix;
         this.svixTenantService = svixTenantService;
         this.svixServerUrl = svixServerUrl;
     }
@@ -53,15 +50,20 @@ public class SvixPortalController {
 
         try {
             svixTenantService.ensureApplication(tenantId, tenantId);
-            var accessIn = new AppPortalAccessIn();
-            var accessOut = svix.getAuthentication().appPortalAccess(tenantId, accessIn);
+            var access = svixTenantService.getPortalAccess(tenantId);
             return ResponseEntity.ok(Map.of(
-                    "token", accessOut.getToken(),
+                    "token", access.token(),
                     "appId", tenantId,
                     "serverUrl", svixServerUrl
             ));
+        } catch (RestClientResponseException e) {
+            log.error("Svix returned {} for tenant '{}': {}",
+                    e.getStatusCode(), tenantId, e.getResponseBodyAsString());
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
+                    "error", "Svix returned " + e.getStatusCode().value()
+            ));
         } catch (Exception e) {
-            log.error("Failed to generate Svix portal access for tenant '{}': {}", tenantId, e.getMessage());
+            log.error("Failed to generate Svix portal access for tenant '{}'", tenantId, e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Failed to generate webhook portal access"));
         }

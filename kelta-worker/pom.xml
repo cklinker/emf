@@ -192,13 +192,6 @@
             <artifactId>caffeine</artifactId>
         </dependency>
 
-        <!-- Svix SDK for webhook delivery -->
-        <dependency>
-            <groupId>com.svix</groupId>
-            <artifactId>svix</artifactId>
-            <version>1.68.0</version>
-        </dependency>
-
         <!-- Jackson 3 -->
         <dependency>
             <groupId>tools.jackson.core</groupId>

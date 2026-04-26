@@ -89,29 +89,57 @@ CREATE POLICY admin_bypass ON credential_oauth_token
     USING (current_setting('app.current_tenant_id', true) = '');
 
 -- Grant the new credential-management permissions to existing System Administrator
--- profiles. New tenants pick up the same grants via TenantProvisioningHook.
+-- and Standard User profiles. New tenants pick up the same grants via
+-- TenantProvisioningHook.
+--
+-- profile_system_permission.tenant_id has been NOT NULL since V85, so the
+-- INSERT must include it (mirrors the V112 pattern for MANAGE_TENANTS).
+-- ON CONFLICT can't be used because there's no UNIQUE constraint on
+-- (profile_id, permission_name); use a NOT EXISTS guard instead.
 DO $$
 DECLARE
-    p_id VARCHAR(36);
+    p RECORD;
 BEGIN
-    FOR p_id IN
-        SELECT id FROM profile WHERE name = 'System Administrator' AND is_system = TRUE
+    FOR p IN
+        SELECT id, tenant_id
+        FROM profile
+        WHERE name = 'System Administrator' AND is_system = TRUE
     LOOP
-        INSERT INTO profile_system_permission (id, profile_id, permission_name, granted)
-        VALUES (gen_random_uuid()::text, p_id, 'MANAGE_CREDENTIALS', TRUE)
-        ON CONFLICT DO NOTHING;
-        INSERT INTO profile_system_permission (id, profile_id, permission_name, granted)
-        VALUES (gen_random_uuid()::text, p_id, 'VIEW_CREDENTIALS', TRUE)
-        ON CONFLICT DO NOTHING;
+        IF NOT EXISTS (
+            SELECT 1 FROM profile_system_permission
+            WHERE profile_id = p.id AND permission_name = 'MANAGE_CREDENTIALS'
+        ) THEN
+            INSERT INTO profile_system_permission
+                (id, tenant_id, profile_id, permission_name, granted)
+            VALUES (gen_random_uuid()::text, p.tenant_id, p.id,
+                    'MANAGE_CREDENTIALS', TRUE);
+        END IF;
+        IF NOT EXISTS (
+            SELECT 1 FROM profile_system_permission
+            WHERE profile_id = p.id AND permission_name = 'VIEW_CREDENTIALS'
+        ) THEN
+            INSERT INTO profile_system_permission
+                (id, tenant_id, profile_id, permission_name, granted)
+            VALUES (gen_random_uuid()::text, p.tenant_id, p.id,
+                    'VIEW_CREDENTIALS', TRUE);
+        END IF;
     END LOOP;
 
     -- Standard users can VIEW credentials (so they can pick one in a flow)
     -- but cannot manage them.
-    FOR p_id IN
-        SELECT id FROM profile WHERE name = 'Standard User' AND is_system = TRUE
+    FOR p IN
+        SELECT id, tenant_id
+        FROM profile
+        WHERE name = 'Standard User' AND is_system = TRUE
     LOOP
-        INSERT INTO profile_system_permission (id, profile_id, permission_name, granted)
-        VALUES (gen_random_uuid()::text, p_id, 'VIEW_CREDENTIALS', TRUE)
-        ON CONFLICT DO NOTHING;
+        IF NOT EXISTS (
+            SELECT 1 FROM profile_system_permission
+            WHERE profile_id = p.id AND permission_name = 'VIEW_CREDENTIALS'
+        ) THEN
+            INSERT INTO profile_system_permission
+                (id, tenant_id, profile_id, permission_name, granted)
+            VALUES (gen_random_uuid()::text, p.tenant_id, p.id,
+                    'VIEW_CREDENTIALS', TRUE);
+        END IF;
     END LOOP;
 END $$;

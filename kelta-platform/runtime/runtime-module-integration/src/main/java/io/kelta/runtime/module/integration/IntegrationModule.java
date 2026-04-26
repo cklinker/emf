@@ -1,7 +1,12 @@
 package io.kelta.runtime.module.integration;
 
+import io.kelta.runtime.flow.StateDataResolver;
 import io.kelta.runtime.module.integration.handlers.*;
+import io.kelta.runtime.module.integration.mapping.PayloadMapperService;
+import io.kelta.runtime.module.integration.spi.ApiSpecStore;
+import io.kelta.runtime.module.integration.spi.CredentialResolverPort;
 import io.kelta.runtime.module.integration.spi.EmailService;
+import io.kelta.runtime.module.integration.spi.IdempotencyStore;
 import io.kelta.runtime.module.integration.spi.PendingActionStore;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor;
 import io.kelta.runtime.module.integration.spi.noop.LoggingEmailService;
@@ -96,6 +101,23 @@ public class IntegrationModule implements KeltaModule {
             scriptExecutor = new LoggingScriptExecutor();
         }
         handlers.add(new InvokeScriptActionHandler(objectMapper, scriptExecutor));
+
+        // CALL_API — generic external-API step. Pulls SPI implementations
+        // from the worker via ModuleContext extensions; missing extensions
+        // produce typed runtime errors instead of failing module startup so
+        // legacy installations stay bootable.
+        StateDataResolver dataResolver = context.getExtension(StateDataResolver.class);
+        if (dataResolver == null) {
+            dataResolver = new StateDataResolver(objectMapper);
+        }
+        PayloadMapperService payloadMapper = new PayloadMapperService(dataResolver);
+        ApiSpecStore apiSpecStore = context.getExtension(ApiSpecStore.class);
+        CredentialResolverPort credentialResolver =
+            context.getExtension(CredentialResolverPort.class);
+        IdempotencyStore idempotencyStore = context.getExtension(IdempotencyStore.class);
+        handlers.add(new CallApiActionHandler(
+            objectMapper, payloadMapper, apiSpecStore,
+            credentialResolver, idempotencyStore, restTemplate));
     }
 
     @Override

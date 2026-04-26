@@ -318,6 +318,7 @@ export const RESOURCE_GROUPS: ResourceGroup[] = [
   {
     label: 'Integration',
     options: [
+      { value: 'CALL_API', label: 'Call API' },
       { value: 'HTTP_CALLOUT', label: 'HTTP Callout' },
       { value: 'PUBLISH_EVENT', label: 'Publish Event' },
       { value: 'INVOKE_SCRIPT', label: 'Invoke Script' },

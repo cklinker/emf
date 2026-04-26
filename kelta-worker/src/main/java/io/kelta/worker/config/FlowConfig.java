@@ -183,7 +183,13 @@ public class FlowConfig {
                                           FlowEngine flowEngine,
                                           RollupSummaryService rollupSummaryService,
                                           @Autowired(required = false) EmailService emailService,
-                                          @Autowired(required = false) ScriptExecutor scriptExecutor) {
+                                          @Autowired(required = false) ScriptExecutor scriptExecutor,
+                                          @Autowired(required = false)
+                                              io.kelta.runtime.module.integration.spi.ApiSpecStore apiSpecStore,
+                                          @Autowired(required = false)
+                                              io.kelta.runtime.module.integration.spi.CredentialResolverPort credentialResolverPort,
+                                          @Autowired(required = false)
+                                              io.kelta.runtime.module.integration.spi.IdempotencyStore idempotencyStore) {
         ModuleRegistry registry = new ModuleRegistry(actionHandlerRegistry, beforeSaveHookRegistry);
 
         if (discoveredModules != null && !discoveredModules.isEmpty()) {
@@ -199,6 +205,23 @@ public class FlowConfig {
             if (scriptExecutor != null) {
                 extensions.put(ScriptExecutor.class, scriptExecutor);
                 log.info("ScriptExecutor wired into module context — flow scripts will use GraalVM execution");
+            }
+
+            // PR 4: wire CALL_API SPI implementations so the integration
+            // module can resolve specs, credentials, and idempotency state.
+            if (apiSpecStore != null) {
+                extensions.put(io.kelta.runtime.module.integration.spi.ApiSpecStore.class, apiSpecStore);
+                log.info("ApiSpecStore wired into module context — CALL_API operation mode active");
+            }
+            if (credentialResolverPort != null) {
+                extensions.put(io.kelta.runtime.module.integration.spi.CredentialResolverPort.class,
+                    credentialResolverPort);
+                log.info("CredentialResolverPort wired into module context — CALL_API can attach credentials");
+            }
+            if (idempotencyStore != null) {
+                extensions.put(io.kelta.runtime.module.integration.spi.IdempotencyStore.class,
+                    idempotencyStore);
+                log.info("IdempotencyStore wired into module context — CALL_API will dedupe non-idempotent calls");
             }
 
             ModuleContext context = new ModuleContext(

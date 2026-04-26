@@ -52,6 +52,15 @@
             <version>2.1.22</version>
         </dependency>
 
+        <!-- JSONata: structural transform language used by PayloadMapperService.
+             Layered on top of the existing ${$.path} substitution so any string
+             starting with `=` is treated as a JSONata expression. -->
+        <dependency>
+            <groupId>com.dashjoin</groupId>
+            <artifactId>jsonata</artifactId>
+            <version>0.9.8</version>
+        </dependency>
+
         <!-- GraalVM Polyglot API for JavaScript script execution -->
         <dependency>
             <groupId>org.graalvm.polyglot</groupId>

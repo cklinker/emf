@@ -13,6 +13,7 @@ import { DeleteRecordParams } from './DeleteRecordParams'
 import { FieldUpdateParams } from './FieldUpdateParams'
 import { LogMessageParams } from './LogMessageParams'
 import { HttpCalloutParams } from './HttpCalloutParams'
+import { CallApiParams } from './CallApiParams'
 import { SendNotificationParams } from './SendNotificationParams'
 import { EmailAlertParams } from './EmailAlertParams'
 import { TriggerFlowParams } from './TriggerFlowParams'
@@ -92,6 +93,12 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
       )}
       {resource === 'HTTP_CALLOUT' && (
         <HttpCalloutParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'CALL_API' && (
+        <CallApiParams
           parameters={data.parameters as Record<string, unknown> | undefined}
           onUpdate={(params) => onUpdate({ parameters: params })}
         />

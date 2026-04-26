@@ -514,6 +514,10 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("related_collection_id"))
             .addField(FieldDefinition.string("folder"))
             .addField(FieldDefinition.bool("isActive").withColumnName("is_active"))
+            // PR 5 — payload mapper integration
+            .addField(FieldDefinition.json("variablesSchema").withColumnName("variables_schema"))
+            .addField(FieldDefinition.lookup("smtpCredentialId", "credentials", "SMTP Credential")
+                .withColumnName("smtp_credential_id"))
             .build();
     }
 

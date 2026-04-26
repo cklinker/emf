@@ -90,11 +90,19 @@ public class IntegrationModule implements KeltaModule {
         }
         handlers.add(new DelayActionHandler(objectMapper, pendingActionStore));
 
+        // PayloadMapperService is shared by EmailAlert (PR 5) and CALL_API
+        // (PR 4) so build it once up front.
+        StateDataResolver dataResolver = context.getExtension(StateDataResolver.class);
+        if (dataResolver == null) {
+            dataResolver = new StateDataResolver(objectMapper);
+        }
+        PayloadMapperService payloadMapper = new PayloadMapperService(dataResolver);
+
         EmailService emailService = context.getExtension(EmailService.class);
         if (emailService == null) {
             emailService = new LoggingEmailService();
         }
-        handlers.add(new EmailAlertActionHandler(objectMapper, emailService));
+        handlers.add(new EmailAlertActionHandler(objectMapper, emailService, payloadMapper));
 
         ScriptExecutor scriptExecutor = context.getExtension(ScriptExecutor.class);
         if (scriptExecutor == null) {
@@ -106,11 +114,6 @@ public class IntegrationModule implements KeltaModule {
         // from the worker via ModuleContext extensions; missing extensions
         // produce typed runtime errors instead of failing module startup so
         // legacy installations stay bootable.
-        StateDataResolver dataResolver = context.getExtension(StateDataResolver.class);
-        if (dataResolver == null) {
-            dataResolver = new StateDataResolver(objectMapper);
-        }
-        PayloadMapperService payloadMapper = new PayloadMapperService(dataResolver);
         ApiSpecStore apiSpecStore = context.getExtension(ApiSpecStore.class);
         CredentialResolverPort credentialResolver =
             context.getExtension(CredentialResolverPort.class);

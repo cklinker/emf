@@ -15,6 +15,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
@@ -56,9 +58,17 @@ public class SvixConfig {
         return this.svixClient;
     }
 
+    @Bean("svixRestClient")
+    public RestClient svixRestClient() {
+        return RestClient.builder()
+                .baseUrl(serverUrl)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + authToken)
+                .build();
+    }
+
     @Bean
-    public SvixTenantService svixTenantService(Svix svix) {
-        return new SvixTenantService(svix);
+    public SvixTenantService svixTenantService(RestClient svixRestClient) {
+        return new SvixTenantService(svixRestClient);
     }
 
     @Bean

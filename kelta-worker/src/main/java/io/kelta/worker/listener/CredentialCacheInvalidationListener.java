@@ -1,8 +1,10 @@
 package io.kelta.worker.listener;
 
+import io.kelta.crypto.EncryptionService;
 import io.kelta.worker.service.credential.CredentialResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -13,6 +15,7 @@ import tools.jackson.databind.ObjectMapper;
  * runs this listener so cache stays consistent across the fleet.
  */
 @Component
+@ConditionalOnBean(EncryptionService.class)
 public class CredentialCacheInvalidationListener {
 
     private static final Logger log = LoggerFactory.getLogger(CredentialCacheInvalidationListener.class);

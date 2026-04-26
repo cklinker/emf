@@ -189,6 +189,12 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'VIEW_CREDENTIALS',
       },
       {
+        name: 'API Specs',
+        path: '/api-specs',
+        description: 'OpenAPI spec library used by the flow builder',
+        permission: 'VIEW_API_SPECS',
+      },
+      {
         name: 'Webhooks',
         path: '/webhooks',
         description: 'Configure outbound webhooks',

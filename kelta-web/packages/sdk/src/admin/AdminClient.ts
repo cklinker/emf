@@ -1,9 +1,15 @@
 import type { AxiosInstance } from 'axios';
 import type {
   CollectionDefinition,
+  ApiOperationDetail,
+  ApiOperationSummary,
+  ApiSpecSummary,
+  ApiSpecValidateResult,
   CredentialTemplateDescriptor,
   CredentialTestResultPayload,
   CredentialTypeDescriptor,
+  ImportApiSpecRequest,
+  ImportApiSpecResponse,
   FieldDefinition,
   Role,
   Policy,
@@ -1895,6 +1901,67 @@ export class AdminClient {
         redirectUri,
       });
       return response.data as { ok: boolean; expiresAt?: string; scope?: string };
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // OpenAPI Spec Library (PR 3)
+  // ---------------------------------------------------------------------------
+
+  readonly apiSpecs = {
+    list: async (): Promise<ApiSpecSummary[]> => {
+      const response = await this.axios.get('/api/api-specs/library');
+      return (response.data as { data: ApiSpecSummary[] }).data ?? [];
+    },
+
+    get: async (id: string): Promise<ApiSpecSummary> => {
+      const response = await this.axios.get(`/api/api-specs/${id}/details`);
+      return response.data as ApiSpecSummary;
+    },
+
+    raw: async (id: string): Promise<string> => {
+      const response = await this.axios.get(`/api/api-specs/${id}/raw`, {
+        responseType: 'text',
+        transformResponse: (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v)),
+      });
+      return String(response.data ?? '');
+    },
+
+    importSpec: async (request: ImportApiSpecRequest): Promise<ImportApiSpecResponse> => {
+      const response = await this.axios.post('/api/api-specs/import', request);
+      return response.data as ImportApiSpecResponse;
+    },
+
+    validate: async (request: {
+      raw?: string;
+      sourceUrl?: string;
+    }): Promise<ApiSpecValidateResult> => {
+      const response = await this.axios.post('/api/api-specs/validate', request);
+      return response.data as ApiSpecValidateResult;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/api/api-specs/${id}`);
+    },
+
+    listOperations: async (specId: string): Promise<ApiOperationSummary[]> => {
+      const response = await this.axios.get(`/api/api-specs/${specId}/operations`);
+      return (response.data as { data: ApiOperationSummary[] }).data ?? [];
+    },
+
+    getOperation: async (specId: string, opId: string): Promise<ApiOperationDetail> => {
+      const response = await this.axios.get(`/api/api-specs/${specId}/operations/${opId}`);
+      return response.data as ApiOperationDetail;
+    },
+
+    searchOperations: async (params: {
+      q?: string;
+      method?: string;
+      specId?: string;
+      limit?: number;
+    }): Promise<ApiOperationSummary[]> => {
+      const response = await this.axios.get('/api/api-operations/search', { params });
+      return (response.data as { data: ApiOperationSummary[] }).data ?? [];
     },
   };
 

@@ -42,6 +42,16 @@
             <artifactId>spring-web</artifactId>
         </dependency>
 
+        <!-- swagger-parser-v3: parses + validates OpenAPI 3.0/3.1 specs in JSON or YAML.
+             Used by OpenApiSpecParser to seed the api_spec / api_operation tables.
+             Brings its own Jackson 2 transitively for internal deserialization;
+             we re-serialize results into the platform's Jackson 3 trees ourselves. -->
+        <dependency>
+            <groupId>io.swagger.parser.v3</groupId>
+            <artifactId>swagger-parser</artifactId>
+            <version>2.1.22</version>
+        </dependency>
+
         <!-- GraalVM Polyglot API for JavaScript script execution -->
         <dependency>
             <groupId>org.graalvm.polyglot</groupId>

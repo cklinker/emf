@@ -140,6 +140,12 @@ export type {
   CredentialTypeDescriptor,
   CredentialTemplateDescriptor,
   CredentialTestResultPayload,
+  ApiSpecSummary,
+  ApiOperationSummary,
+  ApiOperationDetail,
+  ImportApiSpecRequest,
+  ImportApiSpecResponse,
+  ApiSpecValidateResult,
 } from './admin/types';
 
 // Authentication

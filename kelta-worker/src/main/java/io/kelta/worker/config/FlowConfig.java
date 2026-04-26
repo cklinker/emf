@@ -22,8 +22,10 @@ import io.kelta.worker.listener.FieldConfigEventPublisher;
 import io.kelta.worker.listener.ApprovalProcessConfigHook;
 import io.kelta.worker.listener.ApprovalRecordLockHook;
 import io.kelta.worker.listener.CerbosPolicySyncHook;
+import io.kelta.worker.listener.ApiSpecConfigHook;
 import io.kelta.worker.listener.CredentialEncryptionHook;
 import io.kelta.worker.listener.CredentialEventPublisher;
+import io.kelta.runtime.module.integration.api.OpenApiSpecParser;
 import io.kelta.worker.listener.RecordTypeEnforcementHook;
 import io.kelta.worker.listener.ValidationRuleRefreshHook;
 import io.kelta.crypto.EncryptionService;
@@ -285,6 +287,24 @@ public class FlowConfig {
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher) {
         CredentialEventPublisher hook = new CredentialEventPublisher(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    // ---------------------------------------------------------------------------
+    // OpenAPI spec library — parser bean + NATS broadcast on spec changes
+    // ---------------------------------------------------------------------------
+
+    @Bean
+    public OpenApiSpecParser openApiSpecParser(ObjectMapper objectMapper) {
+        return new OpenApiSpecParser(objectMapper);
+    }
+
+    @Bean
+    public ApiSpecConfigHook apiSpecConfigHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        ApiSpecConfigHook hook = new ApiSpecConfigHook(eventPublisher);
         hookRegistry.register(hook);
         return hook;
     }

@@ -1961,3 +1961,68 @@ export interface CredentialRecord {
   createdAt?: string;
   updatedAt?: string;
 }
+
+// ----------------------------------------------------------------------------
+// OpenAPI Spec Library (PR 3)
+// ----------------------------------------------------------------------------
+
+export interface ApiSpecSummary {
+  id: string;
+  name: string;
+  description?: string | null;
+  specVersion: string;
+  apiTitle?: string | null;
+  apiVersion?: string | null;
+  baseUrl?: string | null;
+  servers?: unknown;
+  securitySchemes?: unknown;
+  sourceType: 'INLINE_JSON' | 'INLINE_YAML' | 'URL';
+  sourceUrl?: string | null;
+  revision: number;
+  active: boolean;
+  lastImportedAt?: string | null;
+}
+
+export interface ApiOperationSummary {
+  id: string;
+  specId: string;
+  operationId?: string | null;
+  syntheticOpId: string;
+  httpMethod: string;
+  pathTemplate: string;
+  summary?: string | null;
+  tags?: unknown;
+  deprecated: boolean;
+}
+
+export interface ApiOperationDetail extends ApiOperationSummary {
+  description?: string | null;
+  parametersSchema?: unknown;
+  requestBodySchema?: unknown;
+  responseSchemas?: unknown;
+  securityRequired?: unknown;
+}
+
+export interface ImportApiSpecRequest {
+  name: string;
+  description?: string;
+  sourceType: 'INLINE_JSON' | 'INLINE_YAML' | 'URL';
+  sourceUrl?: string;
+  raw?: string;
+  rawFormat?: 'json' | 'yaml';
+}
+
+export interface ImportApiSpecResponse {
+  spec: ApiSpecSummary;
+  diff: { added: number; changed: number; removed: number };
+}
+
+export interface ApiSpecValidateResult {
+  ok: boolean;
+  title?: string;
+  version?: string;
+  specVersion?: string;
+  operations?: number;
+  baseUrl?: string;
+  error?: string;
+}

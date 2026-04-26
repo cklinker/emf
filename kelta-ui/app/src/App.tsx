@@ -93,6 +93,8 @@ import {
   EmailTemplatesPage,
   ScriptsPage,
   WebhooksPage,
+  ApiSpecsPage,
+  ApiSpecDetailPage,
   ConnectedAppsPage,
   CredentialsPage,
   ApiTokensPage,
@@ -1022,6 +1024,30 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="VIEW_CREDENTIALS">
               <CredentialsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* OpenAPI Spec Library — list + import */}
+      <Route
+        path="api-specs"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_API_SPECS">
+              <ApiSpecsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Spec detail — overview, operations browser, raw */}
+      <Route
+        path="api-specs/:specId"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_API_SPECS">
+              <ApiSpecDetailPage />
             </RequirePermission>
           </AdminPageRoute>
         }

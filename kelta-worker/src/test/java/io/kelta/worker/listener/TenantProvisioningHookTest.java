@@ -88,8 +88,8 @@ class TenantProvisioningHookTest {
                     contains("INSERT INTO profile"),
                     anyString(), eq(TENANT_ID), anyString(), anyString());
 
-            // 7 profiles × 18 permissions = 126 permission records
-            verify(jdbcTemplate, times(126)).update(
+            // 7 profiles × 20 permissions = 140 permission records
+            verify(jdbcTemplate, times(140)).update(
                     contains("INSERT INTO profile_system_permission"),
                     anyString(), anyString(), anyString(), anyString(), anyBoolean());
         }

@@ -209,6 +209,10 @@ export type { ConnectedAppsPageProps } from './ConnectedAppsPage'
 export { CredentialsPage } from './CredentialsPage'
 export type { CredentialsPageProps } from './CredentialsPage'
 
+// ApiSpecsPage - OpenAPI spec library (PR 3)
+export { ApiSpecsPage, ApiSpecDetailPage } from './ApiSpecsPage'
+export type { ApiSpecsPageProps, ApiSpecDetailPageProps } from './ApiSpecsPage'
+
 // ApiTokensPage - Personal access token management page
 export { ApiTokensPage } from './ApiTokensPage'
 export type { ApiTokensPageProps } from './ApiTokensPage'

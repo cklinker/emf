@@ -108,6 +108,8 @@ public final class SystemCollectionDefinitions {
         definitions.add(oidcProviders());
         definitions.add(credentials());
         definitions.add(credentialOauthTokens());
+        definitions.add(apiSpecs());
+        definitions.add(apiOperations());
 
         // Reports & Dashboards
         definitions.add(reports());
@@ -580,6 +582,65 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("refresh_failure_count"))
             .addField(FieldDefinition.text("lastRefreshError").withColumnName("last_refresh_error"))
             .addField(FieldDefinition.text("scope"))
+            .build();
+    }
+
+    public static CollectionDefinition apiSpecs() {
+        return systemBuilder("api-specs", "API Specs", "api_spec")
+            .displayFieldName("name")
+            .addField(FieldDefinition.requiredString("name", 200))
+            .addField(FieldDefinition.string("description", 1000))
+            .addField(FieldDefinition.requiredString("specVersion", 20)
+                .withColumnName("spec_version"))
+            .addField(FieldDefinition.string("apiTitle", 500).withColumnName("api_title"))
+            .addField(FieldDefinition.string("apiVersion", 50).withColumnName("api_version"))
+            .addField(FieldDefinition.string("baseUrl", 1000).withColumnName("base_url"))
+            .addField(FieldDefinition.json("servers"))
+            .addField(FieldDefinition.json("securitySchemes").withColumnName("security_schemes"))
+            .addField(FieldDefinition.requiredString("sourceType", 20)
+                .withColumnName("source_type"))
+            .addField(FieldDefinition.string("sourceUrl", 2000).withColumnName("source_url"))
+            // raw_spec / parsed_spec are exposed but immutable through the
+            // dynamic router — imports go through ApiSpecController which runs
+            // the parser. Keeping them here lets the system-collection viewer
+            // render the spec's metadata without bouncing to a second endpoint.
+            .addField(FieldDefinition.requiredText("rawSpec")
+                .withColumnName("raw_spec").withImmutable(true))
+            .addField(FieldDefinition.requiredString("rawFormat", 10)
+                .withColumnName("raw_format").withImmutable(true))
+            .addField(FieldDefinition.requiredJson("parsedSpec")
+                .withColumnName("parsed_spec").withImmutable(true))
+            .addField(FieldDefinition.requiredString("specHash", 64)
+                .withColumnName("spec_hash").withImmutable(true))
+            .addField(FieldDefinition.integer("revision").withDefault(1))
+            .addField(FieldDefinition.bool("isActive").withColumnName("is_active")
+                .withDefault(true))
+            .addField(FieldDefinition.datetime("lastImportedAt")
+                .withColumnName("last_imported_at"))
+            .build();
+    }
+
+    public static CollectionDefinition apiOperations() {
+        return readOnlySystemBuilder("api-operations", "API Operations", "api_operation")
+            .addField(FieldDefinition.lookup("specId", "api-specs", "Spec")
+                .withColumnName("spec_id"))
+            .addField(FieldDefinition.string("operationId", 200).withColumnName("operation_id"))
+            .addField(FieldDefinition.requiredString("syntheticOpId", 200)
+                .withColumnName("synthetic_op_id"))
+            .addField(FieldDefinition.requiredString("httpMethod", 10)
+                .withColumnName("http_method"))
+            .addField(FieldDefinition.requiredString("pathTemplate", 1000)
+                .withColumnName("path_template"))
+            .addField(FieldDefinition.string("summary", 500))
+            .addField(FieldDefinition.text("description"))
+            .addField(FieldDefinition.json("tags"))
+            .addField(FieldDefinition.json("parametersSchema").withColumnName("parameters_schema"))
+            .addField(FieldDefinition.json("requestBodySchema")
+                .withColumnName("request_body_schema"))
+            .addField(FieldDefinition.json("responseSchemas").withColumnName("response_schemas"))
+            .addField(FieldDefinition.json("securityRequired").withColumnName("security_required"))
+            .addField(FieldDefinition.bool("deprecated"))
+            .addField(FieldDefinition.text("searchText").withColumnName("search_text"))
             .build();
     }
 

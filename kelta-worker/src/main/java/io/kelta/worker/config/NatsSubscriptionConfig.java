@@ -4,6 +4,7 @@ import io.kelta.runtime.event.EventSubscription;
 import io.kelta.runtime.messaging.nats.NatsSubscriptionManager;
 import io.kelta.worker.listener.CerbosCacheInvalidationListener;
 import io.kelta.worker.listener.CollectionSchemaListener;
+import io.kelta.worker.listener.CredentialCacheInvalidationListener;
 import io.kelta.worker.listener.FlowEventListener;
 import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SupersetCollectionSyncListener;
@@ -37,6 +38,7 @@ public class NatsSubscriptionConfig {
     private final CollectionSchemaListener collectionSchemaListener;
     private final ModuleEventListener moduleEventListener;
     private final CerbosCacheInvalidationListener cerbosCacheInvalidationListener;
+    private final CredentialCacheInvalidationListener credentialCacheInvalidationListener;
 
     @Autowired(required = false)
     private SupersetCollectionSyncListener supersetCollectionSyncListener;
@@ -49,13 +51,15 @@ public class NatsSubscriptionConfig {
                                    SearchIndexListener searchIndexListener,
                                    CollectionSchemaListener collectionSchemaListener,
                                    ModuleEventListener moduleEventListener,
-                                   CerbosCacheInvalidationListener cerbosCacheInvalidationListener) {
+                                   CerbosCacheInvalidationListener cerbosCacheInvalidationListener,
+                                   CredentialCacheInvalidationListener credentialCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.flowEventListener = flowEventListener;
         this.searchIndexListener = searchIndexListener;
         this.collectionSchemaListener = collectionSchemaListener;
         this.moduleEventListener = moduleEventListener;
         this.cerbosCacheInvalidationListener = cerbosCacheInvalidationListener;
+        this.credentialCacheInvalidationListener = credentialCacheInvalidationListener;
     }
 
     @PostConstruct
@@ -82,6 +86,12 @@ public class NatsSubscriptionConfig {
                 "worker-cerbos", "kelta.cerbos.policies.changed.*",
                 cerbosCacheInvalidationListener::handlePolicyChanged));
 
+        // Credential cache invalidation — every pod drops local cache entries
+        // when a credential row changes upstream.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-credential-cache", "kelta.config.credential.changed.>",
+                credentialCacheInvalidationListener::handleCredentialChanged));
+
         // Optional queue group subscriptions — only registered when the integration is enabled
         if (supersetCollectionSyncListener != null) {
             subscriptionManager.register(EventSubscription.queueGroup(
@@ -97,7 +107,7 @@ public class NatsSubscriptionConfig {
             log.info("Registered NATS subscription for Svix webhook publisher");
         }
 
-        log.info("Registered {} worker NATS subscriptions", 5
+        log.info("Registered {} worker NATS subscriptions", 6
                 + (supersetCollectionSyncListener != null ? 1 : 0)
                 + (svixWebhookPublisher != null ? 1 : 0));
     }

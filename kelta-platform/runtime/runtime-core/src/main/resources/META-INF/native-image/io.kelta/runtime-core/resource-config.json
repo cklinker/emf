@@ -1,0 +1,8 @@
+{
+  "resources": {
+    "includes": [
+      { "pattern": "credential-schemas/.*\\.json$" },
+      { "pattern": "credential-templates/.*\\.json$" }
+    ]
+  }
+}

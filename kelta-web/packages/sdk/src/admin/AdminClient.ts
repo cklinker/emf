@@ -1841,7 +1841,10 @@ export class AdminClient {
       return unwrapJsonApiResource<Record<string, unknown>>(response.data);
     },
 
-    update: async (id: string, record: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    update: async (
+      id: string,
+      record: Record<string, unknown>
+    ): Promise<Record<string, unknown>> => {
       const body = toJsonApiBody('credentials', record, id);
       const response = await this.axios.patch(`/api/credentials/${id}`, body);
       return unwrapJsonApiResource<Record<string, unknown>>(response.data);
@@ -1853,12 +1856,12 @@ export class AdminClient {
 
     types: async (): Promise<CredentialTypeDescriptor[]> => {
       const response = await this.axios.get('/api/credentials/types');
-      return ((response.data as { data: CredentialTypeDescriptor[] }).data ?? []);
+      return (response.data as { data: CredentialTypeDescriptor[] }).data ?? [];
     },
 
     templates: async (): Promise<CredentialTemplateDescriptor[]> => {
       const response = await this.axios.get('/api/credentials/templates');
-      return ((response.data as { data: CredentialTemplateDescriptor[] }).data ?? []);
+      return (response.data as { data: CredentialTemplateDescriptor[] }).data ?? [];
     },
 
     test: async (id: string): Promise<CredentialTestResultPayload> => {
@@ -1874,7 +1877,9 @@ export class AdminClient {
       return response.data as CredentialTestResultPayload;
     },
 
-    beginOAuth: async (id: string): Promise<{ authUrl: string; state: string; expiresInSeconds: number }> => {
+    beginOAuth: async (
+      id: string
+    ): Promise<{ authUrl: string; state: string; expiresInSeconds: number }> => {
       const response = await this.axios.post(`/api/credentials/${id}/oauth/authorize-url`);
       return response.data as { authUrl: string; state: string; expiresInSeconds: number };
     },

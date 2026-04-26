@@ -1,0 +1,6 @@
+{
+  "key": "github",
+  "name": "GitHub",
+  "type": "bearer_token",
+  "defaults": {}
+}

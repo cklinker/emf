@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "API Key",
+  "type": "object",
+  "required": ["headerName", "value"],
+  "properties": {
+    "location": {
+      "type": "string",
+      "enum": ["header", "query"],
+      "default": "header",
+      "title": "Send as",
+      "description": "Whether to send the key as an HTTP header or query parameter."
+    },
+    "headerName": {
+      "type": "string",
+      "title": "Header / parameter name",
+      "description": "Name of the header (or query parameter) to send (e.g., X-API-Key).",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "value": {
+      "type": "string",
+      "format": "secret",
+      "title": "Value",
+      "description": "The API key value.",
+      "minLength": 1
+    },
+    "prefix": {
+      "type": "string",
+      "title": "Value prefix (optional)",
+      "description": "Optional prefix prepended to the value (e.g., 'Bearer ').",
+      "maxLength": 20
+    }
+  }
+}

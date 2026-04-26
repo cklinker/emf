@@ -106,6 +106,8 @@ public final class SystemCollectionDefinitions {
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
         definitions.add(oidcProviders());
+        definitions.add(credentials());
+        definitions.add(credentialOauthTokens());
 
         // Reports & Dashboards
         definitions.add(reports());
@@ -537,6 +539,47 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.json("grantTypes").withColumnName("grant_types"))
             .addField(FieldDefinition.bool("requirePkce").withColumnName("require_pkce"))
             .addField(FieldDefinition.bool("consentRequired").withColumnName("consent_required"))
+            .build();
+    }
+
+    public static CollectionDefinition credentials() {
+        return systemBuilder("credentials", "Credentials", "credential")
+            .displayFieldName("name")
+            .addField(FieldDefinition.requiredString("name", 200))
+            .addField(FieldDefinition.string("displayName", 200).withColumnName("display_name"))
+            .addField(FieldDefinition.string("description", 500))
+            .addField(FieldDefinition.requiredString("type", 50))
+            .addField(FieldDefinition.string("providerTemplate", 100)
+                .withColumnName("provider_template"))
+            // dataEnc holds AES-256-GCM ciphertext. The CredentialEncryptionHook
+            // populates it from plaintext input fields; direct API edits to it
+            // are blocked by withImmutable so the only way to change secret
+            // material is through the hook path.
+            .addField(FieldDefinition.text("dataEnc")
+                .withColumnName("data_enc").withImmutable(true))
+            .addField(FieldDefinition.json("metadata"))
+            .addField(FieldDefinition.datetime("lastTestAt").withColumnName("last_test_at"))
+            .addField(FieldDefinition.string("lastTestStatus", 20)
+                .withColumnName("last_test_status"))
+            .addField(FieldDefinition.text("lastTestError").withColumnName("last_test_error"))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .build();
+    }
+
+    public static CollectionDefinition credentialOauthTokens() {
+        return readOnlySystemBuilder("credential-oauth-tokens", "Credential OAuth Tokens",
+                "credential_oauth_token")
+            .addField(FieldDefinition.lookup("credentialId", "credentials", "Credential")
+                .withColumnName("credential_id"))
+            .addField(FieldDefinition.text("accessTokenEnc").withColumnName("access_token_enc"))
+            .addField(FieldDefinition.text("refreshTokenEnc").withColumnName("refresh_token_enc"))
+            .addField(FieldDefinition.string("tokenType", 40).withColumnName("token_type"))
+            .addField(FieldDefinition.datetime("expiresAt").withColumnName("expires_at"))
+            .addField(FieldDefinition.datetime("refreshedAt").withColumnName("refreshed_at"))
+            .addField(FieldDefinition.integer("refreshFailureCount")
+                .withColumnName("refresh_failure_count"))
+            .addField(FieldDefinition.text("lastRefreshError").withColumnName("last_refresh_error"))
+            .addField(FieldDefinition.text("scope"))
             .build();
     }
 

@@ -183,6 +183,12 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'MANAGE_CONNECTED_APPS',
       },
       {
+        name: 'Credentials',
+        path: '/credentials',
+        description: 'Reusable secrets for outbound APIs and email',
+        permission: 'VIEW_CREDENTIALS',
+      },
+      {
         name: 'Webhooks',
         path: '/webhooks',
         description: 'Configure outbound webhooks',

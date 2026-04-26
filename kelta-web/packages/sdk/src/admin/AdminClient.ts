@@ -1,6 +1,9 @@
 import type { AxiosInstance } from 'axios';
 import type {
   CollectionDefinition,
+  CredentialTemplateDescriptor,
+  CredentialTestResultPayload,
+  CredentialTypeDescriptor,
   FieldDefinition,
   Role,
   Policy,
@@ -1814,6 +1817,84 @@ export class AdminClient {
     listAudit: async (id: string): Promise<Record<string, unknown>[]> => {
       const response = await this.axios.get(`/api/connected-apps/${id}/audit`);
       return (response.data as { data: Record<string, unknown>[] }).data ?? [];
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Credentials (tenant-managed, encrypted at rest)
+  // ---------------------------------------------------------------------------
+
+  readonly credentials = {
+    list: async (): Promise<Record<string, unknown>[]> => {
+      const response = await this.axios.get('/api/credentials');
+      return unwrapJsonApiList<Record<string, unknown>>(response.data);
+    },
+
+    get: async (id: string): Promise<Record<string, unknown>> => {
+      const response = await this.axios.get(`/api/credentials/${id}`);
+      return unwrapJsonApiResource<Record<string, unknown>>(response.data);
+    },
+
+    create: async (record: Record<string, unknown>): Promise<Record<string, unknown>> => {
+      const body = toJsonApiBody('credentials', record);
+      const response = await this.axios.post('/api/credentials', body);
+      return unwrapJsonApiResource<Record<string, unknown>>(response.data);
+    },
+
+    update: async (
+      id: string,
+      record: Record<string, unknown>
+    ): Promise<Record<string, unknown>> => {
+      const body = toJsonApiBody('credentials', record, id);
+      const response = await this.axios.patch(`/api/credentials/${id}`, body);
+      return unwrapJsonApiResource<Record<string, unknown>>(response.data);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/api/credentials/${id}`);
+    },
+
+    types: async (): Promise<CredentialTypeDescriptor[]> => {
+      const response = await this.axios.get('/api/credentials/types');
+      return (response.data as { data: CredentialTypeDescriptor[] }).data ?? [];
+    },
+
+    templates: async (): Promise<CredentialTemplateDescriptor[]> => {
+      const response = await this.axios.get('/api/credentials/templates');
+      return (response.data as { data: CredentialTemplateDescriptor[] }).data ?? [];
+    },
+
+    test: async (id: string): Promise<CredentialTestResultPayload> => {
+      const response = await this.axios.post(`/api/credentials/${id}/test`);
+      return response.data as CredentialTestResultPayload;
+    },
+
+    testInline: async (
+      type: string,
+      data: Record<string, unknown>
+    ): Promise<CredentialTestResultPayload> => {
+      const response = await this.axios.post('/api/credentials/test', { type, data });
+      return response.data as CredentialTestResultPayload;
+    },
+
+    beginOAuth: async (
+      id: string
+    ): Promise<{ authUrl: string; state: string; expiresInSeconds: number }> => {
+      const response = await this.axios.post(`/api/credentials/${id}/oauth/authorize-url`);
+      return response.data as { authUrl: string; state: string; expiresInSeconds: number };
+    },
+
+    completeOAuth: async (
+      state: string,
+      code: string,
+      redirectUri?: string
+    ): Promise<{ ok: boolean; expiresAt?: string; scope?: string }> => {
+      const response = await this.axios.post('/api/credentials/oauth/complete', {
+        state,
+        code,
+        redirectUri,
+      });
+      return response.data as { ok: boolean; expiresAt?: string; scope?: string };
     },
   };
 

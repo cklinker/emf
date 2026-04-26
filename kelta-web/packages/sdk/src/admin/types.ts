@@ -1919,3 +1919,45 @@ export interface AiApplyResult {
   data: Record<string, unknown>;
   status: string;
 }
+
+// ----------------------------------------------------------------------------
+// Credentials (PR 1: vault foundation)
+// ----------------------------------------------------------------------------
+
+export interface CredentialTypeDescriptor {
+  key: string;
+  displayName: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  supportsOAuthRefresh: boolean;
+}
+
+export interface CredentialTemplateDescriptor {
+  key: string;
+  name: string;
+  type: string;
+  iconUrl?: string;
+  defaults?: Record<string, unknown>;
+}
+
+export interface CredentialTestResultPayload {
+  ok: boolean;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface CredentialRecord {
+  id: string;
+  name: string;
+  displayName?: string;
+  description?: string;
+  type: string;
+  providerTemplate?: string;
+  metadata?: Record<string, unknown>;
+  active: boolean;
+  lastTestAt?: string;
+  lastTestStatus?: string;
+  lastTestError?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

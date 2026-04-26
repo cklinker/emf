@@ -94,6 +94,7 @@ import {
   ScriptsPage,
   WebhooksPage,
   ConnectedAppsPage,
+  CredentialsPage,
   ApiTokensPage,
   ModulesPage,
   BulkJobsPage,
@@ -1009,6 +1010,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_CONNECTED_APPS">
               <ConnectedAppsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Credentials route — tenant-managed secrets used by flows */}
+      <Route
+        path="credentials"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_CREDENTIALS">
+              <CredentialsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

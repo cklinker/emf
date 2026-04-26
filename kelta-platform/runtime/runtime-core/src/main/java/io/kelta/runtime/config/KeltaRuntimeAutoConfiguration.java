@@ -1,5 +1,8 @@
 package io.kelta.runtime.config;
 
+import io.kelta.runtime.credential.CredentialTemplateRegistry;
+import io.kelta.runtime.credential.CredentialType;
+import io.kelta.runtime.credential.CredentialTypeRegistry;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.runtime.query.DefaultQueryEngine;
 import io.kelta.runtime.query.QueryEngine;
@@ -26,6 +29,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.util.List;
 
 /**
  * Spring Boot auto-configuration for Kelta Runtime.
@@ -129,6 +134,25 @@ public class KeltaRuntimeAutoConfiguration {
         return new DefaultQueryEngine(storageAdapter, validationEngine,
                 null, null, null, null, customValidationRuleEngine, recordEventPublisher,
                 beforeSaveHookRegistry);
+    }
+
+    /**
+     * Registers all auto-discovered {@link CredentialType} implementations.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public CredentialTypeRegistry credentialTypeRegistry(List<CredentialType> types) {
+        return new CredentialTypeRegistry(types);
+    }
+
+    /**
+     * Loads provider credential templates from the classpath.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public CredentialTemplateRegistry credentialTemplateRegistry(
+            tools.jackson.databind.ObjectMapper objectMapper) {
+        return new CredentialTemplateRegistry(objectMapper);
     }
 
     /**

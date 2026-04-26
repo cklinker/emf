@@ -22,8 +22,13 @@ import io.kelta.worker.listener.FieldConfigEventPublisher;
 import io.kelta.worker.listener.ApprovalProcessConfigHook;
 import io.kelta.worker.listener.ApprovalRecordLockHook;
 import io.kelta.worker.listener.CerbosPolicySyncHook;
+import io.kelta.worker.listener.CredentialEncryptionHook;
+import io.kelta.worker.listener.CredentialEventPublisher;
 import io.kelta.worker.listener.RecordTypeEnforcementHook;
 import io.kelta.worker.listener.ValidationRuleRefreshHook;
+import io.kelta.crypto.EncryptionService;
+import io.kelta.runtime.credential.CredentialTypeRegistry;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import io.kelta.worker.handler.SubmitForApprovalActionHandler;
 import io.kelta.worker.repository.ApprovalRepository;
 import io.kelta.worker.service.ApprovalService;
@@ -250,6 +255,36 @@ public class FlowConfig {
             BeforeSaveHookRegistry hookRegistry,
             SetupAuditService auditService) {
         AuditBeforeSaveHook hook = new AuditBeforeSaveHook(auditService);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Credential vault hooks — only registered when an EncryptionService is
+    // available (i.e., kelta.encryption.key is set). The encryption hook runs
+    // first (order -100) to move plaintext secrets into the encrypted blob;
+    // the event publisher fires after (order 100) so all worker pods can
+    // invalidate their credential caches.
+    // ---------------------------------------------------------------------------
+
+    @Bean
+    @ConditionalOnBean(EncryptionService.class)
+    public CredentialEncryptionHook credentialEncryptionHook(
+            BeforeSaveHookRegistry hookRegistry,
+            EncryptionService encryptionService,
+            CredentialTypeRegistry credentialTypeRegistry,
+            ObjectMapper objectMapper) {
+        CredentialEncryptionHook hook = new CredentialEncryptionHook(
+                encryptionService, credentialTypeRegistry, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public CredentialEventPublisher credentialEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        CredentialEventPublisher hook = new CredentialEventPublisher(eventPublisher);
         hookRegistry.register(hook);
         return hook;
     }

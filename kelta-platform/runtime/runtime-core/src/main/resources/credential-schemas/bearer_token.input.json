@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bearer Token",
+  "type": "object",
+  "required": ["token"],
+  "properties": {
+    "token": {
+      "type": "string",
+      "format": "secret",
+      "title": "Token",
+      "description": "The bearer token. Sent as 'Authorization: Bearer <token>'.",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "key": "stripe",
+  "name": "Stripe",
+  "type": "bearer_token",
+  "defaults": {}
+}

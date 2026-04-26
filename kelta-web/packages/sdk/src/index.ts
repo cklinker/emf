@@ -136,6 +136,10 @@ export type {
   PersonalAccessToken,
   PersonalAccessTokenCreated,
   CreatePersonalAccessTokenRequest,
+  CredentialRecord,
+  CredentialTypeDescriptor,
+  CredentialTemplateDescriptor,
+  CredentialTestResultPayload,
 } from './admin/types';
 
 // Authentication

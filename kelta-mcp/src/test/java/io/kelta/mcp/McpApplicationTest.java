@@ -1,5 +1,7 @@
 package io.kelta.mcp;
 
+import io.kelta.mcp.resource.UserResource;
+import io.kelta.mcp.resource.UserResourceTemplate;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpSyncServer;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,12 @@ class McpApplicationTest {
     @Autowired
     private List<UserTool> userTools;
 
+    @Autowired
+    private List<UserResource> userResources;
+
+    @Autowired
+    private List<UserResourceTemplate> userResourceTemplates;
+
     @Test
     void bothMcpServersAreWired() {
         assertThat(userServer).isNotNull();
@@ -59,7 +67,7 @@ class McpApplicationTest {
     }
 
     @Test
-    void allReadOnlyUserToolsAreDiscovered() {
+    void allUserToolsAreDiscovered() {
         List<String> names = userTools.stream()
                 .map(t -> t.toSpecification().tool().name())
                 .toList();
@@ -69,7 +77,30 @@ class McpApplicationTest {
                 "query_collection",
                 "get_record",
                 "search",
-                "describe_api"
+                "describe_api",
+                "create_record",
+                "update_record",
+                "delete_record",
+                "bulk_apply"
         );
+    }
+
+    @Test
+    void userResourcesAreDiscovered() {
+        List<String> uris = userResources.stream()
+                .map(r -> r.toSpecification().resource().uri())
+                .toList();
+        assertThat(uris).containsExactlyInAnyOrder(
+                "kelta://collections",
+                "kelta://openapi.json"
+        );
+    }
+
+    @Test
+    void userResourceTemplatesAreDiscovered() {
+        List<String> templates = userResourceTemplates.stream()
+                .map(t -> t.toSpecification().resourceTemplate().uriTemplate())
+                .toList();
+        assertThat(templates).containsExactly("kelta://collections/{name}");
     }
 }

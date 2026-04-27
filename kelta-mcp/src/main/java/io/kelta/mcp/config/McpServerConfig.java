@@ -1,5 +1,7 @@
 package io.kelta.mcp.config;
 
+import io.kelta.mcp.resource.UserResource;
+import io.kelta.mcp.resource.UserResourceTemplate;
 import io.kelta.mcp.tool.Schemas;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServer;
@@ -55,16 +57,31 @@ public class McpServerConfig {
     public McpSyncServer userMcpServer(
             @org.springframework.beans.factory.annotation.Qualifier("userTransportProvider")
             HttpServletStreamableServerTransportProvider transport,
-            List<UserTool> userTools) {
+            List<UserTool> userTools,
+            List<UserResource> userResources,
+            List<UserResourceTemplate> userResourceTemplates) {
         McpSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-user", SERVER_VERSION)
-                .capabilities(ServerCapabilities.builder().tools(true).build())
+                .capabilities(ServerCapabilities.builder()
+                        .tools(true)
+                        .resources(false, true)  // (subscribe, listChanged)
+                        .build())
                 .build();
         server.addTool(pingTool("user"));
         for (UserTool tool : userTools) {
             McpServerFeatures.SyncToolSpecification spec = tool.toSpecification();
             server.addTool(spec);
             log.info("Registered user tool: {}", spec.tool().name());
+        }
+        for (UserResource resource : userResources) {
+            McpServerFeatures.SyncResourceSpecification spec = resource.toSpecification();
+            server.addResource(spec);
+            log.info("Registered user resource: {}", spec.resource().uri());
+        }
+        for (UserResourceTemplate template : userResourceTemplates) {
+            McpServerFeatures.SyncResourceTemplateSpecification spec = template.toSpecification();
+            server.addResourceTemplate(spec);
+            log.info("Registered user resource template: {}", spec.resourceTemplate().uriTemplate());
         }
         return server;
     }

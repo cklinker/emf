@@ -33,7 +33,7 @@ class CreateLayoutToolTest {
         wm.start();
         GatewayHttpClient client = new GatewayHttpClient(
                 RestClient.builder(),
-                new McpProperties("http://localhost:" + wm.port(), 30, 60_000, null));
+                new McpProperties("http://localhost:" + wm.port(), "", 30, 60_000, null));
         tool = new CreateLayoutTool(client);
         RequestPatHolder.set("klt_layout_test");
     }

@@ -29,7 +29,7 @@ class RateLimitedToolDecoratorTest {
     @BeforeEach
     void setUp() {
         limiter = new RateLimiter(new McpProperties(
-                "http://gw", 30, 60_000,
+                "http://gw", "", 30, 60_000,
                 new McpProperties.RateLimit(2, 0.0)));
         decorator = new RateLimitedToolDecorator(limiter, registry);
         RequestPatHolder.set("klt_decorator_test");

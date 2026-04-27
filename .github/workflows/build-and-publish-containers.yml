@@ -6,6 +6,7 @@ on:
     paths:
       - 'kelta-ai/**'
       - 'kelta-gateway/**'
+      - 'kelta-mcp/**'
       - 'kelta-platform/runtime/**'
       - 'kelta-worker/**'
       - 'kelta-auth/**'
@@ -88,6 +89,9 @@ jobs:
       - name: Test AI Service
         run: mvn verify -f kelta-ai/pom.xml -B
 
+      - name: Test MCP Service
+        run: mvn verify -f kelta-mcp/pom.xml -B
+
   # ===========================================================================
   # Test Frontend
   # ===========================================================================
@@ -150,6 +154,9 @@ jobs:
           - service: ai
             dockerfile: kelta-ai/Dockerfile
             image: kelta-ai
+          - service: mcp
+            dockerfile: kelta-mcp/Dockerfile
+            image: kelta-mcp
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -262,6 +269,11 @@ jobs:
               # Update AI service deployment
               if [ -f "$DIR/ai-deployment.yaml" ]; then
                 sed -i "s|image: .*${PREFIX}-ai:.*|image: harbor.rzware.com/emf/${PREFIX}-ai:${IMAGE_TAG}|g" "$DIR/ai-deployment.yaml"
+              fi
+
+              # Update MCP service deployment
+              if [ -f "$DIR/mcp-deployment.yaml" ]; then
+                sed -i "s|image: .*${PREFIX}-mcp:.*|image: harbor.rzware.com/emf/${PREFIX}-mcp:${IMAGE_TAG}|g" "$DIR/mcp-deployment.yaml"
               fi
             fi
           done

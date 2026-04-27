@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: kelta-mcp
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+kelta:
+  mcp:
+    gateway-url: ${GATEWAY_URL:http://emf-gateway:80}
+    session-ttl-minutes: ${MCP_SESSION_TTL_MINUTES:30}
+    tool-timeout-ms: ${MCP_TOOL_TIMEOUT_MS:60000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+  health:
+    readinessState:
+      enabled: true
+    livenessState:
+      enabled: true
+  otlp:
+    metrics:
+      export:
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
+  tracing:
+    export:
+      enabled: true
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
+    propagation:
+      type: w3c

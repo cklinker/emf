@@ -2,13 +2,13 @@
  * ExecutionLogModal Component
  *
  * A modal dialog for displaying execution logs in a tabular format.
- * Built on shadcn Dialog + ScrollArea with Tailwind CSS styling.
+ * Built on shadcn Dialog with Tailwind CSS styling.
  *
  * Features:
  * - Modal overlay with centered dialog
  * - Table display with configurable columns
  * - Loading, error, and empty states
- * - Scrollable content area via ScrollArea
+ * - Native overflow-auto scroll (both axes) for tables wider than the modal
  * - Accessible with ARIA dialog role
  */
 
@@ -21,7 +21,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
 
 export interface LogColumn<T> {
   key: string
@@ -53,7 +52,7 @@ export function ExecutionLogModal<T extends Record<string, unknown>>({
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="sm:max-w-[900px] max-h-[80vh] flex flex-col p-0"
+        className="sm:max-w-[1100px] max-h-[80vh] flex flex-col p-0"
         data-testid="execution-log-modal"
       >
         {/* Header */}
@@ -73,8 +72,11 @@ export function ExecutionLogModal<T extends Record<string, unknown>>({
           {!subtitle && <DialogDescription className="sr-only">{title}</DialogDescription>}
         </DialogHeader>
 
-        {/* Body */}
-        <ScrollArea className="flex-1 px-6 py-5">
+        {/* Body — native overflow-auto handles both vertical and horizontal scroll;
+            the table cells are nowrap so the parent must clip + scroll, not radix
+            ScrollArea (which doesn't expose horizontal scroll by default and breaks
+            sizing when content exceeds the viewport in either dimension). */}
+        <div className="flex-1 min-h-0 overflow-auto px-6 py-5">
           {isLoading ? (
             <div className="flex items-center justify-center p-8">
               <LoadingSpinner size="medium" label="Loading logs..." />
@@ -86,49 +88,44 @@ export function ExecutionLogModal<T extends Record<string, unknown>>({
               <p className="text-sm text-muted-foreground">{emptyMessage}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table
-                className="w-full border-collapse text-[0.8125rem]"
-                role="grid"
-                aria-label={title}
-              >
-                <thead>
-                  <tr>
+            <table
+              className="w-full border-collapse text-[0.8125rem]"
+              role="grid"
+              aria-label={title}
+            >
+              <thead>
+                <tr>
+                  {columns.map((col) => (
+                    <th
+                      key={col.key}
+                      className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap sticky top-0 bg-background"
+                    >
+                      {col.header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((row, rowIndex) => (
+                  <tr
+                    key={((row as Record<string, unknown>).id as string) ?? rowIndex}
+                    className="hover:bg-muted/50 transition-colors"
+                  >
                     {columns.map((col) => (
-                      <th
-                        key={col.key}
-                        className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap sticky top-0 bg-background"
-                      >
-                        {col.header}
-                      </th>
+                      <td key={col.key} className="px-3 py-2 text-left border-b whitespace-nowrap">
+                        {col.render
+                          ? col.render(row[col.key], row)
+                          : row[col.key] != null
+                            ? String(row[col.key])
+                            : '-'}
+                      </td>
                     ))}
                   </tr>
-                </thead>
-                <tbody>
-                  {data.map((row, rowIndex) => (
-                    <tr
-                      key={((row as Record<string, unknown>).id as string) ?? rowIndex}
-                      className="hover:bg-muted/50 transition-colors"
-                    >
-                      {columns.map((col) => (
-                        <td
-                          key={col.key}
-                          className="px-3 py-2 text-left border-b whitespace-nowrap"
-                        >
-                          {col.render
-                            ? col.render(row[col.key], row)
-                            : row[col.key] != null
-                              ? String(row[col.key])
-                              : '-'}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )

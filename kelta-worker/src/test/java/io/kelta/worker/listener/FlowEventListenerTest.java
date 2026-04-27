@@ -280,6 +280,52 @@ class FlowEventListenerTest {
     }
 
     @Nested
+    @DisplayName("flow config changed broadcast")
+    class FlowConfigChanged {
+
+        @Test
+        @DisplayName("Should invalidate per-tenant cache when broadcast event arrives")
+        @SuppressWarnings("unchecked")
+        void shouldInvalidateCacheOnBroadcast() throws Exception {
+            String plainConfig = """
+                {"events": ["UPDATED"], "collection": "orders"}
+                """;
+            stubJdbcWithTriggerConfig(plainConfig);
+            when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(false);
+
+            // Populate the cache via a record event
+            String recordEvent = buildRecordChangedMessage("tenant-1", "orders", ChangeType.UPDATED);
+            listener.handleRecordChanged(recordEvent);
+
+            // Send a flow config changed broadcast
+            String configEvent = """
+                {"eventType":"kelta.config.flow.changed","tenantId":"tenant-1",
+                 "payload":{"id":"flow-1","changeType":"UPDATED"}}
+                """;
+            listener.handleFlowConfigChanged(configEvent);
+
+            // Next record event should re-query the DB
+            listener.handleRecordChanged(recordEvent);
+            verify(jdbcTemplate, times(2)).query(anyString(), any(RowMapper.class), eq("tenant-1"));
+        }
+
+        @Test
+        @DisplayName("Should silently drop a malformed broadcast message")
+        void shouldDropMalformedBroadcast() {
+            // Should not throw
+            listener.handleFlowConfigChanged("not json");
+            // No assertion needed — the test passes if no exception escapes.
+        }
+
+        @Test
+        @DisplayName("Should drop broadcast with no tenantId")
+        void shouldDropBroadcastWithNoTenantId() {
+            listener.handleFlowConfigChanged("{\"payload\":{\"id\":\"flow-1\"}}");
+            // Cache should be untouched (no tenantId to invalidate).
+        }
+    }
+
+    @Nested
     @DisplayName("cache management")
     class CacheManagement {
 

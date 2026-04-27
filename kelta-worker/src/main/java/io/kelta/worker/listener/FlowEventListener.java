@@ -162,6 +162,27 @@ public class FlowEventListener {
     }
 
     /**
+     * Handles {@code kelta.config.flow.changed.<tenantId>} broadcast events.
+     * Drops the per-tenant trigger cache so the next record event re-queries
+     * the {@code flow} table and picks up the new/updated/deleted flow.
+     *
+     * @param message the raw JSON event message from NATS
+     */
+    public void handleFlowConfigChanged(String message) {
+        try {
+            var tree = objectMapper.readTree(message);
+            String tenantId = tree.path("tenantId").asText(null);
+            if (tenantId == null || tenantId.isBlank()) {
+                log.warn("Dropping flow config changed event with no tenantId");
+                return;
+            }
+            invalidateCache(tenantId);
+        } catch (Exception e) {
+            log.error("Failed to handle flow config changed event: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
      * Invalidates all cached trigger configs.
      */
     public void invalidateAllCaches() {

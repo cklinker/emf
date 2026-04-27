@@ -19,6 +19,7 @@ import io.kelta.runtime.workflow.module.ModuleRegistry;
 import io.kelta.worker.flow.JdbcFlowStore;
 import io.kelta.worker.listener.CollectionConfigEventPublisher;
 import io.kelta.worker.listener.FieldConfigEventPublisher;
+import io.kelta.worker.listener.FlowConfigEventPublisher;
 import io.kelta.worker.listener.ApprovalProcessConfigHook;
 import io.kelta.worker.listener.ApprovalRecordLockHook;
 import io.kelta.worker.listener.CerbosPolicySyncHook;
@@ -258,6 +259,16 @@ public class FlowConfig {
             JdbcTemplate jdbcTemplate) {
         FieldConfigEventPublisher publisher =
                 new FieldConfigEventPublisher(eventPublisher, jdbcTemplate);
+        hookRegistry.register(publisher);
+        return publisher;
+    }
+
+    @Bean
+    public FlowConfigEventPublisher flowConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        FlowConfigEventPublisher publisher =
+                new FlowConfigEventPublisher(eventPublisher);
         hookRegistry.register(publisher);
         return publisher;
     }

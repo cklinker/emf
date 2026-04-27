@@ -92,6 +92,14 @@ public class NatsSubscriptionConfig {
                 "worker-credential-cache", "kelta.config.credential.changed.>",
                 credentialCacheInvalidationListener::handleCredentialChanged));
 
+        // Flow trigger cache invalidation — every pod drops the per-tenant
+        // FlowEventListener cache when a flow row changes (create/update/delete).
+        // Without this, flow edits made via the UI are invisible to pods that
+        // already populated their cache for that tenant until the pod restarts.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-flow-cache", "kelta.config.flow.changed.>",
+                flowEventListener::handleFlowConfigChanged));
+
         // Optional queue group subscriptions — only registered when the integration is enabled
         if (supersetCollectionSyncListener != null) {
             subscriptionManager.register(EventSubscription.queueGroup(
@@ -107,7 +115,7 @@ public class NatsSubscriptionConfig {
             log.info("Registered NATS subscription for Svix webhook publisher");
         }
 
-        log.info("Registered {} worker NATS subscriptions", 6
+        log.info("Registered {} worker NATS subscriptions", 7
                 + (supersetCollectionSyncListener != null ? 1 : 0)
                 + (svixWebhookPublisher != null ? 1 : 0));
     }

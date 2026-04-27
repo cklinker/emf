@@ -36,6 +36,12 @@
     "allDeclaredFields": true
   },
   {
+    "name": "io.kelta.runtime.event.FlowChangedPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "io.kelta.runtime.event.ChangeType",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,

@@ -41,14 +41,6 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     private static final Logger log = LoggerFactory.getLogger(DynamicReactiveJwtDecoder.class);
     private static final Duration PROVIDER_CACHE_TTL = Duration.ofMinutes(15);
     private static final String REDIS_PREFIX = "oidc:provider:";
-    /**
-     * Tokens with this prefix are Personal Access Tokens validated by
-     * {@link PatAuthenticationFilter} as a {@code GlobalFilter} before
-     * Spring Security's {@code AuthenticationWebFilter} runs. The JWT
-     * decoder must short-circuit them to {@link Mono#empty()} — otherwise
-     * {@code extractIssuer} fails parsing and the manager surfaces a 500.
-     */
-    private static final String PAT_PREFIX = "klt_";
 
     private final WebClient workerClient;
     private final ReactiveStringRedisTemplate redisTemplate;
@@ -116,17 +108,6 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
      * @throws JwtException if the token is invalid or the issuer is not registered for the tenant
      */
     public Mono<Jwt> decode(String token, String tenantId) throws JwtException {
-        // Personal Access Tokens (klt_*) are handled by PatAuthenticationFilter
-        // before Spring Security's AuthenticationWebFilter dispatches to this
-        // decoder. Returning Mono.empty() makes JwtReactiveAuthenticationManager
-        // emit no Authentication, which combined with anyExchange().permitAll()
-        // lets the request proceed with the PAT principal already populated by
-        // the global filter. Without this short-circuit the issuer parse fails
-        // and surfaces as HTTP 500 to the caller.
-        if (token != null && token.startsWith(PAT_PREFIX)) {
-            return Mono.empty();
-        }
-
         String issuer;
         try {
             issuer = extractIssuer(token);

@@ -1,6 +1,7 @@
 package io.kelta.gateway.config;
 
 import io.kelta.gateway.auth.DynamicReactiveJwtDecoder;
+import io.kelta.gateway.auth.PatAwareBearerTokenConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -124,7 +125,13 @@ public class SecurityConfig {
                 .pathMatchers("/actuator/**").authenticated()
                 .anyExchange().permitAll()
             )
-            .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtDecoder(reactiveJwtDecoder)))
+            .oauth2ResourceServer(oauth -> oauth
+                    // PATs (klt_*) are validated by PatAuthenticationFilter as a
+                    // GlobalFilter ordered before this chain. Filter them out at
+                    // the converter so AuthenticationWebFilter doesn't try to
+                    // authenticate them as JWTs (which surfaces 5xx).
+                    .bearerTokenConverter(new PatAwareBearerTokenConverter())
+                    .jwt(jwt -> jwt.jwtDecoder(reactiveJwtDecoder)))
             .build();
     }
 

@@ -38,17 +38,6 @@ class DynamicReactiveJwtDecoderTest {
                 .verify();
     }
 
-    @Test
-    @DisplayName("should short-circuit klt_ PATs to Mono.empty() so AuthenticationWebFilter does not 500")
-    void skipsPatTokens() {
-        // PATs are validated by PatAuthenticationFilter as a GlobalFilter; the
-        // JWT manager would otherwise surface "Failed to parse JWT issuer" as
-        // an HTTP 500 from the resource server.
-        StepVerifier.create(decoder.decode("klt_AbCdEf123456789"))
-                .verifyComplete();
-        StepVerifier.create(decoder.decode("klt_AbCdEf123456789", "tenant-1"))
-                .verifyComplete();
-    }
 
     @Test
     @DisplayName("should reject token without issuer")

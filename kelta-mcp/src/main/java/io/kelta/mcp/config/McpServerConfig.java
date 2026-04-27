@@ -1,6 +1,8 @@
 package io.kelta.mcp.config;
 
+import io.kelta.mcp.auth.KeltaTransportContextExtractor;
 import io.kelta.mcp.observe.ObservedToolDecorator;
+import io.kelta.mcp.observe.PatPropagatingToolDecorator;
 import io.kelta.mcp.observe.RateLimitedToolDecorator;
 import io.kelta.mcp.resource.UserResource;
 import io.kelta.mcp.resource.UserResourceTemplate;
@@ -46,6 +48,7 @@ public class McpServerConfig {
     public HttpServletStreamableServerTransportProvider userTransportProvider() {
         return HttpServletStreamableServerTransportProvider.builder()
                 .mcpEndpoint("/mcp/user")
+                .contextExtractor(new KeltaTransportContextExtractor())
                 .build();
     }
 
@@ -53,6 +56,7 @@ public class McpServerConfig {
     public HttpServletStreamableServerTransportProvider adminTransportProvider() {
         return HttpServletStreamableServerTransportProvider.builder()
                 .mcpEndpoint("/mcp/admin")
+                .contextExtractor(new KeltaTransportContextExtractor())
                 .build();
     }
 
@@ -64,7 +68,8 @@ public class McpServerConfig {
             List<UserResource> userResources,
             List<UserResourceTemplate> userResourceTemplates,
             ObservedToolDecorator decorator,
-            RateLimitedToolDecorator rateLimiter) {
+            RateLimitedToolDecorator rateLimiter,
+            PatPropagatingToolDecorator patPropagator) {
         McpSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-user", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder()
@@ -72,9 +77,10 @@ public class McpServerConfig {
                         .resources(false, true)  // (subscribe, listChanged)
                         .build())
                 .build();
-        server.addTool(wrap(pingTool("user"), "user", decorator, rateLimiter));
+        server.addTool(wrap(pingTool("user"), "user", decorator, rateLimiter, patPropagator));
         for (UserTool tool : userTools) {
-            McpServerFeatures.SyncToolSpecification spec = wrap(tool.toSpecification(), "user", decorator, rateLimiter);
+            McpServerFeatures.SyncToolSpecification spec = wrap(
+                    tool.toSpecification(), "user", decorator, rateLimiter, patPropagator);
             server.addTool(spec);
             log.info("Registered user tool: {}", spec.tool().name());
         }
@@ -97,14 +103,16 @@ public class McpServerConfig {
             HttpServletStreamableServerTransportProvider transport,
             List<AdminTool> adminTools,
             ObservedToolDecorator decorator,
-            RateLimitedToolDecorator rateLimiter) {
+            RateLimitedToolDecorator rateLimiter,
+            PatPropagatingToolDecorator patPropagator) {
         McpSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-admin", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder().tools(true).build())
                 .build();
-        server.addTool(wrap(pingTool("admin"), "admin", decorator, rateLimiter));
+        server.addTool(wrap(pingTool("admin"), "admin", decorator, rateLimiter, patPropagator));
         for (AdminTool tool : adminTools) {
-            McpServerFeatures.SyncToolSpecification spec = wrap(tool.toSpecification(), "admin", decorator, rateLimiter);
+            McpServerFeatures.SyncToolSpecification spec = wrap(
+                    tool.toSpecification(), "admin", decorator, rateLimiter, patPropagator);
             server.addTool(spec);
             log.info("Registered admin tool: {}", spec.tool().name());
         }
@@ -112,16 +120,25 @@ public class McpServerConfig {
     }
 
     /**
-     * Decorator stack: rate limiter wraps observation, observation wraps the
-     * original tool. Rate-limited calls are rejected before the timer/counter
-     * fires — they show up in mcp.tool.rate_limited only.
+     * Decorator stack, outermost → innermost:
+     *  1. PAT propagator — copies the PAT from McpTransportContext into
+     *     the per-thread RequestPatHolder (handlers run on a Reactor
+     *     scheduler thread, not the servlet thread).
+     *  2. Rate limiter — keys its bucket on the now-populated PAT;
+     *     rate-limited calls return an error before observation runs.
+     *  3. Observation — timer + counter, tagged with status.
+     *  4. Original tool.
      */
     private static McpServerFeatures.SyncToolSpecification wrap(
             McpServerFeatures.SyncToolSpecification original,
             String profile,
             ObservedToolDecorator observed,
-            RateLimitedToolDecorator rateLimited) {
-        return rateLimited.decorate(observed.decorate(original, profile), profile);
+            RateLimitedToolDecorator rateLimited,
+            PatPropagatingToolDecorator patPropagator) {
+        return patPropagator.decorate(
+                rateLimited.decorate(
+                        observed.decorate(original, profile),
+                        profile));
     }
 
     @Bean

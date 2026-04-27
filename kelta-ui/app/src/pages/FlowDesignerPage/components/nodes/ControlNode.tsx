@@ -2,12 +2,18 @@ import React, { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps, Node } from '@xyflow/react'
 import { Clock, ArrowRight, Columns, Repeat } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { DebugStatusBadge, type DebugStatus } from './DebugStatusBadge'
 
 export type ControlNodeData = {
   label: string
   stateType: 'Wait' | 'Pass' | 'Parallel' | 'Map'
   waitDuration?: string
   branchCount?: number
+  debugStatus?: DebugStatus
+  debugDuration?: string | null
+  debugError?: string | null
+  debugBorderClass?: string
 }
 
 type ControlNodeType = Node<ControlNodeData, 'control'>
@@ -59,6 +65,8 @@ const styleMap = {
 } as const
 
 function ControlNodeComponent({ data, selected }: NodeProps<ControlNodeType>) {
+  const { debugStatus, debugDuration, debugError, debugBorderClass } = data
+  const isDebug = !!debugStatus || !!debugBorderClass
   const Icon = iconMap[data.stateType]
   const style = styleMap[data.stateType]
 
@@ -73,9 +81,12 @@ function ControlNodeComponent({ data, selected }: NodeProps<ControlNodeType>) {
 
   return (
     <div
-      className={`flex min-w-[160px] flex-col rounded-lg border-2 shadow-sm transition-all ${style.bg} ${
-        selected ? style.selectedBorder : style.border
-      }`}
+      className={cn(
+        'relative flex min-w-[160px] flex-col rounded-lg border-2 shadow-sm transition-all',
+        style.bg,
+        !isDebug && (selected ? style.selectedBorder : style.border),
+        isDebug && debugBorderClass
+      )}
     >
       <Handle type="target" position={Position.Top} className={style.handle} />
       <div className="flex items-center gap-2 px-3 py-2">
@@ -86,6 +97,11 @@ function ControlNodeComponent({ data, selected }: NodeProps<ControlNodeType>) {
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className={style.handle} />
+      <DebugStatusBadge
+        status={debugStatus ?? null}
+        duration={debugDuration ?? null}
+        error={debugError ?? null}
+      />
     </div>
   )
 }

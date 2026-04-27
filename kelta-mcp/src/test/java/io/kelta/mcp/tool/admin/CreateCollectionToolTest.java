@@ -34,7 +34,7 @@ class CreateCollectionToolTest {
         wm.start();
         GatewayHttpClient client = new GatewayHttpClient(
                 RestClient.builder(),
-                new McpProperties("http://localhost:" + wm.port(), 30, 60_000, null));
+                new McpProperties("http://localhost:" + wm.port(), "", 30, 60_000, null));
         tool = new CreateCollectionTool(client);
         RequestPatHolder.set("klt_create_coll");
     }

@@ -32,7 +32,7 @@ class CreateFlowToolTest {
         wm.start();
         GatewayHttpClient client = new GatewayHttpClient(
                 RestClient.builder(),
-                new McpProperties("http://localhost:" + wm.port(), 30, 60_000, null));
+                new McpProperties("http://localhost:" + wm.port(), "", 30, 60_000, null));
         tool = new CreateFlowTool(client);
         RequestPatHolder.set("klt_flow_create");
     }

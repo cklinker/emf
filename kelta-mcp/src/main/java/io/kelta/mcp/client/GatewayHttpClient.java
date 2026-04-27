@@ -15,17 +15,26 @@ import java.util.Map;
 
 /**
  * Synchronous HTTP client that forwards MCP tool calls through the
- * Kelta gateway. The gateway validates the PAT, resolves the tenant,
- * and applies Cerbos authorization — kelta-mcp does none of that.
+ * Kelta gateway. The gateway validates the PAT, applies Cerbos
+ * authorization — kelta-mcp does neither.
  *
- * <p>The PAT is pulled from {@link RequestPatHolder} (set by the
- * auth filter on the inbound HTTP request); we never store it in
- * config and never log it.
+ * <p>Tenant routing: the gateway routes by URL prefix
+ * ({@code /{tenantSlug}/api/...}). We resolve the slug from
+ * {@link McpProperties#tenantSlug()} and prepend it to every path the
+ * tools build. Tools keep authoring plain {@code /api/...} paths and
+ * never need to know about the slug. If no slug is configured, paths
+ * pass through verbatim — appropriate for environments that resolve
+ * the tenant some other way.
+ *
+ * <p>The PAT is pulled from {@link RequestPatHolder} (populated by
+ * {@code PatPropagatingToolDecorator} from the MCP transport context);
+ * never stored in config, never logged.
  */
 @Component
 public class GatewayHttpClient {
 
     private final RestClient client;
+    private final String tenantPathPrefix;
 
     public GatewayHttpClient(RestClient.Builder builder, McpProperties properties) {
         // Pin HTTP/1.1 — the in-cluster gateway hop doesn't benefit from HTTP/2,
@@ -38,6 +47,9 @@ public class GatewayHttpClient {
                 .baseUrl(properties.gatewayUrl())
                 .requestFactory(new JdkClientHttpRequestFactory(http))
                 .build();
+        this.tenantPathPrefix = properties.tenantSlug().isEmpty()
+                ? ""
+                : "/" + properties.tenantSlug();
     }
 
     public Response get(String pathAndQuery) {
@@ -56,12 +68,27 @@ public class GatewayHttpClient {
         return exchange("DELETE", pathAndQuery, null);
     }
 
+    /**
+     * Visible for testing — assemble the gateway-side URI for a tool path.
+     * Paths starting with {@code /tenants/} or already prefixed with
+     * {@code /{slug}/} are passed through unchanged so a tool can opt
+     * out of automatic prefixing if it ever needs to.
+     */
+    String buildPath(String pathAndQuery) {
+        if (tenantPathPrefix.isEmpty()) return pathAndQuery;
+        if (pathAndQuery.startsWith(tenantPathPrefix + "/")
+                || pathAndQuery.equals(tenantPathPrefix)) {
+            return pathAndQuery;
+        }
+        return tenantPathPrefix + pathAndQuery;
+    }
+
     private Response exchange(String method, String pathAndQuery, Object body) {
         String pat = RequestPatHolder.get();
         if (pat == null) {
             throw new IllegalStateException("No PAT in request context — auth filter must run before tool dispatch");
         }
-        URI uri = URI.create(pathAndQuery);
+        URI uri = URI.create(buildPath(pathAndQuery));
         RestClient.RequestBodySpec spec = client.method(HttpMethod.valueOf(method))
                 .uri(uri)
                 .header("Authorization", "Bearer " + pat)

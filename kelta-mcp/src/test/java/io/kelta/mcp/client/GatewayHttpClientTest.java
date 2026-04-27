@@ -31,7 +31,7 @@ class GatewayHttpClientTest {
     void setUp() {
         wm = new WireMockServer(0);
         wm.start();
-        McpProperties props = new McpProperties("http://localhost:" + wm.port(), 30, 60_000, null);
+        McpProperties props = new McpProperties("http://localhost:" + wm.port(), "", 30, 60_000, null);
         client = new GatewayHttpClient(RestClient.builder(), props);
         RequestPatHolder.set("klt_test_pat_value");
     }
@@ -118,6 +118,46 @@ class GatewayHttpClientTest {
                 .hasMessageContaining("No PAT in request context");
 
         wm.verify(0, getRequestedForUrl("/api/collections"));
+    }
+
+    @Test
+    void prependsTenantSlugToPathsWhenConfigured() {
+        McpProperties tenantedProps = new McpProperties(
+                "http://localhost:" + wm.port(), "threadline-clothing", 30, 60_000, null);
+        GatewayHttpClient tenantedClient = new GatewayHttpClient(RestClient.builder(), tenantedProps);
+
+        wm.stubFor(get(urlEqualTo("/threadline-clothing/api/collections"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
+
+        GatewayHttpClient.Response res = tenantedClient.get("/api/collections");
+
+        assertThat(res.isSuccess()).isTrue();
+        wm.verify(getRequestedForUrl("/threadline-clothing/api/collections")
+                .withHeader("Authorization", equalTo("Bearer klt_test_pat_value")));
+    }
+
+    @Test
+    void preservesPathThatIsAlreadyTenantPrefixed() {
+        McpProperties tenantedProps = new McpProperties(
+                "http://localhost:" + wm.port(), "threadline-clothing", 30, 60_000, null);
+        GatewayHttpClient tenantedClient = new GatewayHttpClient(RestClient.builder(), tenantedProps);
+
+        wm.stubFor(get(urlEqualTo("/threadline-clothing/api/collections"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
+
+        // Tool authored an already-prefixed path — don't double up.
+        GatewayHttpClient.Response res = tenantedClient.get("/threadline-clothing/api/collections");
+
+        assertThat(res.isSuccess()).isTrue();
+        wm.verify(getRequestedForUrl("/threadline-clothing/api/collections"));
+    }
+
+    @Test
+    void emptySlugLeavesPathsUnchanged() {
+        // The default client instance in setUp has no slug configured.
+        wm.stubFor(get(urlEqualTo("/api/anything")).willReturn(aResponse().withStatus(200)));
+        client.get("/api/anything");
+        wm.verify(getRequestedForUrl("/api/anything"));
     }
 
     private static RequestPatternBuilder getRequestedForUrl(String url) {

@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "kelta.mcp")
 public record McpProperties(
         String gatewayUrl,
+        String tenantSlug,
         int sessionTtlMinutes,
         int toolTimeoutMs,
         RateLimit rateLimit
@@ -12,6 +13,15 @@ public record McpProperties(
     public McpProperties {
         if (gatewayUrl == null || gatewayUrl.isBlank()) {
             gatewayUrl = "http://emf-gateway:80";
+        }
+        if (tenantSlug == null) {
+            tenantSlug = "";
+        } else {
+            tenantSlug = tenantSlug.trim();
+            // Strip a leading slash so callers can configure either form.
+            if (tenantSlug.startsWith("/")) {
+                tenantSlug = tenantSlug.substring(1);
+            }
         }
         if (sessionTtlMinutes <= 0) {
             sessionTtlMinutes = 30;

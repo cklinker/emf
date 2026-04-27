@@ -81,7 +81,11 @@ class McpApplicationTest {
                 "create_record",
                 "update_record",
                 "delete_record",
-                "bulk_apply"
+                "bulk_apply",
+                "execute_flow",
+                "get_flow_run",
+                "submit_for_approval",
+                "list_approvals"
         );
     }
 

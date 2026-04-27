@@ -1,0 +1,67 @@
+package io.kelta.mcp.tool.user;
+
+import io.kelta.mcp.client.GatewayHttpClient;
+import io.kelta.mcp.error.McpErrorMapper;
+import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.UserTool;
+import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.TextContent;
+import io.modelcontextprotocol.spec.McpSchema.Tool;
+import org.springframework.stereotype.Component;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@Component
+public class ExecuteFlowTool implements UserTool {
+
+    private final GatewayHttpClient gateway;
+
+    public ExecuteFlowTool(GatewayHttpClient gateway) {
+        this.gateway = gateway;
+    }
+
+    @Override
+    public SyncToolSpecification toSpecification() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("flowId", Schemas.string("Flow id (UUID) or name. Wraps POST /api/flows/{flowId}/execute."));
+        properties.put("input", Schemas.freeObject(
+                "Optional input payload passed to the flow as the initial context. Shape is flow-specific."));
+
+        Tool tool = Tool.builder()
+                .name("execute_flow")
+                .description("Trigger a flow execution. Returns the execution id; use get_flow_run to poll status.")
+                .inputSchema(Schemas.object(properties, List.of("flowId")))
+                .build();
+
+        return SyncToolSpecification.builder()
+                .tool(tool)
+                .callHandler((exchange, request) -> {
+                    Map<String, Object> args = request.arguments();
+                    if (args == null) args = Map.of();
+                    Object f = args.get("flowId");
+                    if (f == null || f.toString().isBlank()) {
+                        return CallToolResult.builder()
+                                .isError(true)
+                                .content(List.of(new TextContent("Argument \"flowId\" is required.")))
+                                .build();
+                    }
+                    Object input = args.get("input");
+                    Object body = (input instanceof Map<?, ?>) ? input : Map.of();
+
+                    String path = "/api/flows/"
+                            + URLEncoder.encode(f.toString(), StandardCharsets.UTF_8)
+                            + "/execute";
+                    try {
+                        return McpErrorMapper.toResult(gateway.post(path, body));
+                    } catch (RuntimeException e) {
+                        return McpErrorMapper.fromException(e);
+                    }
+                })
+                .build();
+    }
+}

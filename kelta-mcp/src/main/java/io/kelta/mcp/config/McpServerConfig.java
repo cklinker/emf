@@ -1,5 +1,6 @@
 package io.kelta.mcp.config;
 
+import io.kelta.mcp.observe.ObservedToolDecorator;
 import io.kelta.mcp.resource.UserResource;
 import io.kelta.mcp.resource.UserResourceTemplate;
 import io.kelta.mcp.tool.Schemas;
@@ -59,7 +60,8 @@ public class McpServerConfig {
             HttpServletStreamableServerTransportProvider transport,
             List<UserTool> userTools,
             List<UserResource> userResources,
-            List<UserResourceTemplate> userResourceTemplates) {
+            List<UserResourceTemplate> userResourceTemplates,
+            ObservedToolDecorator decorator) {
         McpSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-user", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder()
@@ -67,9 +69,9 @@ public class McpServerConfig {
                         .resources(false, true)  // (subscribe, listChanged)
                         .build())
                 .build();
-        server.addTool(pingTool("user"));
+        server.addTool(decorator.decorate(pingTool("user"), "user"));
         for (UserTool tool : userTools) {
-            McpServerFeatures.SyncToolSpecification spec = tool.toSpecification();
+            McpServerFeatures.SyncToolSpecification spec = decorator.decorate(tool.toSpecification(), "user");
             server.addTool(spec);
             log.info("Registered user tool: {}", spec.tool().name());
         }

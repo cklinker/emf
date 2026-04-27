@@ -9,3 +9,6 @@ export type { TerminalNodeData } from './TerminalNode'
 
 export { ControlNode } from './ControlNode'
 export type { ControlNodeData } from './ControlNode'
+
+export { DebugStatusBadge } from './DebugStatusBadge'
+export type { DebugStatus } from './DebugStatusBadge'

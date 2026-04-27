@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { ReactFlowProvider } from '@xyflow/react'
 import type { Node, Edge } from '@xyflow/react'
 import { useApi } from '../../../context/ApiContext'
+import { unwrapResource, unwrapCollection } from '../../../utils/jsonapi'
 import { useToast, LoadingSpinner } from '../../../components'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -90,7 +91,8 @@ export function DebugTab({ executionId, nodes, edges }: DebugTabProps) {
     queryFn: async () => {
       const resp = await apiClient.fetch(`/api/flows/executions/${executionId}`)
       if (!resp.ok) throw new Error('Failed to load execution')
-      return (await resp.json()) as FlowExecution
+      const json = await resp.json()
+      return unwrapResource(json) as unknown as FlowExecution
     },
     refetchInterval: (query) => {
       const exec = query.state.data
@@ -105,8 +107,8 @@ export function DebugTab({ executionId, nodes, edges }: DebugTabProps) {
     queryFn: async () => {
       const resp = await apiClient.fetch(`/api/flows/executions/${executionId}/steps`)
       if (!resp.ok) throw new Error('Failed to load steps')
-      const json = (await resp.json()) as { steps: StepLog[] }
-      return json.steps || []
+      const json = await resp.json()
+      return unwrapCollection(json).data as unknown as StepLog[]
     },
     refetchInterval: () => {
       if (execution && (execution.status === 'RUNNING' || execution.status === 'WAITING'))

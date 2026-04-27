@@ -195,4 +195,43 @@ class OpenApiSpecParserTest {
             .toList();
         assertEquals(4, petOps.size(), "all 4 operations are tagged 'pet'");
     }
+
+    @Test
+    @DisplayName("Emits clean OpenAPI-style JSON, not swagger-model field dumps")
+    void emitsCleanJson() {
+        ParsedSpec parsed = parser.parse(PETSTORE_YAML);
+        ParsedSpec.ParsedOperation getPet = parsed.operations().stream()
+            .filter(op -> "getPetById".equals(op.operationId()))
+            .findFirst()
+            .orElseThrow();
+
+        String paramsJson = getPet.parametersSchema().toString();
+        // Bare ObjectMapper would dump swagger internals like exampleSetFlag,
+        // jsonSchema, jsonSchemaImpl, types, booleanSchemaValue. Json.mapper()
+        // omits these — assert they're gone.
+        assertFalse(paramsJson.contains("exampleSetFlag"),
+            "swagger internal field 'exampleSetFlag' should not leak into output: " + paramsJson);
+        assertFalse(paramsJson.contains("jsonSchemaImpl"),
+            "swagger internal field 'jsonSchemaImpl' should not leak into output: " + paramsJson);
+        assertFalse(paramsJson.contains("_unparsable"),
+            "convert() should not fall through to _unparsable on Petstore: " + paramsJson);
+        assertTrue(paramsJson.contains("\"name\":\"petId\""),
+            "should include the actual parameter name: " + paramsJson);
+    }
+
+    @Test
+    @DisplayName("convert() does not fall through to _unparsable for any operation field")
+    void noUnparsableFallback() {
+        ParsedSpec parsed = parser.parse(PETSTORE_YAML);
+        for (ParsedSpec.ParsedOperation op : parsed.operations()) {
+            for (var node : List.of(
+                op.parametersSchema() == null ? "" : op.parametersSchema().toString(),
+                op.requestBodySchema() == null ? "" : op.requestBodySchema().toString(),
+                op.responseSchemas() == null ? "" : op.responseSchemas().toString())) {
+                assertFalse(node.contains("_unparsable"),
+                    "Found _unparsable fallback in operation "
+                        + op.httpMethod() + " " + op.pathTemplate() + ": " + node);
+            }
+        }
+    }
 }

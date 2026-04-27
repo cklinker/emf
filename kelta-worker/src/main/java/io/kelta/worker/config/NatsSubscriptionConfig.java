@@ -38,7 +38,9 @@ public class NatsSubscriptionConfig {
     private final CollectionSchemaListener collectionSchemaListener;
     private final ModuleEventListener moduleEventListener;
     private final CerbosCacheInvalidationListener cerbosCacheInvalidationListener;
-    private final CredentialCacheInvalidationListener credentialCacheInvalidationListener;
+
+    @Autowired(required = false)
+    private CredentialCacheInvalidationListener credentialCacheInvalidationListener;
 
     @Autowired(required = false)
     private SupersetCollectionSyncListener supersetCollectionSyncListener;
@@ -51,15 +53,13 @@ public class NatsSubscriptionConfig {
                                    SearchIndexListener searchIndexListener,
                                    CollectionSchemaListener collectionSchemaListener,
                                    ModuleEventListener moduleEventListener,
-                                   CerbosCacheInvalidationListener cerbosCacheInvalidationListener,
-                                   CredentialCacheInvalidationListener credentialCacheInvalidationListener) {
+                                   CerbosCacheInvalidationListener cerbosCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.flowEventListener = flowEventListener;
         this.searchIndexListener = searchIndexListener;
         this.collectionSchemaListener = collectionSchemaListener;
         this.moduleEventListener = moduleEventListener;
         this.cerbosCacheInvalidationListener = cerbosCacheInvalidationListener;
-        this.credentialCacheInvalidationListener = credentialCacheInvalidationListener;
     }
 
     @PostConstruct
@@ -87,10 +87,15 @@ public class NatsSubscriptionConfig {
                 cerbosCacheInvalidationListener::handlePolicyChanged));
 
         // Credential cache invalidation — every pod drops local cache entries
-        // when a credential row changes upstream.
-        subscriptionManager.register(EventSubscription.broadcast(
-                "worker-credential-cache", "kelta.config.credential.changed.>",
-                credentialCacheInvalidationListener::handleCredentialChanged));
+        // when a credential row changes upstream. Only present when
+        // kelta.encryption.key is configured (credential beans are conditional
+        // on EncryptionService).
+        if (credentialCacheInvalidationListener != null) {
+            subscriptionManager.register(EventSubscription.broadcast(
+                    "worker-credential-cache", "kelta.config.credential.changed.>",
+                    credentialCacheInvalidationListener::handleCredentialChanged));
+            log.info("Registered NATS subscription for credential cache invalidation");
+        }
 
         // Flow trigger cache invalidation — every pod drops the per-tenant
         // FlowEventListener cache when a flow row changes (create/update/delete).
@@ -115,7 +120,8 @@ public class NatsSubscriptionConfig {
             log.info("Registered NATS subscription for Svix webhook publisher");
         }
 
-        log.info("Registered {} worker NATS subscriptions", 7
+        log.info("Registered {} worker NATS subscriptions", 6
+                + (credentialCacheInvalidationListener != null ? 1 : 0)
                 + (supersetCollectionSyncListener != null ? 1 : 0)
                 + (svixWebhookPublisher != null ? 1 : 0));
     }

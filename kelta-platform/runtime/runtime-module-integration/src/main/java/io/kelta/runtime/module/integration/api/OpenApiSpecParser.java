@@ -189,24 +189,23 @@ public class OpenApiSpecParser {
 
     /**
      * Converts a swagger-parser model object (Jackson-2 backed POJOs / Maps /
-     * Lists) into a Jackson-3 {@link JsonNode}. We round-trip via a Map so we
-     * don't need to share an ObjectMapper between the two Jackson versions.
+     * Lists) into a Jackson-3 {@link JsonNode}. Uses swagger-core's pre-configured
+     * Jackson-2 mapper so OpenAPI-specific serializers run (clean spec-style
+     * output, NON_NULL inclusion, polymorphic Schema handling); without this,
+     * a bare {@code new ObjectMapper()} dumps every internal field of swagger's
+     * POJOs (or fails outright on certain spec shapes).
      */
     @SuppressWarnings("unchecked")
     private JsonNode convert(Object value) {
         if (value == null) {
             return null;
         }
-        // swagger-parser hands back Jackson-2 POJOs; their toString isn't JSON,
-        // so we serialize via Jackson-2 first, then parse with Jackson-3.
         try {
-            com.fasterxml.jackson.databind.ObjectMapper jackson2 =
-                new com.fasterxml.jackson.databind.ObjectMapper();
-            String json = jackson2.writeValueAsString(value);
+            String json = io.swagger.v3.core.util.Json.mapper().writeValueAsString(value);
             return objectMapper.readTree(json);
         } catch (Exception e) {
-            // As a fallback, stuff the toString into an empty object — better
-            // to lose detail than fail the entire import.
+            log.warn("Failed to serialize swagger object of type {}: {}",
+                value.getClass().getName(), e.toString());
             ObjectNode fallback = objectMapper.createObjectNode();
             fallback.put("_unparsable", value.toString());
             return fallback;

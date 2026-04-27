@@ -113,7 +113,7 @@ class McpApplicationTest {
     }
 
     @Test
-    void adminEndpointSurfaceMatchesPhase6() {
+    void adminEndpointSurfaceCoversPhase6Through8() {
         List<String> names = adminTools.stream()
                 .map(t -> t.toSpecification().tool().name())
                 .toList();
@@ -128,7 +128,16 @@ class McpApplicationTest {
                 "update_field",
                 "remove_field",
                 "create_validation_rule",
-                "create_picklist");
+                "create_picklist",
+                // UI admin (Phase 7)
+                "create_layout",
+                "update_layout",
+                "delete_layout",
+                "create_listview",
+                // automation admin + integrations (Phase 8)
+                "create_flow",
+                "update_flow",
+                "import_api_spec");
     }
 
     @Test

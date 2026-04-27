@@ -1,0 +1,39 @@
+package io.kelta.mcp.tool.user;
+
+import io.kelta.mcp.client.GatewayHttpClient;
+import io.kelta.mcp.error.McpErrorMapper;
+import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.UserTool;
+import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.spec.McpSchema.Tool;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DescribeApiTool implements UserTool {
+
+    private final GatewayHttpClient gateway;
+
+    public DescribeApiTool(GatewayHttpClient gateway) {
+        this.gateway = gateway;
+    }
+
+    @Override
+    public SyncToolSpecification toSpecification() {
+        Tool tool = Tool.builder()
+                .name("describe_api")
+                .description("Return the auto-generated OpenAPI 3.0 spec for the current tenant. The spec covers JSON:API CRUD on every collection — useful when you need exact request/response schemas. Specialized controllers (flows, approvals, bulk) are NOT in this spec; use the dedicated tools for those.")
+                .inputSchema(Schemas.empty())
+                .build();
+
+        return SyncToolSpecification.builder()
+                .tool(tool)
+                .callHandler((exchange, request) -> {
+                    try {
+                        return McpErrorMapper.toResult(gateway.get("/api/docs/openapi.json"));
+                    } catch (RuntimeException e) {
+                        return McpErrorMapper.fromException(e);
+                    }
+                })
+                .build();
+    }
+}

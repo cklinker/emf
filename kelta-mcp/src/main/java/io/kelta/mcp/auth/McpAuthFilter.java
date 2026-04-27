@@ -56,7 +56,12 @@ public class McpAuthFilter extends OncePerRequestFilter implements Ordered {
             return;
         }
 
-        chain.doFilter(new SanitizedRequest(request), response);
+        RequestPatHolder.set(token);
+        try {
+            chain.doFilter(new SanitizedRequest(request), response);
+        } finally {
+            RequestPatHolder.clear();
+        }
     }
 
     private static void unauthorized(HttpServletResponse response, String code, String message)

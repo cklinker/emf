@@ -73,6 +73,40 @@ class McpAuthFilterTest {
     }
 
     @Test
+    void setsPatHolderDuringChainAndClearsAfter() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        req.addHeader("Authorization", "Bearer klt_xyz_during_chain");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+
+        String[] seenInChain = new String[1];
+        FilterChain chain = (request, response) -> {
+            seenInChain[0] = io.kelta.mcp.auth.RequestPatHolder.get();
+        };
+
+        filter.doFilter(req, res, chain);
+
+        assertThat(seenInChain[0]).isEqualTo("klt_xyz_during_chain");
+        assertThat(io.kelta.mcp.auth.RequestPatHolder.get()).isNull();
+    }
+
+    @Test
+    void clearsPatHolderEvenIfChainThrows() {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        req.addHeader("Authorization", "Bearer klt_failing");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        FilterChain chain = (request, response) -> {
+            throw new RuntimeException("simulated downstream failure");
+        };
+
+        try {
+            filter.doFilter(req, res, chain);
+        } catch (Exception ignored) {
+            // expected
+        }
+        assertThat(io.kelta.mcp.auth.RequestPatHolder.get()).isNull();
+    }
+
+    @Test
     void skipsFilterForNonMcpPaths() throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/actuator/health");
         MockHttpServletResponse res = new MockHttpServletResponse();

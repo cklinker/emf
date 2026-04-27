@@ -1,5 +1,6 @@
 package io.kelta.mcp;
 
+import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpSyncServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.test.context.TestPropertySource;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +37,9 @@ class McpApplicationTest {
     @Autowired
     private Map<String, ServletRegistrationBean<?>> servletRegistrations;
 
+    @Autowired
+    private List<UserTool> userTools;
+
     @Test
     void bothMcpServersAreWired() {
         assertThat(userServer).isNotNull();
@@ -51,5 +56,20 @@ class McpApplicationTest {
         assertThat(adminServlet).isNotNull();
         assertThat(userServlet.getUrlMappings()).contains("/mcp/user", "/mcp/user/*");
         assertThat(adminServlet.getUrlMappings()).contains("/mcp/admin", "/mcp/admin/*");
+    }
+
+    @Test
+    void allReadOnlyUserToolsAreDiscovered() {
+        List<String> names = userTools.stream()
+                .map(t -> t.toSpecification().tool().name())
+                .toList();
+        assertThat(names).containsExactlyInAnyOrder(
+                "list_collections",
+                "get_collection_schema",
+                "query_collection",
+                "get_record",
+                "search",
+                "describe_api"
+        );
     }
 }

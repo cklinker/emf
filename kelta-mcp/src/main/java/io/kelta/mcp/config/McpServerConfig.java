@@ -1,21 +1,23 @@
 package io.kelta.mcp.config;
 
+import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
-import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Wires two independent MCP server instances inside a single Spring Boot
@@ -31,6 +33,7 @@ import java.util.Map;
 @EnableScheduling
 public class McpServerConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(McpServerConfig.class);
     private static final String SERVER_NAME = "kelta-mcp";
     private static final String SERVER_VERSION = "1.0.0";
 
@@ -51,12 +54,18 @@ public class McpServerConfig {
     @Bean(name = "userMcpServer")
     public McpSyncServer userMcpServer(
             @org.springframework.beans.factory.annotation.Qualifier("userTransportProvider")
-            HttpServletStreamableServerTransportProvider transport) {
+            HttpServletStreamableServerTransportProvider transport,
+            List<UserTool> userTools) {
         McpSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-user", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder().tools(true).build())
                 .build();
         server.addTool(pingTool("user"));
+        for (UserTool tool : userTools) {
+            McpServerFeatures.SyncToolSpecification spec = tool.toSpecification();
+            server.addTool(spec);
+            log.info("Registered user tool: {}", spec.tool().name());
+        }
         return server;
     }
 
@@ -95,13 +104,10 @@ public class McpServerConfig {
     }
 
     private McpServerFeatures.SyncToolSpecification pingTool(String profile) {
-        McpSchema.JsonSchema emptyObject = new McpSchema.JsonSchema(
-                "object", Map.of(), List.of(), false, null, null);
-
         Tool tool = Tool.builder()
                 .name("ping")
                 .description("Returns 'pong'. Smoke test that the " + profile + " MCP endpoint is reachable.")
-                .inputSchema(emptyObject)
+                .inputSchema(Schemas.empty())
                 .build();
 
         return McpServerFeatures.SyncToolSpecification.builder()

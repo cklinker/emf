@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { getTenantSlug } from '../../context/TenantContext'
+import { unwrapCollection } from '../../utils/jsonapi'
 import {
   useToast,
   ConfirmDialog,
@@ -95,8 +96,8 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
     queryFn: async () => {
       const resp = await apiClient.fetch(`/api/flows/${execItemId}/flow-executions`)
       if (!resp.ok) throw new Error('Failed to load executions')
-      const json = (await resp.json()) as { executions: FlowExecutionLog[] }
-      return json.executions || []
+      const json = await resp.json()
+      return unwrapCollection<FlowExecutionLog>(json).data
     },
     enabled: !!execItemId,
   })

@@ -31,7 +31,7 @@ import io.kelta.worker.listener.RecordTypeEnforcementHook;
 import io.kelta.worker.listener.ValidationRuleRefreshHook;
 import io.kelta.crypto.EncryptionService;
 import io.kelta.runtime.credential.CredentialTypeRegistry;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import io.kelta.worker.handler.SubmitForApprovalActionHandler;
 import io.kelta.worker.repository.ApprovalRepository;
 import io.kelta.worker.service.ApprovalService;
@@ -304,7 +304,7 @@ public class FlowConfig {
     // ---------------------------------------------------------------------------
 
     @Bean
-    @ConditionalOnBean(EncryptionService.class)
+    @ConditionalOnProperty(name = "kelta.encryption.key")
     public CredentialEncryptionHook credentialEncryptionHook(
             BeforeSaveHookRegistry hookRegistry,
             EncryptionService encryptionService,

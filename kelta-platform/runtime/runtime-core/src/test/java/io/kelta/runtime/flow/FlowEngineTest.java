@@ -421,7 +421,7 @@ class FlowEngineTest {
                 }
                 """;
 
-            String executionId = engine.startExecution("t1", "f1", json, Map.of(), "u1", false);
+            String executionId = engine.startExecution("t1", "f1", json, Map.of(), "u1", null, false);
             assertNotNull(executionId);
             assertFalse(executionId.isEmpty());
         }

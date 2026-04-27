@@ -107,7 +107,7 @@ public class FlowExecutionController {
         }
 
         String resultExecutionId = flowEngine.startExecution(
-                tenantId, flowId, definitionJson, initialState, userId, isTest);
+                tenantId, flowId, definitionJson, initialState, userId, null, isTest);
 
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("flowId", flowId);
@@ -264,7 +264,7 @@ public class FlowExecutionController {
 
         String newExecutionId = flowEngine.startExecution(
                 exec.tenantId(), exec.flowId(), definitionJson, initialState,
-                exec.startedBy(), exec.isTest());
+                exec.startedBy(), exec.triggerRecordId(), exec.isTest());
 
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("originalExecutionId", executionId);

@@ -31,6 +31,7 @@ class ScheduledJobExecutorServiceTest {
     private ReportExecutionService reportExecutionService;
     private DataExportService dataExportService;
     private DataExportRepository dataExportRepository;
+    private TenantSlugResolver tenantSlugResolver;
     private ScheduledJobExecutorService executor;
 
     @BeforeEach
@@ -43,9 +44,12 @@ class ScheduledJobExecutorServiceTest {
         reportExecutionService = mock(ReportExecutionService.class);
         dataExportService = mock(DataExportService.class);
         dataExportRepository = mock(DataExportRepository.class);
+        tenantSlugResolver = mock(TenantSlugResolver.class);
+        when(tenantSlugResolver.resolveSlug(anyString())).thenReturn(Optional.of("acme-corp"));
         executor = new ScheduledJobExecutorService(
                 repository, flowEngine, initialStateBuilder, objectMapper,
-                scriptExecutor, reportExecutionService, dataExportService, dataExportRepository);
+                scriptExecutor, reportExecutionService, dataExportService, dataExportRepository,
+                tenantSlugResolver);
     }
 
     @AfterEach
@@ -67,14 +71,40 @@ class ScheduledJobExecutorServiceTest {
             when(repository.findFlowById("flow-1")).thenReturn(Optional.of(Map.of(
                     "id", "flow-1", "tenant_id", "t1", "definition", "{\"StartAt\":\"Start\"}",
                     "trigger_config", "{}", "active", true)));
-            when(flowEngine.startExecution(anyString(), anyString(), anyString(), any(), any(), anyBoolean()))
+            when(flowEngine.startExecution(anyString(), anyString(), anyString(), any(), any(), any(), anyBoolean()))
                     .thenReturn("exec-1");
 
             executor.executeAll();
 
-            verify(flowEngine).startExecution(eq("t1"), eq("flow-1"), anyString(), any(), isNull(), eq(false));
+            verify(flowEngine).startExecution(eq("t1"), eq("flow-1"), anyString(), any(), isNull(), isNull(), eq(false));
             verify(repository).updateAfterExecution(eq("job-1"), eq("SUCCESS"), any(), any());
             verify(repository).insertExecutionLog(eq("job-1"), eq("SUCCESS"), isNull(), any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Should bind tenant slug so flow execution sees correct schema")
+        void shouldBindTenantSlugForFlowExecution() {
+            Map<String, Object> job = Map.of(
+                    "id", "job-1", "tenant_id", "t1", "job_type", "FLOW",
+                    "job_reference_id", "flow-1", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findFlowById("flow-1")).thenReturn(Optional.of(Map.of(
+                    "id", "flow-1", "tenant_id", "t1", "definition", "{\"StartAt\":\"Start\"}",
+                    "trigger_config", "{}", "active", true)));
+            when(tenantSlugResolver.resolveSlug("t1")).thenReturn(Optional.of("threadline-clothing"));
+
+            // Capture the slug visible to TenantContext at the moment startExecution is invoked.
+            java.util.concurrent.atomic.AtomicReference<String> seenSlug = new java.util.concurrent.atomic.AtomicReference<>();
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean()))
+                    .thenAnswer(invocation -> {
+                        seenSlug.set(TenantContext.getSlug());
+                        return "exec-1";
+                    });
+
+            executor.executeAll();
+
+            verify(tenantSlugResolver).resolveSlug("t1");
+            assertThat(seenSlug.get()).isEqualTo("threadline-clothing");
         }
 
         @Test
@@ -88,7 +118,7 @@ class ScheduledJobExecutorServiceTest {
 
             executor.executeAll();
 
-            verify(flowEngine, never()).startExecution(any(), any(), any(), any(), any(), anyBoolean());
+            verify(flowEngine, never()).startExecution(any(), any(), any(), any(), any(), any(), anyBoolean());
             verify(repository).updateAfterExecution(eq("job-2"), eq("FAILED"), any(), any());
             verify(repository).insertExecutionLog(eq("job-2"), eq("FAILED"), contains("not found"), any(), any(), anyLong());
         }
@@ -105,7 +135,7 @@ class ScheduledJobExecutorServiceTest {
 
             executor.executeAll();
 
-            verify(flowEngine, never()).startExecution(any(), any(), any(), any(), any(), anyBoolean());
+            verify(flowEngine, never()).startExecution(any(), any(), any(), any(), any(), any(), anyBoolean());
             verify(repository).updateAfterExecution(eq("job-3"), eq("FAILED"), any(), any());
         }
 
@@ -122,7 +152,7 @@ class ScheduledJobExecutorServiceTest {
             when(repository.findFlowById("missing")).thenReturn(Optional.empty());
             when(repository.findFlowById("flow-ok")).thenReturn(Optional.of(Map.of(
                     "id", "flow-ok", "active", true, "definition", "{}", "trigger_config", "{}")));
-            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-2");
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-2");
 
             executor.executeAll();
 
@@ -312,7 +342,7 @@ class ScheduledJobExecutorServiceTest {
             when(repository.findDueJobs()).thenReturn(List.of(flowJob, scriptJob, reportJob));
             when(repository.findFlowById("flow-1")).thenReturn(Optional.of(Map.of(
                     "id", "flow-1", "active", true, "definition", "{}", "trigger_config", "{}")));
-            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
             when(repository.findScriptById("script-1")).thenReturn(Optional.of(Map.of(
                     "id", "script-1", "name", "test", "active", true,
                     "source_code", "1+1;", "language", "javascript")));
@@ -358,7 +388,7 @@ class ScheduledJobExecutorServiceTest {
 
             executor.executeAll();
 
-            verify(flowEngine, never()).startExecution(any(), any(), any(), any(), any(), anyBoolean());
+            verify(flowEngine, never()).startExecution(any(), any(), any(), any(), any(), any(), anyBoolean());
             verify(scriptExecutor, never()).execute(any());
             verify(repository, never()).updateAfterExecution(any(), any(), any(), any());
         }
@@ -372,7 +402,7 @@ class ScheduledJobExecutorServiceTest {
             when(repository.findDueJobs()).thenReturn(List.of(job));
             when(repository.findFlowById("flow-err")).thenReturn(Optional.of(Map.of(
                     "id", "flow-err", "active", true, "definition", "{}", "trigger_config", "{}")));
-            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean()))
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean()))
                     .thenThrow(new RuntimeException("Boom"));
 
             executor.executeAll();

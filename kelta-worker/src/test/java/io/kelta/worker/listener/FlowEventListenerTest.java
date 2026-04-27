@@ -64,7 +64,7 @@ class FlowEventListenerTest {
             stubJdbcWithTriggerConfig(plainConfig);
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(true);
             when(initialStateBuilder.buildFromRecordEvent(any(), any(), any())).thenReturn(Map.of());
-            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
 
             listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
@@ -89,7 +89,7 @@ class FlowEventListenerTest {
             stubJdbcWithTriggerConfig(wrappedConfig);
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(true);
             when(initialStateBuilder.buildFromRecordEvent(any(), any(), any())).thenReturn(Map.of());
-            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
 
             listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
@@ -202,6 +202,32 @@ class FlowEventListenerTest {
     }
 
     @Nested
+    @DisplayName("trigger record id propagation")
+    class TriggerRecordIdPropagation {
+
+        @Test
+        @DisplayName("Should pass the triggering record's ID to flowEngine.startExecution")
+        @SuppressWarnings("unchecked")
+        void shouldPassRecordIdAsTriggerRecordId() throws Exception {
+            String plainConfig = """
+                {"events": ["UPDATED"], "collection": "orders"}
+                """;
+
+            stubJdbcWithTriggerConfig(plainConfig);
+            when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(true);
+            when(initialStateBuilder.buildFromRecordEvent(any(), any(), any())).thenReturn(Map.of());
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean()))
+                    .thenReturn("exec-1");
+
+            // The helper builds a payload with recordId="rec-1"
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.UPDATED));
+
+            verify(flowEngine).startExecution(
+                    eq("tenant-1"), any(), any(), any(), any(), eq("rec-1"), anyBoolean());
+        }
+    }
+
+    @Nested
     @DisplayName("tenant slug binding")
     class TenantSlugBinding {
 
@@ -220,7 +246,7 @@ class FlowEventListenerTest {
 
             // Capture the slug seen by TenantContext at the moment startExecution is invoked.
             java.util.concurrent.atomic.AtomicReference<String> seenSlug = new java.util.concurrent.atomic.AtomicReference<>();
-            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean()))
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean()))
                     .thenAnswer(invocation -> {
                         seenSlug.set(io.kelta.runtime.context.TenantContext.getSlug());
                         return "exec-1";
@@ -244,12 +270,12 @@ class FlowEventListenerTest {
             when(tenantSlugResolver.resolveSlug("tenant-1")).thenReturn(Optional.empty());
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(true);
             when(initialStateBuilder.buildFromRecordEvent(any(), any(), any())).thenReturn(Map.of());
-            when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
+            when(flowEngine.startExecution(any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
 
             listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.UPDATED));
 
             // Execution still attempted — degraded behaviour, but trigger evaluation still happens
-            verify(flowEngine).startExecution(eq("tenant-1"), any(), any(), any(), any(), anyBoolean());
+            verify(flowEngine).startExecution(eq("tenant-1"), any(), any(), any(), any(), any(), anyBoolean());
         }
     }
 

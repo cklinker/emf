@@ -37,6 +37,26 @@ public final class TenantContextUtils {
     }
 
     /**
+     * Executes {@code task} with both the tenant ID and slug bound in
+     * {@link TenantContext}. Required by code paths that issue tenant-scoped
+     * SQL — schema-per-tenant table resolution depends on the slug.
+     */
+    public static void withTenant(String tenantId, String tenantSlug, ThrowingRunnable task)
+            throws Exception {
+        AtomicReference<Exception> failure = new AtomicReference<>();
+        TenantContext.runWithTenant(tenantId, tenantSlug, () -> {
+            try {
+                task.run();
+            } catch (Exception e) {
+                failure.set(e);
+            }
+        });
+        if (failure.get() != null) {
+            throw failure.get();
+        }
+    }
+
+    /**
      * Callable variant of {@link #withTenant(String, ThrowingRunnable)}.
      */
     public static <T> T withTenant(String tenantId, Callable<T> task) throws Exception {

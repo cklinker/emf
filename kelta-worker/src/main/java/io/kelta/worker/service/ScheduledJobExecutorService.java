@@ -49,6 +49,7 @@ public class ScheduledJobExecutorService {
     private final ReportExecutionService reportExecutionService;
     private final DataExportService dataExportService;
     private final DataExportRepository dataExportRepository;
+    private final TenantSlugResolver tenantSlugResolver;
 
     public ScheduledJobExecutorService(ScheduledJobRepository repository,
                                         FlowEngine flowEngine,
@@ -57,7 +58,8 @@ public class ScheduledJobExecutorService {
                                         ScriptExecutor scriptExecutor,
                                         ReportExecutionService reportExecutionService,
                                         DataExportService dataExportService,
-                                        DataExportRepository dataExportRepository) {
+                                        DataExportRepository dataExportRepository,
+                                        TenantSlugResolver tenantSlugResolver) {
         this.repository = repository;
         this.flowEngine = flowEngine;
         this.initialStateBuilder = initialStateBuilder;
@@ -66,6 +68,7 @@ public class ScheduledJobExecutorService {
         this.reportExecutionService = reportExecutionService;
         this.dataExportService = dataExportService;
         this.dataExportRepository = dataExportRepository;
+        this.tenantSlugResolver = tenantSlugResolver;
     }
 
     /**
@@ -91,8 +94,17 @@ public class ScheduledJobExecutorService {
 
             Instant startedAt = Instant.now();
 
+            // Scheduler thread has no inherited tenant context, so resolve the
+            // slug and bind both ID and slug — every job type that touches
+            // tenant-scoped tables (FLOW + REPORT_EXPORT + DATA_EXPORT) needs
+            // schema-per-tenant resolution to work.
+            String tenantSlug = tenantSlugResolver.resolveSlug(tenantId).orElse(null);
+            if (tenantSlug == null) {
+                log.warn("Could not resolve slug for tenant {} on scheduled job {} — execution will fall back to public schema",
+                        tenantId, jobId);
+            }
             try {
-                TenantContextUtils.withTenant(tenantId, () -> {
+                TenantContextUtils.withTenant(tenantId, tenantSlug, () -> {
                     switch (jobType) {
                         case "FLOW" -> executeFlowJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
                         case "SCRIPT" -> executeScriptJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
@@ -165,7 +177,7 @@ public class ScheduledJobExecutorService {
 
         // Execute flow (async — returns immediately)
         String flowExecutionId = flowEngine.startExecution(
-                tenantId, flowReferenceId, definitionJson, initialState, null, false);
+                tenantId, flowReferenceId, definitionJson, initialState, null, null, false);
 
         Instant completedAt = Instant.now();
         long durationMs = completedAt.toEpochMilli() - startedAt.toEpochMilli();

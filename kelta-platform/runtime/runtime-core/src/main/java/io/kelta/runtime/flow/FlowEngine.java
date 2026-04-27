@@ -84,18 +84,22 @@ public class FlowEngine {
      * Starts a flow execution asynchronously. Returns the execution ID immediately.
      * The execution runs on the engine's thread pool.
      *
-     * @param tenantId        tenant ID
-     * @param flowId          flow ID
-     * @param definitionJson  the flow definition JSON
-     * @param initialInput    the initial state data
-     * @param userId          user who initiated the execution (null for triggers)
-     * @param isTest          whether this is a test execution
+     * @param tenantId         tenant ID
+     * @param flowId           flow ID
+     * @param definitionJson   the flow definition JSON
+     * @param initialInput     the initial state data
+     * @param userId           user who initiated the execution (null for triggers)
+     * @param triggerRecordId  ID of the record that triggered this execution
+     *                         (null for manual runs, scheduled jobs, and webhooks)
+     * @param isTest           whether this is a test execution
      * @return the execution ID
      */
     public String startExecution(String tenantId, String flowId, String definitionJson,
-                                 Map<String, Object> initialInput, String userId, boolean isTest) {
+                                 Map<String, Object> initialInput, String userId,
+                                 String triggerRecordId, boolean isTest) {
         FlowDefinition definition = parser.parse(definitionJson);
-        String executionId = flowStore.createExecution(tenantId, flowId, userId, null, initialInput, isTest);
+        String executionId = flowStore.createExecution(tenantId, flowId, userId, triggerRecordId,
+                initialInput, isTest);
 
         threadPool.submit(() -> TenantContext.runWithTenant(tenantId, () -> {
             listener.onExecutionStarted(flowId);

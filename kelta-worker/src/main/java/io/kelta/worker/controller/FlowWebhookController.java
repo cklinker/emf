@@ -5,6 +5,8 @@ import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.flow.FlowEngine;
 import io.kelta.runtime.flow.InitialStateBuilder;
 import io.kelta.worker.repository.FlowRepository;
+import io.kelta.worker.service.TenantSlugResolver;
+import io.kelta.worker.util.TenantContextUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Handles inbound webhook requests that trigger AUTOLAUNCHED flows,
@@ -37,17 +40,20 @@ public class FlowWebhookController {
     private final FlowRepository flowRepository;
     private final InitialStateBuilder initialStateBuilder;
     private final ObjectMapper objectMapper;
+    private final TenantSlugResolver tenantSlugResolver;
     private final String externalBaseUrl;
 
     public FlowWebhookController(FlowEngine flowEngine,
                                   FlowRepository flowRepository,
                                   InitialStateBuilder initialStateBuilder,
                                   ObjectMapper objectMapper,
+                                  TenantSlugResolver tenantSlugResolver,
                                   @Value("${kelta.external-base-url:http://localhost:8080}") String externalBaseUrl) {
         this.flowEngine = flowEngine;
         this.flowRepository = flowRepository;
         this.initialStateBuilder = initialStateBuilder;
         this.objectMapper = objectMapper;
+        this.tenantSlugResolver = tenantSlugResolver;
         this.externalBaseUrl = externalBaseUrl;
     }
 
@@ -109,8 +115,28 @@ public class FlowWebhookController {
                 body != null ? body : Map.of(),
                 headers, tenantId, flowId, executionId);
 
-        String resultExecutionId = flowEngine.startExecution(
-                tenantId, flowId, definitionJson, initialState, "webhook", false);
+        // Webhooks are unauthenticated and bypass the tenant filter, so the slug
+        // is not yet bound. Resolve it before invoking the engine — the engine's
+        // thread-pool propagation snapshots TenantContext at submit time, and
+        // schema-per-tenant SQL inside the flow needs the slug to resolve to the
+        // right schema.
+        String tenantSlug = tenantSlugResolver.resolveSlug(tenantId).orElse(null);
+        if (tenantSlug == null) {
+            log.warn("Could not resolve slug for tenant {} on webhook for flow {} — flow execution will fall back to public schema",
+                    tenantId, flowId);
+        }
+        AtomicReference<String> resultRef = new AtomicReference<>();
+        try {
+            TenantContextUtils.withTenant(tenantId, tenantSlug, () ->
+                    resultRef.set(flowEngine.startExecution(
+                            tenantId, flowId, definitionJson, initialState, "webhook", null, false)));
+        } catch (Exception e) {
+            log.error("Failed to start webhook-triggered flow execution: flowId={}", flowId, e);
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error",
+                            "Failed to start flow execution"));
+        }
+        String resultExecutionId = resultRef.get();
 
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("flowId", flowId);

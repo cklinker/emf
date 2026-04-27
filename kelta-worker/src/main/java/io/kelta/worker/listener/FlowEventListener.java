@@ -135,6 +135,7 @@ public class FlowEventListener {
                                     config.definitionJson(),
                                     initialState,
                                     boundUserId,
+                                    payload.getRecordId(),
                                     false);
                         }
                     } catch (Exception e) {

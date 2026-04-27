@@ -2,6 +2,7 @@ package io.kelta.mcp;
 
 import io.kelta.mcp.resource.UserResource;
 import io.kelta.mcp.resource.UserResourceTemplate;
+import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpSyncServer;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,9 @@ class McpApplicationTest {
 
     @Autowired
     private List<UserResourceTemplate> userResourceTemplates;
+
+    @Autowired
+    private List<AdminTool> adminTools;
 
     @Test
     void bothMcpServersAreWired() {
@@ -106,5 +110,26 @@ class McpApplicationTest {
                 .map(t -> t.toSpecification().resourceTemplate().uriTemplate())
                 .toList();
         assertThat(templates).containsExactly("kelta://collections/{name}");
+    }
+
+    @Test
+    void adminEndpointHasOnlyReadOnlyBrowseTools() {
+        List<String> names = adminTools.stream()
+                .map(t -> t.toSpecification().tool().name())
+                .toList();
+        assertThat(names).containsExactlyInAnyOrder(
+                "list_collections",
+                "get_collection_schema");
+    }
+
+    @Test
+    void mutationToolsNeverLeakToAdminEndpoint() {
+        List<String> adminNames = adminTools.stream()
+                .map(t -> t.toSpecification().tool().name())
+                .toList();
+        // Hard guarantee: no write-side user tool can appear on the admin server.
+        assertThat(adminNames).doesNotContain(
+                "create_record", "update_record", "delete_record", "bulk_apply",
+                "execute_flow", "submit_for_approval", "list_approvals");
     }
 }

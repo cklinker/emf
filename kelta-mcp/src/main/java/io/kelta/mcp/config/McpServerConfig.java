@@ -3,6 +3,7 @@ package io.kelta.mcp.config;
 import io.kelta.mcp.observe.ObservedToolDecorator;
 import io.kelta.mcp.resource.UserResource;
 import io.kelta.mcp.resource.UserResourceTemplate;
+import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServer;
@@ -91,12 +92,19 @@ public class McpServerConfig {
     @Bean(name = "adminMcpServer")
     public McpSyncServer adminMcpServer(
             @org.springframework.beans.factory.annotation.Qualifier("adminTransportProvider")
-            HttpServletStreamableServerTransportProvider transport) {
+            HttpServletStreamableServerTransportProvider transport,
+            List<AdminTool> adminTools,
+            ObservedToolDecorator decorator) {
         McpSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-admin", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder().tools(true).build())
                 .build();
-        server.addTool(pingTool("admin"));
+        server.addTool(decorator.decorate(pingTool("admin"), "admin"));
+        for (AdminTool tool : adminTools) {
+            McpServerFeatures.SyncToolSpecification spec = decorator.decorate(tool.toSpecification(), "admin");
+            server.addTool(spec);
+            log.info("Registered admin tool: {}", spec.tool().name());
+        }
         return server;
     }
 

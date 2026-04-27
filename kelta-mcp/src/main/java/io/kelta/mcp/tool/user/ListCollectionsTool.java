@@ -2,6 +2,7 @@ package io.kelta.mcp.tool.user;
 
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
+import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class ListCollectionsTool implements UserTool {
+public class ListCollectionsTool implements UserTool, AdminTool {
 
     private final GatewayHttpClient gateway;
 

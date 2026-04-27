@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../../context/ApiContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useToast, ConfirmDialog } from '../../components'
 import type { PersonalAccessToken } from '@kelta/sdk'
 import { cn } from '@/lib/utils'
@@ -354,8 +355,15 @@ export function resolveMcpBaseUrl(): string {
   return ''
 }
 
-export function buildMcpAddCommand(profile: 'user' | 'admin', mcpBaseUrl: string, token: string): string {
-  const url = `${mcpBaseUrl}/mcp/${profile}`
+export function buildMcpAddCommand(
+  profile: 'user' | 'admin',
+  mcpBaseUrl: string,
+  tenantSlug: string,
+  token: string,
+): string {
+  // Slug binds the URL to a tenant (matches the platform-wide /{slug}/...
+  // convention). Different PAT in a different tenant → different URL.
+  const url = `${mcpBaseUrl}/${tenantSlug}/mcp/${profile}`
   // Single-quoted shell strings keep the token opaque to the shell.
   return `claude mcp add kelta-${profile} --transport http --url ${url} --header 'Authorization: Bearer ${token}'`
 }
@@ -418,8 +426,9 @@ function TokenCreatedDialog({
   }, [token])
 
   const mcpBaseUrl = resolveMcpBaseUrl()
-  const userCommand = buildMcpAddCommand('user', mcpBaseUrl, token)
-  const adminCommand = buildMcpAddCommand('admin', mcpBaseUrl, token)
+  const tenantSlug = getTenantSlug() || '<your-tenant-slug>'
+  const userCommand = buildMcpAddCommand('user', mcpBaseUrl, tenantSlug, token)
+  const adminCommand = buildMcpAddCommand('admin', mcpBaseUrl, tenantSlug, token)
 
   return (
     <div

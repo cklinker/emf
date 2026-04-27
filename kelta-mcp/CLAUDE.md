@@ -4,20 +4,40 @@ Model Context Protocol (MCP) server for the Kelta platform. Exposes platform ope
 
 ## Endpoints
 
-Two MCP server instances run inside one Spring Boot process:
+Two MCP server instances run inside one Spring Boot process. The URL
+convention follows the rest of the Kelta platform — slug first:
 
-| Path | Profile | Purpose |
-|------|---------|---------|
-| `/mcp/user` | data-plane | CRUD records, run flows, approvals, search |
-| `/mcp/admin` | control-plane | Define collections/fields/layouts/flows/etc. |
+| URL | Profile | Purpose |
+|-----|---------|---------|
+| `/{tenantSlug}/mcp/user` | data-plane | CRUD records, run flows, approvals, search |
+| `/{tenantSlug}/mcp/admin` | control-plane | Define collections/fields/layouts/flows/etc. |
 
-Each endpoint has its own immutable tool registry — admin tools are not callable from `/mcp/user` (or vice versa).
+The slug binds each MCP session to a specific tenant — different
+PATs in different tenants get different MCP URLs in their Claude
+Code config, so a single deployment can serve any number of tenants.
+`McpAuthFilter` extracts the slug from the URL, rewrites the request
+to the canonical `/mcp/(user|admin)` path the SDK servlet is
+registered at, and stamps the slug as a request attribute.
+
+Each endpoint has its own immutable tool registry — admin tools are
+not callable from `/mcp/user` (or vice versa).
 
 ## Auth
 
-Every request to `/mcp/**` must carry `Authorization: Bearer klt_*`. The `McpAuthFilter` does a presence/prefix check only — the actual cryptographic validation happens at the gateway when tool calls are forwarded. The filter also strips client-supplied `X-Tenant-ID` / `X-Tenant-Slug` / `X-User-Id` headers so a client cannot impersonate another tenant; tenant is derived by the gateway from the PAT.
+Every request to `/{slug}/mcp/**` must carry `Authorization: Bearer
+klt_*`. `McpAuthFilter` does a presence/prefix check only — the
+gateway does the cryptographic validation when tool calls are
+forwarded. The filter strips any client-supplied `X-Tenant-ID` /
+`X-Tenant-Slug` / `X-User-Id` headers so a client can't impersonate
+another tenant; the slug binding is the URL itself.
 
-PATs are kept in `PatSessionStore` keyed by MCP session id, evicted on idle timeout.
+`KeltaTransportContextExtractor` picks both PAT and slug off the
+inbound request and packs them into the SDK's
+`McpTransportContext`. `PatPropagatingToolDecorator` reads them back
+on the Reactor scheduler thread and pushes them into
+`RequestPatHolder` / `RequestSlugHolder` for the duration of the
+tool handler — `GatewayHttpClient` reads from those for outbound
+calls.
 
 ## Package Layout
 
@@ -78,7 +98,7 @@ mvn test -f kelta-mcp/pom.xml -Dtest="*Tool*"                        # Pattern
 mvn spring-boot:run -f kelta-mcp/pom.xml
 
 claude mcp add kelta-local --transport http \
-  --url http://localhost:8080/mcp/user \
+  --url http://localhost:8080/threadline-clothing/mcp/user \
   --header "Authorization: Bearer klt_smoke_test_token"
 # In a Claude Code session, ask: "use the kelta-local MCP server to call ping"
 ```

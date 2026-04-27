@@ -9,7 +9,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -17,11 +16,15 @@ import static org.mockito.Mockito.verify;
 
 class McpAuthFilterTest {
 
+    private static final String SLUG = "threadline-clothing";
+    private static final String URL_USER = "/" + SLUG + "/mcp/user";
+    private static final String URL_ADMIN = "/" + SLUG + "/mcp/admin";
+
     private final McpAuthFilter filter = new McpAuthFilter();
 
     @Test
     void rejectsRequestWithoutAuthorizationHeader() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
@@ -34,7 +37,7 @@ class McpAuthFilterTest {
 
     @Test
     void rejectsBearerTokenWithoutKltPrefix() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
         req.addHeader("Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9.something.signature");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -48,7 +51,7 @@ class McpAuthFilterTest {
 
     @Test
     void rejectsAuthorizationWithoutBearerScheme() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/admin");
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_ADMIN);
         req.addHeader("Authorization", "Basic dXNlcjpwYXNz");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -60,8 +63,22 @@ class McpAuthFilterTest {
     }
 
     @Test
-    void allowsValidKltBearerToken() throws Exception {
+    void rejectsMcpUrlWithoutSlugPrefix() throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        req.addHeader("Authorization", "Bearer klt_abc");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(req, res, chain);
+
+        // Slug is required — pre-slug URL is treated as not-found.
+        assertThat(res.getStatus()).isEqualTo(404);
+        verify(chain, never()).doFilter(req, res);
+    }
+
+    @Test
+    void allowsValidKltBearerTokenWithSlugInUrl() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
         req.addHeader("Authorization", "Bearer klt_abc123def456");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -73,25 +90,28 @@ class McpAuthFilterTest {
     }
 
     @Test
-    void setsPatHolderDuringChainAndClearsAfter() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+    void setsPatHolderAndSlugAttributeDuringChain() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
         req.addHeader("Authorization", "Bearer klt_xyz_during_chain");
         MockHttpServletResponse res = new MockHttpServletResponse();
 
-        String[] seenInChain = new String[1];
+        String[] seenPat = new String[1];
+        Object[] seenSlug = new Object[1];
         FilterChain chain = (request, response) -> {
-            seenInChain[0] = io.kelta.mcp.auth.RequestPatHolder.get();
+            seenPat[0] = RequestPatHolder.get();
+            seenSlug[0] = ((HttpServletRequest) request).getAttribute(McpAuthFilter.SLUG_ATTRIBUTE);
         };
 
         filter.doFilter(req, res, chain);
 
-        assertThat(seenInChain[0]).isEqualTo("klt_xyz_during_chain");
-        assertThat(io.kelta.mcp.auth.RequestPatHolder.get()).isNull();
+        assertThat(seenPat[0]).isEqualTo("klt_xyz_during_chain");
+        assertThat(seenSlug[0]).isEqualTo(SLUG);
+        assertThat(RequestPatHolder.get()).isNull();
     }
 
     @Test
     void clearsPatHolderEvenIfChainThrows() {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
         req.addHeader("Authorization", "Bearer klt_failing");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = (request, response) -> {
@@ -103,7 +123,7 @@ class McpAuthFilterTest {
         } catch (Exception ignored) {
             // expected
         }
-        assertThat(io.kelta.mcp.auth.RequestPatHolder.get()).isNull();
+        assertThat(RequestPatHolder.get()).isNull();
     }
 
     @Test
@@ -118,8 +138,24 @@ class McpAuthFilterTest {
     }
 
     @Test
+    void rewritesRequestUriToCanonicalSdkPath() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER + "/messages");
+        req.addHeader("Authorization", "Bearer klt_abc");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+
+        String[] seenUri = new String[1];
+        FilterChain chain = (request, response) -> {
+            seenUri[0] = ((HttpServletRequest) request).getRequestURI();
+        };
+
+        filter.doFilter(req, res, chain);
+
+        assertThat(seenUri[0]).isEqualTo("/mcp/user/messages");
+    }
+
+    @Test
     void stripsClientSuppliedTenantHeaders() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
         req.addHeader("Authorization", "Bearer klt_abc");
         req.addHeader("X-Tenant-ID", "00000000-0000-0000-0000-000000000999");
         req.addHeader("X-Tenant-Slug", "evil-tenant");

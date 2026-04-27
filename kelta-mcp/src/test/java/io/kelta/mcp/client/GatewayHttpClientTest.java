@@ -31,7 +31,7 @@ class GatewayHttpClientTest {
     void setUp() {
         wm = new WireMockServer(0);
         wm.start();
-        McpProperties props = new McpProperties("http://localhost:" + wm.port(), "", 30, 60_000, null);
+        McpProperties props = new McpProperties("http://localhost:" + wm.port(), 30, 60_000, null);
         client = new GatewayHttpClient(RestClient.builder(), props);
         RequestPatHolder.set("klt_test_pat_value");
     }
@@ -121,43 +121,66 @@ class GatewayHttpClientTest {
     }
 
     @Test
-    void prependsTenantSlugToPathsWhenConfigured() {
-        McpProperties tenantedProps = new McpProperties(
-                "http://localhost:" + wm.port(), "threadline-clothing", 30, 60_000, null);
-        GatewayHttpClient tenantedClient = new GatewayHttpClient(RestClient.builder(), tenantedProps);
+    void prependsTenantSlugFromHolderToPaths() {
+        io.kelta.mcp.auth.RequestSlugHolder.set("threadline-clothing");
+        try {
+            wm.stubFor(get(urlEqualTo("/threadline-clothing/api/collections"))
+                    .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
 
-        wm.stubFor(get(urlEqualTo("/threadline-clothing/api/collections"))
-                .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
+            GatewayHttpClient.Response res = client.get("/api/collections");
 
-        GatewayHttpClient.Response res = tenantedClient.get("/api/collections");
-
-        assertThat(res.isSuccess()).isTrue();
-        wm.verify(getRequestedForUrl("/threadline-clothing/api/collections")
-                .withHeader("Authorization", equalTo("Bearer klt_test_pat_value")));
+            assertThat(res.isSuccess()).isTrue();
+            wm.verify(getRequestedForUrl("/threadline-clothing/api/collections")
+                    .withHeader("Authorization", equalTo("Bearer klt_test_pat_value")));
+        } finally {
+            io.kelta.mcp.auth.RequestSlugHolder.clear();
+        }
     }
 
     @Test
     void preservesPathThatIsAlreadyTenantPrefixed() {
-        McpProperties tenantedProps = new McpProperties(
-                "http://localhost:" + wm.port(), "threadline-clothing", 30, 60_000, null);
-        GatewayHttpClient tenantedClient = new GatewayHttpClient(RestClient.builder(), tenantedProps);
-
-        wm.stubFor(get(urlEqualTo("/threadline-clothing/api/collections"))
-                .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
-
-        // Tool authored an already-prefixed path — don't double up.
-        GatewayHttpClient.Response res = tenantedClient.get("/threadline-clothing/api/collections");
-
-        assertThat(res.isSuccess()).isTrue();
-        wm.verify(getRequestedForUrl("/threadline-clothing/api/collections"));
+        io.kelta.mcp.auth.RequestSlugHolder.set("threadline-clothing");
+        try {
+            wm.stubFor(get(urlEqualTo("/threadline-clothing/api/collections"))
+                    .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
+            // Tool authored an already-prefixed path — don't double up.
+            GatewayHttpClient.Response res = client.get("/threadline-clothing/api/collections");
+            assertThat(res.isSuccess()).isTrue();
+            wm.verify(getRequestedForUrl("/threadline-clothing/api/collections"));
+        } finally {
+            io.kelta.mcp.auth.RequestSlugHolder.clear();
+        }
     }
 
     @Test
-    void emptySlugLeavesPathsUnchanged() {
-        // The default client instance in setUp has no slug configured.
+    void emptyHolderLeavesPathsUnchanged() {
+        // No slug in the holder (the default in setUp).
         wm.stubFor(get(urlEqualTo("/api/anything")).willReturn(aResponse().withStatus(200)));
         client.get("/api/anything");
         wm.verify(getRequestedForUrl("/api/anything"));
+    }
+
+    @Test
+    void differentSlugsOnSameClientGoToDifferentTenants() {
+        // Same GatewayHttpClient instance — slug comes from per-request holder
+        // so two simultaneous PATs in different tenants both work.
+        wm.stubFor(get(urlEqualTo("/threadline-clothing/api/x"))
+                .willReturn(aResponse().withStatus(200).withBody("a")));
+        wm.stubFor(get(urlEqualTo("/another-tenant/api/x"))
+                .willReturn(aResponse().withStatus(200).withBody("b")));
+
+        io.kelta.mcp.auth.RequestSlugHolder.set("threadline-clothing");
+        try {
+            assertThat(client.get("/api/x").body()).isEqualTo("a");
+        } finally {
+            io.kelta.mcp.auth.RequestSlugHolder.clear();
+        }
+        io.kelta.mcp.auth.RequestSlugHolder.set("another-tenant");
+        try {
+            assertThat(client.get("/api/x").body()).isEqualTo("b");
+        } finally {
+            io.kelta.mcp.auth.RequestSlugHolder.clear();
+        }
     }
 
     private static RequestPatternBuilder getRequestedForUrl(String url) {

@@ -33,7 +33,7 @@ class ListCollectionsToolTest {
         wm.start();
         GatewayHttpClient client = new GatewayHttpClient(
                 RestClient.builder(),
-                new McpProperties("http://localhost:" + wm.port(), 30, 60_000));
+                new McpProperties("http://localhost:" + wm.port(), 30, 60_000, null));
         tool = new ListCollectionsTool(client);
         RequestPatHolder.set("klt_list_test");
     }

@@ -29,7 +29,7 @@ class CollectionSchemaResourceTest {
         wm.start();
         GatewayHttpClient client = new GatewayHttpClient(
                 RestClient.builder(),
-                new McpProperties("http://localhost:" + wm.port(), 30, 60_000));
+                new McpProperties("http://localhost:" + wm.port(), 30, 60_000, null));
         resource = new CollectionSchemaResource(client);
         RequestPatHolder.set("klt_res_schema");
     }

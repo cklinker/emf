@@ -1,6 +1,7 @@
 package io.kelta.mcp.config;
 
 import io.kelta.mcp.observe.ObservedToolDecorator;
+import io.kelta.mcp.observe.RateLimitedToolDecorator;
 import io.kelta.mcp.resource.UserResource;
 import io.kelta.mcp.resource.UserResourceTemplate;
 import io.kelta.mcp.tool.AdminTool;
@@ -62,7 +63,8 @@ public class McpServerConfig {
             List<UserTool> userTools,
             List<UserResource> userResources,
             List<UserResourceTemplate> userResourceTemplates,
-            ObservedToolDecorator decorator) {
+            ObservedToolDecorator decorator,
+            RateLimitedToolDecorator rateLimiter) {
         McpSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-user", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder()
@@ -70,9 +72,9 @@ public class McpServerConfig {
                         .resources(false, true)  // (subscribe, listChanged)
                         .build())
                 .build();
-        server.addTool(decorator.decorate(pingTool("user"), "user"));
+        server.addTool(wrap(pingTool("user"), "user", decorator, rateLimiter));
         for (UserTool tool : userTools) {
-            McpServerFeatures.SyncToolSpecification spec = decorator.decorate(tool.toSpecification(), "user");
+            McpServerFeatures.SyncToolSpecification spec = wrap(tool.toSpecification(), "user", decorator, rateLimiter);
             server.addTool(spec);
             log.info("Registered user tool: {}", spec.tool().name());
         }
@@ -94,18 +96,32 @@ public class McpServerConfig {
             @org.springframework.beans.factory.annotation.Qualifier("adminTransportProvider")
             HttpServletStreamableServerTransportProvider transport,
             List<AdminTool> adminTools,
-            ObservedToolDecorator decorator) {
+            ObservedToolDecorator decorator,
+            RateLimitedToolDecorator rateLimiter) {
         McpSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-admin", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder().tools(true).build())
                 .build();
-        server.addTool(decorator.decorate(pingTool("admin"), "admin"));
+        server.addTool(wrap(pingTool("admin"), "admin", decorator, rateLimiter));
         for (AdminTool tool : adminTools) {
-            McpServerFeatures.SyncToolSpecification spec = decorator.decorate(tool.toSpecification(), "admin");
+            McpServerFeatures.SyncToolSpecification spec = wrap(tool.toSpecification(), "admin", decorator, rateLimiter);
             server.addTool(spec);
             log.info("Registered admin tool: {}", spec.tool().name());
         }
         return server;
+    }
+
+    /**
+     * Decorator stack: rate limiter wraps observation, observation wraps the
+     * original tool. Rate-limited calls are rejected before the timer/counter
+     * fires — they show up in mcp.tool.rate_limited only.
+     */
+    private static McpServerFeatures.SyncToolSpecification wrap(
+            McpServerFeatures.SyncToolSpecification original,
+            String profile,
+            ObservedToolDecorator observed,
+            RateLimitedToolDecorator rateLimited) {
+        return rateLimited.decorate(observed.decorate(original, profile), profile);
     }
 
     @Bean

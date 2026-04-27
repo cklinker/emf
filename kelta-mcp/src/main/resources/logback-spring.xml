@@ -1,5 +1,9 @@
 <configuration>
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- Defense-in-depth: drop any event whose message contains a klt_* token.
+             Application code already redacts PATs (see McpErrorMapper); this is the
+             belt-and-suspenders backstop against future regressions. -->
+        <filter class="io.kelta.mcp.observe.PatRedactionFilter"/>
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
             <includeMdcKeyName>traceId</includeMdcKeyName>
             <includeMdcKeyName>spanId</includeMdcKeyName>

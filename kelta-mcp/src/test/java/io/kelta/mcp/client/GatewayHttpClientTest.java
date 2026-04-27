@@ -31,7 +31,7 @@ class GatewayHttpClientTest {
     void setUp() {
         wm = new WireMockServer(0);
         wm.start();
-        McpProperties props = new McpProperties("http://localhost:" + wm.port(), 30, 60_000);
+        McpProperties props = new McpProperties("http://localhost:" + wm.port(), 30, 60_000, null);
         client = new GatewayHttpClient(RestClient.builder(), props);
         RequestPatHolder.set("klt_test_pat_value");
     }

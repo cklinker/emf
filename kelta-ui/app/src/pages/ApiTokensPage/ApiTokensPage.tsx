@@ -340,6 +340,67 @@ function CreateTokenForm({
   )
 }
 
+/**
+ * Resolve the MCP server base URL for use-with-claude-code commands.
+ * Mirrors the API base URL convention: VITE_API_BASE_URL when set
+ * (production), otherwise the current page origin (local dev).
+ */
+export function resolveMcpBaseUrl(): string {
+  const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+  if (apiBase) return apiBase
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin
+  }
+  return ''
+}
+
+export function buildMcpAddCommand(profile: 'user' | 'admin', mcpBaseUrl: string, token: string): string {
+  const url = `${mcpBaseUrl}/mcp/${profile}`
+  // Single-quoted shell strings keep the token opaque to the shell.
+  return `claude mcp add kelta-${profile} --transport http --url ${url} --header 'Authorization: Bearer ${token}'`
+}
+
+function CopyableCommandBlock({
+  label,
+  command,
+  testId,
+}: {
+  label: string
+  command: string
+  testId: string
+}): React.ReactElement {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(command).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [command])
+
+  return (
+    <div data-testid={testId}>
+      <div className="mb-1 text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="flex items-start gap-2">
+        <code
+          className="flex-1 rounded bg-muted px-2 py-1.5 font-mono text-xs text-foreground break-all"
+          data-testid={`${testId}-value`}
+        >
+          {command}
+        </code>
+        <button
+          type="button"
+          className="shrink-0 rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+          onClick={handleCopy}
+          data-testid={`${testId}-copy`}
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function TokenCreatedDialog({
   token,
   onClose,
@@ -356,6 +417,10 @@ function TokenCreatedDialog({
     })
   }, [token])
 
+  const mcpBaseUrl = resolveMcpBaseUrl()
+  const userCommand = buildMcpAddCommand('user', mcpBaseUrl, token)
+  const adminCommand = buildMcpAddCommand('admin', mcpBaseUrl, token)
+
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
@@ -364,7 +429,7 @@ function TokenCreatedDialog({
       data-testid="token-created-dialog-overlay"
     >
       <div
-        className="w-full max-w-[600px] rounded-lg bg-card shadow-xl"
+        className="w-full max-w-[640px] rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         data-testid="token-created-dialog-modal"
@@ -380,7 +445,7 @@ function TokenCreatedDialog({
             &times;
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-6 space-y-5">
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950">
             <p className="mb-3 text-sm font-medium text-amber-800 dark:text-amber-300">
               Copy this token now. It will not be shown again.
@@ -402,7 +467,33 @@ function TokenCreatedDialog({
               </button>
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+
+          <div
+            className="rounded-lg border border-border bg-card p-4 space-y-3"
+            data-testid="claude-code-panel"
+          >
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Use with Claude Code</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Run one or both of these in a terminal to register Kelta as an MCP server.
+                The <code className="font-mono">/mcp/user</code> endpoint exposes data-plane
+                tools (CRUD, flows, approvals); <code className="font-mono">/mcp/admin</code>{' '}
+                exposes control-plane tools (collection / layout / flow definition).
+              </p>
+            </div>
+            <CopyableCommandBlock
+              label="Data plane (CRUD, flows, approvals)"
+              command={userCommand}
+              testId="mcp-add-user"
+            />
+            <CopyableCommandBlock
+              label="Control plane (schema, layouts, flows definition)"
+              command={adminCommand}
+              testId="mcp-add-admin"
+            />
+          </div>
+
+          <div className="flex justify-end">
             <button
               type="button"
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"

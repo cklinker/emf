@@ -16,13 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -78,6 +72,12 @@ function isSecretField(prop: SchemaProperty | undefined): boolean {
   return prop?.format === 'secret'
 }
 
+function isObjectField(prop: SchemaProperty | undefined): boolean {
+  if (!prop) return false
+  const baseType = Array.isArray(prop.type) ? prop.type[0] : prop.type
+  return baseType === 'object'
+}
+
 export function CredentialsPage({ className }: CredentialsPageProps): React.ReactElement {
   const { keltaClient } = useApi()
   const { hasPermission } = useSystemPermissions()
@@ -87,9 +87,7 @@ export function CredentialsPage({ className }: CredentialsPageProps): React.Reac
   const canManage = hasPermission('MANAGE_CREDENTIALS')
 
   const [dialogState, setDialogState] = useState<
-    | { mode: 'create' }
-    | { mode: 'edit'; credential: CredentialRecord }
-    | null
+    { mode: 'create' } | { mode: 'edit'; credential: CredentialRecord } | null
   >(null)
 
   const credentialsQuery = useQuery({
@@ -256,9 +254,7 @@ function CredentialsList({
                 </td>
                 <td className="px-4 py-3 align-top text-xs text-muted-foreground">
                   {c.lastTestAt ? new Date(c.lastTestAt).toLocaleString() : '—'}
-                  {c.lastTestError ? (
-                    <div className="text-red-600">{c.lastTestError}</div>
-                  ) : null}
+                  {c.lastTestError ? <div className="text-red-600">{c.lastTestError}</div> : null}
                 </td>
                 <td className="px-4 py-3 align-top">
                   {c.lastTestStatus === 'OK' ? (
@@ -349,10 +345,7 @@ function CredentialDialog({
   const [testResult, setTestResult] = useState<CredentialTestResultPayload | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const selectedType = useMemo(
-    () => types.find((t) => t.key === type) ?? null,
-    [type, types]
-  )
+  const selectedType = useMemo(() => types.find((t) => t.key === type) ?? null, [type, types])
   const inputSchema = (selectedType?.inputSchema as InputSchema | undefined) ?? null
 
   const orderedFields = useMemo(() => {
@@ -384,11 +377,7 @@ function CredentialDialog({
     if (template.defaults) {
       const next: FormValues = { ...values }
       Object.entries(template.defaults).forEach(([key, value]) => {
-        if (
-          typeof value === 'string' ||
-          typeof value === 'boolean' ||
-          typeof value === 'number'
-        ) {
+        if (typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number') {
           next[key] = value as never
         } else if (Array.isArray(value)) {
           next[key] = value as string[]
@@ -415,11 +404,24 @@ function CredentialDialog({
       payload.providerTemplate = providerTemplate
     }
     Object.entries(values).forEach(([key, value]) => {
+      const prop = inputSchema?.properties?.[key]
       // Skip empty optional secret fields on edit (don't overwrite stored value).
-      if (mode === 'edit' && isSecretField(inputSchema?.properties?.[key]) && !value) {
+      if (mode === 'edit' && isSecretField(prop) && !value) {
         return
       }
       if (value === '' || value === undefined) {
+        return
+      }
+      if (isObjectField(prop) && typeof value === 'string') {
+        try {
+          payload[key] = JSON.parse(value)
+        } catch (err) {
+          throw new Error(
+            `Field "${prop?.title ?? key}" must be valid JSON: ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          )
+        }
         return
       }
       payload[key] = value
@@ -432,7 +434,21 @@ function CredentialDialog({
     try {
       const data: Record<string, unknown> = {}
       Object.entries(values).forEach(([k, v]) => {
-        if (v !== '' && v !== undefined) data[k] = v
+        if (v === '' || v === undefined) return
+        const prop = inputSchema?.properties?.[k]
+        if (isObjectField(prop) && typeof v === 'string') {
+          try {
+            data[k] = JSON.parse(v)
+            return
+          } catch (err) {
+            throw new Error(
+              `Field "${prop?.title ?? k}" must be valid JSON: ${
+                err instanceof Error ? err.message : String(err)
+              }`
+            )
+          }
+        }
+        data[k] = v
       })
       const result = await keltaClient.admin.credentials.testInline(type, data)
       setTestResult(result)
@@ -628,8 +644,8 @@ function CredentialDialog({
           {isOAuthAuthCode && mode === 'create' && (
             <Card className="border-amber-200 bg-amber-50/40 dark:bg-amber-950/20">
               <CardContent className="py-3 text-sm">
-                Authorization Code flow requires a browser sign-in. Save the credential first,
-                then start the OAuth dance from the credential row. (Coming in PR 4.)
+                Authorization Code flow requires a browser sign-in. Save the credential first, then
+                start the OAuth dance from the credential row. (Coming in PR 4.)
               </CardContent>
             </Card>
           )}
@@ -672,14 +688,9 @@ function SchemaField({ name, schema, required, value, onChange, isEdit }: Schema
       <div className="flex items-center justify-between rounded-md border bg-background p-3">
         <div className="space-y-0.5">
           <FieldLabel>{label}</FieldLabel>
-          {description ? (
-            <p className="text-xs text-muted-foreground">{description}</p>
-          ) : null}
+          {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
         </div>
-        <Switch
-          checked={Boolean(value ?? schema.default)}
-          onCheckedChange={(v) => onChange(v)}
-        />
+        <Switch checked={Boolean(value ?? schema.default)} onCheckedChange={(v) => onChange(v)} />
       </div>
     )
   }
@@ -708,10 +719,7 @@ function SchemaField({ name, schema, required, value, onChange, isEdit }: Schema
           {label}
           {required ? <span className="text-red-500"> *</span> : null}
         </FieldLabel>
-        <Select
-          value={String(value ?? schema.default ?? '')}
-          onValueChange={(v) => onChange(v)}
-        >
+        <Select value={String(value ?? schema.default ?? '')} onValueChange={(v) => onChange(v)}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
@@ -724,6 +732,41 @@ function SchemaField({ name, schema, required, value, onChange, isEdit }: Schema
           </SelectContent>
         </Select>
         {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+    )
+  }
+
+  if (baseType === 'object') {
+    const text = (value as string | undefined) ?? ''
+    let parseError: string | null = null
+    if (text.trim()) {
+      try {
+        JSON.parse(text)
+      } catch (err) {
+        parseError = err instanceof Error ? err.message : String(err)
+      }
+    }
+    return (
+      <div className="space-y-1">
+        <FieldLabel>
+          {label}
+          {required ? <span className="text-red-500"> *</span> : null}
+        </FieldLabel>
+        <Textarea
+          value={text}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={
+            isSecret && isEdit ? '{ ... } (leave blank to keep existing)' : '{\n  "key": "value"\n}'
+          }
+          className="font-mono text-xs min-h-[120px]"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {parseError ? (
+          <p className="text-xs text-red-600">Invalid JSON: {parseError}</p>
+        ) : description ? (
+          <p className="text-xs text-muted-foreground">{description}</p>
+        ) : null}
       </div>
     )
   }
@@ -761,9 +804,7 @@ function SchemaField({ name, schema, required, value, onChange, isEdit }: Schema
         type={isSecret ? 'password' : 'text'}
         value={(value as string | undefined) ?? ''}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={
-          isSecret && isEdit ? '•••••••• (leave blank to keep existing)' : undefined
-        }
+        placeholder={isSecret && isEdit ? '•••••••• (leave blank to keep existing)' : undefined}
         autoComplete={isSecret ? 'off' : undefined}
       />
       {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}

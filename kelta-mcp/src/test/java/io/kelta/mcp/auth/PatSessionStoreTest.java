@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PatSessionStoreTest {
 
-    private final PatSessionStore store = new PatSessionStore(new McpProperties("http://gw", "", 30, 60_000, null));
+    private final PatSessionStore store = new PatSessionStore(new McpProperties("http://gw", 30, 60_000, null));
 
     @Test
     void putsAndRetrievesPat() {

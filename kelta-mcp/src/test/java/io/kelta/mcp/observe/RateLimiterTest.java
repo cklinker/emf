@@ -10,7 +10,7 @@ class RateLimiterTest {
     @Test
     void allowsUpToBucketCapacityImmediately() {
         RateLimiter limiter = new RateLimiter(new McpProperties(
-                "http://gw", "", 30, 60_000,
+                "http://gw", 30, 60_000,
                 new McpProperties.RateLimit(5, 1.0)));
 
         for (int i = 0; i < 5; i++) {
@@ -22,7 +22,7 @@ class RateLimiterTest {
     @Test
     void bucketsAreIsolatedPerKey() {
         RateLimiter limiter = new RateLimiter(new McpProperties(
-                "http://gw", "", 30, 60_000,
+                "http://gw", 30, 60_000,
                 new McpProperties.RateLimit(2, 0.0)));
 
         assertThat(limiter.tryAcquire("klt_a")).isTrue();
@@ -37,7 +37,7 @@ class RateLimiterTest {
     @Test
     void refillsOverTime() throws InterruptedException {
         RateLimiter limiter = new RateLimiter(new McpProperties(
-                "http://gw", "", 30, 60_000,
+                "http://gw", 30, 60_000,
                 new McpProperties.RateLimit(2, 100.0))); // 100/sec → ~10ms per token
 
         assertThat(limiter.tryAcquire("klt_a")).isTrue();
@@ -53,7 +53,7 @@ class RateLimiterTest {
     @Test
     void activeBucketCountReflectsDistinctKeys() {
         RateLimiter limiter = new RateLimiter(new McpProperties(
-                "http://gw", "", 30, 60_000,
+                "http://gw", 30, 60_000,
                 new McpProperties.RateLimit(1, 1.0)));
 
         limiter.tryAcquire("klt_a");

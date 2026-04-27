@@ -2,6 +2,7 @@ package io.kelta.mcp.observe;
 
 import io.kelta.mcp.auth.KeltaTransportContextExtractor;
 import io.kelta.mcp.auth.RequestPatHolder;
+import io.kelta.mcp.auth.RequestSlugHolder;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.server.McpAsyncServerExchange;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
@@ -90,5 +91,27 @@ class PatPropagatingToolDecoratorTest {
         decorated.callHandler().apply(exchange, new CallToolRequest("stub", Map.of(), null));
 
         assertThat(seen.get()).isNull();
+    }
+
+    @Test
+    void copiesTenantSlugFromTransportContextIntoHolder() {
+        AtomicReference<String> seenPat = new AtomicReference<>();
+        AtomicReference<String> seenSlug = new AtomicReference<>();
+        SyncToolSpecification decorated = decorator.decorate(stub((ex, req) -> {
+            seenPat.set(RequestPatHolder.get());
+            seenSlug.set(RequestSlugHolder.get());
+            return CallToolResult.builder().content(List.of(new TextContent("ok"))).build();
+        }));
+
+        McpSyncServerExchange exchange = exchangeWithContext(McpTransportContext.create(Map.of(
+                KeltaTransportContextExtractor.PAT_KEY, "klt_session",
+                KeltaTransportContextExtractor.TENANT_SLUG_KEY, "threadline-clothing")));
+
+        decorated.callHandler().apply(exchange, new CallToolRequest("stub", Map.of(), null));
+
+        assertThat(seenPat.get()).isEqualTo("klt_session");
+        assertThat(seenSlug.get()).isEqualTo("threadline-clothing");
+        assertThat(RequestPatHolder.get()).isNull();
+        assertThat(RequestSlugHolder.get()).isNull();
     }
 }

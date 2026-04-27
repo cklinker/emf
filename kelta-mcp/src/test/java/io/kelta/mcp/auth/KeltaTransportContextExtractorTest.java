@@ -48,4 +48,27 @@ class KeltaTransportContextExtractorTest {
 
         assertThat(context).isSameAs(McpTransportContext.EMPTY);
     }
+
+    @Test
+    void includesTenantSlugFromRequestAttribute() {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        req.addHeader("Authorization", "Bearer klt_token");
+        req.setAttribute(McpAuthFilter.SLUG_ATTRIBUTE, "threadline-clothing");
+
+        McpTransportContext context = extractor.extract(req);
+
+        assertThat(context.get(KeltaTransportContextExtractor.PAT_KEY)).isEqualTo("klt_token");
+        assertThat(context.get(KeltaTransportContextExtractor.TENANT_SLUG_KEY))
+                .isEqualTo("threadline-clothing");
+    }
+
+    @Test
+    void omitsSlugKeyWhenAttributeAbsent() {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
+        req.addHeader("Authorization", "Bearer klt_token");
+
+        McpTransportContext context = extractor.extract(req);
+
+        assertThat(context.get(KeltaTransportContextExtractor.TENANT_SLUG_KEY)).isNull();
+    }
 }

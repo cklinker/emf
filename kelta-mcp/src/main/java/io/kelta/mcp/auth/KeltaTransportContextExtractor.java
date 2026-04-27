@@ -4,6 +4,7 @@ import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.server.McpTransportContextExtractor;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -12,34 +13,43 @@ import java.util.Map;
  * tool handlers — even though the handler runs on a Reactor scheduler
  * thread, not the servlet thread.
  *
- * <p>The {@code "pat"} key carries the PAT (without the {@code Bearer}
- * prefix). Tool decorators read it back via
- * {@code exchange.transportContext().get("pat")}.
+ * <p>{@code "pat"} carries the PAT (without the {@code Bearer} prefix).
+ * {@code "tenant_slug"} carries the tenant slug that
+ * {@link McpAuthFilter} extracted from the URL path. Tool decorators
+ * read both back via {@code exchange.transportContext().get(...)}.
  *
- * <p>{@link McpAuthFilter} still runs first and rejects any request
- * without a valid {@code Bearer klt_*} header — by the time this
- * extractor sees the request, presence is already guaranteed. We
- * defensively re-check anyway so a future routing change that bypasses
- * the filter can't silently leave the context empty.
+ * <p>{@link McpAuthFilter} runs first and rejects any request without
+ * a well-formed URL or a {@code Bearer klt_*} header — by the time
+ * this extractor sees the request both fields are guaranteed. We
+ * defensively re-check so a future routing change that bypasses the
+ * filter can't silently leave the context empty.
  */
 public final class KeltaTransportContextExtractor
         implements McpTransportContextExtractor<HttpServletRequest> {
 
     public static final String PAT_KEY = "pat";
+    public static final String TENANT_SLUG_KEY = "tenant_slug";
 
     private static final String AUTHORIZATION = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
     @Override
     public McpTransportContext extract(HttpServletRequest request) {
+        Map<String, Object> values = new LinkedHashMap<>();
+
         String header = request.getHeader(AUTHORIZATION);
-        if (header == null || !header.startsWith(BEARER_PREFIX)) {
-            return McpTransportContext.EMPTY;
+        if (header != null && header.startsWith(BEARER_PREFIX)) {
+            String token = header.substring(BEARER_PREFIX.length());
+            if (!token.isEmpty()) {
+                values.put(PAT_KEY, token);
+            }
         }
-        String token = header.substring(BEARER_PREFIX.length());
-        if (token.isEmpty()) {
-            return McpTransportContext.EMPTY;
+
+        Object slug = request.getAttribute(McpAuthFilter.SLUG_ATTRIBUTE);
+        if (slug instanceof String s && !s.isEmpty()) {
+            values.put(TENANT_SLUG_KEY, s);
         }
-        return McpTransportContext.create(Map.of(PAT_KEY, token));
+
+        return values.isEmpty() ? McpTransportContext.EMPTY : McpTransportContext.create(values);
     }
 }

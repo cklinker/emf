@@ -10,7 +10,7 @@ import io.kelta.worker.service.SetupAuditService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentMap;
  * {@link io.kelta.worker.listener.CredentialCacheInvalidationListener}.
  */
 @Service
-@ConditionalOnBean(EncryptionService.class)
+@ConditionalOnProperty(name = "kelta.encryption.key")
 public class CredentialResolverImpl implements CredentialResolver {
 
     private static final Logger log = LoggerFactory.getLogger(CredentialResolverImpl.class);

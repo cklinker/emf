@@ -6,7 +6,7 @@ import io.kelta.runtime.module.integration.spi.CredentialResolverPort;
 import io.kelta.worker.repository.CredentialOAuthTokenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -22,7 +22,7 @@ import java.util.Optional;
  * a single uniform applyAuth path.
  */
 @Service
-@ConditionalOnBean(EncryptionService.class)
+@ConditionalOnProperty(name = "kelta.encryption.key")
 public class CredentialResolverPortAdapter implements CredentialResolverPort {
 
     private static final Logger log = LoggerFactory.getLogger(CredentialResolverPortAdapter.class);

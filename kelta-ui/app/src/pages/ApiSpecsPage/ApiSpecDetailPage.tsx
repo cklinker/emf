@@ -5,6 +5,7 @@ import { ArrowLeft, BookOpen, ChevronRight } from 'lucide-react'
 import type { ApiOperationDetail, ApiOperationSummary } from '@kelta/sdk'
 
 import { useApi } from '../../context/ApiContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -67,13 +68,16 @@ export function ApiSpecDetailPage({ className }: ApiSpecDetailPageProps): React.
 
   const grouped = groupByTag(filtered)
   const selectedOp = selected
-    ? operations.find((op) => op.syntheticOpId === selected) ?? null
+    ? (operations.find((op) => op.syntheticOpId === selected) ?? null)
     : null
 
   return (
     <div className={cn('space-y-4', className)}>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link to="/api-specs" className="inline-flex items-center gap-1 hover:text-foreground">
+        <Link
+          to={`/${getTenantSlug()}/api-specs`}
+          className="inline-flex items-center gap-1 hover:text-foreground"
+        >
           <ArrowLeft className="h-3.5 w-3.5" /> API Specs
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
@@ -87,8 +91,8 @@ export function ApiSpecDetailPage({ className }: ApiSpecDetailPageProps): React.
             {spec.apiTitle || spec.name}
           </h1>
           <p className="text-sm text-muted-foreground truncate">
-            <code className="font-mono">{spec.name}</code> · v{spec.apiVersion ?? '—'} ·
-            OpenAPI {spec.specVersion} · revision {spec.revision}
+            <code className="font-mono">{spec.name}</code> · v{spec.apiVersion ?? '—'} · OpenAPI{' '}
+            {spec.specVersion} · revision {spec.revision}
           </p>
         </div>
       </div>
@@ -115,9 +119,7 @@ export function ApiSpecDetailPage({ className }: ApiSpecDetailPageProps): React.
               {spec.sourceUrl && <KeyValue label="Source URL" value={spec.sourceUrl} mono />}
               <KeyValue
                 label="Last imported"
-                value={
-                  spec.lastImportedAt ? new Date(spec.lastImportedAt).toLocaleString() : '—'
-                }
+                value={spec.lastImportedAt ? new Date(spec.lastImportedAt).toLocaleString() : '—'}
               />
               <KeyValue label="Active" value={spec.active ? 'Yes' : 'No'} />
               <KeyValue label="Revision" value={String(spec.revision)} mono />
@@ -131,7 +133,10 @@ export function ApiSpecDetailPage({ className }: ApiSpecDetailPageProps): React.
           </Card>
         </TabsContent>
 
-        <TabsContent value="operations" className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <TabsContent
+          value="operations"
+          className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+        >
           <Card>
             <CardContent className="p-3 space-y-2">
               <Input
@@ -163,9 +168,7 @@ export function ApiSpecDetailPage({ className }: ApiSpecDetailPageProps): React.
                           >
                             {op.httpMethod}
                           </span>
-                          <span className="font-mono text-xs truncate">
-                            {op.pathTemplate}
-                          </span>
+                          <span className="font-mono text-xs truncate">{op.pathTemplate}</span>
                           {op.deprecated && (
                             <span className="ml-auto text-[10px] text-muted-foreground">
                               deprecated
@@ -177,9 +180,7 @@ export function ApiSpecDetailPage({ className }: ApiSpecDetailPageProps): React.
                   </div>
                 ))}
                 {filtered.length === 0 && (
-                  <p className="p-3 text-xs text-muted-foreground">
-                    No operations match.
-                  </p>
+                  <p className="p-3 text-xs text-muted-foreground">No operations match.</p>
                 )}
               </div>
             </CardContent>
@@ -223,15 +224,7 @@ function groupByTag(operations: ApiOperationSummary[]): Record<string, ApiOperat
   return groups
 }
 
-function KeyValue({
-  label,
-  value,
-  mono,
-}: {
-  label: string
-  value: string
-  mono?: boolean
-}) {
+function KeyValue({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="space-y-1">
       <FieldLabel>{label}</FieldLabel>
@@ -269,15 +262,11 @@ function OperationDetailView({ specId, op }: OperationDetailViewProps) {
           {detail.httpMethod}
         </span>
         <span className="font-mono text-sm">{detail.pathTemplate}</span>
-        {detail.deprecated && (
-          <span className="text-xs text-muted-foreground">deprecated</span>
-        )}
+        {detail.deprecated && <span className="text-xs text-muted-foreground">deprecated</span>}
       </div>
       {detail.summary && <p className="text-sm font-medium">{detail.summary}</p>}
       {detail.description && (
-        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-          {detail.description}
-        </p>
+        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{detail.description}</p>
       )}
       {detail.parametersSchema != null && (
         <SchemaSection title="Parameters" schema={detail.parametersSchema} />

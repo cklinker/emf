@@ -113,13 +113,22 @@ class McpApplicationTest {
     }
 
     @Test
-    void adminEndpointHasOnlyReadOnlyBrowseTools() {
+    void adminEndpointSurfaceMatchesPhase6() {
         List<String> names = adminTools.stream()
                 .map(t -> t.toSpecification().tool().name())
                 .toList();
         assertThat(names).containsExactlyInAnyOrder(
+                // shared read-only browse tools (also on /mcp/user)
                 "list_collections",
-                "get_collection_schema");
+                "get_collection_schema",
+                // schema admin (Phase 6)
+                "create_collection",
+                "update_collection",
+                "add_field",
+                "update_field",
+                "remove_field",
+                "create_validation_rule",
+                "create_picklist");
     }
 
     @Test

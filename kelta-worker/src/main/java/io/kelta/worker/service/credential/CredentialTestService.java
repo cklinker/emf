@@ -10,7 +10,7 @@ import jakarta.mail.Session;
 import jakarta.mail.Transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -31,7 +31,7 @@ import java.util.Properties;
  * </ul>
  */
 @Service
-@ConditionalOnBean(EncryptionService.class)
+@ConditionalOnProperty(name = "kelta.encryption.key")
 public class CredentialTestService {
 
     private static final Logger log = LoggerFactory.getLogger(CredentialTestService.class);

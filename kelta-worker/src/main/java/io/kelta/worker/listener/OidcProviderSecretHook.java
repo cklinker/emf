@@ -5,7 +5,7 @@ import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -25,7 +25,7 @@ import java.util.Map;
  * when kelta-auth needs to perform token exchange with the external IdP.
  */
 @Component
-@ConditionalOnBean(EncryptionService.class)
+@ConditionalOnProperty(name = "kelta.encryption.key")
 public class OidcProviderSecretHook implements BeforeSaveHook {
 
     private static final Logger log = LoggerFactory.getLogger(OidcProviderSecretHook.class);

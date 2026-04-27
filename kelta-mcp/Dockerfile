@@ -2,6 +2,11 @@
 
 # =============================================================================
 # Stage 1: Build runtime-platform dependencies
+#
+# kelta-mcp only needs runtime-core at runtime, but runtime-core has compile
+# dependencies on runtime-events and runtime-jsonapi (e.g. JsonApiError,
+# AtomicResult), so all three must be built. We mirror kelta-ai's module
+# list for cache-key compatibility — Maven's -am handles the dep graph.
 # =============================================================================
 FROM maven:3.9-eclipse-temurin-25 AS runtime-builder
 
@@ -20,15 +25,16 @@ COPY kelta-platform/runtime/runtime-module-schema/pom.xml ./runtime/runtime-modu
 
 # Download runtime dependencies (cached unless pom.xml changes)
 RUN mvn dependency:go-offline -B \
-    -pl runtime/runtime-core \
+    -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi \
     -am || true
 
-# Copy source and build only what kelta-mcp needs (runtime-core)
+# Copy source for runtime-core and its compile-time prerequisites
 COPY kelta-platform/runtime/runtime-core/src ./runtime/runtime-core/src
 COPY kelta-platform/runtime/runtime-events/src ./runtime/runtime-events/src
+COPY kelta-platform/runtime/runtime-jsonapi/src ./runtime/runtime-jsonapi/src
 
 RUN mvn clean install -DskipTests -B \
-    -pl runtime/runtime-core \
+    -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi \
     -am
 
 # =============================================================================

@@ -5,6 +5,7 @@ import { BookOpen, FileJson, Globe2, Plus, Trash2 } from 'lucide-react'
 import type { ApiSpecSummary, ApiSpecValidateResult, ImportApiSpecRequest } from '@kelta/sdk'
 
 import { useApi } from '../../context/ApiContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useSystemPermissions } from '../../hooks/useSystemPermissions'
 import { useToast } from '../../components/Toast'
 import { LoadingSpinner, ErrorMessage } from '../../components'
@@ -66,8 +67,8 @@ export function ApiSpecsPage({ className }: ApiSpecsPageProps): React.ReactEleme
           <div>
             <h1 className="text-[26px] font-bold tracking-[-0.01em]">API Specs</h1>
             <p className="text-sm text-muted-foreground">
-              OpenAPI 3.x specs imported into the platform. Pick operations from
-              these in the flow builder.
+              OpenAPI 3.x specs imported into the platform. Pick operations from these in the flow
+              builder.
             </p>
           </div>
         </div>
@@ -101,7 +102,7 @@ export function ApiSpecsPage({ className }: ApiSpecsPageProps): React.ReactEleme
         <SpecList
           specs={specs}
           canManage={canManage}
-          onOpen={(s) => navigate(`/api-specs/${s.id}`)}
+          onOpen={(s) => navigate(`/${getTenantSlug()}/api-specs/${s.id}`)}
           onDelete={(s) => {
             if (
               confirm(
@@ -157,10 +158,7 @@ function SpecList({ specs, canManage, onOpen, onDelete }: SpecListProps) {
             {specs.map((s) => (
               <tr key={s.id} className="border-b last:border-b-0">
                 <td className="px-4 py-3">
-                  <button
-                    onClick={() => onOpen(s)}
-                    className="text-left hover:underline"
-                  >
+                  <button onClick={() => onOpen(s)} className="text-left hover:underline">
                     <div className="font-medium">{s.apiTitle || s.name}</div>
                     <div className="text-xs text-muted-foreground font-mono">
                       {s.name} · v{s.apiVersion ?? '—'} · OpenAPI {s.specVersion}
@@ -248,8 +246,7 @@ function ImportSpecDialog({ onClose, onImported }: ImportSpecDialogProps) {
 
   const validate = async () => {
     try {
-      const body: { raw?: string; sourceUrl?: string } =
-        tab === 'url' ? { sourceUrl } : { raw }
+      const body: { raw?: string; sourceUrl?: string } = tab === 'url' ? { sourceUrl } : { raw }
       const result = await keltaClient.admin.apiSpecs.validate(body)
       setValidationResult(result)
     } catch (e) {
@@ -302,9 +299,8 @@ function ImportSpecDialog({ onClose, onImported }: ImportSpecDialogProps) {
         <DialogHeader>
           <DialogTitle>Import OpenAPI spec</DialogTitle>
           <DialogDescription>
-            Import an OpenAPI 3.x spec from a URL, paste it inline, or drop a file.
-            The platform indexes every operation so they can be picked from the flow
-            builder.
+            Import an OpenAPI 3.x spec from a URL, paste it inline, or drop a file. The platform
+            indexes every operation so they can be picked from the flow builder.
           </DialogDescription>
         </DialogHeader>
 
@@ -400,10 +396,7 @@ function ImportSpecDialog({ onClose, onImported }: ImportSpecDialogProps) {
             </Button>
             {validationResult && (
               <span
-                className={cn(
-                  'text-sm',
-                  validationResult.ok ? 'text-green-600' : 'text-red-600'
-                )}
+                className={cn('text-sm', validationResult.ok ? 'text-green-600' : 'text-red-600')}
               >
                 {validationResult.ok
                   ? `${validationResult.title ?? 'Spec'} v${validationResult.version ?? '?'} — ${validationResult.operations} operations, base ${validationResult.baseUrl || '—'}`

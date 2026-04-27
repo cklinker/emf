@@ -111,12 +111,17 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
                 log.debug("Filtered {} records from response for user={} collection={}",
                         removed, email, collectionId);
             }
-            responseBody.put("data", filtered);
+            // Copy into a mutable map — controllers may return Map.of(...) which is immutable.
+            Map<String, Object> result = new LinkedHashMap<>(responseBody);
+            result.put("data", filtered);
+            return result;
         } else if (data instanceof Map<?, ?> singleRecord) {
             Map<String, Object> typedRecord = (Map<String, Object>) singleRecord;
             if (!isRecordAllowed(email, profileId, tenantId, collectionId, typedRecord, action)) {
                 log.debug("Denied single record for user={} collection={}", email, collectionId);
-                responseBody.put("data", null);
+                Map<String, Object> result = new LinkedHashMap<>(responseBody);
+                result.put("data", null);
+                return result;
             }
         }
 
@@ -153,7 +158,12 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
                 || path.startsWith("/api/oidc")
                 || path.startsWith("/api/tenants")
                 || path.startsWith("/api/metrics")
-                || path.startsWith("/api/flows");
+                || path.startsWith("/api/flows")
+                || path.startsWith("/api/api-specs")
+                || path.startsWith("/api/api-operations")
+                || path.startsWith("/api/credentials")
+                || path.startsWith("/api/connected-apps")
+                || path.startsWith("/api/devices");
     }
 
     private String extractCollectionId(String path) {

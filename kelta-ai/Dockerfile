@@ -1,22 +1,11 @@
-# Multi-stage native image build for Kelta AI Service
-# Builder: GraalVM CE 25 + Maven  |  Runtime: debian:12-slim (no JRE needed)
-
-ARG MAVEN_VERSION=3.9.9
-ARG GRAALVM_IMAGE=ghcr.io/graalvm/native-image-community:25-ol9
+# Multi-stage build for Kelta AI Service
 
 # =============================================================================
 # Stage 1: Build runtime-platform dependencies
 # =============================================================================
-FROM ${GRAALVM_IMAGE} AS runtime-builder
-
-ARG MAVEN_VERSION
+FROM maven:3.9-eclipse-temurin-25 AS runtime-builder
 
 WORKDIR /kelta-platform
-
-RUN microdnf install -y findutils && \
-    curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | \
-    tar xzf - -C /opt && \
-    ln -sf /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
 
 # Copy only POMs first for dependency layer caching
 COPY kelta-platform/pom.xml ./
@@ -29,10 +18,12 @@ COPY kelta-platform/runtime/runtime-module-integration/pom.xml ./runtime/runtime
 COPY kelta-platform/runtime/runtime-messaging-nats/pom.xml ./runtime/runtime-messaging-nats/
 COPY kelta-platform/runtime/runtime-module-schema/pom.xml ./runtime/runtime-module-schema/
 
+# Download runtime dependencies (cached unless pom.xml changes)
 RUN mvn dependency:go-offline -B \
     -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
     -am || true
 
+# Copy source and build runtime modules
 COPY kelta-platform/runtime/runtime-core/src ./runtime/runtime-core/src
 COPY kelta-platform/runtime/runtime-events/src ./runtime/runtime-events/src
 COPY kelta-platform/runtime/runtime-messaging-nats/src ./runtime/runtime-messaging-nats/src
@@ -46,50 +37,51 @@ RUN mvn clean install -DskipTests -B \
     -am
 
 # =============================================================================
-# Stage 2: Compile native image
+# Stage 2: Build the application
 # =============================================================================
-FROM ${GRAALVM_IMAGE} AS builder
-
-ARG MAVEN_VERSION
+FROM maven:3.9-eclipse-temurin-25 AS builder
 
 WORKDIR /build
 
-RUN microdnf install -y findutils && \
-    curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | \
-    tar xzf - -C /opt && \
-    ln -sf /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
+# Copy runtime artifacts from previous stage
+COPY --from=runtime-builder /root/.m2/repository/io/kelta /root/.m2/repository/io/kelta
 
-COPY --from=runtime-builder /root/.m2/repository /root/.m2/repository
-
+# Copy POM first for dependency layer caching
 COPY kelta-ai/pom.xml .
-RUN mvn dependency:go-offline -B -Pnative || true
 
+# Download dependencies (cached unless pom.xml changes)
+RUN mvn dependency:go-offline -B || true
+
+# Copy source and build
 COPY kelta-ai/src ./src
-RUN mvn -Pnative native:compile -DskipTests -B
+RUN mvn clean package -DskipTests -B && \
+    mv target/kelta-ai-*.jar target/kelta-ai.jar
 
 # =============================================================================
-# Stage 3: Minimal runtime (no JRE — binary is self-contained)
+# Stage 3: Runtime image
 # =============================================================================
-FROM debian:12-slim
+FROM eclipse-temurin:25-jre
 
 WORKDIR /app
 
-RUN groupadd -r kelta && useradd -r -g kelta kelta && \
-    apt-get update && apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN groupadd -r kelta && useradd -r -g kelta kelta
 
-COPY --from=builder /build/target/kelta-ai .
+COPY --from=builder /build/target/kelta-ai.jar app.jar
 
-RUN chown kelta:kelta kelta-ai
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* && \
+    curl -fL -o opentelemetry-javaagent.jar \
+    https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.25.0/opentelemetry-javaagent.jar && \
+    test -s opentelemetry-javaagent.jar
+
+RUN chown -R kelta:kelta /app
 
 USER kelta
 
 EXPOSE 8080
 
-# Native startup is ~50ms — start-period can be much tighter than JVM
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
-# OTEL is configured via OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_SERVICE_NAME env vars;
-# Spring Boot's native opentelemetry starter exports OTLP directly — no Java agent needed.
-ENTRYPOINT ["./kelta-ai"]
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -javaagent:/app/opentelemetry-javaagent.jar"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

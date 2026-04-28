@@ -6,7 +6,7 @@ import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
 import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import org.springframework.stereotype.Component;
 
@@ -40,7 +40,7 @@ public class ListCollectionsTool implements UserTool, AdminTool {
 
         return SyncToolSpecification.builder()
                 .tool(tool)
-                .callHandler((exchange, request) -> {
+                .callHandler((context, request) -> {
                     boolean includeSystem = readBool(request.arguments(), "includeSystem", true);
                     String path = "/api/collections";
                     if (!includeSystem) {

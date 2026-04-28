@@ -3,7 +3,7 @@ package io.kelta.mcp.observe;
 import io.kelta.mcp.auth.RequestPatHolder;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import org.springframework.stereotype.Component;
@@ -40,7 +40,7 @@ public class RateLimitedToolDecorator {
 
         return SyncToolSpecification.builder()
                 .tool(original.tool())
-                .callHandler((exchange, request) -> {
+                .callHandler((context, request) -> {
                     String pat = RequestPatHolder.get();
                     String bucketKey = pat == null ? "anonymous" : pat;
                     if (!limiter.tryAcquire(bucketKey)) {
@@ -56,7 +56,7 @@ public class RateLimitedToolDecorator {
                                         + "Slow down and retry shortly.")))
                                 .build();
                     }
-                    return inner.apply(exchange, request);
+                    return inner.apply(context, request);
                 })
                 .build();
     }

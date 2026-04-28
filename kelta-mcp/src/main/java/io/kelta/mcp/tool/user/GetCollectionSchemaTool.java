@@ -6,7 +6,7 @@ import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
 import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
@@ -47,7 +47,7 @@ public class GetCollectionSchemaTool implements UserTool, AdminTool {
 
         return SyncToolSpecification.builder()
                 .tool(tool)
-                .callHandler((exchange, request) -> {
+                .callHandler((context, request) -> {
                     Map<String, Object> args = request.arguments();
                     Object cv = args == null ? null : args.get("collection");
                     if (cv == null || cv.toString().isBlank()) {

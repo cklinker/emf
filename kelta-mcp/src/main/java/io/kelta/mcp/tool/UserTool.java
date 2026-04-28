@@ -1,6 +1,6 @@
 package io.kelta.mcp.tool;
 
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 
 /**
  * Marker interface for tools registered on the {@code /mcp/user}

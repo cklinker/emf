@@ -2,7 +2,7 @@ package io.kelta.mcp.resource.user;
 
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.resource.UserResourceTemplate;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncResourceTemplateSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncResourceTemplateSpecification;
 import io.modelcontextprotocol.spec.McpSchema.ReadResourceResult;
 import io.modelcontextprotocol.spec.McpSchema.ResourceTemplate;
 import io.modelcontextprotocol.spec.McpSchema.TextResourceContents;
@@ -40,7 +40,7 @@ public class CollectionSchemaResource implements UserResourceTemplate {
                 .mimeType("application/json")
                 .build();
 
-        return new SyncResourceTemplateSpecification(template, (exchange, request) -> {
+        return new SyncResourceTemplateSpecification(template, (context, request) -> {
             String requestUri = request.uri();
             Matcher m = URI_PATTERN.matcher(requestUri);
             String body;

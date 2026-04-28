@@ -1,7 +1,6 @@
 package io.kelta.mcp.transport;
 
 import io.kelta.mcp.auth.KeltaTransportContextExtractor;
-import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -12,35 +11,32 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Spring MVC controller that dispatches MCP requests at
- * {@code /{tenantSlug}/mcp/(user|admin)} to the matching SDK transport
- * servlet, leaving the slug in the URL end-to-end.
+ * {@code /{tenantSlug}/mcp/(user|admin)} to the matching stateless
+ * transport, leaving the slug in the URL end-to-end.
  *
  * <p>The slug is just a Spring {@code @PathVariable} — Spring extracts
  * it, we stamp it onto the request as an attribute (read by
  * {@link KeltaTransportContextExtractor} when the SDK builds its
- * transport context), and we hand the request straight to the SDK
- * transport via {@code HttpServlet.service}. The SDK's {@code
- * mcpEndpoint} validation uses {@code requestUri.endsWith(mcpEndpoint)}
- * so the slug-prefixed URL matches natively.
+ * transport context), and the request goes straight to the
+ * stateless transport's {@code service()} method.
  *
- * <p>This replaces an earlier strip-and-re-add approach where the
- * filter rewrote {@code /{slug}/mcp/user} to {@code /mcp/user} and
- * forwarded to a slug-less servlet registration. With path variables
- * we don't need to rewrite anything — the slug travels with the
- * request all the way through, and outbound calls re-use the same
- * slug verbatim.
+ * <p>Stateless mode (see {@link HttpServletStatelessServerTransportProvider})
+ * means there's no per-pod session state to lose on restart. The
+ * controller still accepts {@code GET} and {@code DELETE} so misbehaving
+ * clients get a clean {@code 405 Method Not Allowed} from the transport
+ * instead of a Spring 404.
  */
 @RestController
 public class KeltaMcpController {
 
-    private final HttpServletStreamableServerTransportProvider userTransport;
-    private final HttpServletStreamableServerTransportProvider adminTransport;
+    private final HttpServletStatelessServerTransportProvider userTransport;
+    private final HttpServletStatelessServerTransportProvider adminTransport;
 
     public KeltaMcpController(
             @Qualifier("userTransportProvider")
-            HttpServletStreamableServerTransportProvider userTransport,
+            HttpServletStatelessServerTransportProvider userTransport,
             @Qualifier("adminTransportProvider")
-            HttpServletStreamableServerTransportProvider adminTransport) {
+            HttpServletStatelessServerTransportProvider adminTransport) {
         this.userTransport = userTransport;
         this.adminTransport = adminTransport;
     }
@@ -54,7 +50,7 @@ public class KeltaMcpController {
                           HttpServletRequest request,
                           HttpServletResponse response) throws Exception {
         request.setAttribute(KeltaTransportContextExtractor.SLUG_REQUEST_ATTRIBUTE, tenantSlug);
-        HttpServletStreamableServerTransportProvider transport = "user".equals(profile)
+        HttpServletStatelessServerTransportProvider transport = "user".equals(profile)
                 ? userTransport
                 : adminTransport;
         transport.service(request, response);

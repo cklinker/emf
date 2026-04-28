@@ -1,6 +1,6 @@
 package io.kelta.mcp.resource;
 
-import io.modelcontextprotocol.server.McpServerFeatures.SyncResourceSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncResourceSpecification;
 
 /**
  * Marker interface for static resources registered on {@code /mcp/user}.

@@ -4,7 +4,7 @@ import io.kelta.mcp.auth.RequestPatHolder;
 import io.kelta.mcp.config.McpProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.JsonSchema;
@@ -48,7 +48,7 @@ class RateLimitedToolDecoratorTest {
                 .build();
         return SyncToolSpecification.builder()
                 .tool(tool)
-                .callHandler((ex, req) -> {
+                .callHandler((ctx, req) -> {
                     calls.incrementAndGet();
                     return CallToolResult.builder().content(List.of(new TextContent("ok"))).build();
                 })

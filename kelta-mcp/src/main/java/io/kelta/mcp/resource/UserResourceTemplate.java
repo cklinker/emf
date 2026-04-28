@@ -1,6 +1,6 @@
 package io.kelta.mcp.resource;
 
-import io.modelcontextprotocol.server.McpServerFeatures.SyncResourceTemplateSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncResourceTemplateSpecification;
 
 /**
  * Marker interface for templated resources registered on {@code /mcp/user}.

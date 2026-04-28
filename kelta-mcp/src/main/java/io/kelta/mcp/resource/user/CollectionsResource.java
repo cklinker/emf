@@ -2,7 +2,7 @@ package io.kelta.mcp.resource.user;
 
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.resource.UserResource;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncResourceSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncResourceSpecification;
 import io.modelcontextprotocol.spec.McpSchema.ReadResourceResult;
 import io.modelcontextprotocol.spec.McpSchema.Resource;
 import io.modelcontextprotocol.spec.McpSchema.TextResourceContents;
@@ -34,7 +34,7 @@ public class CollectionsResource implements UserResource {
                 .mimeType("application/json")
                 .build();
 
-        return new SyncResourceSpecification(resource, (exchange, request) -> {
+        return new SyncResourceSpecification(resource, (context, request) -> {
             GatewayHttpClient.Response response = gateway.get("/api/collections");
             String body = response.isSuccess()
                     ? response.body()

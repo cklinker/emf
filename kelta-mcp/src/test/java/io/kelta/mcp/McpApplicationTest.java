@@ -5,7 +5,7 @@ import io.kelta.mcp.resource.UserResourceTemplate;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.UserTool;
 import io.kelta.mcp.transport.KeltaMcpController;
-import io.modelcontextprotocol.server.McpSyncServer;
+import io.modelcontextprotocol.server.McpStatelessSyncServer;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import io.modelcontextprotocol.spec.McpSchema.ToolAnnotations;
 import org.junit.jupiter.api.Test;
@@ -33,11 +33,11 @@ class McpApplicationTest {
 
     @Autowired
     @Qualifier("userMcpServer")
-    private McpSyncServer userServer;
+    private McpStatelessSyncServer userServer;
 
     @Autowired
     @Qualifier("adminMcpServer")
-    private McpSyncServer adminServer;
+    private McpStatelessSyncServer adminServer;
 
     @Autowired
     private KeltaMcpController mcpController;

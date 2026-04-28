@@ -5,7 +5,7 @@ import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
 import io.kelta.mcp.tool.ToolHints;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
@@ -46,7 +46,7 @@ public class UpdateFlowTool implements AdminTool {
 
         return SyncToolSpecification.builder()
                 .tool(tool)
-                .callHandler((exchange, request) -> {
+                .callHandler((context, request) -> {
                     Map<String, Object> args = request.arguments();
                     if (args == null) args = Map.of();
                     Object id = args.get("id");

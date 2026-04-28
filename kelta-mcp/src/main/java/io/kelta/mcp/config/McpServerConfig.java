@@ -10,10 +10,10 @@ import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
 import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
+import io.kelta.mcp.transport.HttpServletStatelessServerTransportProvider;
 import io.modelcontextprotocol.server.McpServer;
-import io.modelcontextprotocol.server.McpServerFeatures;
-import io.modelcontextprotocol.server.McpSyncServer;
-import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures;
+import io.modelcontextprotocol.server.McpStatelessSyncServer;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -35,6 +35,20 @@ import java.util.List;
  * and its own resource registry. Tools registered on one server are NOT
  * visible from the other — this is the structural guarantee that prevents
  * an admin tool from being callable through the user endpoint.
+ *
+ * <p><b>Transport mode: stateless.</b> We use the SDK's
+ * {@code McpStatelessSyncServer} + a custom
+ * {@link HttpServletStatelessServerTransportProvider} adapter. The earlier
+ * streamable transport kept per-pod session state in memory, so every pod
+ * restart wiped the session map and the next request from a connected
+ * client returned {@code -32603 Session not found}. Stateless mode avoids
+ * the problem by construction — every request carries everything it needs
+ * (PAT in {@code Authorization}, tenant slug in the URL), so pod restarts
+ * are invisible to clients.
+ *
+ * <p>Trade-off: server-initiated SSE notifications ({@code listChanged},
+ * resource subscriptions) aren't available in stateless mode. We don't use
+ * those today and aren't planning to.
  */
 @Configuration
 @EnableScheduling
@@ -45,52 +59,48 @@ public class McpServerConfig {
     private static final String SERVER_VERSION = "1.0.0";
 
     @Bean(name = "userTransportProvider")
-    public HttpServletStreamableServerTransportProvider userTransportProvider() {
-        return HttpServletStreamableServerTransportProvider.builder()
-                .mcpEndpoint("/mcp/user")
-                .contextExtractor(new KeltaTransportContextExtractor())
-                .build();
+    public HttpServletStatelessServerTransportProvider userTransportProvider() {
+        return new HttpServletStatelessServerTransportProvider(
+                new KeltaTransportContextExtractor());
     }
 
     @Bean(name = "adminTransportProvider")
-    public HttpServletStreamableServerTransportProvider adminTransportProvider() {
-        return HttpServletStreamableServerTransportProvider.builder()
-                .mcpEndpoint("/mcp/admin")
-                .contextExtractor(new KeltaTransportContextExtractor())
-                .build();
+    public HttpServletStatelessServerTransportProvider adminTransportProvider() {
+        return new HttpServletStatelessServerTransportProvider(
+                new KeltaTransportContextExtractor());
     }
 
     @Bean(name = "userMcpServer")
-    public McpSyncServer userMcpServer(
+    public McpStatelessSyncServer userMcpServer(
             @org.springframework.beans.factory.annotation.Qualifier("userTransportProvider")
-            HttpServletStreamableServerTransportProvider transport,
+            HttpServletStatelessServerTransportProvider transport,
             List<UserTool> userTools,
             List<UserResource> userResources,
             List<UserResourceTemplate> userResourceTemplates,
             ObservedToolDecorator decorator,
             RateLimitedToolDecorator rateLimiter,
             PatPropagatingToolDecorator patPropagator) {
-        McpSyncServer server = McpServer.sync(transport)
+        McpStatelessSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-user", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder()
                         .tools(true)
-                        .resources(false, true)  // (subscribe, listChanged)
+                        .resources(false, false)  // (subscribe, listChanged): both off in stateless
                         .build())
                 .build();
         server.addTool(wrap(pingTool("user"), "user", decorator, rateLimiter, patPropagator));
         for (UserTool tool : userTools) {
-            McpServerFeatures.SyncToolSpecification spec = wrap(
+            McpStatelessServerFeatures.SyncToolSpecification spec = wrap(
                     tool.toSpecification(), "user", decorator, rateLimiter, patPropagator);
             server.addTool(spec);
             log.info("Registered user tool: {}", spec.tool().name());
         }
         for (UserResource resource : userResources) {
-            McpServerFeatures.SyncResourceSpecification spec = resource.toSpecification();
+            McpStatelessServerFeatures.SyncResourceSpecification spec = resource.toSpecification();
             server.addResource(spec);
             log.info("Registered user resource: {}", spec.resource().uri());
         }
         for (UserResourceTemplate template : userResourceTemplates) {
-            McpServerFeatures.SyncResourceTemplateSpecification spec = template.toSpecification();
+            McpStatelessServerFeatures.SyncResourceTemplateSpecification spec = template.toSpecification();
             server.addResourceTemplate(spec);
             log.info("Registered user resource template: {}", spec.resourceTemplate().uriTemplate());
         }
@@ -98,20 +108,20 @@ public class McpServerConfig {
     }
 
     @Bean(name = "adminMcpServer")
-    public McpSyncServer adminMcpServer(
+    public McpStatelessSyncServer adminMcpServer(
             @org.springframework.beans.factory.annotation.Qualifier("adminTransportProvider")
-            HttpServletStreamableServerTransportProvider transport,
+            HttpServletStatelessServerTransportProvider transport,
             List<AdminTool> adminTools,
             ObservedToolDecorator decorator,
             RateLimitedToolDecorator rateLimiter,
             PatPropagatingToolDecorator patPropagator) {
-        McpSyncServer server = McpServer.sync(transport)
+        McpStatelessSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-admin", SERVER_VERSION)
                 .capabilities(ServerCapabilities.builder().tools(true).build())
                 .build();
         server.addTool(wrap(pingTool("admin"), "admin", decorator, rateLimiter, patPropagator));
         for (AdminTool tool : adminTools) {
-            McpServerFeatures.SyncToolSpecification spec = wrap(
+            McpStatelessServerFeatures.SyncToolSpecification spec = wrap(
                     tool.toSpecification(), "admin", decorator, rateLimiter, patPropagator);
             server.addTool(spec);
             log.info("Registered admin tool: {}", spec.tool().name());
@@ -122,15 +132,15 @@ public class McpServerConfig {
     /**
      * Decorator stack, outermost → innermost:
      *  1. PAT propagator — copies the PAT from McpTransportContext into
-     *     the per-thread RequestPatHolder (handlers run on a Reactor
-     *     scheduler thread, not the servlet thread).
+     *     the per-thread RequestPatHolder (the gateway client reads it
+     *     from there).
      *  2. Rate limiter — keys its bucket on the now-populated PAT;
      *     rate-limited calls return an error before observation runs.
      *  3. Observation — timer + counter, tagged with status.
      *  4. Original tool.
      */
-    private static McpServerFeatures.SyncToolSpecification wrap(
-            McpServerFeatures.SyncToolSpecification original,
+    private static McpStatelessServerFeatures.SyncToolSpecification wrap(
+            McpStatelessServerFeatures.SyncToolSpecification original,
             String profile,
             ObservedToolDecorator observed,
             RateLimitedToolDecorator rateLimited,
@@ -145,10 +155,10 @@ public class McpServerConfig {
     // ServletRegistrationBean. KeltaMcpController dispatches to them via
     // @RequestMapping("/{tenantSlug}/mcp/{profile:user|admin}") so the slug
     // stays in the URL end-to-end. The transports are still Spring beans
-    // (above) so McpSyncServer can attach them to its tool/resource registries
+    // (above) so McpServer can attach them to its tool/resource registries
     // — they're just not bound to a servlet container path.
 
-    private McpServerFeatures.SyncToolSpecification pingTool(String profile) {
+    private McpStatelessServerFeatures.SyncToolSpecification pingTool(String profile) {
         Tool tool = Tool.builder()
                 .name("ping")
                 .title("Ping (" + profile + ")")
@@ -157,9 +167,9 @@ public class McpServerConfig {
                 .annotations(ToolHints.read())
                 .build();
 
-        return McpServerFeatures.SyncToolSpecification.builder()
+        return McpStatelessServerFeatures.SyncToolSpecification.builder()
                 .tool(tool)
-                .callHandler((exchange, request) -> CallToolResult.builder()
+                .callHandler((context, request) -> CallToolResult.builder()
                         .content(List.of(new TextContent("pong (" + profile + ")")))
                         .build())
                 .build();

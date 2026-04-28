@@ -3,7 +3,7 @@ package io.kelta.mcp.observe;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
@@ -39,13 +39,13 @@ public class ObservedToolDecorator {
 
         return SyncToolSpecification.builder()
                 .tool(original.tool())
-                .callHandler((exchange, request) -> {
+                .callHandler((context, request) -> {
                     long startNs = System.nanoTime();
                     String status = "success";
                     MDC.put("mcpTool", toolName);
                     MDC.put("mcpProfile", profile);
                     try {
-                        CallToolResult result = originalHandler.apply(exchange, request);
+                        CallToolResult result = originalHandler.apply(context, request);
                         if (Boolean.TRUE.equals(result.isError())) {
                             status = "error";
                         }

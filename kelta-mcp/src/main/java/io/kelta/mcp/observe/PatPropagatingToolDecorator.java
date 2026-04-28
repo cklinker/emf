@@ -3,7 +3,7 @@ package io.kelta.mcp.observe;
 import io.kelta.mcp.auth.KeltaTransportContextExtractor;
 import io.kelta.mcp.auth.RequestPatHolder;
 import io.kelta.mcp.auth.RequestSlugHolder;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,13 +12,17 @@ import org.springframework.stereotype.Component;
  * during HTTP intake) into thread-local holders for the duration
  * of the tool handler.
  *
- * <p>Why this exists: the MCP SDK dispatches sync tool handlers on
- * Reactor scheduler threads, not the servlet thread. The
- * {@code ThreadLocal} the auth filter populates on the inbound
- * thread is therefore invisible to the handler. The transport
- * context is the SDK-blessed mechanism for thread-safe propagation;
- * this decorator bridges it back into the holders the downstream
- * HTTP client reads from.
+ * <p>Why this exists: the gateway HTTP client reads PAT/slug from
+ * thread-local holders rather than threading the context through
+ * every method signature. The transport context is the SDK-blessed
+ * mechanism for thread-safe propagation; this decorator bridges it
+ * back into the holders the gateway client reads from.
+ *
+ * <p>In stateless mode the {@code McpTransportContext} flows directly
+ * to the tool handler as the first BiFunction argument — no
+ * {@code exchange.transportContext()} hop needed (and no Reactor
+ * scheduler thread switch in the way), so this decorator is now a
+ * straight set-then-clear around the inner handler.
  *
  * <p>Two pieces of data ride along:
  * <ul>
@@ -39,19 +43,19 @@ public class PatPropagatingToolDecorator {
         var inner = original.callHandler();
         return SyncToolSpecification.builder()
                 .tool(original.tool())
-                .callHandler((exchange, request) -> {
+                .callHandler((context, request) -> {
                     String pat = null;
                     String slug = null;
-                    if (exchange != null && exchange.transportContext() != null) {
-                        Object patValue = exchange.transportContext().get(KeltaTransportContextExtractor.PAT_KEY);
+                    if (context != null) {
+                        Object patValue = context.get(KeltaTransportContextExtractor.PAT_KEY);
                         if (patValue instanceof String s) pat = s;
-                        Object slugValue = exchange.transportContext().get(KeltaTransportContextExtractor.TENANT_SLUG_KEY);
+                        Object slugValue = context.get(KeltaTransportContextExtractor.TENANT_SLUG_KEY);
                         if (slugValue instanceof String s) slug = s;
                     }
                     if (pat != null) RequestPatHolder.set(pat);
                     if (slug != null) RequestSlugHolder.set(slug);
                     try {
-                        return inner.apply(exchange, request);
+                        return inner.apply(context, request);
                     } finally {
                         RequestSlugHolder.clear();
                         RequestPatHolder.clear();

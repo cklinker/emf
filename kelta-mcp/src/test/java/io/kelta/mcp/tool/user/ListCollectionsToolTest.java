@@ -5,7 +5,7 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import io.kelta.mcp.auth.RequestPatHolder;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.config.McpProperties;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;

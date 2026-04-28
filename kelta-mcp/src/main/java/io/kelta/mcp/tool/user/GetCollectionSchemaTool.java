@@ -10,6 +10,8 @@ import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +21,8 @@ import java.util.Map;
 
 @Component
 public class GetCollectionSchemaTool implements UserTool, AdminTool {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final GatewayHttpClient gateway;
 
@@ -58,15 +62,27 @@ public class GetCollectionSchemaTool implements UserTool, AdminTool {
                             return McpErrorMapper.toResult(collectionRes);
                         }
 
-                        GatewayHttpClient.Response fieldsRes = gateway.get(
-                                "/api/fields?filter[collectionName][EQ]="
-                                        + URLEncoder.encode(collection, StandardCharsets.UTF_8)
-                                        + "&page[size]=200");
+                        // The fields system collection links each field to its parent
+                        // by `collectionId` (a UUID), NOT by `collectionName`. Filtering
+                        // on `collectionName` returns HTTP 400 from the worker because
+                        // that column doesn't exist on the FieldDefinition entity, so
+                        // we have to extract the collection's id from the first
+                        // response and use that.
+                        String collectionId = extractCollectionId(collectionRes.body());
+                        GatewayHttpClient.Response fieldsRes = collectionId == null
+                                ? null
+                                : gateway.get(
+                                        "/api/fields?filter[collectionId][EQ]="
+                                                + URLEncoder.encode(collectionId, StandardCharsets.UTF_8)
+                                                + "&page[size]=200");
 
+                        String fieldsBody = (fieldsRes != null && fieldsRes.isSuccess())
+                                ? fieldsRes.body()
+                                : "null";
                         String combined = "{\n  \"collection\": "
                                 + collectionRes.body()
                                 + ",\n  \"fields\": "
-                                + (fieldsRes.isSuccess() ? fieldsRes.body() : "null")
+                                + fieldsBody
                                 + "\n}";
                         return CallToolResult.builder()
                                 .content(List.of(new TextContent(combined)))
@@ -76,5 +92,21 @@ public class GetCollectionSchemaTool implements UserTool, AdminTool {
                     }
                 })
                 .build();
+    }
+
+    /**
+     * Pull {@code data.id} out of a JSON:API single-resource response body.
+     * Returns null on any parse failure or if the id is missing — callers
+     * fall back to skipping the fields fetch in that case.
+     */
+    static String extractCollectionId(String body) {
+        if (body == null || body.isBlank()) return null;
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(body);
+            JsonNode id = root.path("data").path("id");
+            return id.isMissingNode() || id.isNull() ? null : id.asString();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 }

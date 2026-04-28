@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -34,8 +35,10 @@ public class GetCollectionSchemaTool implements UserTool, AdminTool {
 
         Tool tool = Tool.builder()
                 .name("get_collection_schema")
+                .title("Get Collection Schema")
                 .description("Return the full schema for a collection: metadata + all field definitions (type, required, unique, validation rules). Use this before constructing a query or create_record call to know what attributes are available.")
                 .inputSchema(Schemas.object(properties, List.of("collection")))
+                .annotations(ToolHints.read())
                 .build();
 
         return SyncToolSpecification.builder()

@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -34,8 +35,10 @@ public class GetFlowRunTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("get_flow_run")
+                .title("Get Flow Run")
                 .description("Fetch the status of a flow execution. Wraps GET /api/flows/executions/{executionId}, with optional step-by-step logs from /steps merged in. Use to poll a long-running flow.")
                 .inputSchema(Schemas.object(properties, List.of("executionId")))
+                .annotations(ToolHints.read())
                 .build();
 
         return SyncToolSpecification.builder()

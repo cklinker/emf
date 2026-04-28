@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -38,8 +39,10 @@ public class CreateFlowTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("create_flow")
+                .title("Create Flow")
                 .description("Create a new automation flow. Wraps POST /api/flows. The definition payload is opaque to this tool — pass the flow-engine JSON directly.")
                 .inputSchema(Schemas.object(properties, List.of("name", "triggerType", "definition")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -34,8 +35,10 @@ public class SubmitForApprovalTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("submit_for_approval")
+                .title("Submit for Approval")
                 .description("Submit a record for approval. Wraps POST /api/approvals/submit. Returns the new approval instance id; use list_approvals to track its status.")
                 .inputSchema(Schemas.object(properties, List.of("collectionId", "recordId")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

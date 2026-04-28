@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -36,8 +37,10 @@ public class GetRecordTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("get_record")
+                .title("Get Record")
                 .description("Fetch a single record by id from a collection. Returns the JSON:API single-resource response.")
                 .inputSchema(Schemas.object(properties, List.of("collection", "id")))
+                .annotations(ToolHints.read())
                 .build();
 
         return SyncToolSpecification.builder()

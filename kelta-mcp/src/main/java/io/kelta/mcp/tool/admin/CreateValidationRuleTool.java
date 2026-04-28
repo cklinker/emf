@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -37,8 +38,10 @@ public class CreateValidationRuleTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("create_validation_rule")
+                .title("Create Validation Rule")
                 .description("Create a validation rule on a collection. Records that fail the expression are rejected at create/update time.")
                 .inputSchema(Schemas.object(properties, List.of("collectionName", "name", "expression", "errorMessage")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -54,8 +55,10 @@ public class CreatePicklistTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("create_picklist")
+                .title("Create Picklist")
                 .description("Create a global picklist with its initial values. The picklist is created first; each value is then POSTed to /api/picklistValues with picklistName backreference.")
                 .inputSchema(Schemas.object(properties, List.of("name", "values")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

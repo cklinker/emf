@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -32,8 +33,10 @@ public class ImportApiSpecTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("import_api_spec")
+                .title("Import API Spec")
                 .description("Import an external OpenAPI 3.x spec into the platform's API spec library. Operations are parsed and indexed so flows can call them. Wraps POST /api/api-specs/import. Returns a diff of added/changed/removed operations.")
                 .inputSchema(Schemas.object(properties, List.of("name", "raw")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

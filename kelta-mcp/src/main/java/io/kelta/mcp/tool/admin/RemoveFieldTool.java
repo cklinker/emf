@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -32,8 +33,10 @@ public class RemoveFieldTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("remove_field")
+                .title("Remove Field")
                 .description("Remove a field from a collection. Wraps DELETE /api/fields/{id}. The field's data on existing records is dropped — irreversible.")
                 .inputSchema(Schemas.object(properties, List.of("id")))
+                .annotations(ToolHints.write(true, true))
                 .build();
 
         return SyncToolSpecification.builder()

@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -36,8 +37,10 @@ public class CreateRecordTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("create_record")
+                .title("Create Record")
                 .description("Create a single record in a collection. Wraps POST /api/{collection} in JSON:API format. Returns the created record on success (HTTP 201).")
                 .inputSchema(Schemas.object(properties, List.of("collection", "attributes")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

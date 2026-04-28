@@ -8,6 +8,7 @@ import io.kelta.mcp.resource.UserResource;
 import io.kelta.mcp.resource.UserResourceTemplate;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpServerFeatures;
@@ -150,8 +151,10 @@ public class McpServerConfig {
     private McpServerFeatures.SyncToolSpecification pingTool(String profile) {
         Tool tool = Tool.builder()
                 .name("ping")
+                .title("Ping (" + profile + ")")
                 .description("Returns 'pong'. Smoke test that the " + profile + " MCP endpoint is reachable.")
                 .inputSchema(Schemas.empty())
+                .annotations(ToolHints.read())
                 .build();
 
         return McpServerFeatures.SyncToolSpecification.builder()

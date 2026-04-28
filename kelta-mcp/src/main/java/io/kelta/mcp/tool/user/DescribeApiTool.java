@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
@@ -21,8 +22,10 @@ public class DescribeApiTool implements UserTool {
     public SyncToolSpecification toSpecification() {
         Tool tool = Tool.builder()
                 .name("describe_api")
+                .title("Describe API")
                 .description("Return the auto-generated OpenAPI 3.0 spec for the current tenant. The spec covers JSON:API CRUD on every collection — useful when you need exact request/response schemas. Specialized controllers (flows, approvals, bulk) are NOT in this spec; use the dedicated tools for those.")
                 .inputSchema(Schemas.empty())
+                .annotations(ToolHints.read())
                 .build();
 
         return SyncToolSpecification.builder()

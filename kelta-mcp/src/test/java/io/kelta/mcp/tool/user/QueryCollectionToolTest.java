@@ -61,10 +61,70 @@ class QueryCollectionToolTest {
 
     @Test
     void buildQueryStringDropsUnknownOperators() {
+        // Defensive contract on the helper: anything that bypasses the
+        // call-handler validation still produces a clean URL with the
+        // unknown op stripped (rather than passed to the worker, which
+        // would silently drop it and return a wrong result set).
         String q = QueryCollectionTool.buildQueryString(Map.of(
                 "filter", Map.of("name", Map.of("BOGUS_OP", "x"))));
 
         assertThat(q).doesNotContain("BOGUS_OP");
+    }
+
+    @Test
+    void buildQueryStringPassesThroughCaseInsensitiveOperators() {
+        // ICONTAINS / ISTARTS / IENDS / IEQ are real worker operators; they
+        // must survive buildQueryString unchanged.
+        String q = QueryCollectionTool.buildQueryString(Map.of(
+                "filter", Map.of("lastName", Map.of("ICONTAINS", "smith"))));
+
+        assertThat(q).contains("filter[lastName][ICONTAINS]=smith");
+    }
+
+    @Test
+    void validateFilterOperatorsAcceptsKnownOperators() {
+        assertThat(QueryCollectionTool.validateFilterOperators(
+                Map.of("status", Map.of("EQ", "ACTIVE")))).isNull();
+        assertThat(QueryCollectionTool.validateFilterOperators(
+                Map.of("price", Map.of("GTE", 100, "LTE", 1000)))).isNull();
+        assertThat(QueryCollectionTool.validateFilterOperators(
+                Map.of("phone", Map.of("ISNULL", "true")))).isNull();
+    }
+
+    @Test
+    void validateFilterOperatorsRejectsUnsupportedNamesWithGuidance() {
+        // Operators that look plausible but the worker doesn't recognize
+        // — these used to be silently forwarded and dropped. Now the MCP
+        // layer rejects them with a message that points at the workaround.
+        assertThat(QueryCollectionTool.validateFilterOperators(
+                Map.of("status", Map.of("IN", "ACTIVE,PENDING"))))
+                .contains("IN")
+                .contains("Workarounds");
+        assertThat(QueryCollectionTool.validateFilterOperators(
+                Map.of("total", Map.of("BETWEEN", "100,1000"))))
+                .contains("BETWEEN")
+                .contains("GTE+LTE");
+        assertThat(QueryCollectionTool.validateFilterOperators(
+                Map.of("name", Map.of("STARTSWITH", "Foo"))))
+                .contains("STARTSWITH");
+        assertThat(QueryCollectionTool.validateFilterOperators(
+                Map.of("phone", Map.of("IS_NULL", "true"))))
+                .contains("IS_NULL");
+    }
+
+    @Test
+    void rejectsCallWithUnsupportedFilterOperator() {
+        SyncToolSpecification spec = tool.toSpecification();
+        CallToolRequest req = new CallToolRequest("query_collection", Map.of(
+                "collection", "customers",
+                "filter", Map.of("status", Map.of("BETWEEN", "A,B"))
+        ), null);
+
+        CallToolResult result = spec.callHandler().apply(null, req);
+
+        assertThat(result.isError()).isEqualTo(Boolean.TRUE);
+        // No HTTP call should have escaped to the gateway.
+        wm.verify(0, WireMock.anyRequestedFor(WireMock.anyUrl()));
     }
 
     @Test

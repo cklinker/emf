@@ -41,7 +41,10 @@ public class ListCollectionsTool implements UserTool, AdminTool {
                     boolean includeSystem = readBool(request.arguments(), "includeSystem", true);
                     String path = "/api/collections";
                     if (!includeSystem) {
-                        path += "?filter[isSystem][EQ]=false";
+                        // Field name is `systemCollection` on CollectionDefinition;
+                        // the previous `isSystem` filter was silently dropped by the
+                        // worker (unknown field), making the flag a no-op.
+                        path += "?filter[systemCollection][EQ]=false";
                     }
                     try {
                         return McpErrorMapper.toResult(gateway.get(path));

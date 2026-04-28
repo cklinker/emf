@@ -67,13 +67,13 @@ class ListCollectionsToolTest {
 
     @Test
     void includeSystemFalseAddsFilter() {
-        wm.stubFor(get(urlEqualTo("/api/collections?filter[isSystem][EQ]=false"))
+        wm.stubFor(get(urlEqualTo("/api/collections?filter[systemCollection][EQ]=false"))
                 .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
 
         tool.toSpecification().callHandler().apply(null, new CallToolRequest(
                 "list_collections", Map.of("includeSystem", false), null));
 
-        wm.verify(WireMock.getRequestedFor(urlEqualTo("/api/collections?filter[isSystem][EQ]=false")));
+        wm.verify(WireMock.getRequestedFor(urlEqualTo("/api/collections?filter[systemCollection][EQ]=false")));
     }
 
     @Test

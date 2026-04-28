@@ -19,7 +19,6 @@ import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -141,27 +140,12 @@ public class McpServerConfig {
                         profile));
     }
 
-    @Bean
-    public ServletRegistrationBean<HttpServletStreamableServerTransportProvider> userMcpServlet(
-            @org.springframework.beans.factory.annotation.Qualifier("userTransportProvider")
-            HttpServletStreamableServerTransportProvider transport) {
-        ServletRegistrationBean<HttpServletStreamableServerTransportProvider> reg =
-                new ServletRegistrationBean<>(transport, "/mcp/user", "/mcp/user/*");
-        reg.setName("mcpUserServlet");
-        reg.setLoadOnStartup(1);
-        return reg;
-    }
-
-    @Bean
-    public ServletRegistrationBean<HttpServletStreamableServerTransportProvider> adminMcpServlet(
-            @org.springframework.beans.factory.annotation.Qualifier("adminTransportProvider")
-            HttpServletStreamableServerTransportProvider transport) {
-        ServletRegistrationBean<HttpServletStreamableServerTransportProvider> reg =
-                new ServletRegistrationBean<>(transport, "/mcp/admin", "/mcp/admin/*");
-        reg.setName("mcpAdminServlet");
-        reg.setLoadOnStartup(1);
-        return reg;
-    }
+    // Note: SDK transports are NOT registered as standalone servlets via
+    // ServletRegistrationBean. KeltaMcpController dispatches to them via
+    // @RequestMapping("/{tenantSlug}/mcp/{profile:user|admin}") so the slug
+    // stays in the URL end-to-end. The transports are still Spring beans
+    // (above) so McpSyncServer can attach them to its tool/resource registries
+    // — they're just not bound to a servlet container path.
 
     private McpServerFeatures.SyncToolSpecification pingTool(String profile) {
         Tool tool = Tool.builder()

@@ -30,6 +30,12 @@ public final class KeltaTransportContextExtractor
     public static final String PAT_KEY = "pat";
     public static final String TENANT_SLUG_KEY = "tenant_slug";
 
+    /**
+     * Request attribute the controller uses to carry the slug from
+     * its {@code @PathVariable} extraction down to this extractor.
+     */
+    public static final String SLUG_REQUEST_ATTRIBUTE = "kelta.mcp.tenantSlug";
+
     private static final String AUTHORIZATION = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
@@ -45,7 +51,7 @@ public final class KeltaTransportContextExtractor
             }
         }
 
-        Object slug = request.getAttribute(McpAuthFilter.SLUG_ATTRIBUTE);
+        Object slug = request.getAttribute(SLUG_REQUEST_ATTRIBUTE);
         if (slug instanceof String s && !s.isEmpty()) {
             values.put(TENANT_SLUG_KEY, s);
         }

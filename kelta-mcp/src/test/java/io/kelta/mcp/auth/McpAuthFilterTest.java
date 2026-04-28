@@ -16,15 +16,13 @@ import static org.mockito.Mockito.verify;
 
 class McpAuthFilterTest {
 
-    private static final String SLUG = "threadline-clothing";
-    private static final String URL_USER = "/" + SLUG + "/mcp/user";
-    private static final String URL_ADMIN = "/" + SLUG + "/mcp/admin";
+    private static final String URL = "/threadline-clothing/mcp/user";
 
     private final McpAuthFilter filter = new McpAuthFilter();
 
     @Test
     void rejectsRequestWithoutAuthorizationHeader() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL);
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
@@ -37,7 +35,7 @@ class McpAuthFilterTest {
 
     @Test
     void rejectsBearerTokenWithoutKltPrefix() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL);
         req.addHeader("Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9.something.signature");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -51,7 +49,7 @@ class McpAuthFilterTest {
 
     @Test
     void rejectsAuthorizationWithoutBearerScheme() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_ADMIN);
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL);
         req.addHeader("Authorization", "Basic dXNlcjpwYXNz");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -63,22 +61,8 @@ class McpAuthFilterTest {
     }
 
     @Test
-    void rejectsMcpUrlWithoutSlugPrefix() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
-        req.addHeader("Authorization", "Bearer klt_abc");
-        MockHttpServletResponse res = new MockHttpServletResponse();
-        FilterChain chain = mock(FilterChain.class);
-
-        filter.doFilter(req, res, chain);
-
-        // Slug is required — pre-slug URL is treated as not-found.
-        assertThat(res.getStatus()).isEqualTo(404);
-        verify(chain, never()).doFilter(req, res);
-    }
-
-    @Test
-    void allowsValidKltBearerTokenWithSlugInUrl() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
+    void allowsValidKltBearerToken() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL);
         req.addHeader("Authorization", "Bearer klt_abc123def456");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -86,44 +70,9 @@ class McpAuthFilterTest {
         filter.doFilter(req, res, chain);
 
         assertThat(res.getStatus()).isEqualTo(200);
-        verify(chain, times(1)).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(res));
-    }
-
-    @Test
-    void setsPatHolderAndSlugAttributeDuringChain() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
-        req.addHeader("Authorization", "Bearer klt_xyz_during_chain");
-        MockHttpServletResponse res = new MockHttpServletResponse();
-
-        String[] seenPat = new String[1];
-        Object[] seenSlug = new Object[1];
-        FilterChain chain = (request, response) -> {
-            seenPat[0] = RequestPatHolder.get();
-            seenSlug[0] = ((HttpServletRequest) request).getAttribute(McpAuthFilter.SLUG_ATTRIBUTE);
-        };
-
-        filter.doFilter(req, res, chain);
-
-        assertThat(seenPat[0]).isEqualTo("klt_xyz_during_chain");
-        assertThat(seenSlug[0]).isEqualTo(SLUG);
-        assertThat(RequestPatHolder.get()).isNull();
-    }
-
-    @Test
-    void clearsPatHolderEvenIfChainThrows() {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
-        req.addHeader("Authorization", "Bearer klt_failing");
-        MockHttpServletResponse res = new MockHttpServletResponse();
-        FilterChain chain = (request, response) -> {
-            throw new RuntimeException("simulated downstream failure");
-        };
-
-        try {
-            filter.doFilter(req, res, chain);
-        } catch (Exception ignored) {
-            // expected
-        }
-        assertThat(RequestPatHolder.get()).isNull();
+        verify(chain, times(1)).doFilter(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(res));
     }
 
     @Test
@@ -138,24 +87,8 @@ class McpAuthFilterTest {
     }
 
     @Test
-    void rewritesRequestUriToCanonicalSdkPath() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER + "/messages");
-        req.addHeader("Authorization", "Bearer klt_abc");
-        MockHttpServletResponse res = new MockHttpServletResponse();
-
-        String[] seenUri = new String[1];
-        FilterChain chain = (request, response) -> {
-            seenUri[0] = ((HttpServletRequest) request).getRequestURI();
-        };
-
-        filter.doFilter(req, res, chain);
-
-        assertThat(seenUri[0]).isEqualTo("/mcp/user/messages");
-    }
-
-    @Test
     void stripsClientSuppliedTenantHeaders() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL_USER);
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", URL);
         req.addHeader("Authorization", "Bearer klt_abc");
         req.addHeader("X-Tenant-ID", "00000000-0000-0000-0000-000000000999");
         req.addHeader("X-Tenant-Slug", "evil-tenant");

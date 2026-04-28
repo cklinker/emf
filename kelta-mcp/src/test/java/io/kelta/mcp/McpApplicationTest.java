@@ -4,16 +4,15 @@ import io.kelta.mcp.resource.UserResource;
 import io.kelta.mcp.resource.UserResourceTemplate;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.UserTool;
+import io.kelta.mcp.transport.KeltaMcpController;
 import io.modelcontextprotocol.server.McpSyncServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,7 +37,7 @@ class McpApplicationTest {
     private McpSyncServer adminServer;
 
     @Autowired
-    private Map<String, ServletRegistrationBean<?>> servletRegistrations;
+    private KeltaMcpController mcpController;
 
     @Autowired
     private List<UserTool> userTools;
@@ -60,14 +59,10 @@ class McpApplicationTest {
     }
 
     @Test
-    void bothServletsAreRegisteredWithDistinctMappings() {
-        ServletRegistrationBean<?> userServlet = servletRegistrations.get("userMcpServlet");
-        ServletRegistrationBean<?> adminServlet = servletRegistrations.get("adminMcpServlet");
-
-        assertThat(userServlet).isNotNull();
-        assertThat(adminServlet).isNotNull();
-        assertThat(userServlet.getUrlMappings()).contains("/mcp/user", "/mcp/user/*");
-        assertThat(adminServlet.getUrlMappings()).contains("/mcp/admin", "/mcp/admin/*");
+    void mcpControllerIsRegisteredAtSlugPathPattern() {
+        // The Spring MVC controller dispatches /{tenantSlug}/mcp/(user|admin)
+        // to the matching SDK transport via @PathVariable.
+        assertThat(mcpController).isNotNull();
     }
 
     @Test

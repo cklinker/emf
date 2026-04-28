@@ -14,75 +14,43 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Servlet filter for MCP HTTP endpoints.
  *
- * <p>The MCP URL convention follows the rest of the Kelta platform:
- * <pre>{@code
- *   /{tenantSlug}/mcp/user
- *   /{tenantSlug}/mcp/admin
- * }</pre>
- * The slug binds the request to a specific tenant — different PATs in
- * different tenants get different MCP URLs in their Claude Code config,
- * so a single deployment can serve any number of tenants.
- *
- * <p>This filter:
+ * <p>Lightweight gate — runs on any URL containing {@code /mcp/} and:
  * <ol>
- *   <li>Matches the URL pattern, extracts the slug, and rewrites the
- *       request to the canonical {@code /mcp/(user|admin)} path the SDK
- *       servlet is registered at. The slug rides along as a request
- *       attribute the {@link KeltaTransportContextExtractor} reads.</li>
- *   <li>Enforces presence of {@code Authorization: Bearer klt_*} —
- *       cryptographic validation happens at the gateway on the first
- *       forwarded API call. We just gate the session.</li>
- *   <li>Strips client-supplied tenant headers so a client can't
- *       impersonate another tenant.</li>
+ *   <li>Requires {@code Authorization: Bearer klt_*}. Cryptographic
+ *       validation happens at the gateway on the first forwarded API
+ *       call; here we only ensure the header is well-formed.</li>
+ *   <li>Strips client-supplied {@code X-Tenant-ID} / {@code X-Tenant-Slug}
+ *       / {@code X-User-Id} headers so a malicious client can't claim
+ *       a tenant other than the one bound to the URL.</li>
  * </ol>
+ *
+ * <p>URL-pattern matching and slug extraction happen in
+ * {@code KeltaMcpController} via Spring MVC {@code @PathVariable},
+ * which keeps the slug in the URL throughout the request lifecycle —
+ * no rewriting, no forward.
  */
 @Component
 public class McpAuthFilter extends OncePerRequestFilter implements Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(McpAuthFilter.class);
 
-    /** Request attribute carrying the slug extracted from the URL. */
-    public static final String SLUG_ATTRIBUTE = "kelta.mcp.tenantSlug";
-
     private static final String AUTHORIZATION = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String PAT_PREFIX = "klt_";
 
-    /**
-     * Matches {@code /{tenantSlug}/mcp/(user|admin)[/...]}. The slug
-     * pattern mirrors {@code TenantSlugExtractionFilter} on the gateway
-     * so an invalid slug is rejected here rather than later.
-     */
-    private static final Pattern URL_PATTERN = Pattern.compile(
-            "^/(?<slug>[a-z][a-z0-9-]{1,61}[a-z0-9])/mcp/(?<profile>user|admin)(?<rest>/.*)?$");
-
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return !path.contains("/mcp/");
+        return !request.getRequestURI().contains("/mcp/");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
-        Matcher m = URL_PATTERN.matcher(request.getRequestURI());
-        if (!m.matches()) {
-            unauthorized(response, "invalid_mcp_path",
-                    "Path must be /{tenantSlug}/mcp/(user|admin)");
-            return;
-        }
-        String slug = m.group("slug");
-        String profile = m.group("profile");
-        String rest = m.group("rest");
-        String canonicalPath = "/mcp/" + profile + (rest == null ? "" : rest);
-
         String header = request.getHeader(AUTHORIZATION);
         if (header == null || !header.startsWith(BEARER_PREFIX)) {
             unauthorized(response, "missing_bearer", "Missing Authorization: Bearer header");
@@ -93,26 +61,15 @@ public class McpAuthFilter extends OncePerRequestFilter implements Ordered {
             unauthorized(response, "invalid_token_prefix", "Token must be a Kelta PAT (klt_*)");
             return;
         }
-
-        request.setAttribute(SLUG_ATTRIBUTE, slug);
-        RequestPatHolder.set(token);
-        try {
-            chain.doFilter(new RewrittenRequest(new SanitizedRequest(request), canonicalPath), response);
-        } finally {
-            RequestPatHolder.clear();
-        }
+        chain.doFilter(new SanitizedRequest(request), response);
     }
 
     private static void unauthorized(HttpServletResponse response, String code, String message)
             throws IOException {
-        int status = "invalid_mcp_path".equals(code) ? HttpStatus.NOT_FOUND.value()
-                : HttpStatus.UNAUTHORIZED.value();
-        response.setStatus(status);
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        if (status == HttpStatus.UNAUTHORIZED.value()) {
-            response.setHeader("WWW-Authenticate",
-                    "Bearer realm=\"kelta-mcp\", error=\"" + code + "\"");
-        }
+        response.setHeader("WWW-Authenticate",
+                "Bearer realm=\"kelta-mcp\", error=\"" + code + "\"");
         response.getWriter().write("{\"error\":\"" + code + "\",\"message\":\"" + message + "\"}");
     }
 
@@ -123,9 +80,9 @@ public class McpAuthFilter extends OncePerRequestFilter implements Ordered {
 
     /**
      * Wrapper that hides client-supplied tenant headers — the tenant
-     * is bound to the URL slug, not headers. Without this, a malicious
-     * client could try {@code X-Tenant-ID: <other-tenant>} to escape
-     * its own tenant.
+     * is bound to the URL slug ({@code /{tenantSlug}/mcp/...}), not
+     * headers. Without this, a malicious client could try
+     * {@code X-Tenant-ID: <other-tenant>} to escape its own tenant.
      */
     private static final class SanitizedRequest extends HttpServletRequestWrapper {
         private static final java.util.Set<String> STRIPPED = java.util.Set.of(
@@ -162,50 +119,6 @@ public class McpAuthFilter extends OncePerRequestFilter implements Ordered {
                 }
             }
             return java.util.Collections.enumeration(names);
-        }
-    }
-
-    /**
-     * Wrapper that rewrites the request URI / servlet path to the
-     * canonical SDK-registered path {@code /mcp/(user|admin)} after
-     * the slug has been extracted. The SDK servlet's path matching
-     * (and any session-id correlation) operates on this rewritten URI.
-     */
-    private static final class RewrittenRequest extends HttpServletRequestWrapper {
-        private final String canonicalPath;
-
-        RewrittenRequest(HttpServletRequest req, String canonicalPath) {
-            super(req);
-            this.canonicalPath = canonicalPath;
-        }
-
-        @Override
-        public String getRequestURI() {
-            return canonicalPath;
-        }
-
-        @Override
-        public StringBuffer getRequestURL() {
-            StringBuffer url = new StringBuffer();
-            url.append(getScheme()).append("://").append(getServerName());
-            int port = getServerPort();
-            if (port > 0
-                    && (("http".equalsIgnoreCase(getScheme()) && port != 80)
-                    || ("https".equalsIgnoreCase(getScheme()) && port != 443))) {
-                url.append(':').append(port);
-            }
-            url.append(canonicalPath);
-            return url;
-        }
-
-        @Override
-        public String getServletPath() {
-            return canonicalPath;
-        }
-
-        @Override
-        public String getPathInfo() {
-            return null;
         }
     }
 }

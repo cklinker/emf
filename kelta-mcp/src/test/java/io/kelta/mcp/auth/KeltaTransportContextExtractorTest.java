@@ -53,7 +53,7 @@ class KeltaTransportContextExtractorTest {
     void includesTenantSlugFromRequestAttribute() {
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/mcp/user");
         req.addHeader("Authorization", "Bearer klt_token");
-        req.setAttribute(McpAuthFilter.SLUG_ATTRIBUTE, "threadline-clothing");
+        req.setAttribute(KeltaTransportContextExtractor.SLUG_REQUEST_ATTRIBUTE, "threadline-clothing");
 
         McpTransportContext context = extractor.extract(req);
 

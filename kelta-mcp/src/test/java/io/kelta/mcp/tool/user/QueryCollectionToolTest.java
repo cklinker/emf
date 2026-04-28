@@ -8,10 +8,12 @@ import io.kelta.mcp.config.McpProperties;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.Tool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Map;
 
@@ -136,6 +138,28 @@ class QueryCollectionToolTest {
 
         assertThat(result.isError()).isEqualTo(Boolean.TRUE);
         wm.verify(0, WireMock.anyRequestedFor(WireMock.anyUrl()));
+    }
+
+    @Test
+    void toolSpecFitsWithinClientSizeBudget() throws Exception {
+        // Claude Desktop drops or hides tools when the per-tool definition is
+        // disproportionately large vs. its peers in the same tools/list. Before
+        // this test was added, the description had ballooned to ~6 KB while
+        // every other tool was under 900 bytes — and Desktop quietly hid
+        // query_collection from the LLM.
+        //
+        // Hard caps so a future "let me add one more example" doesn't put us
+        // back in the same place. Numbers are conservative — adjust if the
+        // Desktop budget changes, but never raise without a real reason.
+        Tool t = tool.toSpecification().tool();
+        String json = JsonMapper.builder().build().writeValueAsString(t);
+
+        assertThat(t.description().length())
+                .as("tool description (kept short so client budgets don't drop the tool)")
+                .isLessThan(1500);
+        assertThat(json.length())
+                .as("full Tool JSON (description + schema, currently ~2.3 KB)")
+                .isLessThan(2500);
     }
 
     @Test

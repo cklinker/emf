@@ -57,127 +57,55 @@ public class QueryCollectionTool implements UserTool {
     @Override
     public SyncToolSpecification toSpecification() {
         Map<String, Object> filter = Schemas.freeObject("""
-                Filter expressions, keyed by field name. Each value is an object mapping \
-                OPERATOR -> value. Multiple operators on one field combine with AND (use \
-                this for ranges); multiple fields combine with AND across each other. \
-                IMPORTANT: there is NO OR — for "match A or B" run two queries and union \
-                the results client-side.
-
-                Supported operators (operator name is case-insensitive; values are \
-                case-sensitive unless you use an I-prefixed variant):
-                  EQ, NEQ                       exact / not equal
-                  GT, GTE, LT, LTE              comparison (numbers, strings, ISO-8601 timestamps)
-                  CONTAINS, STARTS, ENDS        substring / prefix / suffix (case-sensitive)
-                  ICONTAINS, ISTARTS, IENDS,
-                  IEQ                           same matches, case-insensitive
-                  ISNULL                        value must be "true" or "false"
-
-                NOT supported (the call will be rejected with an error). Workarounds:
-                  • IN, NIN          — call this tool once per value, union results client-side
-                  • BETWEEN          — use GTE + LTE on the same field
-                  • STARTSWITH       — use STARTS (or ISTARTS for case-insensitive)
-                  • ENDSWITH         — use ENDS (or IENDS)
-                  • IS_NULL          — use ISNULL
-                  • NOT_CONTAINS,
-                    EXISTS           — not currently expressible as a single query
-
-                Example — created in 2026 AND status equals ACTIVE:
-                  { "createdAt": { "GTE": "2026-01-01T00:00:00Z", "LT": "2027-01-01T00:00:00Z" },
-                    "status":    { "EQ":  "ACTIVE" } }
-
-                Example — case-insensitive name search with a price ceiling:
-                  { "name":  { "ICONTAINS": "widget" },
-                    "price": { "LTE": 99.99 } }
-                """);
+                { field: { OP: value } }. Ops on one field AND together (ranges); fields AND across; NO OR.
+                Supported: EQ NEQ GT GTE LT LTE CONTAINS STARTS ENDS ICONTAINS ISTARTS IENDS IEQ ISNULL.
+                Workarounds: BETWEEN→GTE+LTE; STARTSWITH/ENDSWITH→STARTS/ENDS; IS_NULL→ISNULL; IN/OR→multiple queries.
+                Ex: { "status": { "EQ": "ACTIVE" }, "createdAt": { "GTE": "2026-01-01T00:00:00Z" } }""");
 
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("collection", Schemas.string(
-                "Collection name as it appears in `list_collections` "
-                + "(e.g. \"customers\", \"accounts\", \"orders\")."));
+                "Collection name from `list_collections` (e.g. \"customers\")."));
         properties.put("filter", filter);
         properties.put("sort", Schemas.string(
-                "Comma-separated sort keys. Prefix '-' for descending. "
-                + "Examples: \"lastName\"  |  \"-createdAt\"  |  \"lastName,-createdAt\"."));
+                "CSV sort keys; '-' prefix = desc. Ex: \"-createdAt,lastName\"."));
         properties.put("pageSize", Schemas.integer(
-                "Records per page (default 20, max 200). Set to 1 when you only need a count — "
-                + "the total is in `meta.totalCount` regardless of page size.", 1, 200));
+                "Records per page (default 20, max 200). Use 1 to fetch only meta.totalCount.", 1, 200));
         properties.put("pageNumber", Schemas.integer(
-                "1-based page index (default 1). Response `links.next` / `links.prev` indicate "
-                + "further pages when present.", 1, null));
+                "1-based page index (default 1).", 1, null));
         properties.put("fields", Schemas.string(
-                "Sparse fieldset — comma-separated attribute names to return per record. "
-                + "Default returns all attributes. Example: \"firstName,lastName,email\"."));
+                "Sparse fieldset — CSV attribute names. Default: all. Ex: \"firstName,lastName,email\"."));
         properties.put("include", Schemas.string(
-                "Comma-separated relationship names to eager-load. Each related record appears "
-                + "once in the top-level `included[]` array; `data[].relationships[name].data` "
-                + "references them by id + type. Example: \"account,owner\"."));
+                "CSV relationship names to eager-load (returned in top-level included[]). Ex: \"account,owner\"."));
 
         Tool tool = Tool.builder()
                 .name("query_collection")
                 .description("""
-                        Run a JSON:API list query against a Kelta collection (GET /api/{collection}).
+                        List records from a Kelta collection (GET /api/{collection}). For one \
+                        record by id use `get_record`; for full-text use `search`; for field \
+                        names use `get_collection_schema`.
 
-                        Use this for browsing or finding records by criteria. For a single record \
-                        by id use `get_record`; for cross-collection full-text search use `search`. \
-                        Before filtering on a field you've never seen, call `get_collection_schema` \
-                        to discover field names and types.
+                        Filter ops: EQ NEQ GT GTE LT LTE CONTAINS STARTS ENDS ICONTAINS ISTARTS \
+                        IENDS IEQ ISNULL. Multiple ops on one field AND together (ranges); \
+                        fields AND across; NO OR. Rejected names map to workarounds — full list \
+                        in the `filter` arg.
 
-                        Capabilities (every argument is optional except `collection`):
-                          • filter  — combine any number of fields and operators. All conditions \
-                        AND together; there is NO OR (run separate queries for "either / or"). \
-                        Supported ops: EQ NEQ GT GTE LT LTE CONTAINS STARTS ENDS ICONTAINS \
-                        ISTARTS IENDS IEQ ISNULL. See the `filter` argument for usage and \
-                        workarounds for unsupported names (IN, BETWEEN, etc.).
-                          • sort    — multi-key, '-' prefix for descending. Direct attributes only \
-                        (cannot sort by relationship fields).
-                          • page    — pageSize + pageNumber (1-based, default 20 / 1, max 1000). \
-                        Total record count is always at `meta.totalCount`, regardless of pageSize.
-                          • fields  — sparse fieldset: only return the columns you need.
-                          • include — eager-load related records (returned in top-level \
-                        `included[]`). Single hop only — nested includes like `account.owner` \
-                        are not supported.
+                        Returns JSON:API: data[], optional included[], meta.totalCount, \
+                        links.next/prev.
 
-                        Returns the JSON:API envelope:
-                          {
-                            "data":     [ { "id": "...", "type": "<collection>",
-                                            "attributes": {...}, "relationships": {...} } ],
-                            "included": [ ... ],   // only when `include` is set
-                            "meta":     { "totalCount": N, "pageNumber": ...,
-                                          "pageSize": ..., "totalPages": ... },
-                            "links":    { "self": "...", "next": "...", "prev": "..." }
-                          }
-
-                        Common patterns:
-
-                          // count-only: pageSize=1 and read meta.totalCount
+                        Examples:
+                          // count only — read meta.totalCount
                           { "collection": "customers", "pageSize": 1 }
 
-                          // most-recent N records of a given status
-                          { "collection": "orders",
-                            "filter":   { "status": { "EQ": "OPEN" } },
-                            "sort":     "-createdAt",
-                            "pageSize": 10 }
-
-                          // range query (BETWEEN-style) using two ops on one field
+                          // BETWEEN-style range on one field
                           { "collection": "orders",
                             "filter": { "total": { "GTE": 100, "LTE": 1000 } } }
 
-                          // case-insensitive name search
+                          // active customers, newest first, with related account
                           { "collection": "customers",
-                            "filter": { "lastName": { "ICONTAINS": "smith" } } }
-
-                          // records missing a value
-                          { "collection": "customers",
-                            "filter": { "phone": { "ISNULL": "true" } } }
-
-                          // selected fields plus an eager-loaded relationship
-                          { "collection": "customers",
-                            "fields":  "firstName,lastName,email",
+                            "filter":  { "status": { "EQ": "ACTIVE" } },
+                            "sort":    "-createdAt",
                             "include": "account",
                             "pageSize": 25 }
-
-                          // pagination: walk pages with pageNumber, or follow links.next
-                          { "collection": "customers", "pageSize": 50, "pageNumber": 3 }
                         """)
                 .inputSchema(Schemas.object(properties, List.of("collection")))
                 .build();

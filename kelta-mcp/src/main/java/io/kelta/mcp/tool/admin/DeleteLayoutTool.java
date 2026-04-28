@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -32,8 +33,10 @@ public class DeleteLayoutTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("delete_layout")
+                .title("Delete Layout")
                 .description("Delete a page layout and (cascade) its sections and field assignments. Wraps DELETE /api/pageLayouts/{id}. Does NOT delete the underlying field definitions on the collection.")
                 .inputSchema(Schemas.object(properties, List.of("id")))
+                .annotations(ToolHints.write(true, true))
                 .build();
 
         return SyncToolSpecification.builder()

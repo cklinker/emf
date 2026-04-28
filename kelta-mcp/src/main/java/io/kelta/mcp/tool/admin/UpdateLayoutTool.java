@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -35,8 +36,10 @@ public class UpdateLayoutTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("update_layout")
+                .title("Update Layout")
                 .description("Update a page layout's metadata (name, default flag, record type). PATCHes /api/pageLayouts/{id}. To restructure sections or fields, use delete_layout + create_layout — full section replacement isn't supported in a single tool call.")
                 .inputSchema(Schemas.object(properties, List.of("id")))
+                .annotations(ToolHints.write(true, true))
                 .build();
 
         return SyncToolSpecification.builder()

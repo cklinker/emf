@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -41,8 +42,10 @@ public class AddFieldTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("add_field")
+                .title("Add Field")
                 .description("Add a field to an existing collection. Wraps POST /api/fields with a JSON:API body.")
                 .inputSchema(Schemas.object(properties, List.of("collectionName", "fieldName", "type")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

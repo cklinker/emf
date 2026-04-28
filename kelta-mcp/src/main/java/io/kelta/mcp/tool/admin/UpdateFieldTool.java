@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -37,8 +38,10 @@ public class UpdateFieldTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("update_field")
+                .title("Update Field")
                 .description("Update a field's mutable attributes. Wraps PATCH /api/fields/{id}. Note: changing field type or fieldName is generally rejected by the platform — drop+recreate is the path for those.")
                 .inputSchema(Schemas.object(properties, List.of("id")))
+                .annotations(ToolHints.write(true, true))
                 .build();
 
         return SyncToolSpecification.builder()

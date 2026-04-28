@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -37,8 +38,10 @@ public class UpdateRecordTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("update_record")
+                .title("Update Record")
                 .description("Update fields on a single record. Wraps PATCH /api/{collection}/{id}. Only the attributes you supply are modified — omitted fields keep their current values.")
                 .inputSchema(Schemas.object(properties, List.of("collection", "id")))
+                .annotations(ToolHints.write(true, true))
                 .build();
 
         return SyncToolSpecification.builder()

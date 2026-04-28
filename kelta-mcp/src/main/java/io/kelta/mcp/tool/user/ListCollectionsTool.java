@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
@@ -31,8 +32,10 @@ public class ListCollectionsTool implements UserTool, AdminTool {
 
         Tool tool = Tool.builder()
                 .name("list_collections")
+                .title("List Collections")
                 .description("List all collections available in the current tenant. Returns JSON:API formatted list with collection metadata. Use this to discover what data is available before querying.")
                 .inputSchema(Schemas.object(properties, List.of()))
+                .annotations(ToolHints.read())
                 .build();
 
         return SyncToolSpecification.builder()

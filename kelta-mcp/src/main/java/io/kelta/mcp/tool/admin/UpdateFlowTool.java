@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -37,8 +38,10 @@ public class UpdateFlowTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("update_flow")
+                .title("Update Flow")
                 .description("Update an existing flow's metadata, definition, or active state. Wraps PATCH /api/flows/{id}. Toggling \"active\" enables or disables the trigger without redeploying the definition.")
                 .inputSchema(Schemas.object(properties, List.of("id")))
+                .annotations(ToolHints.write(true, true))
                 .build();
 
         return SyncToolSpecification.builder()

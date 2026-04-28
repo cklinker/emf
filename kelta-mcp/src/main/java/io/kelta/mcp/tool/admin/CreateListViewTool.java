@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -37,8 +38,10 @@ public class CreateListViewTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("create_listview")
+                .title("Create List View")
                 .description("Create a saved list view (column set + filter + sort) for a collection. Wraps POST /api/listViews.")
                 .inputSchema(Schemas.object(properties, List.of("collectionName", "name", "displayedFields")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

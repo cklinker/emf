@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
@@ -34,8 +35,10 @@ public class ListApprovalsTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("list_approvals")
+                .title("List Approvals")
                 .description("List approval instances, optionally filtered by status. Wraps the approvalInstances system collection. Useful to find what's waiting on you.")
                 .inputSchema(Schemas.object(properties, List.of()))
+                .annotations(ToolHints.read())
                 .build();
 
         return SyncToolSpecification.builder()

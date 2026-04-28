@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -86,8 +87,10 @@ public class CreateLayoutTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("create_layout")
+                .title("Create Layout")
                 .description("Build a complete page layout in one call: layout + sections + fields per section. The layout is created first; sections and their fields follow. Returns a summary of what was created and any per-piece failures.")
                 .inputSchema(Schemas.object(properties, List.of("name", "collectionName", "sections")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

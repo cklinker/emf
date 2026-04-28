@@ -4,6 +4,7 @@ import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -64,8 +65,10 @@ public class CreateCollectionTool implements AdminTool {
 
         Tool tool = Tool.builder()
                 .name("create_collection")
+                .title("Create Collection")
                 .description("Create a new collection definition, optionally with an initial set of fields. The collection is created first; each field is then created in order. Returns a summary with the new collection id and per-field success/failure.")
                 .inputSchema(Schemas.object(properties, List.of("name")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

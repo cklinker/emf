@@ -6,6 +6,8 @@ import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.UserTool;
 import io.kelta.mcp.transport.KeltaMcpController;
 import io.modelcontextprotocol.server.McpSyncServer;
+import io.modelcontextprotocol.spec.McpSchema.Tool;
+import io.modelcontextprotocol.spec.McpSchema.ToolAnnotations;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -13,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -133,6 +136,86 @@ class McpApplicationTest {
                 "create_flow",
                 "update_flow",
                 "import_api_spec");
+    }
+
+    @Test
+    void everyToolHasTitleAndAnnotations() {
+        // Every tool, user-side and admin-side, must publish a friendly title
+        // and the standard MCP safety hints. This pushes clients toward the
+        // right UX (preload safe reads, confirm destructive writes) and prevents
+        // a future tool from shipping with a blank annotations record.
+        List<Tool> all = java.util.stream.Stream.concat(
+                        userTools.stream().map(t -> t.toSpecification().tool()),
+                        adminTools.stream().map(t -> t.toSpecification().tool()))
+                .toList();
+
+        for (Tool t : all) {
+            assertThat(t.title())
+                    .as("tool %s must have a friendly title", t.name())
+                    .isNotBlank();
+            ToolAnnotations a = t.annotations();
+            assertThat(a)
+                    .as("tool %s must declare annotations", t.name())
+                    .isNotNull();
+            assertThat(a.openWorldHint())
+                    .as("tool %s must mark openWorldHint=true (calls the gateway)", t.name())
+                    .isTrue();
+            assertThat(a.readOnlyHint())
+                    .as("tool %s must declare readOnlyHint", t.name())
+                    .isNotNull();
+        }
+    }
+
+    @Test
+    void readToolsAreMarkedReadOnly() {
+        // Pinned by name so a future tool that switches kind without updating
+        // its hints fails this test loud and clear instead of silently
+        // misleading the client.
+        Set<String> readOnlyTools = Set.of(
+                "list_collections", "get_collection_schema", "query_collection",
+                "get_record", "search", "describe_api", "get_flow_run",
+                "list_approvals");
+        for (UserTool ut : userTools) {
+            Tool t = ut.toSpecification().tool();
+            if (!readOnlyTools.contains(t.name())) continue;
+            assertThat(t.annotations().readOnlyHint())
+                    .as("user tool %s should be read-only", t.name())
+                    .isTrue();
+            assertThat(t.annotations().idempotentHint())
+                    .as("user tool %s should be idempotent (read-only is always idempotent)", t.name())
+                    .isTrue();
+        }
+        // Shared admin-side reads.
+        for (AdminTool at : adminTools) {
+            Tool t = at.toSpecification().tool();
+            if (!Set.of("list_collections", "get_collection_schema").contains(t.name())) continue;
+            assertThat(t.annotations().readOnlyHint())
+                    .as("admin tool %s should be read-only", t.name())
+                    .isTrue();
+        }
+    }
+
+    @Test
+    void destructiveWritesAreMarkedDestructive() {
+        // Hard pin: tools that delete or overwrite must surface destructiveHint=true
+        // so clients can prompt for confirmation. Adding a destructive tool
+        // without flagging it here is a real safety regression — fail loud.
+        Set<String> destructive = Set.of(
+                "update_record", "delete_record", "bulk_apply",
+                "update_collection", "update_field", "remove_field",
+                "update_layout", "delete_layout", "update_flow");
+        for (UserTool ut : userTools) {
+            Tool t = ut.toSpecification().tool();
+            if (!destructive.contains(t.name())) continue;
+            assertThat(t.annotations().readOnlyHint()).as("%s readOnlyHint=false", t.name()).isFalse();
+            assertThat(t.annotations().destructiveHint()).as("%s destructiveHint=true", t.name()).isTrue();
+        }
+        for (AdminTool at : adminTools) {
+            Tool t = at.toSpecification().tool();
+            if (!destructive.contains(t.name())) continue;
+            assertThat(t.annotations().readOnlyHint()).as("%s readOnlyHint=false", t.name()).isFalse();
+            assertThat(t.annotations().destructiveHint()).as("%s destructiveHint=true", t.name()).isTrue();
+        }
     }
 
     @Test

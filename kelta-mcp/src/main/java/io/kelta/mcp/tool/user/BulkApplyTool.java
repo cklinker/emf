@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -46,8 +47,10 @@ public class BulkApplyTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("bulk_apply")
+                .title("Bulk Apply")
                 .description("Apply multiple record changes atomically via /api/_atomic. All operations succeed together or none do. Use this for multi-record changes that must roll back as a unit (e.g. moving line items between orders, rewiring relationships).")
                 .inputSchema(Schemas.object(properties, List.of("operations")))
+                .annotations(ToolHints.write(true, false))
                 .build();
 
         return SyncToolSpecification.builder()

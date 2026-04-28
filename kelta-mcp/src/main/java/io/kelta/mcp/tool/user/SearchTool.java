@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -33,8 +34,10 @@ public class SearchTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("search")
+                .title("Search")
                 .description("Cross-collection full-text search. Returns hits with collection name, record id, and matched snippet. Useful when you don't know which collection holds the answer.")
                 .inputSchema(Schemas.object(properties, List.of("query")))
+                .annotations(ToolHints.read())
                 .build();
 
         return SyncToolSpecification.builder()

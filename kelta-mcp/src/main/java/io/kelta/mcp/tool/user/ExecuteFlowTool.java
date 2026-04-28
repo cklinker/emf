@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -34,8 +35,10 @@ public class ExecuteFlowTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("execute_flow")
+                .title("Execute Flow")
                 .description("Trigger a flow execution. Returns the execution id; use get_flow_run to poll status.")
                 .inputSchema(Schemas.object(properties, List.of("flowId")))
+                .annotations(ToolHints.write(false, false))
                 .build();
 
         return SyncToolSpecification.builder()

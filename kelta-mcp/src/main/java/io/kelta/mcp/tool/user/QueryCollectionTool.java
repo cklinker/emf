@@ -3,6 +3,7 @@ package io.kelta.mcp.tool.user;
 import io.kelta.mcp.client.GatewayHttpClient;
 import io.kelta.mcp.error.McpErrorMapper;
 import io.kelta.mcp.tool.Schemas;
+import io.kelta.mcp.tool.ToolHints;
 import io.kelta.mcp.tool.UserTool;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -79,6 +80,7 @@ public class QueryCollectionTool implements UserTool {
 
         Tool tool = Tool.builder()
                 .name("query_collection")
+                .title("Query Collection")
                 .description("""
                         List records from a Kelta collection (GET /api/{collection}). For one \
                         record by id use `get_record`; for full-text use `search`; for field \
@@ -108,6 +110,7 @@ public class QueryCollectionTool implements UserTool {
                             "pageSize": 25 }
                         """)
                 .inputSchema(Schemas.object(properties, List.of("collection")))
+                .annotations(ToolHints.read())
                 .build();
 
         return SyncToolSpecification.builder()

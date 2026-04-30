@@ -1,5 +1,8 @@
 package io.kelta.runtime.datapath;
 
+import io.kelta.runtime.formula.BuiltInFunctions;
+import io.kelta.runtime.formula.FormulaEvaluator;
+import io.kelta.runtime.formula.FormulaFunction;
 import io.kelta.runtime.model.*;
 import io.kelta.runtime.query.QueryEngine;
 import org.junit.jupiter.api.BeforeEach;
@@ -163,6 +166,100 @@ class MergeFieldRendererTest {
                 "Status: {{ status }}", record, ordersCollection);
 
             assertEquals("Status: Done", result);
+        }
+    }
+
+    @Nested
+    @DisplayName("Formula function support")
+    class FormulaFunctionTests {
+
+        private MergeFieldRenderer formulaRenderer;
+
+        @BeforeEach
+        void setUpFormulaRenderer() {
+            List<FormulaFunction> functions = List.of(
+                new BuiltInFunctions.Upper(),
+                new BuiltInFunctions.Lower(),
+                new BuiltInFunctions.Text(),
+                new BuiltInFunctions.If(),
+                new BuiltInFunctions.IsBlank(),
+                new BuiltInFunctions.BlankValue(),
+                new BuiltInFunctions.Len()
+            );
+            FormulaEvaluator evaluator = new FormulaEvaluator(functions);
+            formulaRenderer = new MergeFieldRenderer(pathResolver, evaluator);
+        }
+
+        @Test
+        @DisplayName("Should evaluate single-arg function over a field reference")
+        void shouldEvaluateUpperOverField() {
+            Map<String, Object> record = Map.of("status", "shipped");
+
+            String result = formulaRenderer.render(
+                "Status: {{UPPER(status)}}", record, ordersCollection);
+
+            assertEquals("Status: SHIPPED", result);
+        }
+
+        @Test
+        @DisplayName("Should evaluate IF with literal arguments")
+        void shouldEvaluateIfWithLiterals() {
+            Map<String, Object> record = new HashMap<>();
+            record.put("total", 250.0);
+
+            String result = formulaRenderer.render(
+                "Tier: {{IF(total > 100, \"premium\", \"standard\")}}",
+                record, ordersCollection);
+
+            assertEquals("Tier: premium", result);
+        }
+
+        @Test
+        @DisplayName("Should fall back to data path when expression has no parens")
+        void shouldFallBackForBareField() {
+            Map<String, Object> record = Map.of("status", "Approved");
+
+            String result = formulaRenderer.render(
+                "Order is {{status}}", record, ordersCollection);
+
+            assertEquals("Order is Approved", result);
+        }
+
+        @Test
+        @DisplayName("Should mix bare paths and function calls in one template")
+        void shouldMixBareAndFunctionTags() {
+            Map<String, Object> record = Map.of("status", "shipped", "total", 50.0);
+
+            String result = formulaRenderer.render(
+                "Order {{status}} → {{UPPER(status)}} (LEN={{LEN(status)}})",
+                record, ordersCollection);
+
+            assertEquals("Order shipped → SHIPPED (LEN=7)", result);
+        }
+
+        @Test
+        @DisplayName("Should replace failing function calls with empty string")
+        void shouldSwallowFunctionErrors() {
+            Map<String, Object> record = new HashMap<>();
+
+            String result = formulaRenderer.render(
+                "[{{UNKNOWN_FUNCTION(1)}}]", record, ordersCollection);
+
+            assertEquals("[]", result);
+        }
+
+        @Test
+        @DisplayName("Should treat function calls as data paths when evaluator absent")
+        void shouldFallBackWithoutEvaluator() {
+            // The original two-arg constructor with null evaluator => function
+            // calls swallow into "" since DataPath cannot parse them.
+            MergeFieldRenderer noFnRenderer = new MergeFieldRenderer(pathResolver, null);
+            Map<String, Object> record = Map.of("status", "shipped");
+
+            String result = noFnRenderer.render(
+                "Status: {{UPPER(status)}}", record, ordersCollection);
+
+            assertEquals("Status: ", result);
         }
     }
 }

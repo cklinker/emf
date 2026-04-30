@@ -624,12 +624,18 @@ function EmailTemplateForm({
                   }}
                 />
               </div>
-              <div className="flex-1 overflow-hidden rounded-md border border-border bg-background">
+              <div className="min-h-[320px] flex-1 overflow-hidden rounded-md border border-border bg-white">
                 <iframe
                   title="Email body preview"
                   sandbox=""
-                  srcDoc={`<!doctype html><html><head><style>
-                    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px; color: #111; }
+                  srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>
+                    :root { color-scheme: light; }
+                    html, body { background: #ffffff; }
+                    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px; color: #111; margin: 0; line-height: 1.5; }
+                    body > *:first-child { margin-top: 0; }
+                    p { margin: 0 0 0.75em; }
+                    h1, h2, h3 { color: #111; margin: 1em 0 0.5em; }
+                    a { color: #2563eb; }
                     [data-merge-tag] { display: inline-block; border-radius: 4px; background: rgba(99,102,241,0.15); color: #4338ca; padding: 0 4px; font-family: ui-monospace, monospace; font-size: 0.9em; }
                   </style></head><body>${previewHtml}</body></html>`}
                   className="h-full w-full"

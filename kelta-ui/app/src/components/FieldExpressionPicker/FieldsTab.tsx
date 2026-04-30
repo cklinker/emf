@@ -5,11 +5,19 @@ import {
   type FieldDefinition,
   type FieldType,
 } from '../../hooks/useCollectionSchema'
+import { useCollectionStore } from '../../context/CollectionStoreContext'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { StaticNamespace } from './types'
 
 const RELATIONSHIP_TYPES: ReadonlySet<FieldType> = new Set(['reference', 'lookup', 'master_detail'])
+
+/**
+ * Encoding marker for inbound (child) relationships. The picker emits paths
+ * like `order_lines__order_id.product_id` for child traversals; this marker
+ * keeps the segment shape unambiguous from a normal field name.
+ */
+const CHILD_REL_SEPARATOR = '__'
 
 function isRelationshipField(field: FieldDefinition): boolean {
   return RELATIONSHIP_TYPES.has(field.type) && !!field.referenceCollectionId
@@ -23,6 +31,8 @@ interface FieldRow {
   nextCollectionId?: string
   /** Set on a static-namespace root row to push that namespace's fields next. */
   namespaceName?: string
+  /** True when this row represents a child (one-to-many / inbound) relationship. */
+  isChildRelationship?: boolean
 }
 
 interface ColumnProps {
@@ -51,16 +61,42 @@ function Column({
   const { schema, fields, isLoading } = useCollectionSchema(
     !rows && collectionId ? collectionId : undefined
   )
+  // The collection store gives us every collection's schema in memory, so we
+  // can discover *inbound* (child) relationships — other collections whose
+  // fields point at this collection — without an extra API call. The picker
+  // is always rendered inside the app shell, where the provider is mounted.
+  const collectionStore = useCollectionStore()
 
   const sourceRows: FieldRow[] = useMemo(() => {
     if (rows) return rows
-    return fields.map((f) => ({
+    const fieldRows: FieldRow[] = fields.map((f) => ({
       segment: f.name,
       displayName: f.displayName ?? f.name,
       type: f.type,
       nextCollectionId: isRelationshipField(f) ? f.referenceCollectionId : undefined,
     }))
-  }, [rows, fields])
+    if (!collectionId || !collectionStore) {
+      return fieldRows
+    }
+    // Find every collection that has a field whose referenceCollectionId
+    // points at *this* collection. Each such field becomes a "child" row.
+    const childRows: FieldRow[] = []
+    for (const otherCollection of collectionStore.collections) {
+      if (otherCollection.id === collectionId) continue
+      for (const otherField of otherCollection.fields) {
+        if (otherField.referenceCollectionId !== collectionId) continue
+        childRows.push({
+          segment: `${otherCollection.name}${CHILD_REL_SEPARATOR}${otherField.name}`,
+          displayName: `${otherCollection.displayName} (via ${otherField.displayName ?? otherField.name})`,
+          type: 'list',
+          nextCollectionId: otherCollection.id,
+          isChildRelationship: true,
+        })
+      }
+    }
+    childRows.sort((a, b) => a.displayName.localeCompare(b.displayName))
+    return [...fieldRows, ...childRows]
+  }, [rows, fields, collectionId, collectionStore])
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase()
@@ -114,7 +150,14 @@ function Column({
                 data-testid={`${testId}-row-${row.segment}`}
               >
                 <span className="flex-1 truncate">{row.displayName}</span>
-                <span className="rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <span
+                  className={cn(
+                    'rounded px-1 py-0.5 text-[10px] font-medium',
+                    row.isChildRelationship
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
                   {row.type}
                 </span>
                 {cascades && <ChevronRight className="h-3 w-3 text-muted-foreground" />}

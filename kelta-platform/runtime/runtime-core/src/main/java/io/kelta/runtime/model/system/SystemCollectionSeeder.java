@@ -56,12 +56,15 @@ public class SystemCollectionSeeder {
     private static final String INSERT_FIELD = """
             INSERT INTO field (id, collection_id, name, display_name, type, required,
                                unique_constraint, indexed, default_value, constraints,
-                               field_type_config, reference_target, relationship_type,
-                               relationship_name, cascade_delete, field_order, active,
-                               column_name, immutable, track_history,
+                               field_type_config, reference_target, reference_collection_id,
+                               relationship_type, relationship_name, cascade_delete,
+                               field_order, active, column_name, immutable, track_history,
                                auto_number_sequence_name, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
+
+    private static final String SELECT_COLLECTION_ID_BY_NAME =
+            "SELECT id FROM collection WHERE name = ? AND tenant_id = ?";
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -94,8 +97,34 @@ public class SystemCollectionSeeder {
             }
         }
 
+        // Forward-referenced relationships (e.g. fields seeded before their
+        // target collection was inserted) leave `reference_collection_id` null
+        // on insert. Resolve them all in one pass once every collection has
+        // been written.
+        backfillReferenceCollectionIds();
+
         log.info("System collection seeding complete: {} created, {} updated, {} unchanged",
                 created, updated, unchanged);
+    }
+
+    private static final String BACKFILL_REFERENCE_COLLECTION_ID = """
+            UPDATE field
+            SET reference_collection_id = c.id
+            FROM collection c
+            WHERE field.reference_target = c.name
+              AND field.reference_collection_id IS NULL
+              AND field.reference_target IS NOT NULL
+            """;
+
+    private void backfillReferenceCollectionIds() {
+        try {
+            int rows = jdbcTemplate.update(BACKFILL_REFERENCE_COLLECTION_ID);
+            if (rows > 0) {
+                log.info("Backfilled reference_collection_id on {} field row(s)", rows);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to backfill reference_collection_id: {}", e.getMessage());
+        }
     }
 
     /**
@@ -214,11 +243,13 @@ public class SystemCollectionSeeder {
 
         // Reference config
         String referenceTarget = null;
+        String referenceCollectionId = null;
         String relationshipType = null;
         String relationshipName = null;
         boolean cascadeDelete = false;
         if (fieldDef.referenceConfig() != null) {
             referenceTarget = fieldDef.referenceConfig().targetCollection();
+            referenceCollectionId = lookupCollectionIdByName(referenceTarget);
             relationshipType = fieldDef.referenceConfig().relationshipType();
             relationshipName = fieldDef.referenceConfig().relationshipName();
             cascadeDelete = fieldDef.referenceConfig().cascadeDelete();
@@ -237,6 +268,7 @@ public class SystemCollectionSeeder {
                 constraintsJson,
                 fieldTypeConfigJson,
                 referenceTarget,
+                referenceCollectionId,
                 relationshipType,
                 relationshipName,
                 cascadeDelete,
@@ -248,6 +280,33 @@ public class SystemCollectionSeeder {
                 null,   // auto_number_sequence_name
                 now,
                 now);
+    }
+
+    /**
+     * Looks up the UUID of a system collection by name.
+     *
+     * <p>Used at field-insert time to populate the {@code reference_collection_id}
+     * column alongside {@code reference_target}. Returns {@code null} if the
+     * target collection has not yet been seeded — in that case a follow-up
+     * pass populates the column (see V69 migration for the pattern). System
+     * collections are seeded in {@link SystemCollectionDefinitions#all()}
+     * order, so a forward declaration that references a not-yet-seeded
+     * collection will leave this null until the next reconciliation pass.
+     */
+    private String lookupCollectionIdByName(String collectionName) {
+        if (collectionName == null || collectionName.isBlank()) {
+            return null;
+        }
+        try {
+            List<String> rows = jdbcTemplate.queryForList(
+                    SELECT_COLLECTION_ID_BY_NAME, String.class,
+                    collectionName, SYSTEM_TENANT_ID);
+            return rows.isEmpty() ? null : rows.get(0);
+        } catch (Exception e) {
+            log.debug("Could not resolve reference_collection_id for '{}': {}",
+                    collectionName, e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -277,9 +336,9 @@ public class SystemCollectionSeeder {
             case ENCRYPTED -> "string";
             case EXTERNAL_ID -> "string";
             case GEOLOCATION -> "number";
-            case REFERENCE -> "string";
-            case LOOKUP -> "string";
-            case MASTER_DETAIL -> "string";
+            case REFERENCE -> "reference";
+            case LOOKUP -> "lookup";
+            case MASTER_DETAIL -> "master_detail";
             case FORMULA -> "string";
             case ROLLUP_SUMMARY -> "string";
         };

@@ -66,11 +66,18 @@ class SystemCollectionSeederTest {
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.RICH_TEXT)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.ENCRYPTED)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.EXTERNAL_ID)).isEqualTo("string");
-            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.REFERENCE)).isEqualTo("string");
-            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.LOOKUP)).isEqualTo("string");
-            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.MASTER_DETAIL)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.FORMULA)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.ROLLUP_SUMMARY)).isEqualTo("string");
+        }
+
+        @Test
+        void shouldMapRelationshipTypesToTheirOwnNames() {
+            // Relationship fields are stored with their proper logical type so the
+            // frontend picker can recognize them as drillable. Reverse mapping in
+            // CollectionLifecycleManager.reverseMapFieldType() consumes these.
+            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.REFERENCE)).isEqualTo("reference");
+            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.LOOKUP)).isEqualTo("lookup");
+            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.MASTER_DETAIL)).isEqualTo("master_detail");
         }
 
         @Test
@@ -251,7 +258,7 @@ class SystemCollectionSeederTest {
                     contains("INSERT INTO field"),
                     any(), any(), any(), any(), any(), any(), any(), any(),
                     any(), any(), any(), any(), any(), any(), any(), any(),
-                    any(), any(), any(), any(), any(), any(), any());
+                    any(), any(), any(), any(), any(), any(), any(), any());
         }
     }
 
@@ -285,7 +292,7 @@ class SystemCollectionSeederTest {
             verify(jdbcTemplate, never()).update(contains("INSERT INTO field"),
                     any(), any(), any(), any(), any(), any(), any(), any(),
                     any(), any(), any(), any(), any(), any(), any(), any(),
-                    any(), any(), any(), any(), any(), any(), any());
+                    any(), any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -312,7 +319,7 @@ class SystemCollectionSeederTest {
             verify(jdbcTemplate, times(missingCount)).update(contains("INSERT INTO field"),
                     any(), any(), any(), any(), any(), any(), any(), any(),
                     any(), any(), any(), any(), any(), any(), any(), any(),
-                    any(), any(), any(), any(), any(), any(), any());
+                    any(), any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -418,10 +425,13 @@ class SystemCollectionSeederTest {
                 // args[11] = reference_target
                 if ("profiles".equals(args[11])) {
                     foundReferenceField = true;
-                    // args[12] = relationship_type should be "LOOKUP"
-                    assertThat(args[12]).isEqualTo("LOOKUP");
-                    // args[13] = relationship_name should be "Profile"
-                    assertThat(args[13]).isEqualTo("Profile");
+                    // args[12] = reference_collection_id (null in this mocked test —
+                    // no real `collection` rows exist, so the lookup returns null)
+                    assertThat(args[12]).isNull();
+                    // args[13] = relationship_type should be "LOOKUP"
+                    assertThat(args[13]).isEqualTo("LOOKUP");
+                    // args[14] = relationship_name should be "Profile"
+                    assertThat(args[14]).isEqualTo("Profile");
                     break;
                 }
             }
@@ -446,10 +456,11 @@ class SystemCollectionSeederTest {
 
             boolean foundMappedField = false;
             for (Object[] args : captor.getAllValues()) {
-                // args[2] = name, args[17] = column_name
+                // args[2] = name, args[18] = column_name (shifted +1 by new
+                // reference_collection_id column at index 12)
                 if ("firstName".equals(args[2])) {
                     foundMappedField = true;
-                    assertThat(args[17]).isEqualTo("first_name");
+                    assertThat(args[18]).isEqualTo("first_name");
                     break;
                 }
             }

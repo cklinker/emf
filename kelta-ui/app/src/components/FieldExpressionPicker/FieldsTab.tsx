@@ -26,15 +26,11 @@ const CHILD_REL_SEPARATOR = '__'
 /**
  * Resolves the target collection for an outgoing relationship.
  *
- * Three sources, in order of confidence:
- * 1. `referenceCollectionId` — the proper UUID set on user-defined collections.
- * 2. `referenceTarget` — the target collection *name* set on system collection
- *    LOOKUP/MASTER_DETAIL fields (which never get a UUID).
- * 3. Name-based heuristic — for plain-string FK fields like `tenantId` on
- *    system collections that have no relationship metadata at all, strip the
- *    `Id`/`_id` suffix and look for a collection whose name matches the stem
- *    or its plural. This catches the very common case where a field is
- *    structurally a foreign key but the schema didn't bother to declare it.
+ * Two sources, in order of confidence:
+ * 1. `referenceCollectionId` — the proper UUID. Set on user-defined fields and
+ *    on system fields seeded after the relationship-metadata fix landed.
+ * 2. `referenceTarget` — the target collection *name*. Defensive fallback for
+ *    legacy rows where the UUID hasn't been backfilled.
  *
  * Returns `undefined` when no candidate target collection can be found.
  */
@@ -50,22 +46,6 @@ function resolveTargetCollection(
   if (field.referenceTarget) {
     const byName = store.getCollectionByName(field.referenceTarget)
     if (byName) return byName
-  }
-  const stem = stripIdSuffix(field.name)
-  if (!stem) return undefined
-  return (
-    store.getCollectionByName(stem) ??
-    store.getCollectionByName(`${stem}s`) ??
-    store.getCollectionByName(`${stem}es`) ??
-    store.collections.find((c) => c.name.toLowerCase() === stem.toLowerCase())
-  )
-}
-
-function stripIdSuffix(name: string): string | undefined {
-  if (name.endsWith('_id') && name.length > 3) return name.slice(0, -3)
-  if (name.endsWith('Id') && name.length > 2) {
-    const stem = name.slice(0, -2)
-    return stem.charAt(0).toLowerCase() + stem.slice(1)
   }
   return undefined
 }

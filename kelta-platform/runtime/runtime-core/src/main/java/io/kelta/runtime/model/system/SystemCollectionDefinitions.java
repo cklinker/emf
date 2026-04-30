@@ -182,6 +182,8 @@ public final class SystemCollectionDefinitions {
         return systemBuilder("users", "Users", "platform_user")
             .displayFieldName("email")
             .addImmutableField("tenantId")
+            .addField(FieldDefinition.lookup("tenantId", "tenants", "Tenant")
+                .withColumnName("tenant_id"))
             .addField(FieldDefinition.requiredString("email", 320))
             .addField(FieldDefinition.string("username", 100))
             .addField(FieldDefinition.string("firstName", 100).withColumnName("first_name"))

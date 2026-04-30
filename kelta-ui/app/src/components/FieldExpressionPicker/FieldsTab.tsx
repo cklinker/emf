@@ -5,7 +5,11 @@ import {
   type FieldDefinition,
   type FieldType,
 } from '../../hooks/useCollectionSchema'
-import { useCollectionStore } from '../../context/CollectionStoreContext'
+import {
+  useCollectionStore,
+  type CollectionStoreValue,
+} from '../../context/CollectionStoreContext'
+import type { CollectionSchema } from '../../hooks/useCollectionSchema'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { StaticNamespace } from './types'
@@ -19,8 +23,55 @@ const RELATIONSHIP_TYPES: ReadonlySet<FieldType> = new Set(['reference', 'lookup
  */
 const CHILD_REL_SEPARATOR = '__'
 
-function isRelationshipField(field: FieldDefinition): boolean {
-  return RELATIONSHIP_TYPES.has(field.type) && !!field.referenceCollectionId
+/**
+ * Resolves the target collection for an outgoing relationship.
+ *
+ * Three sources, in order of confidence:
+ * 1. `referenceCollectionId` — the proper UUID set on user-defined collections.
+ * 2. `referenceTarget` — the target collection *name* set on system collection
+ *    LOOKUP/MASTER_DETAIL fields (which never get a UUID).
+ * 3. Name-based heuristic — for plain-string FK fields like `tenantId` on
+ *    system collections that have no relationship metadata at all, strip the
+ *    `Id`/`_id` suffix and look for a collection whose name matches the stem
+ *    or its plural. This catches the very common case where a field is
+ *    structurally a foreign key but the schema didn't bother to declare it.
+ *
+ * Returns `undefined` when no candidate target collection can be found.
+ */
+function resolveTargetCollection(
+  field: FieldDefinition,
+  store: CollectionStoreValue | undefined
+): CollectionSchema | undefined {
+  if (!store) return undefined
+  if (field.referenceCollectionId) {
+    const direct = store.getCollectionById(field.referenceCollectionId)
+    if (direct) return direct
+  }
+  if (field.referenceTarget) {
+    const byName = store.getCollectionByName(field.referenceTarget)
+    if (byName) return byName
+  }
+  const stem = stripIdSuffix(field.name)
+  if (!stem) return undefined
+  return (
+    store.getCollectionByName(stem) ??
+    store.getCollectionByName(`${stem}s`) ??
+    store.getCollectionByName(`${stem}es`) ??
+    store.collections.find((c) => c.name.toLowerCase() === stem.toLowerCase())
+  )
+}
+
+function stripIdSuffix(name: string): string | undefined {
+  if (name.endsWith('_id') && name.length > 3) return name.slice(0, -3)
+  if (name.endsWith('Id') && name.length > 2) {
+    const stem = name.slice(0, -2)
+    return stem.charAt(0).toLowerCase() + stem.slice(1)
+  }
+  return undefined
+}
+
+function isTypedRelationship(field: FieldDefinition): boolean {
+  return RELATIONSHIP_TYPES.has(field.type)
 }
 
 interface FieldRow {
@@ -69,22 +120,27 @@ function Column({
 
   const sourceRows: FieldRow[] = useMemo(() => {
     if (rows) return rows
-    const fieldRows: FieldRow[] = fields.map((f) => ({
-      segment: f.name,
-      displayName: f.displayName ?? f.name,
-      type: f.type,
-      nextCollectionId: isRelationshipField(f) ? f.referenceCollectionId : undefined,
-    }))
+    const fieldRows: FieldRow[] = fields.map((f) => {
+      const target = resolveTargetCollection(f, collectionStore)
+      const cascades = isTypedRelationship(f) || !!target
+      return {
+        segment: f.name,
+        displayName: f.displayName ?? f.name,
+        type: f.type,
+        nextCollectionId: cascades && target ? target.id : undefined,
+      }
+    })
     if (!collectionId || !collectionStore) {
       return fieldRows
     }
-    // Find every collection that has a field whose referenceCollectionId
-    // points at *this* collection. Each such field becomes a "child" row.
+    // Find every collection that has a field referencing *this* collection
+    // (either by UUID or by inferred name) and surface it as a child row.
     const childRows: FieldRow[] = []
     for (const otherCollection of collectionStore.collections) {
       if (otherCollection.id === collectionId) continue
       for (const otherField of otherCollection.fields) {
-        if (otherField.referenceCollectionId !== collectionId) continue
+        const target = resolveTargetCollection(otherField, collectionStore)
+        if (target?.id !== collectionId) continue
         childRows.push({
           segment: `${otherCollection.name}${CHILD_REL_SEPARATOR}${otherField.name}`,
           displayName: `${otherCollection.displayName} (via ${otherField.displayName ?? otherField.name})`,

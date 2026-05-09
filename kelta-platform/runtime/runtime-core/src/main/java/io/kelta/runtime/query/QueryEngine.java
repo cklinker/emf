@@ -2,6 +2,7 @@ package io.kelta.runtime.query;
 
 import io.kelta.runtime.model.CollectionDefinition;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -55,6 +56,23 @@ public interface QueryEngine {
      * @throws io.kelta.runtime.storage.StorageException if the query fails
      */
     QueryResult executeQuery(CollectionDefinition definition, QueryRequest request);
+
+    /**
+     * Computes one or more aggregate values over the records matching {@code filters}.
+     *
+     * <p>Validates each spec's {@code field} against the collection definition before
+     * delegating to the storage adapter. The returned map is keyed by spec alias.
+     *
+     * @param definition the collection definition
+     * @param filters    filter conditions; same semantics as {@code QueryRequest.filters()}
+     * @param specs      aggregations to compute; must be non-empty
+     * @return aggregate values keyed by alias
+     * @throws InvalidQueryException if a spec's field does not exist in the collection
+     * @throws io.kelta.runtime.storage.StorageException if the query fails
+     */
+    Map<String, Object> aggregate(CollectionDefinition definition,
+                                   List<FilterCondition> filters,
+                                   List<AggregationSpec> specs);
     
     /**
      * Gets a single record by its ID.

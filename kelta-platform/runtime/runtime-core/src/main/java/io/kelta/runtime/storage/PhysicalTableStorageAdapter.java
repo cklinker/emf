@@ -4,6 +4,7 @@ import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.model.FieldType;
+import io.kelta.runtime.query.AggregationSpec;
 import io.kelta.runtime.query.FilterCondition;
 import io.kelta.runtime.query.FilterOperator;
 import io.kelta.runtime.query.Pagination;
@@ -298,6 +299,66 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         } catch (DataAccessException e) {
             throw new StorageException("Failed to query collection: " + definition.name(), e);
         }
+    }
+
+    @Override
+    public Map<String, Object> aggregate(CollectionDefinition definition,
+                                          List<FilterCondition> filters,
+                                          List<AggregationSpec> specs) {
+        if (specs == null || specs.isEmpty()) {
+            return Map.of();
+        }
+
+        TableRef tableRef = getTableRef(definition);
+        List<Object> params = new ArrayList<>();
+
+        StringBuilder selectList = new StringBuilder();
+        for (int i = 0; i < specs.size(); i++) {
+            AggregationSpec spec = specs.get(i);
+            if (i > 0) selectList.append(", ");
+            String aliasIdent = sanitizeIdentifier(spec.alias());
+            if ("COUNT".equals(spec.function())) {
+                selectList.append("COUNT(*) AS ").append(aliasIdent);
+            } else {
+                String columnName = sanitizeIdentifier(resolveColumnName(definition, spec.field()));
+                selectList.append(spec.function()).append("(").append(columnName).append(") AS ").append(aliasIdent);
+            }
+        }
+
+        StringBuilder sql = new StringBuilder("SELECT ");
+        sql.append(selectList);
+        sql.append(" FROM ").append(tableRef.toSql());
+
+        if (filters != null && !filters.isEmpty()) {
+            sql.append(" WHERE ");
+            sql.append(buildWhereClause(filters, definition, params));
+        }
+
+        try {
+            Map<String, Object> row = jdbcTemplate.queryForMap(sql.toString(), params.toArray());
+            Map<String, Object> caseInsensitive = new HashMap<>();
+            for (Map.Entry<String, Object> e : row.entrySet()) {
+                caseInsensitive.put(e.getKey().toLowerCase(), e.getValue());
+            }
+            Map<String, Object> result = new HashMap<>();
+            for (AggregationSpec spec : specs) {
+                Object value = caseInsensitive.get(spec.alias().toLowerCase());
+                result.put(spec.alias(), normalizeAggregateValue(spec.function(), value));
+            }
+            return result;
+        } catch (DataAccessException e) {
+            throw new StorageException("Failed to aggregate collection: " + definition.name(), e);
+        }
+    }
+
+    private Object normalizeAggregateValue(String function, Object raw) {
+        if ("COUNT".equals(function)) {
+            if (raw == null) return 0L;
+            return raw instanceof Number n ? n.longValue() : Long.parseLong(raw.toString());
+        }
+        if (raw == null) return null;
+        if (raw instanceof Number n) return n.doubleValue();
+        return raw;
     }
 
     @Override

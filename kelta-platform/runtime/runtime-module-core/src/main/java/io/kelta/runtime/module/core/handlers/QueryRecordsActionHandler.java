@@ -3,7 +3,6 @@ package io.kelta.runtime.module.core.handlers;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.query.*;
 import io.kelta.runtime.registry.CollectionRegistry;
-import io.kelta.runtime.service.RollupSummaryService;
 import io.kelta.runtime.workflow.ActionContext;
 import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.ActionResult;
@@ -52,16 +51,13 @@ public class QueryRecordsActionHandler implements ActionHandler {
     private final ObjectMapper objectMapper;
     private final CollectionRegistry collectionRegistry;
     private final QueryEngine queryEngine;
-    private final RollupSummaryService rollupSummaryService;
 
     public QueryRecordsActionHandler(ObjectMapper objectMapper,
                                      CollectionRegistry collectionRegistry,
-                                     QueryEngine queryEngine,
-                                     RollupSummaryService rollupSummaryService) {
+                                     QueryEngine queryEngine) {
         this.objectMapper = objectMapper;
         this.collectionRegistry = collectionRegistry;
         this.queryEngine = queryEngine;
-        this.rollupSummaryService = rollupSummaryService;
     }
 
     @Override
@@ -75,7 +71,6 @@ public class QueryRecordsActionHandler implements ActionHandler {
             Map<String, Object> config = objectMapper.readValue(
                 context.actionConfigJson(), new TypeReference<>() {});
 
-            // 1. Resolve collection
             String targetCollectionName = (String) config.get("targetCollectionName");
             if (targetCollectionName == null || targetCollectionName.isBlank()) {
                 return ActionResult.failure("targetCollectionName is required");
@@ -86,42 +81,31 @@ public class QueryRecordsActionHandler implements ActionHandler {
                 return ActionResult.failure("Collection not found: " + targetCollectionName);
             }
 
-            // 2. Build filters
             List<FilterCondition> filters = buildFilters(config);
-
-            // 3. Build sorting
             List<SortField> sorting = buildSorting(config);
 
-            // 4. Build pagination
             int pageSize = config.containsKey("pageSize")
                 ? ((Number) config.get("pageSize")).intValue()
                 : 200;
             Pagination pagination = new Pagination(1, pageSize);
 
-            // 5. Execute query
             QueryRequest request = new QueryRequest(pagination, sorting, List.of(), filters);
             QueryResult queryResult = queryEngine.executeQuery(targetCollection, request);
 
-            // 6. Build output
             Map<String, Object> output = new LinkedHashMap<>();
             output.put("records", queryResult.data());
             output.put("totalCount", queryResult.metadata().totalCount());
 
-            // 7. Compute aggregations if requested
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> aggregations =
-                (List<Map<String, Object>>) config.get("aggregations");
-
-            if (aggregations != null && !aggregations.isEmpty()
-                    && rollupSummaryService != null) {
-                Map<String, Object> aggResults = computeAggregations(
-                    targetCollection, filters, aggregations);
+            List<AggregationSpec> aggregationSpecs = buildAggregationSpecs(config);
+            if (!aggregationSpecs.isEmpty()) {
+                Map<String, Object> aggResults = queryEngine.aggregate(
+                    targetCollection, filters, aggregationSpecs);
                 output.put("aggregations", aggResults);
             }
 
             log.info("Query records: collection={}, filters={}, records={}, aggregations={}",
                 targetCollectionName, filters.size(), queryResult.data().size(),
-                aggregations != null ? aggregations.size() : 0);
+                aggregationSpecs.size());
 
             return ActionResult.success(output);
         } catch (Exception e) {
@@ -139,6 +123,7 @@ public class QueryRecordsActionHandler implements ActionHandler {
             if (config.get("targetCollectionName") == null) {
                 throw new IllegalArgumentException("Config must contain 'targetCollectionName'");
             }
+            buildAggregationSpecs(config);
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
@@ -204,70 +189,21 @@ public class QueryRecordsActionHandler implements ActionHandler {
         return sorting;
     }
 
-    private Map<String, Object> computeAggregations(
-            CollectionDefinition collection,
-            List<FilterCondition> filters,
-            List<Map<String, Object>> aggregations) {
-
-        Map<String, Object> results = new LinkedHashMap<>();
-        String tableName = collection.storageConfig().tableName();
-
-        // For aggregations, we need a filter field and value to pass to RollupSummaryService.
-        // If we have filters, use the first one as the grouping constraint.
-        // If no filters, compute against all records (use a dummy always-true condition).
-        String filterField = null;
-        String filterValue = null;
-        Map<String, Object> additionalFilter = null;
-
-        if (!filters.isEmpty()) {
-            FilterCondition primaryFilter = filters.get(0);
-            filterField = primaryFilter.fieldName();
-            filterValue = primaryFilter.value() != null ? primaryFilter.value().toString() : null;
-
-            // Any additional filters beyond the first one
-            if (filters.size() > 1) {
-                additionalFilter = new LinkedHashMap<>();
-                for (int i = 1; i < filters.size(); i++) {
-                    FilterCondition fc = filters.get(i);
-                    additionalFilter.put(fc.fieldName(),
-                        fc.value() != null ? fc.value().toString() : null);
-                }
-            }
+    @SuppressWarnings("unchecked")
+    private List<AggregationSpec> buildAggregationSpecs(Map<String, Object> config) {
+        List<Map<String, Object>> raw =
+            (List<Map<String, Object>>) config.get("aggregations");
+        if (raw == null || raw.isEmpty()) {
+            return List.of();
         }
 
-        for (Map<String, Object> agg : aggregations) {
+        List<AggregationSpec> specs = new ArrayList<>(raw.size());
+        for (Map<String, Object> agg : raw) {
             String function = (String) agg.get("function");
             String field = (String) agg.get("field");
             String alias = (String) agg.get("alias");
-
-            if (function == null || alias == null) continue;
-
-            try {
-                Object value;
-                if (filterField != null && filterValue != null) {
-                    value = rollupSummaryService.compute(
-                        tableName, filterField, filterValue,
-                        function.toUpperCase(), field, additionalFilter);
-                } else {
-                    // No filter — compute aggregate over all records using a sentinel
-                    // Use tenant_id or a similar always-present field if available
-                    // For now, we'll fall back to 0 for count and null for others
-                    value = function.equalsIgnoreCase("COUNT") ? 0L : null;
-                }
-
-                // Ensure numeric types are consistent
-                if (value == null) {
-                    value = function.equalsIgnoreCase("COUNT") ? 0L : 0.0;
-                }
-
-                results.put(alias, value);
-            } catch (Exception e) {
-                log.warn("Failed to compute aggregation {} for alias '{}': {}",
-                    function, alias, e.getMessage());
-                results.put(alias, function.equalsIgnoreCase("COUNT") ? 0L : 0.0);
-            }
+            specs.add(new AggregationSpec(function, field, alias));
         }
-
-        return results;
+        return specs;
     }
 }

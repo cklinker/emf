@@ -4,6 +4,7 @@ import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.model.FieldType;
 import io.kelta.runtime.model.StorageConfig;
+import io.kelta.runtime.query.AggregationSpec;
 import io.kelta.runtime.query.FilterCondition;
 import io.kelta.runtime.query.FilterOperator;
 import io.kelta.runtime.query.Pagination;
@@ -801,6 +802,101 @@ class PhysicalTableStorageAdapterTest {
             
             assertEquals(1, result.data().size()); // Only Banana has a description
             assertEquals("Banana", result.data().get(0).get("NAME"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Aggregate Tests")
+    class AggregateTests {
+
+        @BeforeEach
+        void initTableAndData() {
+            adapter.initializeCollection(testCollection);
+            insertRow("1", "Apple",      1.99, 100, true,  "SKU001");
+            insertRow("2", "Banana",     0.99, 200, true,  "SKU002");
+            insertRow("3", "Cherry",     3.99,  50, false, "SKU003");
+            insertRow("4", "Date",       5.99,  30, true,  "SKU004");
+            insertRow("5", "Elderberry", 7.99,  10, false, "SKU005");
+        }
+
+        private void insertRow(String id, String name, double price, int quantity,
+                               boolean active, String sku) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", id);
+            data.put("name", name);
+            data.put("price", price);
+            data.put("quantity", quantity);
+            data.put("active", active);
+            data.put("sku", sku);
+            data.put("createdAt", Instant.now());
+            data.put("updatedAt", Instant.now());
+            adapter.create(testCollection, data);
+        }
+
+        @Test
+        @DisplayName("SUM + COUNT with no filters covers all rows")
+        void sumAndCountAll() {
+            Map<String, Object> result = adapter.aggregate(
+                testCollection,
+                List.of(),
+                List.of(
+                    new AggregationSpec("SUM", "price", "total_price"),
+                    new AggregationSpec("COUNT", null, "total_count")
+                )
+            );
+
+            assertEquals(20.95, ((Number) result.get("total_price")).doubleValue(), 0.001);
+            assertEquals(5L, result.get("total_count"));
+        }
+
+        @Test
+        @DisplayName("Aggregations honour filter conditions")
+        void aggregationsRespectFilters() {
+            Map<String, Object> result = adapter.aggregate(
+                testCollection,
+                List.of(new FilterCondition("active", FilterOperator.EQ, true)),
+                List.of(
+                    new AggregationSpec("SUM", "quantity", "total_qty"),
+                    new AggregationSpec("COUNT", null, "active_count")
+                )
+            );
+
+            assertEquals(330.0, ((Number) result.get("total_qty")).doubleValue(), 0.001);
+            assertEquals(3L, result.get("active_count"));
+        }
+
+        @Test
+        @DisplayName("Empty match returns zero COUNT and null SUM normalised")
+        void emptyMatchYieldsZeros() {
+            Map<String, Object> result = adapter.aggregate(
+                testCollection,
+                List.of(new FilterCondition("name", FilterOperator.EQ, "no-such-fruit")),
+                List.of(
+                    new AggregationSpec("SUM", "price", "total"),
+                    new AggregationSpec("COUNT", null, "count")
+                )
+            );
+
+            assertEquals(0L, result.get("count"));
+            assertNull(result.get("total"));
+        }
+
+        @Test
+        @DisplayName("MIN, MAX, AVG produce expected scalars")
+        void minMaxAvg() {
+            Map<String, Object> result = adapter.aggregate(
+                testCollection,
+                List.of(),
+                List.of(
+                    new AggregationSpec("MIN", "price", "min_price"),
+                    new AggregationSpec("MAX", "price", "max_price"),
+                    new AggregationSpec("AVG", "price", "avg_price")
+                )
+            );
+
+            assertEquals(0.99, ((Number) result.get("min_price")).doubleValue(), 0.001);
+            assertEquals(7.99, ((Number) result.get("max_price")).doubleValue(), 0.001);
+            assertEquals(4.19, ((Number) result.get("avg_price")).doubleValue(), 0.001);
         }
     }
 }

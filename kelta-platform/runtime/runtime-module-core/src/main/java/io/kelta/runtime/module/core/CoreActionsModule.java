@@ -67,16 +67,8 @@ public class CoreActionsModule implements KeltaModule {
         handlers.add(new DeleteRecordActionHandler(objectMapper, collectionRegistry));
 
         // Query handler — queries records with optional aggregations
-        var rollupService = context.getExtension(
-            io.kelta.runtime.service.RollupSummaryService.class);
-        if (rollupService != null) {
-            handlers.add(new QueryRecordsActionHandler(
-                objectMapper, collectionRegistry, queryEngine, rollupService));
-        } else {
-            // Register without aggregation support — queries still work
-            handlers.add(new QueryRecordsActionHandler(
-                objectMapper, collectionRegistry, queryEngine, null));
-        }
+        handlers.add(new QueryRecordsActionHandler(
+            objectMapper, collectionRegistry, queryEngine));
 
         // Handler needing FormulaEvaluator + ActionHandlerRegistry
         handlers.add(new DecisionActionHandler(

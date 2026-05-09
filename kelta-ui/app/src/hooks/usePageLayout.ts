@@ -208,10 +208,22 @@ export function usePageLayout(
           })
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-        // Extract field placements and group by sectionId
+        // Extract field placements and group by sectionId.
+        // Backend serializes the boolean toggles with their `is*` Java field
+        // names (`isRequiredOnLayout`, `isReadOnlyOnLayout`); normalize to the
+        // unprefixed names the renderer + DTO consumers expect.
         const fieldPlacements = included
           .filter((r) => r.type === 'layout-fields')
-          .map((r) => flatten(r) as unknown as LayoutFieldPlacementDto & { sectionId: string })
+          .map((r) => {
+            const flat = flatten(r) as Record<string, unknown>
+            if ('isRequiredOnLayout' in flat && !('requiredOnLayout' in flat)) {
+              flat.requiredOnLayout = flat.isRequiredOnLayout
+            }
+            if ('isReadOnlyOnLayout' in flat && !('readOnlyOnLayout' in flat)) {
+              flat.readOnlyOnLayout = flat.isReadOnlyOnLayout
+            }
+            return flat as unknown as LayoutFieldPlacementDto & { sectionId: string }
+          })
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
         const fieldsBySection = new Map<string, LayoutFieldPlacementDto[]>()

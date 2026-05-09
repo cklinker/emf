@@ -8,9 +8,14 @@
  * picklists, lookups, custom renderers) is reused unchanged.
  *
  * Layout-level overrides applied:
- * - labelOverride → replaces displayName for the form label
- * - readOnlyOnLayout → disables the field input
- * - requiredOnLayout → adds required indicator even if schema says optional
+ * - labelOverride        → replaces displayName for the form label
+ * - requiredOnLayout     → marks the field required even if schema says optional
+ * - readOnlyOnLayout     → exposed on the resolved field as `readOnly`; consumers
+ *                          either honor it directly or rely on the wrapping
+ *                          <fieldset disabled> emitted by this component
+ * - helpTextOverride     → renders as a small muted line under each field
+ * - columnSpan           → applies inline `gridColumn: span N` to the field cell
+ * - visibilityRule       → filters fields and sections per record (when supplied)
  */
 
 import React, { useState, useMemo } from 'react'
@@ -18,6 +23,7 @@ import { ChevronDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
+import { isVisible } from '@kelta/components'
 import type { LayoutSectionDto, LayoutFieldPlacementDto } from '@/hooks/usePageLayout'
 
 export interface LayoutFormFieldDefinition {
@@ -26,6 +32,9 @@ export interface LayoutFormFieldDefinition {
   displayName?: string
   type: string
   required: boolean
+  readOnly?: boolean
+  helpText?: string
+  columnSpan?: number
   [key: string]: unknown
 }
 
@@ -36,6 +45,16 @@ export interface LayoutFormSectionsProps {
   schemaFields: LayoutFormFieldDefinition[]
   /** Render callback for a single form field — reuses the parent's renderField */
   renderField: (field: LayoutFormFieldDefinition, index: number) => React.ReactNode
+  /**
+   * Optional record values used for visibility-rule evaluation. When omitted
+   * (e.g. create form with no values yet), all visibility rules pass.
+   */
+  record?: Record<string, unknown>
+}
+
+interface ResolvedField {
+  field: LayoutFormFieldDefinition
+  placement: LayoutFieldPlacementDto
 }
 
 /**
@@ -48,11 +67,15 @@ function resolvePlacements(
   placements: LayoutFieldPlacementDto[],
   fieldsByName: Map<string, LayoutFormFieldDefinition>,
   fieldsById: Map<string, LayoutFormFieldDefinition>,
-  columns: number
-): LayoutFormFieldDefinition[] {
-  // Group placements by column, sorted within each column by sortOrder
+  columns: number,
+  record: Record<string, unknown> | undefined
+): ResolvedField[] {
+  const visiblePlacements = record
+    ? placements.filter((p) => isVisible(p.visibilityRule, record))
+    : placements
+
   const columnGroups: LayoutFieldPlacementDto[][] = Array.from({ length: columns }, () => [])
-  for (const p of placements) {
+  for (const p of visiblePlacements) {
     const col = Math.min(p.columnNumber, columns - 1)
     columnGroups[col].push(p)
   }
@@ -60,7 +83,6 @@ function resolvePlacements(
     group.sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
-  // Interleave row-by-row across columns for CSS grid auto-placement
   const interleaved: LayoutFieldPlacementDto[] = []
   const maxRows = Math.max(...columnGroups.map((g) => g.length), 0)
   for (let row = 0; row < maxRows; row++) {
@@ -76,30 +98,34 @@ function resolvePlacements(
       const schemaField = fieldsById.get(placement.fieldId) || fieldsByName.get(placement.fieldName)
       if (!schemaField) return null
 
-      return {
+      const resolved: LayoutFormFieldDefinition = {
         ...schemaField,
         displayName: placement.labelOverride || schemaField.displayName || schemaField.name,
         required: placement.requiredOnLayout || schemaField.required,
+        readOnly: placement.readOnlyOnLayout || schemaField.readOnly,
+        helpText: placement.helpTextOverride || schemaField.helpText,
+        columnSpan: placement.columnSpan ?? 1,
       }
+      return { field: resolved, placement }
     })
-    .filter((f): f is LayoutFormFieldDefinition => f !== null)
+    .filter((f): f is ResolvedField => f !== null)
 }
 
 function FormSection({
   section,
-  fields,
+  resolved,
   renderField,
   startIndex,
 }: {
   section: LayoutSectionDto
-  fields: LayoutFormFieldDefinition[]
+  resolved: ResolvedField[]
   renderField: (field: LayoutFormFieldDefinition, index: number) => React.ReactNode
   startIndex: number
 }) {
   const [isOpen, setIsOpen] = useState(!section.collapsed)
   const columns = (section.columns as 1 | 2 | 3) || 1
 
-  if (fields.length === 0) return null
+  if (resolved.length === 0) return null
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -116,7 +142,7 @@ function FormSection({
               />
               {section.heading || 'Details'}
               <span className="text-xs font-normal text-muted-foreground">
-                ({fields.length} field{fields.length !== 1 ? 's' : ''})
+                ({resolved.length} field{resolved.length !== 1 ? 's' : ''})
               </span>
             </CardTitle>
           </CardHeader>
@@ -131,7 +157,33 @@ function FormSection({
                 columns >= 3 && 'md:grid-cols-2 lg:grid-cols-3'
               )}
             >
-              {fields.map((field, i) => renderField(field, startIndex + i))}
+              {resolved.map(({ field }, i) => {
+                const span = Math.min(field.columnSpan ?? 1, columns)
+                const cellStyle = span > 1 ? { gridColumn: `span ${span}` } : undefined
+                return (
+                  <div
+                    key={field.id}
+                    style={cellStyle}
+                    data-testid={`layout-field-cell-${field.name}`}
+                  >
+                    {/* fieldset[disabled] disables every nested form control natively */}
+                    <fieldset
+                      disabled={!!field.readOnly}
+                      className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0"
+                    >
+                      {renderField(field, startIndex + i)}
+                      {field.helpText && (
+                        <p
+                          className="mt-1 text-xs text-muted-foreground"
+                          data-testid={`layout-field-help-${field.name}`}
+                        >
+                          {field.helpText}
+                        </p>
+                      )}
+                    </fieldset>
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </CollapsibleContent>
@@ -144,6 +196,7 @@ export function LayoutFormSections({
   sections,
   schemaFields,
   renderField,
+  record,
 }: LayoutFormSectionsProps): React.ReactElement {
   const { fieldsByName, fieldsById } = useMemo(() => {
     const byName = new Map<string, LayoutFormFieldDefinition>()
@@ -155,34 +208,37 @@ export function LayoutFormSections({
     return { fieldsByName: byName, fieldsById: byId }
   }, [schemaFields])
 
-  // Pre-compute resolved fields and start indices for each section
   const resolvedSections = useMemo(() => {
-    const sorted = [...sections].sort((a, b) => a.sortOrder - b.sortOrder)
+    const visibleSections = record
+      ? sections.filter((s) => isVisible(s.visibilityRule, record))
+      : sections
+    const sorted = [...visibleSections].sort((a, b) => a.sortOrder - b.sortOrder)
     const result: {
       section: LayoutSectionDto
-      fields: LayoutFormFieldDefinition[]
+      resolved: ResolvedField[]
       startIndex: number
     }[] = []
     sorted.reduce((acc, section) => {
-      const fields = resolvePlacements(
+      const resolved = resolvePlacements(
         section.fields,
         fieldsByName,
         fieldsById,
-        section.columns || 1
+        section.columns || 1,
+        record
       )
-      result.push({ section, fields, startIndex: acc })
-      return acc + fields.length
+      result.push({ section, resolved, startIndex: acc })
+      return acc + resolved.length
     }, 0)
     return result
-  }, [sections, fieldsByName, fieldsById])
+  }, [sections, fieldsByName, fieldsById, record])
 
   return (
     <div className="flex flex-col gap-4">
-      {resolvedSections.map(({ section, fields, startIndex }) => (
+      {resolvedSections.map(({ section, resolved, startIndex }) => (
         <FormSection
           key={section.id}
           section={section}
-          fields={fields}
+          resolved={resolved}
           renderField={renderField}
           startIndex={startIndex}
         />

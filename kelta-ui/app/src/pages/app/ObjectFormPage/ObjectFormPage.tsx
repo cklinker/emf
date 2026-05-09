@@ -601,15 +601,17 @@ function ObjectFormBody({
           <LayoutFormSections
             sections={layout.sections}
             schemaFields={displayFields}
+            record={formData}
             renderField={(field) => {
               const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
+              const layoutReadOnly = !!field.readOnly
               return (
                 <FormField
                   key={field.name}
                   field={field as FieldDefinition}
                   value={formData[field.name]}
-                  onChange={fieldIsEditable ? handleFieldChange : () => {}}
-                  readOnly={!fieldIsEditable}
+                  onChange={fieldIsEditable && !layoutReadOnly ? handleFieldChange : () => {}}
+                  readOnly={!fieldIsEditable || layoutReadOnly}
                   error={formErrors[field.name]}
                   pluginRenderer={getFieldRenderer(field.type)}
                 />

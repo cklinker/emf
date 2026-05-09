@@ -168,6 +168,12 @@ public class FlowConfig {
     }
 
     @Bean
+    public org.springframework.transaction.support.TransactionTemplate flowTransactionTemplate(
+            org.springframework.transaction.PlatformTransactionManager txManager) {
+        return new org.springframework.transaction.support.TransactionTemplate(txManager);
+    }
+
+    @Bean
     public ScriptExecutor scriptExecutor(
             @Value("${kelta.script.timeout-seconds:30}") int timeoutSeconds) {
         return new GraalVmScriptExecutor(timeoutSeconds);
@@ -183,6 +189,8 @@ public class FlowConfig {
                                           ObjectMapper objectMapper,
                                           FlowEngine flowEngine,
                                           RollupSummaryService rollupSummaryService,
+                                          JdbcTemplate jdbcTemplate,
+                                          org.springframework.transaction.support.TransactionTemplate transactionTemplate,
                                           @Autowired(required = false) EmailService emailService,
                                           @Autowired(required = false) ScriptExecutor scriptExecutor,
                                           @Autowired(required = false)
@@ -194,9 +202,12 @@ public class FlowConfig {
         ModuleRegistry registry = new ModuleRegistry(actionHandlerRegistry, beforeSaveHookRegistry);
 
         if (discoveredModules != null && !discoveredModules.isEmpty()) {
-            var extensions = new java.util.HashMap<>(Map.of(
-                    FlowEngine.class, (Object) flowEngine,
-                    RollupSummaryService.class, (Object) rollupSummaryService));
+            var extensions = new java.util.HashMap<Class<?>, Object>();
+            extensions.put(FlowEngine.class, flowEngine);
+            extensions.put(RollupSummaryService.class, rollupSummaryService);
+            extensions.put(JdbcTemplate.class, jdbcTemplate);
+            extensions.put(org.springframework.transaction.support.TransactionTemplate.class,
+                    transactionTemplate);
 
             if (emailService != null) {
                 extensions.put(EmailService.class, emailService);

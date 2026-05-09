@@ -35,11 +35,13 @@ class IntegrationModuleTest {
     }
 
     @Test
-    @DisplayName("Should register 7 handlers after startup")
-    void shouldRegister7HandlersAfterStartup() {
+    @DisplayName("Should register 8 handlers after startup (without JDBC extensions)")
+    void shouldRegister8HandlersAfterStartup() {
         ModuleContext context = new ModuleContext(null, null, null, new ObjectMapper());
         module.onStartup(context);
-        assertEquals(7, module.getActionHandlers().size());
+        // SQL_QUERY needs JdbcTemplate + TransactionTemplate extensions and is
+        // skipped when missing; without them the count is 8 (incl. CALL_API).
+        assertEquals(8, module.getActionHandlers().size());
     }
 
     @Test
@@ -59,6 +61,31 @@ class IntegrationModuleTest {
         assertTrue(keys.contains("DELAY"));
         assertTrue(keys.contains("EMAIL_ALERT"));
         assertTrue(keys.contains("INVOKE_SCRIPT"));
+        assertTrue(keys.contains("CALL_API"));
+    }
+
+    @Test
+    @DisplayName("Should register SQL_QUERY when JdbcTemplate + TransactionTemplate extensions are provided")
+    void shouldRegisterSqlQueryWithJdbcExtensions() {
+        org.springframework.jdbc.core.JdbcTemplate jdbc =
+            org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        org.springframework.transaction.support.TransactionTemplate tx =
+            org.mockito.Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class);
+
+        Map<Class<?>, Object> extensions = Map.of(
+            org.springframework.jdbc.core.JdbcTemplate.class, jdbc,
+            org.springframework.transaction.support.TransactionTemplate.class, tx
+        );
+        ModuleContext context = new ModuleContext(
+            null, null, null, new ObjectMapper(), null, extensions);
+        module.onStartup(context);
+
+        Set<String> keys = module.getActionHandlers().stream()
+            .map(ActionHandler::getActionTypeKey)
+            .collect(Collectors.toSet());
+
+        assertEquals(9, module.getActionHandlers().size());
+        assertTrue(keys.contains("SQL_QUERY"));
     }
 
     @Test
@@ -94,6 +121,6 @@ class IntegrationModuleTest {
         ModuleContext context = new ModuleContext(null, null, null, new ObjectMapper(), null, extensions);
         module.onStartup(context);
 
-        assertEquals(7, module.getActionHandlers().size());
+        assertEquals(8, module.getActionHandlers().size());
     }
 }

@@ -72,6 +72,14 @@ export interface RelatedListProps {
   /** Optional: number of records to show (default: 5) */
   limit?: number
   /**
+   * Optional: ordered list of field names to display as columns. When provided
+   * and non-empty, these names are resolved against the schema and rendered in
+   * the given order, exactly as configured (no system-field/FK filtering, no
+   * MAX_COLUMNS slice). When omitted or empty, falls back to the legacy
+   * "first N non-system fields" auto-discovery.
+   */
+  displayColumns?: string[]
+  /**
    * Optional: raw JSON:API response from the parent record request.
    * When provided, related records are extracted from the `included` array
    * instead of making a separate API call. This eliminates per-related-list
@@ -106,6 +114,7 @@ export function RelatedList({
   tenantSlug,
   label,
   limit = DEFAULT_LIMIT,
+  displayColumns,
   includedData,
 }: RelatedListProps): React.ReactElement {
   const navigate = useNavigate()
@@ -118,15 +127,24 @@ export function RelatedList({
   // Fetch permissions for the related collection
   const { permissions } = useObjectPermissions(collectionName)
 
-  // Determine visible columns (exclude system fields and FK field, limit to MAX_COLUMNS)
+  // Determine visible columns. When `displayColumns` is provided, render exactly
+  // those fields in that order (configured in the page layout). Otherwise fall
+  // back to the legacy auto-discovery: first MAX_COLUMNS non-system, non-id,
+  // non-FK fields.
   const visibleFields = useMemo<FieldDefinition[]>(() => {
     if (!fields.length) return []
+    if (displayColumns && displayColumns.length > 0) {
+      const byName = new Map(fields.map((f) => [f.name, f]))
+      return displayColumns
+        .map((name) => byName.get(name))
+        .filter((f): f is FieldDefinition => Boolean(f))
+    }
     return fields
       .filter((f) => !SYSTEM_FIELDS.has(f.name))
       .filter((f) => f.name !== 'id')
       .filter((f) => f.name !== foreignKeyField)
       .slice(0, MAX_COLUMNS)
-  }, [fields, foreignKeyField])
+  }, [fields, foreignKeyField, displayColumns])
 
   // Identify reference fields among visible columns for include resolution
   const referenceFields = useMemo(

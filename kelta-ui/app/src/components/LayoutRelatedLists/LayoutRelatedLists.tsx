@@ -9,6 +9,7 @@
 import React, { useMemo } from 'react'
 import { RelatedList } from '@/components/RelatedList'
 import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
+import { parseDisplayColumns } from './parseDisplayColumns'
 
 export interface LayoutRelatedListsProps {
   /** Related list configurations from the resolved page layout */
@@ -48,6 +49,7 @@ export function LayoutRelatedLists({
           parentRecordId={parentRecordId}
           tenantSlug={tenantSlug}
           limit={rl.rowLimit}
+          displayColumns={parseDisplayColumns(rl.displayColumns)}
           includedData={includedData}
         />
       ))}

@@ -53,6 +53,9 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 describe('RelatedList', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Drop any queued mockResolvedValueOnce values left over from a prior test.
+    // clearAllMocks only clears call history, not the implementation queue.
+    mockGet.mockReset()
   })
 
   it('shows empty state when no related records found', async () => {
@@ -154,6 +157,113 @@ describe('RelatedList', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Team Members')).toBeDefined()
+    })
+  })
+
+  describe('column resolution', () => {
+    function mockSchemaWith(fieldNames: string[]) {
+      // useCollectionSchema fetches `/api/collections/{name}?include=fields` and
+      // expects a JSON:API envelope; field records arrive in the `included` array.
+      mockGet.mockResolvedValueOnce({
+        data: {
+          id: 'col-1',
+          type: 'collections',
+          attributes: { name: 'contacts', displayName: 'Contacts' },
+        },
+        included: fieldNames.map((name, i) => ({
+          id: `f-${i}`,
+          type: 'fields',
+          attributes: {
+            name,
+            displayName: name,
+            type: 'STRING',
+            required: false,
+            active: true,
+            fieldOrder: i,
+          },
+        })),
+      })
+    }
+
+    function mockOneRecord(values: Record<string, unknown>) {
+      mockGet.mockResolvedValueOnce({
+        data: [{ id: 'rec-1', accountId: 'rec-123', ...values }],
+        metadata: { totalCount: 1, currentPage: 1, pageSize: 5, totalPages: 1 },
+      })
+    }
+
+    it('renders only configured displayColumns, in given order', async () => {
+      mockSchemaWith(['name', 'email', 'phone', 'title'])
+      mockOneRecord({ name: 'Ada', email: 'a@x', phone: '555', title: 'Eng' })
+
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['title', 'email']}
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Eng')).toBeDefined()
+      })
+
+      const headers = screen.getAllByRole('columnheader').map((el) => el.textContent)
+      expect(headers).toEqual(['title', 'email'])
+      // 'Ada' is the `name` field — not in displayColumns, so should NOT render
+      expect(screen.queryByText('Ada')).toBeNull()
+    })
+
+    it('falls back to first MAX_COLUMNS schema fields when displayColumns is empty', async () => {
+      mockSchemaWith(['name', 'email', 'phone', 'title', 'notes'])
+      mockOneRecord({ name: 'Ada' })
+
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={[]}
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Ada')).toBeDefined()
+      })
+
+      const headers = screen.getAllByRole('columnheader').map((el) => el.textContent)
+      expect(headers).toEqual(['name', 'email', 'phone', 'title'])
+    })
+
+    it('silently drops unknown names from displayColumns', async () => {
+      mockSchemaWith(['name', 'email'])
+      mockOneRecord({ name: 'Ada', email: 'a@x' })
+
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['ghost', 'name', 'phantom']}
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Ada')).toBeDefined()
+      })
+
+      const headers = screen.getAllByRole('columnheader').map((el) => el.textContent)
+      expect(headers).toEqual(['name'])
     })
   })
 

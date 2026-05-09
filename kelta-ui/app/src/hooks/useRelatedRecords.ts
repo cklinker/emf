@@ -25,6 +25,10 @@ export interface RelatedRecordsOptions {
   enabled?: boolean
   /** Comma-separated list of collection names to include via JSON:API ?include= */
   include?: string
+  /** Field to sort by on the related collection. Omit for backend default. */
+  sortField?: string
+  /** Sort direction. Defaults to ascending when sortField is set. */
+  sortDirection?: 'asc' | 'desc' | 'ASC' | 'DESC'
 }
 
 export interface UseRelatedRecordsReturn {
@@ -51,7 +55,9 @@ async function fetchRelatedRecords(
   foreignKeyField: string,
   parentRecordId: string,
   limit: number,
-  include?: string
+  include?: string,
+  sortField?: string,
+  sortDirection?: 'asc' | 'desc' | 'ASC' | 'DESC'
 ): Promise<{ paginated: PaginatedResponse; rawResponse: unknown }> {
   const queryParams = new URLSearchParams()
   queryParams.set('page[number]', '1')
@@ -59,6 +65,10 @@ async function fetchRelatedRecords(
   queryParams.set(`filter[${foreignKeyField}][eq]`, parentRecordId)
   if (include) {
     queryParams.set('include', include)
+  }
+  if (sortField) {
+    const desc = sortDirection?.toLowerCase() === 'desc'
+    queryParams.set('sort', desc ? `-${sortField}` : sortField)
   }
 
   const rawResponse = await apiClient.get(`/api/${collectionName}?${queryParams.toString()}`)
@@ -84,6 +94,8 @@ export function useRelatedRecords(options: RelatedRecordsOptions): UseRelatedRec
     limit = 5,
     enabled = true,
     include,
+    sortField,
+    sortDirection,
   } = options
 
   const isEnabled = !!collectionName && !!foreignKeyField && !!parentRecordId && enabled
@@ -94,7 +106,16 @@ export function useRelatedRecords(options: RelatedRecordsOptions): UseRelatedRec
     error,
     refetch,
   } = useQuery({
-    queryKey: ['related-records', collectionName, foreignKeyField, parentRecordId, limit, include],
+    queryKey: [
+      'related-records',
+      collectionName,
+      foreignKeyField,
+      parentRecordId,
+      limit,
+      include,
+      sortField,
+      sortDirection,
+    ],
     queryFn: () =>
       fetchRelatedRecords(
         apiClient,
@@ -102,7 +123,9 @@ export function useRelatedRecords(options: RelatedRecordsOptions): UseRelatedRec
         foreignKeyField!,
         parentRecordId!,
         limit,
-        include
+        include,
+        sortField,
+        sortDirection
       ),
     enabled: isEnabled,
     staleTime: 30 * 1000, // 30 seconds

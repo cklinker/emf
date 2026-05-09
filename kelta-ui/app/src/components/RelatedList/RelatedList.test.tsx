@@ -242,6 +242,89 @@ describe('RelatedList', () => {
       expect(headers).toEqual(['name', 'email', 'phone', 'title'])
     })
 
+    it('passes sortField as JSON:API sort param (asc default)', async () => {
+      mockSchemaWith(['name'])
+      mockOneRecord({ name: 'Ada' })
+
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['name']}
+            sortField="name"
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Ada')).toBeDefined()
+      })
+
+      const recordsCall = mockGet.mock.calls.find(([url]) =>
+        String(url).startsWith('/api/contacts')
+      )
+      expect(recordsCall).toBeDefined()
+      expect(String(recordsCall![0])).toContain('sort=name')
+      expect(String(recordsCall![0])).not.toContain('sort=-name')
+    })
+
+    it('prefixes sort param with - for desc direction', async () => {
+      mockSchemaWith(['name'])
+      mockOneRecord({ name: 'Ada' })
+
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['name']}
+            sortField="name"
+            sortDirection="desc"
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Ada')).toBeDefined()
+      })
+
+      const recordsCall = mockGet.mock.calls.find(([url]) =>
+        String(url).startsWith('/api/contacts')
+      )
+      expect(String(recordsCall![0])).toContain('sort=-name')
+    })
+
+    it('omits sort param when sortField is not provided', async () => {
+      mockSchemaWith(['name'])
+      mockOneRecord({ name: 'Ada' })
+
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['name']}
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Ada')).toBeDefined()
+      })
+
+      const recordsCall = mockGet.mock.calls.find(([url]) =>
+        String(url).startsWith('/api/contacts')
+      )
+      expect(String(recordsCall![0])).not.toContain('sort=')
+    })
+
     it('silently drops unknown names from displayColumns', async () => {
       mockSchemaWith(['name', 'email'])
       mockOneRecord({ name: 'Ada', email: 'a@x' })

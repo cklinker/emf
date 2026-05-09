@@ -11,6 +11,14 @@ import { RelatedList } from '@/components/RelatedList'
 import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
 import { parseDisplayColumns } from './parseDisplayColumns'
 
+/**
+ * Normalize the persisted sort direction into the lower-case form the
+ * RelatedList API uses. Anything unrecognized falls back to ascending.
+ */
+function normalizeSortDirection(raw: string | null | undefined): 'asc' | 'desc' {
+  return raw && raw.trim().toLowerCase() === 'desc' ? 'desc' : 'asc'
+}
+
 export interface LayoutRelatedListsProps {
   /** Related list configurations from the resolved page layout */
   relatedLists: LayoutRelatedListDto[]
@@ -50,6 +58,8 @@ export function LayoutRelatedLists({
           tenantSlug={tenantSlug}
           limit={rl.rowLimit}
           displayColumns={parseDisplayColumns(rl.displayColumns)}
+          sortField={rl.sortField ?? undefined}
+          sortDirection={normalizeSortDirection(rl.sortDirection)}
           includedData={includedData}
         />
       ))}

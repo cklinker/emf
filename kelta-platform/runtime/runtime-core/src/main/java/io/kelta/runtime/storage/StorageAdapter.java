@@ -1,9 +1,12 @@
 package io.kelta.runtime.storage;
 
 import io.kelta.runtime.model.CollectionDefinition;
+import io.kelta.runtime.query.AggregationSpec;
+import io.kelta.runtime.query.FilterCondition;
 import io.kelta.runtime.query.QueryRequest;
 import io.kelta.runtime.query.QueryResult;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -74,6 +77,26 @@ public interface StorageAdapter {
      * @throws StorageException if the query fails
      */
     QueryResult query(CollectionDefinition definition, QueryRequest request);
+
+    /**
+     * Computes one or more aggregate values over a filtered subset of records.
+     *
+     * <p>Builds and executes a single SQL query of the form
+     * {@code SELECT fn1(col1) AS alias1, fn2(col2) AS alias2 FROM <table> WHERE ...},
+     * reusing the same tenant schema resolution, column-name mapping, and type-coercion
+     * rules as {@link #query(CollectionDefinition, QueryRequest)}.
+     *
+     * @param definition the collection definition
+     * @param filters    filter conditions; same semantics as {@code QueryRequest.filters()}
+     * @param specs      aggregations to compute (one per output entry); must be non-empty
+     * @return a map keyed by each spec's alias, with values typed as {@code Long} for
+     *         {@code COUNT} and {@code Double} for {@code SUM}/{@code AVG}/{@code MIN}/{@code MAX}
+     *         on numeric columns; null/zero results are returned as the zero of the expected type
+     * @throws StorageException if the query fails
+     */
+    Map<String, Object> aggregate(CollectionDefinition definition,
+                                   List<FilterCondition> filters,
+                                   List<AggregationSpec> specs);
     
     /**
      * Gets a single record by its ID.

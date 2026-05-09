@@ -183,6 +183,28 @@ public class DefaultQueryEngine implements QueryEngine {
     }
     
     @Override
+    public Map<String, Object> aggregate(CollectionDefinition definition,
+                                          List<FilterCondition> filters,
+                                          List<AggregationSpec> specs) {
+        Objects.requireNonNull(definition, "definition cannot be null");
+        if (specs == null || specs.isEmpty()) {
+            return Map.of();
+        }
+
+        if (filters != null) {
+            validateFilterFields(definition, filters);
+        }
+        for (AggregationSpec spec : specs) {
+            if (spec.field() != null && !isValidField(definition, spec.field())) {
+                throw new InvalidQueryException(spec.field(),
+                    "Aggregation field does not exist in collection '" + definition.name() + "'");
+            }
+        }
+
+        return storageAdapter.aggregate(definition, filters == null ? List.of() : filters, specs);
+    }
+
+    @Override
     public Optional<Map<String, Object>> getById(CollectionDefinition definition, String id) {
         Objects.requireNonNull(definition, "definition cannot be null");
         Objects.requireNonNull(id, "id cannot be null");

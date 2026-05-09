@@ -51,7 +51,11 @@ export interface LayoutRelatedListDto {
   relatedCollectionName: string
   relationshipFieldId: string
   relationshipFieldName: string
-  displayColumns: string
+  /**
+   * JSONB-backed; can arrive as a real `string[]` or as a JSON-stringified
+   * array. Use `parseDisplayColumns()` to normalize before reading.
+   */
+  displayColumns: string | string[]
   sortField: string | null
   sortDirection: string
   rowLimit: number

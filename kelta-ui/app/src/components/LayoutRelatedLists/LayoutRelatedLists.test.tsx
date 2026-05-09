@@ -9,6 +9,20 @@ describe('parseDisplayColumns', () => {
     expect(parseDisplayColumns('   ')).toEqual([])
   })
 
+  it('returns array input as-is when JSONB deserializes to a real array', () => {
+    expect(parseDisplayColumns(['productName', 'quantity'])).toEqual(['productName', 'quantity'])
+  })
+
+  it('drops non-string entries from a real array input', () => {
+    // Cast to bypass TS — we are deliberately testing runtime resilience.
+    expect(parseDisplayColumns(['a', 1, null, 'b'] as unknown)).toEqual(['a', 'b'])
+  })
+
+  it('returns empty array when input is neither string nor array', () => {
+    expect(parseDisplayColumns(42 as unknown)).toEqual([])
+    expect(parseDisplayColumns({ foo: 'bar' } as unknown)).toEqual([])
+  })
+
   it('parses JSON-stringified array (current builder format)', () => {
     expect(parseDisplayColumns('["productName","quantity","unitPrice"]')).toEqual([
       'productName',

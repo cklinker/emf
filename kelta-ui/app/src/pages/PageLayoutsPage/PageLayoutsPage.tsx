@@ -100,8 +100,11 @@ interface ApiFieldPlacement {
   columnNumber: number
   columnSpan?: number
   sortOrder: number
-  requiredOnLayout: boolean
-  readOnlyOnLayout: boolean
+  // Backend stores these on the system collection as `isRequiredOnLayout` /
+  // `isReadOnlyOnLayout` (matches the `is_*` DB columns). The JSON:API
+  // serializer surfaces them with the same `is`-prefixed keys.
+  isRequiredOnLayout: boolean
+  isReadOnlyOnLayout: boolean
   labelOverride?: string
   helpTextOverride?: string
   visibilityRule?: string
@@ -192,8 +195,8 @@ function apiFieldToEditor(f: ApiFieldPlacement): EditorFieldPlacement {
     columnNumber: f.columnNumber,
     columnSpan: f.columnSpan,
     sortOrder: f.sortOrder,
-    requiredOnLayout: f.requiredOnLayout,
-    readOnlyOnLayout: f.readOnlyOnLayout,
+    requiredOnLayout: f.isRequiredOnLayout,
+    readOnlyOnLayout: f.isReadOnlyOnLayout,
     labelOverride: f.labelOverride,
     helpTextOverride: f.helpTextOverride,
     visibilityRule: f.visibilityRule,
@@ -697,13 +700,25 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
       }
       const desiredRelatedListIds = new Set(desiredRelatedLists.map((r) => r.id))
 
-      // Step 1: PUT parent layout with scalar attributes only
-      await apiClient.putResource(`/api/page-layouts/${layoutId}`, {
+      // Step 1: PUT parent layout only when its scalar attributes actually
+      // changed. The editor doesn't currently expose layout-level attributes
+      // for editing, so this is a near-perfect skip in practice — but the
+      // diff guards future edits, too.
+      const layoutPayload = {
         name: layoutDetail!.name,
         description: layoutDetail!.description ?? '',
         layoutType: layoutDetail!.layoutType,
         isDefault: layoutDetail!.isDefault,
-      })
+      }
+      const layoutChanged =
+        !layoutDetail ||
+        layoutPayload.name !== layoutDetail.name ||
+        layoutPayload.description !== (layoutDetail.description ?? '') ||
+        layoutPayload.layoutType !== layoutDetail.layoutType ||
+        layoutPayload.isDefault !== layoutDetail.isDefault
+      if (layoutChanged) {
+        await apiClient.putResource(`/api/page-layouts/${layoutId}`, layoutPayload)
+      }
 
       // Step 2: Delete removed fields first (before sections, to handle moves)
       const fieldIdsToDelete = [...originalFieldIds].filter((id) => !desiredFieldIds.has(id))
@@ -753,42 +768,83 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
       }
 
       // Step 6: Update existing sections (scalar attributes only)
+      // Skip PUTs for sections whose tracked attributes are unchanged.
+      const originalSectionsById = new Map(originalSections.map((s) => [s.id, s]))
       const sectionsToUpdate = desiredSections.filter((s) => originalSectionIds.has(s.id))
-      if (sectionsToUpdate.length > 0) {
-        await Promise.all(
-          sectionsToUpdate.map((s) =>
-            apiClient.putResource(`/api/layout-sections/${s.id}`, {
-              heading: s.heading,
-              columns: s.columns,
-              sortOrder: s.sortOrder,
-              collapsed: s.collapsed,
-              style: (s.style ?? 'default').toUpperCase(),
-              sectionType: (s.sectionType ?? 'fields').toUpperCase(),
-              tabGroup: s.tabGroup || null,
-              tabLabel: s.tabLabel || null,
-              visibilityRule: s.visibilityRule || null,
-            })
-          )
-        )
+      const sectionUpdatePromises: Promise<unknown>[] = []
+      for (const s of sectionsToUpdate) {
+        const original = originalSectionsById.get(s.id)
+        const payload = {
+          heading: s.heading,
+          columns: s.columns,
+          sortOrder: s.sortOrder,
+          collapsed: s.collapsed,
+          style: (s.style ?? 'default').toUpperCase(),
+          sectionType: (s.sectionType ?? 'fields').toUpperCase(),
+          tabGroup: s.tabGroup || null,
+          tabLabel: s.tabLabel || null,
+          visibilityRule: s.visibilityRule || null,
+        }
+        const unchanged =
+          original &&
+          original.heading === payload.heading &&
+          original.columns === payload.columns &&
+          original.sortOrder === payload.sortOrder &&
+          !!original.collapsed === payload.collapsed &&
+          (original.style ?? 'DEFAULT').toUpperCase() === payload.style &&
+          (original.sectionType ?? 'FIELDS').toUpperCase() === payload.sectionType &&
+          (original.tabGroup || null) === payload.tabGroup &&
+          (original.tabLabel || null) === payload.tabLabel &&
+          (original.visibilityRule || null) === payload.visibilityRule
+        if (unchanged) continue
+        sectionUpdatePromises.push(apiClient.putResource(`/api/layout-sections/${s.id}`, payload))
+      }
+      if (sectionUpdatePromises.length > 0) {
+        await Promise.all(sectionUpdatePromises)
       }
 
       // Step 7: Create/update field placements
+      // Build a lookup of the original field state by id so we can diff and skip
+      // PUTs for placements that haven't actually changed. Avoids hitting the
+      // backend with N unchanged fields every time the user tweaks one toggle.
+      const originalFieldsById = new Map<string, ApiFieldPlacement & { sectionId: string }>()
+      for (const s of originalSections) {
+        for (const f of s.fields ?? []) {
+          originalFieldsById.set(f.id, { ...f, sectionId: s.id })
+        }
+      }
       const fieldPromises: Promise<unknown>[] = []
       for (const section of desiredSections) {
         const serverSectionId = sectionIdMap.get(section.id) ?? section.id
         for (const f of section.fields) {
+          // Backend stores these as `is*`-prefixed boolean columns; using the
+          // unprefixed names here would silently no-op the update.
           const fieldPayload = {
             fieldId: f.fieldId,
             columnNumber: f.columnNumber,
             columnSpan: f.columnSpan && f.columnSpan > 1 ? f.columnSpan : null,
             sortOrder: f.sortOrder,
-            requiredOnLayout: f.requiredOnLayout,
-            readOnlyOnLayout: f.readOnlyOnLayout,
+            isRequiredOnLayout: !!f.requiredOnLayout,
+            isReadOnlyOnLayout: !!f.readOnlyOnLayout,
             labelOverride: f.labelOverride || null,
             helpTextOverride: f.helpTextOverride || null,
             visibilityRule: f.visibilityRule || null,
           }
           if (originalFieldIds.has(f.id)) {
+            const original = originalFieldsById.get(f.id)
+            const unchanged =
+              original &&
+              original.sectionId === serverSectionId &&
+              original.fieldId === fieldPayload.fieldId &&
+              original.columnNumber === fieldPayload.columnNumber &&
+              (original.columnSpan ?? null) === fieldPayload.columnSpan &&
+              original.sortOrder === fieldPayload.sortOrder &&
+              !!original.isRequiredOnLayout === fieldPayload.isRequiredOnLayout &&
+              !!original.isReadOnlyOnLayout === fieldPayload.isReadOnlyOnLayout &&
+              (original.labelOverride ?? null) === fieldPayload.labelOverride &&
+              (original.helpTextOverride ?? null) === fieldPayload.helpTextOverride &&
+              (original.visibilityRule ?? null) === fieldPayload.visibilityRule
+            if (unchanged) continue
             fieldPromises.push(
               apiClient.putResource(`/api/layout-fields/${f.id}`, {
                 ...fieldPayload,

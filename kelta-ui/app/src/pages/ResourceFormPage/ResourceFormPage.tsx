@@ -1623,6 +1623,7 @@ export function ResourceFormPage({
             sections={layout.sections}
             schemaFields={sortedFields}
             renderField={renderField}
+            record={formData}
           />
         ) : (
           <div className="flex flex-col gap-6 rounded-md border border-border bg-card p-6 max-md:p-4">

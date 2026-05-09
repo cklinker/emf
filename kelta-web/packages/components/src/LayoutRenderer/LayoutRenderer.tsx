@@ -12,59 +12,10 @@ import type {
   FieldDefinition,
   LayoutSection,
   LayoutFieldPlacement,
-  VisibilityRule,
   LayoutRelatedList,
 } from '@kelta/sdk';
 import type { LayoutRendererProps, FieldRendererFn } from './types';
-
-// ---------------------------------------------------------------------------
-// Visibility rule evaluation
-// ---------------------------------------------------------------------------
-
-function parseVisibilityRule(json: string | undefined): VisibilityRule | null {
-  if (!json) return null;
-  try {
-    const parsed = JSON.parse(json) as VisibilityRule;
-    if (parsed.fieldName && parsed.operator) return parsed;
-    // Handle alternate key name from editor (fieldId vs fieldName)
-    const alt = parsed as unknown as { fieldId?: string; operator?: string; value?: string };
-    if (alt.fieldId && alt.operator) {
-      return {
-        fieldName: alt.fieldId,
-        operator: alt.operator as VisibilityRule['operator'],
-        value: alt.value,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function evaluateRule(rule: VisibilityRule, record: Record<string, unknown>): boolean {
-  const fieldValue = String(record[rule.fieldName] ?? '');
-
-  switch (rule.operator) {
-    case 'EQUALS':
-      return fieldValue === (rule.value ?? '');
-    case 'NOT_EQUALS':
-      return fieldValue !== (rule.value ?? '');
-    case 'CONTAINS':
-      return fieldValue.includes(rule.value ?? '');
-    case 'IS_EMPTY':
-      return !fieldValue;
-    case 'IS_NOT_EMPTY':
-      return !!fieldValue;
-    default:
-      return true;
-  }
-}
-
-function isVisible(visibilityRule: string | undefined, record: Record<string, unknown>): boolean {
-  const rule = parseVisibilityRule(visibilityRule);
-  if (!rule) return true; // No rule means always visible
-  return evaluateRule(rule, record);
-}
+import { isVisible } from './visibilityRule';
 
 // ---------------------------------------------------------------------------
 // Default field renderers

@@ -55,6 +55,11 @@ export type {
 // LayoutRenderer
 export { LayoutRenderer } from './LayoutRenderer/LayoutRenderer';
 export type { LayoutRendererProps, FieldRendererFn } from './LayoutRenderer/types';
+export {
+  parseVisibilityRule,
+  evaluateVisibilityRule,
+  isVisible,
+} from './LayoutRenderer/visibilityRule';
 
 // Hooks
 export { useResource } from './hooks/useResource';

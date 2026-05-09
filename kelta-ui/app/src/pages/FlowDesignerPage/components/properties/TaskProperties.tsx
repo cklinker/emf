@@ -7,6 +7,7 @@ import { DataPathFields } from './DataPathFields'
 import { RetryEditor } from './RetryEditor'
 import { CatchEditor } from './CatchEditor'
 import { QueryRecordsParams } from './QueryRecordsParams'
+import { SqlQueryParams } from './SqlQueryParams'
 import { UpdateRecordParams } from './UpdateRecordParams'
 import { CreateRecordParams } from './CreateRecordParams'
 import { DeleteRecordParams } from './DeleteRecordParams'
@@ -57,6 +58,12 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
       {/* Resource-specific parameter editors */}
       {resource === 'QUERY_RECORDS' && (
         <QueryRecordsParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'SQL_QUERY' && (
+        <SqlQueryParams
           parameters={data.parameters as Record<string, unknown> | undefined}
           onUpdate={(params) => onUpdate({ parameters: params })}
         />

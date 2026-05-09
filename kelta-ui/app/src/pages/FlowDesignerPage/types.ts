@@ -305,6 +305,7 @@ export const RESOURCE_GROUPS: ResourceGroup[] = [
       { value: 'UPDATE_RECORD', label: 'Update Record' },
       { value: 'DELETE_RECORD', label: 'Delete Record' },
       { value: 'QUERY_RECORDS', label: 'Query Records' },
+      { value: 'SQL_QUERY', label: 'SQL Query' },
     ],
   },
   {

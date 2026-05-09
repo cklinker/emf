@@ -15,6 +15,8 @@ import io.kelta.runtime.module.integration.spi.noop.LoggingScriptExecutor;
 import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.module.KeltaModule;
 import io.kelta.runtime.workflow.module.ModuleContext;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -121,6 +123,15 @@ public class IntegrationModule implements KeltaModule {
         handlers.add(new CallApiActionHandler(
             objectMapper, payloadMapper, apiSpecStore,
             credentialResolver, idempotencyStore, restTemplate));
+
+        // SQL_QUERY — raw SQL step. Needs JdbcTemplate + TransactionTemplate.
+        // Skipped silently if extensions are not wired (e.g. in unit-test contexts
+        // that don't have a datasource), keeping module startup tolerant.
+        JdbcTemplate jdbcTemplate = context.getExtension(JdbcTemplate.class);
+        TransactionTemplate transactionTemplate = context.getExtension(TransactionTemplate.class);
+        if (jdbcTemplate != null && transactionTemplate != null) {
+            handlers.add(new SqlQueryActionHandler(objectMapper, jdbcTemplate, transactionTemplate));
+        }
     }
 
     @Override

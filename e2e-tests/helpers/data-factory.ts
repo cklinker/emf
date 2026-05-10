@@ -296,6 +296,76 @@ export class DataFactory {
     );
   }
 
+  /**
+   * Poll GET /api/collections (LIST) until a collection with the given name is
+   * present, or timeout. The admin UI loads its table from the LIST endpoint,
+   * which is served from per-pod state and may lag the per-id GET after a
+   * NATS-propagated create. Use this in addition to `waitForCollectionVisible`
+   * before reloading the UI.
+   */
+  async waitForCollectionInList(
+    name: string,
+    timeoutMs = STORAGE_READY_TIMEOUT_MS,
+  ): Promise<void> {
+    await this.pollCollectionList(
+      name,
+      (present) => present,
+      timeoutMs,
+      `Collection '${name}' not in LIST after ${timeoutMs}ms`,
+    );
+  }
+
+  /**
+   * Poll GET /api/collections (LIST) until no collection with the given name is
+   * present, or timeout. Mirror of `waitForCollectionInList` for deletes.
+   */
+  async waitForCollectionGoneFromList(
+    name: string,
+    timeoutMs = STORAGE_READY_TIMEOUT_MS,
+  ): Promise<void> {
+    await this.pollCollectionList(
+      name,
+      (present) => !present,
+      timeoutMs,
+      `Collection '${name}' still in LIST after ${timeoutMs}ms`,
+    );
+  }
+
+  private async pollCollectionList(
+    name: string,
+    predicate: (present: boolean) => boolean,
+    timeoutMs: number,
+    timeoutMessage: string,
+  ): Promise<void> {
+    const url = `${this.api.baseUrl}/${this.api.tenantSlug}/api/collections?page[size]=1000`;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/vnd.api+json",
+            Authorization: `Bearer ${this.currentToken}`,
+          },
+        });
+        if (response.ok) {
+          const body = (await response.json()) as JsonApiResponse;
+          const data = Array.isArray(body.data) ? body.data : [body.data];
+          const present = data.some((r) => r?.attributes?.name === name);
+          if (predicate(present)) return;
+        }
+      } catch {
+        // Network error — keep retrying
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, STORAGE_READY_POLL_MS),
+      );
+    }
+
+    throw new Error(timeoutMessage);
+  }
+
   async cleanup(): Promise<void> {
     for (const entity of this.createdEntities.reverse()) {
       try {

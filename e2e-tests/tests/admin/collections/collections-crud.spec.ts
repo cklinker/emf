@@ -143,8 +143,10 @@ test.describe("Collections CRUD", () => {
     const collectionName = collection.attributes.name as string;
 
     // Collection create propagates asynchronously across worker pods via NATS;
-    // wait until the GET endpoint confirms visibility before loading the UI.
+    // wait until both the per-id GET and the LIST endpoint confirm visibility
+    // before loading the UI (the admin table loads from LIST).
     await dataFactory.waitForCollectionVisible(collection.id);
+    await dataFactory.waitForCollectionInList(collectionName);
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
@@ -177,8 +179,10 @@ test.describe("Collections CRUD", () => {
     await deletePromise;
 
     // DELETE may take a moment to propagate to the LIST endpoint on other pods;
-    // poll the per-id GET until it 404s so the subsequent reload sees fresh data.
+    // poll the per-id GET until it 404s, then poll LIST until the row is gone,
+    // so the subsequent reload sees fresh data on whichever pod serves it.
     await dataFactory.waitForCollectionDeleted(collection.id);
+    await dataFactory.waitForCollectionGoneFromList(collectionName);
 
     // Reload to drop any client-side cache and re-fetch from the backend.
     await page.reload();

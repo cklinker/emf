@@ -358,6 +358,34 @@ jobs:
           exit 1
 
   # ===========================================================================
+  # Auto-rollback on smoke-test failure — reverts the image bump in homelab-argo.
+  # Runs only if smoke-test failed; ArgoCD reconciles within ~30s.
+  # ===========================================================================
+  rollback-on-smoke-failure:
+    name: Auto-rollback (smoke failed)
+    needs: smoke-test
+    if: failure() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout EMF (for rollback script)
+        uses: actions/checkout@v4
+        with:
+          path: emf
+
+      - name: Checkout homelab-argo
+        uses: actions/checkout@v4
+        with:
+          repository: cklinker/homelab-argo
+          token: ${{ secrets.ARGOCD_REPO_TOKEN }}
+          path: homelab-argo
+
+      - name: Roll back image bump
+        env:
+          HOMELAB_ARGO_DIR: homelab-argo
+          REASON: "smoke-test failed in run ${{ github.run_id }}"
+        run: bash emf/scripts/rollback.sh
+
+  # ===========================================================================
   # E2E Tests (Playwright) — post-deployment UI verification
   # ===========================================================================
   e2e-test:
@@ -427,3 +455,65 @@ jobs:
           name: e2e-traces
           path: e2e-tests/test-results/**/*.zip
           retention-days: 7
+
+      - name: Collect failing pod logs
+        if: failure()
+        run: |
+          mkdir -p _bug-context
+          NS=$(kubectl get ns kelta -o name 2>/dev/null && echo kelta || echo emf)
+          for d in gateway worker auth ai ui; do
+            kubectl -n "$NS" logs -l app=${NS}-$d --tail=100 > "_bug-context/${d}.log" 2>/dev/null || true
+          done
+          ls -la _bug-context
+
+      - name: File bug task into emf-queue
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          EMF_QUEUE_PUSH_TOKEN: ${{ secrets.EMF_QUEUE_PUSH_TOKEN }}
+        run: |
+          if [ -z "$EMF_QUEUE_PUSH_TOKEN" ]; then
+            echo "EMF_QUEUE_PUSH_TOKEN secret not set — skipping bug-task file. Set it in repo secrets to enable auto-bug ingress."
+            exit 0
+          fi
+          git clone "https://x-access-token:${EMF_QUEUE_PUSH_TOKEN}@github.com/cklinker/emf-queue.git" emf-queue
+          cd emf-queue
+          BUG_ID="BUG-$(date -u +%Y-%m-%d)-$(printf '%04d' $((RANDOM % 10000)))"
+          BUG_PATH="inbox/${BUG_ID}.md"
+          {
+            echo "---"
+            echo "id: ${BUG_ID}"
+            echo "title: \"E2E failure in run ${{ github.run_id }}\""
+            echo "type: bug"
+            echo "priority: 1"
+            echo "parallel_safe: true"
+            echo "needs_migration: false"
+            echo "depends_on: []"
+            echo "status: inbox"
+            echo "attempts: 0"
+            echo "max_attempts: 3"
+            echo "auto_promote: true"
+            echo "source_run: \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\""
+            echo "source_test: \"e2e-tests/playwright (see attached report)\""
+            echo "created_at: \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\""
+            echo "---"
+            echo
+            echo "## Failing run"
+            echo "- Workflow: build-and-publish-containers"
+            echo "- Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- Commit: ${{ github.sha }}"
+            echo
+            echo "## Recent logs (tail 100 each)"
+            for d in ../_bug-context/*.log; do
+              [ -f "$d" ] || continue
+              echo
+              echo "### $(basename "$d" .log)"
+              echo '```'
+              tail -100 "$d"
+              echo '```'
+            done
+          } > "$BUG_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$BUG_PATH"
+          git commit -m "bug: file ${BUG_ID} from failed E2E run ${{ github.run_id }}"
+          git push origin main

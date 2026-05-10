@@ -190,17 +190,37 @@ export function CollectionStoreProvider({
   const { isAuthenticated } = useAuth()
   const queryClient = useQueryClient()
 
-  // Single API call to load all collections with their fields.
-  // Only runs when the user is authenticated — prevents 401 loops on the login page.
+  // Page through every collection + included fields. Earlier this was a
+  // single page=1 size=1000 call, which silently truncated when total
+  // collections × fields exceeded the cap and made newly-added fields
+  // (e.g. a fresh rollup_summary) invisible to the cache. Backend list
+  // responses include metadata.totalPages — keep fetching until exhausted.
   const { data: schemas = [], isLoading } = useQuery({
     queryKey: ['collection-store'],
     queryFn: async () => {
-      const raw = await apiClient.get('/api/collections?page[size]=1000&include=fields')
-      const parsed = parseCollectionsResponse(raw)
+      const PAGE_SIZE = 500
+      const allData: RawResource[] = []
+      const allIncluded: RawResource[] = []
+      let page = 1
+      while (true) {
+        const raw = (await apiClient.get(
+          `/api/collections?page[size]=${PAGE_SIZE}&page[number]=${page}&include=fields`
+        )) as {
+          data?: RawResource[]
+          included?: RawResource[]
+          metadata?: { totalPages?: number }
+        }
+        if (Array.isArray(raw.data)) allData.push(...raw.data)
+        if (Array.isArray(raw.included)) allIncluded.push(...raw.included)
+        const totalPages = raw.metadata?.totalPages ?? 1
+        if (page >= totalPages || !Array.isArray(raw.data) || raw.data.length < PAGE_SIZE) break
+        page++
+      }
 
-      // Pre-populate the React Query cache with individual collection-schema entries.
-      // This way, any component using useCollectionSchema(name) will find cached data
-      // and won't make an additional API call.
+      const parsed = parseCollectionsResponse({ data: allData, included: allIncluded })
+
+      // Pre-populate the React Query cache with individual collection-schema entries
+      // so useCollectionSchema(name) finds cached data without a second fetch.
       for (const schema of parsed) {
         queryClient.setQueryData(['collection-schema', schema.name], schema)
       }

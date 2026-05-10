@@ -36,7 +36,11 @@ describe('FormulaEvaluator', () => {
 
   it('extractFieldRefs returns dependencies', () => {
     const ev = new FormulaEvaluator();
-    expect(ev.extractFieldRefs('(qty * price) - discount').sort()).toEqual(['discount', 'price', 'qty']);
+    expect(ev.extractFieldRefs('(qty * price) - discount').sort()).toEqual([
+      'discount',
+      'price',
+      'qty',
+    ]);
   });
 
   it('caches compiled ASTs', () => {

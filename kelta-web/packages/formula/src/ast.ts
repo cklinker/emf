@@ -9,10 +9,20 @@ export type FormulaAst =
   | { kind: 'functionCall'; functionName: string; arguments: FormulaAst[] };
 
 export type BinaryOperator =
-  | '+' | '-' | '*' | '/'
-  | '>' | '<' | '>=' | '<='
-  | '=' | '==' | '!=' | '<>'
-  | '&&' | '||';
+  | '+'
+  | '-'
+  | '*'
+  | '/'
+  | '>'
+  | '<'
+  | '>='
+  | '<='
+  | '='
+  | '=='
+  | '!='
+  | '<>'
+  | '&&'
+  | '||';
 
 export type UnaryOperator = '-' | '!';
 
@@ -25,7 +35,11 @@ export function evaluateAst(node: FormulaAst, context: FormulaContext): unknown 
       return v === undefined ? null : v;
     }
     case 'binaryOp':
-      return evaluateBinary(node.operator, evaluateAst(node.left, context), evaluateAst(node.right, context));
+      return evaluateBinary(
+        node.operator,
+        evaluateAst(node.left, context),
+        evaluateAst(node.right, context)
+      );
     case 'unaryOp':
       return evaluateUnary(node.operator, evaluateAst(node.operand, context));
     case 'functionCall': {
@@ -39,31 +53,44 @@ export function evaluateAst(node: FormulaAst, context: FormulaContext): unknown 
 
 function evaluateBinary(op: BinaryOperator, left: unknown, right: unknown): unknown {
   switch (op) {
-    case '+': return add(left, right);
-    case '-': return toDouble(left) - toDouble(right);
-    case '*': return toDouble(left) * toDouble(right);
+    case '+':
+      return add(left, right);
+    case '-':
+      return toDouble(left) - toDouble(right);
+    case '*':
+      return toDouble(left) * toDouble(right);
     case '/': {
       const divisor = toDouble(right);
       if (divisor === 0) throw new FormulaException('Division by zero');
       return toDouble(left) / divisor;
     }
-    case '>': return compare(left, right) > 0;
-    case '<': return compare(left, right) < 0;
-    case '>=': return compare(left, right) >= 0;
-    case '<=': return compare(left, right) <= 0;
+    case '>':
+      return compare(left, right) > 0;
+    case '<':
+      return compare(left, right) < 0;
+    case '>=':
+      return compare(left, right) >= 0;
+    case '<=':
+      return compare(left, right) <= 0;
     case '=':
-    case '==': return objectEquals(left, right);
+    case '==':
+      return objectEquals(left, right);
     case '!=':
-    case '<>': return !objectEquals(left, right);
-    case '&&': return toBoolean(left) && toBoolean(right);
-    case '||': return toBoolean(left) || toBoolean(right);
+    case '<>':
+      return !objectEquals(left, right);
+    case '&&':
+      return toBoolean(left) && toBoolean(right);
+    case '||':
+      return toBoolean(left) || toBoolean(right);
   }
 }
 
 function evaluateUnary(op: UnaryOperator, val: unknown): unknown {
   switch (op) {
-    case '-': return -toDouble(val);
-    case '!': return !toBoolean(val);
+    case '-':
+      return -toDouble(val);
+    case '!':
+      return !toBoolean(val);
   }
 }
 
@@ -120,8 +147,11 @@ export function toBoolean(value: unknown): boolean {
 
 export function extractFieldRefs(node: FormulaAst, out: Set<string> = new Set()): Set<string> {
   switch (node.kind) {
-    case 'literal': break;
-    case 'fieldRef': out.add(node.fieldName); break;
+    case 'literal':
+      break;
+    case 'fieldRef':
+      out.add(node.fieldName);
+      break;
     case 'binaryOp':
       extractFieldRefs(node.left, out);
       extractFieldRefs(node.right, out);

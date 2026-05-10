@@ -61,7 +61,7 @@ describe('useLayoutRules', () => {
     };
 
     const { result } = renderHook(() =>
-      useTestForm([rule], { quantity: 3, unit_price: 24, discount: 5 }),
+      useTestForm([rule], { quantity: 3, unit_price: 24, discount: 5 })
     );
 
     // useEffect runs after render — wait one tick.

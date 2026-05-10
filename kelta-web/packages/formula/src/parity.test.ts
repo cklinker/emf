@@ -20,7 +20,7 @@ interface ParityFixtures {
 
 const FIXTURE_PATH = resolve(
   __dirname,
-  '../../../../kelta-platform/runtime/runtime-core/src/test/resources/formula-parity-fixtures.json',
+  '../../../../kelta-platform/runtime/runtime-core/src/test/resources/formula-parity-fixtures.json'
 );
 
 const fixtures: ParityFixtures = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));

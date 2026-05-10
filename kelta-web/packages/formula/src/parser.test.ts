@@ -44,7 +44,11 @@ describe('FormulaParser', () => {
   });
 
   it('parses function call no args', () => {
-    expect(parser.parse('TODAY()')).toEqual({ kind: 'functionCall', functionName: 'TODAY', arguments: [] });
+    expect(parser.parse('TODAY()')).toEqual({
+      kind: 'functionCall',
+      functionName: 'TODAY',
+      arguments: [],
+    });
   });
 
   it('parses function call multiple args', () => {

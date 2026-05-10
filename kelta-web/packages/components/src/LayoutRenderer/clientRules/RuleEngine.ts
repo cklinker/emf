@@ -304,7 +304,7 @@ export class RuleEngine {
   private transform(
     value: unknown,
     spec: TransformLayoutRule['transform'],
-    form: FormBinding,
+    form: FormBinding
   ): unknown {
     if (spec.type === 'formula') {
       return this.evaluator.evaluate(spec.formula, form.getValues());
@@ -318,9 +318,7 @@ export class RuleEngine {
       case 'trim':
         return value.trim();
       case 'titleCase':
-        return value
-          .toLowerCase()
-          .replace(/\b\w/g, (m) => m.toUpperCase());
+        return value.toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase());
     }
   }
 
@@ -341,7 +339,7 @@ export class RuleEngine {
 
   private evaluateCollectionValidation(
     rule: CollectionValidationRule,
-    form: FormBinding,
+    form: FormBinding
   ): RuleViolation | null {
     let triggered = false;
     try {

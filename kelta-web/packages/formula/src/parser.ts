@@ -16,7 +16,7 @@ export class FormulaParser {
     if (this.pos < this.input.length) {
       throw new FormulaException(
         `Unexpected character at position ${this.pos}: '${this.input.charAt(this.pos)}'`,
-        this.pos,
+        this.pos
       );
     }
     return result;
@@ -120,13 +120,15 @@ export class FormulaParser {
       return expr;
     }
 
-    if (c === '\'' || c === '"') {
+    if (c === "'" || c === '"') {
       return this.parseStringLiteral(c);
     }
 
     if (
       this.isDigit(c) ||
-      (c === '.' && this.pos + 1 < this.input.length && this.isDigit(this.input.charAt(this.pos + 1)))
+      (c === '.' &&
+        this.pos + 1 < this.input.length &&
+        this.isDigit(this.input.charAt(this.pos + 1)))
     ) {
       return this.parseNumberLiteral();
     }
@@ -209,7 +211,10 @@ export class FormulaParser {
 
   private match(s: string): boolean {
     this.skipWhitespace();
-    if (this.pos + s.length <= this.input.length && this.input.substring(this.pos, this.pos + s.length) === s) {
+    if (
+      this.pos + s.length <= this.input.length &&
+      this.input.substring(this.pos, this.pos + s.length) === s
+    ) {
       this.pos += s.length;
       return true;
     }
@@ -239,9 +244,13 @@ export class FormulaParser {
     }
   }
 
-  private isDigit(c: string): boolean { return c >= '0' && c <= '9'; }
+  private isDigit(c: string): boolean {
+    return c >= '0' && c <= '9';
+  }
   private isLetter(c: string): boolean {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
   }
-  private isLetterOrDigit(c: string): boolean { return this.isLetter(c) || this.isDigit(c); }
+  private isLetterOrDigit(c: string): boolean {
+    return this.isLetter(c) || this.isDigit(c);
+  }
 }

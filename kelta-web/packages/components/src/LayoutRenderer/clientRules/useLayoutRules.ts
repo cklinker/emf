@@ -66,18 +66,21 @@ export function useLayoutRules(opts: UseLayoutRulesOptions): UseLayoutRulesResul
     });
   }, [enabled, rules, validationRules]);
 
-  const binding = useMemo<FormBinding>(() => ({
-    getValue: (field) => valuesRef.current[field],
-    getValues: () => ({ ...valuesRef.current }),
-    setValue: (field, value) => {
-      // Mirror in the ref so subsequent rule evaluations within the same tick
-      // see the new value (engine-internal cascades).
-      valuesRef.current = { ...valuesRef.current, [field]: value };
-      setFieldValueRef.current(field, value);
-    },
-    setError: (field, message) => setFieldErrorRef.current(field, message),
-    clearError: (field) => clearFieldErrorRef.current(field),
-  }), []);
+  const binding = useMemo<FormBinding>(
+    () => ({
+      getValue: (field) => valuesRef.current[field],
+      getValues: () => ({ ...valuesRef.current }),
+      setValue: (field, value) => {
+        // Mirror in the ref so subsequent rule evaluations within the same tick
+        // see the new value (engine-internal cascades).
+        valuesRef.current = { ...valuesRef.current, [field]: value };
+        setFieldValueRef.current(field, value);
+      },
+      setError: (field, message) => setFieldErrorRef.current(field, message),
+      clearError: (field) => clearFieldErrorRef.current(field),
+    }),
+    []
+  );
 
   // Run onLoad once when an engine is created.
   const loadedRef = useRef<RuleEngine | null>(null);
@@ -88,13 +91,19 @@ export function useLayoutRules(opts: UseLayoutRulesOptions): UseLayoutRulesResul
     }
   }, [engine, binding]);
 
-  const onFieldChange = useCallback((field: string) => {
-    engine?.onFieldChange(field, binding);
-  }, [engine, binding]);
+  const onFieldChange = useCallback(
+    (field: string) => {
+      engine?.onFieldChange(field, binding);
+    },
+    [engine, binding]
+  );
 
-  const onFieldBlur = useCallback((field: string) => {
-    engine?.onFieldBlur(field, binding);
-  }, [engine, binding]);
+  const onFieldBlur = useCallback(
+    (field: string) => {
+      engine?.onFieldBlur(field, binding);
+    },
+    [engine, binding]
+  );
 
   const runBeforeSave = useCallback((): BeforeSaveResult => {
     if (!engine) return { blocked: false, violations: [] };

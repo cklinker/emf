@@ -115,7 +115,7 @@ function traceCycle(rules: RuleNode[]): string[] {
 export function downstreamRules(
   changedField: string,
   rules: RuleNode[],
-  evaluationOrder: string[],
+  evaluationOrder: string[]
 ): string[] {
   const ruleById = new Map(rules.map((r) => [r.id, r]));
   const targetToRule = new Map<string, RuleNode>();

@@ -14,8 +14,12 @@ class TestForm implements FormBinding {
     this.values = { ...initial };
   }
 
-  getValue(field: string): unknown { return this.values[field]; }
-  getValues(): Record<string, unknown> { return { ...this.values }; }
+  getValue(field: string): unknown {
+    return this.values[field];
+  }
+  getValues(): Record<string, unknown> {
+    return { ...this.values };
+  }
   setValue(field: string, value: unknown): void {
     this.values[field] = value;
     this.setValueLog.push([field, value]);
@@ -29,7 +33,9 @@ class TestForm implements FormBinding {
     this.clearErrorLog.push(field);
   }
 
-  getErrors(): Record<string, string> { return { ...this.errors }; }
+  getErrors(): Record<string, string> {
+    return { ...this.errors };
+  }
 }
 
 const baseRule = {
@@ -250,12 +256,24 @@ describe('RuleEngine', () => {
   describe('cycle detection', () => {
     it('disables engine when cycle present', () => {
       const a: LayoutRule = {
-        ...baseRule, id: 'a', name: 'a', kind: 'compute',
-        target: 'fa', formula: 'fb + 1', when: ['onChange'], sortOrder: 0,
+        ...baseRule,
+        id: 'a',
+        name: 'a',
+        kind: 'compute',
+        target: 'fa',
+        formula: 'fb + 1',
+        when: ['onChange'],
+        sortOrder: 0,
       };
       const b: LayoutRule = {
-        ...baseRule, id: 'b', name: 'b', kind: 'compute',
-        target: 'fb', formula: 'fa + 1', when: ['onChange'], sortOrder: 1,
+        ...baseRule,
+        id: 'b',
+        name: 'b',
+        kind: 'compute',
+        target: 'fb',
+        formula: 'fa + 1',
+        when: ['onChange'],
+        sortOrder: 1,
       };
       const engine = new RuleEngine({ layoutRules: [a, b] });
       expect(engine.isDisabled()).toBe(true);
@@ -266,12 +284,24 @@ describe('RuleEngine', () => {
 
     it('disabled engine ignores events', () => {
       const a: LayoutRule = {
-        ...baseRule, id: 'a', name: 'a', kind: 'compute',
-        target: 'fa', formula: 'fb + 1', when: ['onChange'], sortOrder: 0,
+        ...baseRule,
+        id: 'a',
+        name: 'a',
+        kind: 'compute',
+        target: 'fa',
+        formula: 'fb + 1',
+        when: ['onChange'],
+        sortOrder: 0,
       };
       const b: LayoutRule = {
-        ...baseRule, id: 'b', name: 'b', kind: 'compute',
-        target: 'fb', formula: 'fa + 1', when: ['onChange'], sortOrder: 1,
+        ...baseRule,
+        id: 'b',
+        name: 'b',
+        kind: 'compute',
+        target: 'fb',
+        formula: 'fa + 1',
+        when: ['onChange'],
+        sortOrder: 1,
       };
       const engine = new RuleEngine({ layoutRules: [a, b] });
       const form = new TestForm();
@@ -304,12 +334,24 @@ describe('RuleEngine', () => {
   describe('parse failure', () => {
     it('records diagnostic and skips bad rule', () => {
       const bad: LayoutRule = {
-        ...baseRule, id: 'bad', name: 'bad', kind: 'compute',
-        target: 'x', formula: '1 + +', when: ['onLoad'], sortOrder: 0,
+        ...baseRule,
+        id: 'bad',
+        name: 'bad',
+        kind: 'compute',
+        target: 'x',
+        formula: '1 + +',
+        when: ['onLoad'],
+        sortOrder: 0,
       };
       const good: LayoutRule = {
-        ...baseRule, id: 'good', name: 'good', kind: 'compute',
-        target: 'y', formula: '1 + 2', when: ['onLoad'], sortOrder: 1,
+        ...baseRule,
+        id: 'good',
+        name: 'good',
+        kind: 'compute',
+        target: 'y',
+        formula: '1 + 2',
+        when: ['onLoad'],
+        sortOrder: 1,
       };
       const engine = new RuleEngine({ layoutRules: [bad, good] });
       const diags = engine.getDiagnostics();
@@ -365,16 +407,34 @@ describe('RuleEngine', () => {
   describe('multi-rule dependency chain', () => {
     it('evaluates in topological order', () => {
       const subtotal: LayoutRule = {
-        ...baseRule, id: 's', name: 'sub', kind: 'compute',
-        target: 'subtotal', formula: 'qty * price', when: ['onChange', 'onLoad'], sortOrder: 1,
+        ...baseRule,
+        id: 's',
+        name: 'sub',
+        kind: 'compute',
+        target: 'subtotal',
+        formula: 'qty * price',
+        when: ['onChange', 'onLoad'],
+        sortOrder: 1,
       };
       const tax: LayoutRule = {
-        ...baseRule, id: 't', name: 'tax', kind: 'compute',
-        target: 'tax', formula: 'subtotal * 0.07', when: ['onChange', 'onLoad'], sortOrder: 2,
+        ...baseRule,
+        id: 't',
+        name: 'tax',
+        kind: 'compute',
+        target: 'tax',
+        formula: 'subtotal * 0.07',
+        when: ['onChange', 'onLoad'],
+        sortOrder: 2,
       };
       const total: LayoutRule = {
-        ...baseRule, id: 'g', name: 'total', kind: 'compute',
-        target: 'total', formula: 'subtotal + tax', when: ['onChange', 'onLoad'], sortOrder: 3,
+        ...baseRule,
+        id: 'g',
+        name: 'total',
+        kind: 'compute',
+        target: 'total',
+        formula: 'subtotal + tax',
+        when: ['onChange', 'onLoad'],
+        sortOrder: 3,
       };
       const engine = new RuleEngine({ layoutRules: [total, tax, subtotal] });
       const form = new TestForm({ qty: 2, price: 50 });

@@ -198,10 +198,27 @@ function toLocalDate(val: unknown): Date {
 }
 
 export const ALL_BUILTINS: FormulaFunction[] = [
-  TODAY, NOW, ISBLANK, BLANKVALUE, IF,
-  AND_FN, OR_FN, NOT_FN, LEN, CONTAINS,
-  UPPER, LOWER, TRIM, TEXT, VALUE,
-  ROUND, ABS, MAX_FN, MIN_FN, REGEX, DATEDIFF,
+  TODAY,
+  NOW,
+  ISBLANK,
+  BLANKVALUE,
+  IF,
+  AND_FN,
+  OR_FN,
+  NOT_FN,
+  LEN,
+  CONTAINS,
+  UPPER,
+  LOWER,
+  TRIM,
+  TEXT,
+  VALUE,
+  ROUND,
+  ABS,
+  MAX_FN,
+  MIN_FN,
+  REGEX,
+  DATEDIFF,
 ];
 
 export function buildBuiltinMap(extra: FormulaFunction[] = []): Map<string, FormulaFunction> {

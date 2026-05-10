@@ -290,6 +290,12 @@ public final class SystemCollectionDefinitions {
                 .withDefault("DETAIL"))
             .addField(FieldDefinition.bool("isDefault").withColumnName("is_default")
                 .withDefault(false))
+            .addField(FieldDefinition.json("defaultFilter").withColumnName("default_filter"))
+            .addField(FieldDefinition.string("defaultSortField", 100).withColumnName("default_sort_field"))
+            .addField(FieldDefinition.string("defaultSortDirection", 4).withColumnName("default_sort_direction")
+                .withDefault("ASC"))
+            .addField(FieldDefinition.integer("defaultRowLimit").withColumnName("default_row_limit")
+                .withDefault(50))
             .build();
     }
 
@@ -302,6 +308,9 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("recordTypeId", 36).withColumnName("record_type_id"))
             .addField(FieldDefinition.masterDetail("layoutId", "page-layouts", "Layout")
                 .withColumnName("layout_id"))
+            .addField(FieldDefinition.json("condition"))
+            .addField(FieldDefinition.integer("evaluationOrder").withColumnName("evaluation_order")
+                .withDefault(100).withNullable(false))
             .build();
     }
 

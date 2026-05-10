@@ -1441,7 +1441,18 @@ public class DynamicCollectionRouter {
     /**
      * Queries child records from a collection using an IN filter on the given
      * reference field.
+     *
+     * <p>Pages through every matching record so JSON:API include resolution
+     * stays complete. The previous single-page (1×1000) cap silently truncated
+     * include results — e.g. on the bulk
+     * {@code GET /api/collections?include=fields} call, ~92 collections × 10-20
+     * fields each can exceed 1000 included rows. The truncated set still
+     * returns 200, but newly-added fields tail-end of the list disappear from
+     * the SPA's collection store, so layout placements that reference them
+     * silently drop on render.
      */
+    private static final int INCLUDE_PAGE_SIZE = 1000;
+
     private List<Map<String, Object>> queryChildRecords(
             CollectionDefinition childDef,
             String refField,
@@ -1451,23 +1462,34 @@ public class DynamicCollectionRouter {
         List<FilterCondition> filters = new ArrayList<>();
         filters.add(new FilterCondition(refField, FilterOperator.IN, parentIds));
 
-        QueryRequest childQuery = new QueryRequest(
-                new Pagination(1, 1000),
-                List.of(),
-                List.of(),
-                filters
-        );
-
-        childQuery = injectTenantFilter(childQuery, childDef, request);
-
+        List<Map<String, Object>> aggregated = new ArrayList<>();
         try {
-            QueryResult childResult = queryEngine.executeQuery(childDef, childQuery);
-            return childResult.data();
+            int page = 1;
+            while (true) {
+                QueryRequest childQuery = new QueryRequest(
+                        new Pagination(page, INCLUDE_PAGE_SIZE),
+                        List.of(),
+                        List.of(),
+                        filters
+                );
+                childQuery = injectTenantFilter(childQuery, childDef, request);
+                QueryResult childResult = queryEngine.executeQuery(childDef, childQuery);
+                List<Map<String, Object>> data = childResult.data();
+                if (data.isEmpty()) {
+                    break;
+                }
+                aggregated.addAll(data);
+                if (data.size() < INCLUDE_PAGE_SIZE) {
+                    break;
+                }
+                page++;
+            }
         } catch (Exception e) {
             logger.warn("Failed to query child records for '{}': {}", childDef.name(),
                     e.getMessage());
             return List.of();
         }
+        return aggregated;
     }
 
 }

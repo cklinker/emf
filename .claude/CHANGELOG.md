@@ -1,0 +1,7 @@
+# Kelta Platform changelog
+
+This file tracks merged autopilot work. Entries are appended by autopilot workers as the final step of each task, one line per merged change, in the format `- YYYY-MM-DD <type>(<scope>): <one-line summary> (<task-id>)`. Newest dates appear at the bottom; group entries under an H2 date heading.
+
+## 2026-05-10
+
+- 2026-05-10 chore(autopilot): seed CHANGELOG.md (CHORE-2026-05-10-0001)

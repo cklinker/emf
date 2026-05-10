@@ -27,7 +27,13 @@ Restart=always
 RestartSec=10
 TimeoutStartSec=60
 TimeoutStopSec=30
-KillMode=mixed
+# KillMode=process so workers (running inside a tmux daemon spawned by
+# this unit) survive dispatcher restart. Only the dispatcher's main bash
+# pid receives SIGTERM; tmux + worker subprocesses are left alone.
+# After restart the new dispatcher prunes any in-progress tasks whose tmux
+# sessions are gone — but with KillMode=process they aren't, so the new
+# dispatcher just sees the same active workers and respects MAX_PARALLEL.
+KillMode=process
 KillSignal=SIGTERM
 
 # --- Logging ---

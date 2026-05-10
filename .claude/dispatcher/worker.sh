@@ -66,12 +66,27 @@ if ! git -C "$EMF_REPO" fetch --quiet origin main; then
 fi
 
 mkdir -p "$EMF_WT_ROOT"
+# Belt and suspenders cleanup before re-creating: any stale worktree dir,
+# stale worktree registration in .git/worktrees, stale local branch, stale
+# remote branch from a prior failed attempt.
 if [[ -d "$WT" ]]; then
-  log_warn "stale worktree exists, removing" path="$WT"
-  git -C "$EMF_REPO" worktree remove --force "$WT" 2>/dev/null || rm -rf "$WT"
+  log_warn "stale worktree dir exists, removing" path="$WT"
+  git -C "$EMF_REPO" worktree remove --force "$WT" 2>/dev/null
+  rm -rf "$WT"
+fi
+git -C "$EMF_REPO" worktree prune >/dev/null 2>&1
+if git -C "$EMF_REPO" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+  log_warn "stale local branch exists, deleting" branch="$BRANCH"
+  git -C "$EMF_REPO" branch -D "$BRANCH" >/dev/null 2>&1
+fi
+if git -C "$EMF_REPO" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+  log_warn "stale remote branch exists, deleting" branch="$BRANCH"
+  git -C "$EMF_REPO" push origin --delete "$BRANCH" >/dev/null 2>&1
 fi
 
-if ! git -C "$EMF_REPO" worktree add "$WT" -b "$BRANCH" origin/main 2>&1; then
+# -B (force-create) so a half-cleaned-up branch from a previous attempt
+# doesn't block the new worktree.
+if ! git -C "$EMF_REPO" worktree add --force "$WT" -B "$BRANCH" origin/main 2>&1; then
   log_error "worktree add failed"
   queue_fail "$TASK_FILE" "worktree add failed"
   exit 1
@@ -123,20 +138,10 @@ if [[ -f "$WT/BLOCKED.md" ]]; then
   exit 0
 fi
 
-# ---- 4. Defensive /verify ---------------------------------------------------
-
-log_event verify_start task="$ID"
-if ! bash "$WT/.claude/commands/verify.sh" >> "$JSONL_LOG" 2>&1; then
-  log_error "/verify failed after claude session"
-  if (( ATTEMPTS < MAX_ATTEMPTS )); then
-    log_info "will retry on next dispatch cycle (queue_release_orphan)" attempts="$ATTEMPTS" max="$MAX_ATTEMPTS"
-    queue_release_orphan "$TASK_FILE"
-  else
-    queue_fail "$TASK_FILE" "/verify failed after $MAX_ATTEMPTS attempts"
-  fi
-  exit 1
-fi
-log_event verify_end task="$ID"
+# ---- 4. (No defensive /verify) ----------------------------------------------
+# The Stop hook .claude/hooks/pre-pr-gate.sh already runs verify.sh before
+# the claude session can return. Running it again here was costing 5–10 min
+# per task with no signal — if the Stop hook passed, verify is green.
 
 # ---- 5. Push + PR -----------------------------------------------------------
 

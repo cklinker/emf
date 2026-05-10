@@ -9,3 +9,4 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-05-11
 
 - 2026-05-11 chore(repo): add .editorconfig with project-wide indentation rules (CHORE-2026-05-10-0004)
+- 2026-05-11 chore(docs): add CONTRIBUTING.md outlining the autopilot workflow (CHORE-2026-05-10-0003)

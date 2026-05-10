@@ -231,7 +231,7 @@ export class RuleEngine {
       if (prepared.rule.kind === 'compute' || prepared.rule.kind === 'default') continue;
       if (!prepared.rule.when.includes(event)) continue;
       if (changedField && prepared.rule.kind === 'transform') {
-        if ((prepared.rule as TransformLayoutRule).target !== changedField) continue;
+        if (prepared.rule.target !== changedField) continue;
       }
       this.applyRule(prepared, form);
     }

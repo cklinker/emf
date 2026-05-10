@@ -17,7 +17,9 @@ function useTestForm(rules: LayoutRule[], initial: Record<string, unknown>) {
   // Stabilize the rules list and initial values across renders so the engine
   // memo only fires once. Real callers (ResourceFormPage) get this for free
   // via TanStack Query's reference identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const stableRules = useMemo(() => rules, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const stableInitial = useMemo(() => initial, []);
 
   const [values, setValues] = useState(stableInitial);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useCallback } from 'react';
+import type { ReactElement } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -214,7 +215,7 @@ export function ResourceForm({
   initialValues = {},
   readOnly = false,
   className = '',
-}: ResourceFormProps): JSX.Element {
+}: ResourceFormProps): ReactElement {
   const client = useKeltaClient();
   const user = useCurrentUser();
   const queryClient = useQueryClient();
@@ -520,7 +521,7 @@ interface RenderFieldOptions {
 /**
  * Render a field using custom renderer or default input
  */
-function renderField(field: FieldDefinition, options: RenderFieldOptions): JSX.Element {
+function renderField(field: FieldDefinition, options: RenderFieldOptions): ReactElement {
   const { register, control, readOnly } = options;
 
   // Check for custom field renderer from plugin registry
@@ -556,7 +557,7 @@ function renderDefaultFieldInput(
   field: FieldDefinition,
   register: ReturnType<typeof useForm>['register'],
   readOnly: boolean
-): JSX.Element {
+): ReactElement {
   const baseClassName = `kelta-resource-form__input kelta-resource-form__input--${field.type}`;
   const id = `field-${field.name}`;
 

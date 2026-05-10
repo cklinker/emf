@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { TwoColumnLayoutProps } from './types';
 
 /**
@@ -40,7 +41,7 @@ export function TwoColumnLayout({
   breakpoints = DEFAULT_BREAKPOINTS,
   collapsibleOnMobile = true,
   testId = 'kelta-two-column-layout',
-}: TwoColumnLayoutProps): JSX.Element {
+}: TwoColumnLayoutProps): ReactElement {
   const layoutStyle = {
     ...style,
     '--sidebar-width': sidebarWidth,

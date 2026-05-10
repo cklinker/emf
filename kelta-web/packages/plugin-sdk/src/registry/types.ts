@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { FieldDefinition, KeltaClient, User } from '@kelta/sdk';
 
 /**
@@ -28,7 +29,7 @@ export interface FieldRendererProps {
 /**
  * Field renderer component type
  */
-export type FieldRendererComponent = (props: FieldRendererProps) => JSX.Element;
+export type FieldRendererComponent = (props: FieldRendererProps) => ReactElement;
 
 /**
  * Props passed to page components
@@ -53,7 +54,7 @@ export interface PageComponentProps {
 /**
  * Page component type
  */
-export type PageComponent = (props: PageComponentProps) => JSX.Element;
+export type PageComponent = (props: PageComponentProps) => ReactElement;
 
 /**
  * Registered page component with route

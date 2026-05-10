@@ -15,6 +15,7 @@ import io.kelta.runtime.formula.FormulaEvaluator;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.storage.PhysicalTableStorageAdapter;
 import io.kelta.runtime.storage.StorageAdapter;
+import io.kelta.runtime.storage.TableRef;
 import io.kelta.runtime.validation.CustomValidationRuleEngine;
 import io.kelta.runtime.validation.OperationType;
 import io.kelta.runtime.validation.TypeCoercionService;
@@ -796,13 +797,16 @@ public class DefaultQueryEngine implements QueryEngine {
             return null;
         }
 
-        String childTable = resolveTableName(childDef);
+        TableRef childTable = resolveTableRef(childDef);
         String fkColumn = resolveColumnName(childDef, foreignKeyField);
         String aggColumn = aggregateField == null ? null : resolveColumnName(childDef, aggregateField);
 
         try {
-            return rollupSummaryService.compute(childTable, fkColumn, parentId.toString(),
+            Object value = rollupSummaryService.compute(childTable, fkColumn, parentId.toString(),
                     aggregateFunction, aggColumn, filter);
+            logger.debug("Rollup '{}' = {} ({} on {}.{})", field.name(), value,
+                    aggregateFunction, childTable.toSql(), aggColumn != null ? aggColumn : "*");
+            return value;
         } catch (RuntimeException e) {
             logger.warn("Rollup compute failed for field '{}' on collection '{}': {}",
                     field.name(), childDef.name(), e.getMessage());
@@ -810,11 +814,24 @@ public class DefaultQueryEngine implements QueryEngine {
         }
     }
 
-    private String resolveTableName(CollectionDefinition def) {
-        if (def.storageConfig() != null && def.storageConfig().tableName() != null) {
-            return def.storageConfig().tableName();
+    /**
+     * Resolves the schema-qualified table reference for a child collection,
+     * mirroring {@link io.kelta.runtime.storage.PhysicalTableStorageAdapter}'s
+     * tenant-schema rules. Tenant collections route to the current tenant's
+     * schema; system collections stay in the public schema.
+     */
+    private TableRef resolveTableRef(CollectionDefinition def) {
+        String tableName = def.storageConfig() != null && def.storageConfig().tableName() != null
+                ? def.storageConfig().tableName()
+                : def.name();
+        if (def.systemCollection()) {
+            return TableRef.publicSchema(tableName);
         }
-        return def.name();
+        String tenantSlug = io.kelta.runtime.context.TenantContext.getSlug();
+        if (tenantSlug != null && !tenantSlug.isBlank()) {
+            return TableRef.tenantSchema(tenantSlug, tableName);
+        }
+        return TableRef.publicSchema(tableName);
     }
 
     private String resolveColumnName(CollectionDefinition def, String fieldName) {

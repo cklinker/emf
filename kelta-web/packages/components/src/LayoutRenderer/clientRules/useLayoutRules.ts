@@ -26,10 +26,19 @@ export interface UseLayoutRulesResult {
   diagnostics: RuleEngineDiagnostic[];
   /** Whether a field is a compute target (render as read-only with ƒ adornment). */
   isComputed: (field: string) => boolean;
-  /** Run one onChange tick — call from your form's field-change handler. */
-  onFieldChange: (field: string) => void;
+  /**
+   * Run one onChange tick — call from your form's field-change handler.
+   *
+   * Pass the post-mutation values map as the second argument to bypass the
+   * stale-closure / async-setState race: with plain useState, calling
+   * `setFormData(prev => ({...prev, name: value}))` does NOT make the new
+   * value visible to the engine until React re-renders and our `values`
+   * prop updates. Supply `nextValues` so the engine sees the fresh value
+   * immediately.
+   */
+  onFieldChange: (field: string, nextValues?: Record<string, unknown>) => void;
   /** Run one onBlur tick — call from your input onBlur handler. */
-  onFieldBlur: (field: string) => void;
+  onFieldBlur: (field: string, nextValues?: Record<string, unknown>) => void;
   /** Run before-save checks. Block submission when blocked === true. */
   runBeforeSave: () => BeforeSaveResult;
 }
@@ -92,14 +101,19 @@ export function useLayoutRules(opts: UseLayoutRulesOptions): UseLayoutRulesResul
   }, [engine, binding]);
 
   const onFieldChange = useCallback(
-    (field: string) => {
+    (field: string, nextValues?: Record<string, unknown>) => {
+      // Override the ref with caller-supplied fresh values BEFORE the engine
+      // reads them. Avoids the React useState/useRef race where the engine
+      // would otherwise read pre-change values.
+      if (nextValues) valuesRef.current = nextValues;
       engine?.onFieldChange(field, binding);
     },
     [engine, binding]
   );
 
   const onFieldBlur = useCallback(
-    (field: string) => {
+    (field: string, nextValues?: Record<string, unknown>) => {
+      if (nextValues) valuesRef.current = nextValues;
       engine?.onFieldBlur(field, binding);
     },
     [engine, binding]

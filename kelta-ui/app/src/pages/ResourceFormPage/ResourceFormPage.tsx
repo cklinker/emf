@@ -11,7 +11,7 @@
  * - 12.4: Use custom field renderers when registered, fall back to defaults
  */
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
@@ -963,33 +963,37 @@ export function ResourceFormPage({
   /**
    * Handle field value change
    */
+  // Mirror formData in a ref so handleFieldChange can compute the post-mutation
+  // values map and pass it straight into the engine, bypassing the
+  // useState/useRef async-update race that would otherwise have the engine
+  // evaluate against stale values.
+  const formDataRef = useRef(formData)
+  formDataRef.current = formData
+
   const handleFieldChange = useCallback(
     (fieldName: string, value: unknown) => {
-      setFormData((prev) => ({
-        ...prev,
-        [fieldName]: value,
-      }))
+      const next = { ...formDataRef.current, [fieldName]: value }
+      formDataRef.current = next
+      setFormData(next)
 
       // Clear error when field is modified
       if (formErrors[fieldName]) {
         setFormErrors((prev) => {
-          const next = { ...prev }
-          delete next[fieldName]
-          return next
+          const errNext = { ...prev }
+          delete errNext[fieldName]
+          return errNext
         })
       }
 
-      // Drive the layout-rules engine: cascade computes/validations triggered
-      // by this field. The engine writes back via setFieldValue (above), so
-      // dependent fields update in the same render cycle.
-      ruleEngine.onFieldChange(fieldName)
+      // Drive the layout-rules engine with the freshly computed values map.
+      ruleEngine.onFieldChange(fieldName, next)
     },
     [formErrors, ruleEngine]
   )
 
   const handleFieldBlur = useCallback(
     (fieldName: string) => {
-      ruleEngine.onFieldBlur(fieldName)
+      ruleEngine.onFieldBlur(fieldName, formDataRef.current)
     },
     [ruleEngine],
   )

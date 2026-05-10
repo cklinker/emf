@@ -170,6 +170,8 @@ export class DataFactory {
       displayName: string;
       type: string;
       required?: boolean;
+      referenceTarget?: string;
+      fieldTypeConfig?: Record<string, unknown>;
     },
   ): Promise<JsonApiResource> {
     const result = await this.request(
@@ -220,6 +222,17 @@ export class DataFactory {
     throw new Error(
       `createRecord for '${collectionName}' failed after ${MAX_RETRIES} retries`,
     );
+  }
+
+  async getRecord(
+    collectionName: string,
+    id: string,
+  ): Promise<JsonApiResource> {
+    const result = await this.request(
+      "GET",
+      `/api/${collectionName}/${id}`,
+    );
+    return result.data as JsonApiResource;
   }
 
   /**

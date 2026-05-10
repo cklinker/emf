@@ -927,4 +927,155 @@ describe('FieldEditor Integration', () => {
       expect(onSave).toHaveBeenCalled()
     })
   })
+
+  describe('Rollup Summary configuration', () => {
+    const defaultProps = {
+      collectionId: 'col-123',
+      onSave: vi.fn().mockResolvedValue(undefined),
+      onCancel: vi.fn(),
+    }
+    const childFields = [
+      { name: 'orderId', displayName: 'Order', type: 'master_detail' as const, referenceTarget: 'orders' },
+      { name: 'amount', displayName: 'Amount', type: 'number' as const },
+      { name: 'placedAt', displayName: 'Placed At', type: 'datetime' as const },
+      { name: 'note', displayName: 'Note', type: 'string' as const },
+    ]
+
+    function renderRollupForm(opts?: { fetcher?: ReturnType<typeof vi.fn> }) {
+      const fetcher = opts?.fetcher ?? vi.fn().mockResolvedValue(childFields)
+      const onSave = vi.fn().mockResolvedValue(undefined)
+      const utils = renderWithProviders(
+        <FieldEditor
+          {...defaultProps}
+          collectionName="orders"
+          collections={mockCollections}
+          fetchCollectionFields={fetcher}
+          onSave={onSave}
+        />
+      )
+      return { ...utils, fetcher, onSave }
+    }
+
+    it('renders no rollup config block by default', () => {
+      renderRollupForm()
+      expect(screen.queryByTestId('rollup-config')).not.toBeInTheDocument()
+    })
+
+    it('reveals rollup config inputs when rollup_summary is selected', async () => {
+      const user = userEvent.setup()
+      renderRollupForm()
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'rollup_summary')
+
+      expect(screen.getByTestId('rollup-config')).toBeInTheDocument()
+      expect(screen.getByTestId('field-rollup-child-select')).toBeInTheDocument()
+      expect(screen.getByTestId('field-rollup-fn-select')).toBeInTheDocument()
+    })
+
+    it('builds fieldTypeConfig on submit including aggregateField for SUM', async () => {
+      const user = userEvent.setup()
+      const { onSave, fetcher } = renderRollupForm()
+
+      await user.type(screen.getByTestId('field-name-input'), 'total_amount')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'rollup_summary')
+      await user.selectOptions(screen.getByTestId('field-rollup-child-select'), 'products')
+      await waitFor(() => expect(fetcher).toHaveBeenCalledWith('products'))
+
+      await user.selectOptions(screen.getByTestId('field-rollup-fk-select'), 'orderId')
+      await user.selectOptions(screen.getByTestId('field-rollup-fn-select'), 'SUM')
+      await user.selectOptions(screen.getByTestId('field-rollup-field-select'), 'amount')
+
+      await user.click(screen.getByTestId('field-editor-submit'))
+
+      await waitFor(() => expect(onSave).toHaveBeenCalled())
+      const submitted = onSave.mock.calls[0][0]
+      expect(submitted.type).toBe('rollup_summary')
+      expect(submitted.fieldTypeConfig).toEqual({
+        childCollection: 'products',
+        foreignKeyField: 'orderId',
+        aggregateFunction: 'SUM',
+        aggregateField: 'amount',
+      })
+    })
+
+    it('omits aggregateField for COUNT and skips the field selector', async () => {
+      const user = userEvent.setup()
+      const { onSave } = renderRollupForm()
+
+      await user.type(screen.getByTestId('field-name-input'), 'line_count')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'rollup_summary')
+      await user.selectOptions(screen.getByTestId('field-rollup-child-select'), 'products')
+      await waitFor(() =>
+        expect(screen.getByTestId('field-rollup-fk-select')).not.toBeDisabled()
+      )
+      await user.selectOptions(screen.getByTestId('field-rollup-fk-select'), 'orderId')
+      await user.selectOptions(screen.getByTestId('field-rollup-fn-select'), 'COUNT')
+
+      expect(screen.queryByTestId('field-rollup-field-select')).not.toBeInTheDocument()
+
+      await user.click(screen.getByTestId('field-editor-submit'))
+      await waitFor(() => expect(onSave).toHaveBeenCalled())
+      expect(onSave.mock.calls[0][0].fieldTypeConfig).toEqual({
+        childCollection: 'products',
+        foreignKeyField: 'orderId',
+        aggregateFunction: 'COUNT',
+      })
+    })
+
+    it('blocks submit when child collection is missing', async () => {
+      const user = userEvent.setup()
+      const { onSave } = renderRollupForm()
+
+      await user.type(screen.getByTestId('field-name-input'), 'total')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'rollup_summary')
+      await user.click(screen.getByTestId('field-editor-submit'))
+
+      await new Promise((r) => setTimeout(r, 50))
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('pre-populates rollup config from existing fieldTypeConfig in edit mode', () => {
+      const existing: FieldDefinition = {
+        id: 'rollup-1',
+        name: 'total_amount',
+        type: 'rollup_summary',
+        required: false,
+        unique: false,
+        indexed: false,
+        order: 0,
+        fieldTypeConfig: {
+          childCollection: 'products',
+          foreignKeyField: 'orderId',
+          aggregateFunction: 'AVG',
+          aggregateField: 'amount',
+        },
+      }
+      renderRollupForm()
+      renderWithProviders(
+        <FieldEditor
+          {...defaultProps}
+          collectionName="orders"
+          collections={mockCollections}
+          fetchCollectionFields={vi.fn().mockResolvedValue(childFields)}
+          field={existing}
+        />
+      )
+
+      const editorNodes = screen.getAllByTestId('rollup-config')
+      expect(editorNodes.length).toBeGreaterThan(0)
+      expect(screen.getAllByTestId('field-rollup-child-select')[0]).toHaveValue('products')
+      expect(screen.getAllByTestId('field-rollup-fn-select')[0]).toHaveValue('AVG')
+    })
+
+    it('renders the warning sigil rather than literal "u26A0" on errors', async () => {
+      const user = userEvent.setup()
+      renderRollupForm()
+      await user.click(screen.getByTestId('field-editor-submit'))
+
+      await waitFor(() => expect(screen.getByTestId('field-name-error')).toBeInTheDocument())
+      const styles = window.getComputedStyle(screen.getByTestId('field-name-error'), '::before')
+      // jsdom returns the raw declared value; ensure we never carry the
+      // literal "u26A0" escape that would render as text.
+      expect(styles.content || '').not.toContain('u26A0')
+    })
+  })
 })

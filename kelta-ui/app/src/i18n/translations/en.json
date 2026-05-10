@@ -1195,6 +1195,26 @@
     "descriptionPlaceholder": "Enter a description for this field...",
     "trackHistory": "Track History",
     "searchable": "Searchable",
+    "rollup": {
+      "title": "Rollup Summary Configuration",
+      "childCollection": "Child Collection",
+      "childCollectionHint": "Collection containing the records to aggregate.",
+      "foreignKey": "Foreign Key Field",
+      "foreignKeyHint": "Master-detail field on the child collection that points back to this collection.",
+      "selectForeignKey": "Select a foreign key field...",
+      "function": "Aggregate Function",
+      "selectFunction": "Select a function...",
+      "fn": {
+        "count": "COUNT — number of child records",
+        "sum": "SUM — total of a numeric field",
+        "avg": "AVG — average of a numeric field",
+        "min": "MIN — minimum value",
+        "max": "MAX — maximum value"
+      },
+      "field": "Aggregate Field",
+      "fieldHint": "Field on the child collection to aggregate. Numeric for SUM/AVG; numeric or date for MIN/MAX.",
+      "selectField": "Select a field..."
+    },
     "validation": {
       "nameRequired": "Field name is required",
       "nameTooLong": "Field name must be 50 characters or less",
@@ -1203,6 +1223,10 @@
       "typeRequired": "Field type is required",
       "referenceTargetRequired": "Target collection is required for reference fields",
       "picklistRequired": "A global picklist is required for picklist fields",
+      "rollupChildCollectionRequired": "Child collection is required for rollup fields",
+      "rollupForeignKeyRequired": "Foreign key field is required for rollup fields",
+      "rollupFunctionRequired": "Aggregate function is required for rollup fields",
+      "rollupFieldRequired": "Aggregate field is required for SUM, AVG, MIN, and MAX",
       "descriptionTooLong": "Description must be 500 characters or less"
     }
   },

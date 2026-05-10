@@ -666,7 +666,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param camelCase the camelCase string
      * @return the snake_case equivalent
      */
-    static String toSnakeCase(String camelCase) {
+    public static String toSnakeCase(String camelCase) {
         if (camelCase == null || camelCase.isBlank()) {
             return camelCase;
         }

@@ -19,5 +19,8 @@ export type {
   ValidationRuleType,
   CollectionSummary,
   PicklistSummary,
+  RollupAggregateFunction,
+  RollupChildField,
+  FetchCollectionFields,
 } from './FieldEditor'
 export { default } from './FieldEditor'

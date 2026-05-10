@@ -19,7 +19,6 @@ import {
   Lock,
   Hash,
   Calculator,
-  Sigma,
   Check,
   X,
   Copy,
@@ -399,12 +398,7 @@ export function FieldRenderer({
     }
 
     case 'rollup_summary': {
-      return (
-        <span className={cn('inline-flex items-center gap-1 font-mono tabular-nums', className)}>
-          <Sigma className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-          {formatNumber(value)}
-        </span>
-      )
+      return <span className={cn('font-mono tabular-nums', className)}>{formatNumber(value)}</span>
     }
 
     case 'geolocation': {

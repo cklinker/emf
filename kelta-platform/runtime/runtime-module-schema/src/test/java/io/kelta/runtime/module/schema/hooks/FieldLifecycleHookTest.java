@@ -147,5 +147,84 @@ class FieldLifecycleHookTest {
             BeforeSaveResult result = hook.beforeCreate(new HashMap<>(Map.of("name", "description")), "t1");
             assertTrue(result.isSuccess());
         }
+
+        @Test
+        @DisplayName("Should normalize lowercase 'rollup_summary' to canonical 'ROLLUP_SUMMARY'")
+        void shouldNormalizeRollupSummary() {
+            Map<String, Object> record = new HashMap<>(Map.of("name", "total", "type", "rollup_summary"));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertTrue(result.hasFieldUpdates());
+            assertEquals("ROLLUP_SUMMARY", result.getFieldUpdates().get("type"));
+        }
+
+        @Test
+        @DisplayName("Should map UI synonym 'number' to canonical 'DOUBLE'")
+        void shouldMapNumberToDouble() {
+            Map<String, Object> record = new HashMap<>(Map.of("name", "amount", "type", "number"));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertEquals("DOUBLE", result.getFieldUpdates().get("type"));
+        }
+
+        @Test
+        @DisplayName("Should map UI synonym 'reference' to canonical 'MASTER_DETAIL'")
+        void shouldMapReferenceToMasterDetail() {
+            Map<String, Object> record = new HashMap<>(Map.of("name", "owner", "type", "reference"));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertEquals("MASTER_DETAIL", result.getFieldUpdates().get("type"));
+        }
+
+        @Test
+        @DisplayName("Should leave already-canonical type unchanged")
+        void shouldLeaveCanonicalTypeUnchanged() {
+            Map<String, Object> record = new HashMap<>(Map.of(
+                    "name", "total", "type", "ROLLUP_SUMMARY", "active", true));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertFalse(result.hasFieldUpdates(),
+                    "canonical type + active set should not produce updates");
+        }
+    }
+
+    @Nested
+    @DisplayName("beforeUpdate")
+    class BeforeUpdate {
+
+        @Test
+        @DisplayName("Should normalize a lowercase type passed during update")
+        void shouldNormalizeTypeOnUpdate() {
+            Map<String, Object> record = new HashMap<>(Map.of("type", "rollup_summary"));
+            BeforeSaveResult result = hook.beforeUpdate("id-1", record, Map.of(), "t1");
+            assertTrue(result.isSuccess());
+            assertEquals("ROLLUP_SUMMARY", result.getFieldUpdates().get("type"));
+        }
+
+        @Test
+        @DisplayName("Should pass through canonical type without updates")
+        void shouldPassThroughCanonical() {
+            Map<String, Object> record = new HashMap<>(Map.of("type", "STRING"));
+            BeforeSaveResult result = hook.beforeUpdate("id-1", record, Map.of(), "t1");
+            assertTrue(result.isSuccess());
+            assertFalse(result.hasFieldUpdates());
+        }
+
+        @Test
+        @DisplayName("Should reject invalid type on update")
+        void shouldRejectInvalidTypeOnUpdate() {
+            Map<String, Object> record = new HashMap<>(Map.of("type", "BOGUS"));
+            BeforeSaveResult result = hook.beforeUpdate("id-1", record, Map.of(), "t1");
+            assertFalse(result.isSuccess());
+        }
+
+        @Test
+        @DisplayName("Should be a no-op when type is absent")
+        void shouldNoOpWithoutType() {
+            BeforeSaveResult result = hook.beforeUpdate("id-1",
+                    new HashMap<>(Map.of("displayName", "X")), Map.of(), "t1");
+            assertTrue(result.isSuccess());
+            assertFalse(result.hasFieldUpdates());
+        }
     }
 }

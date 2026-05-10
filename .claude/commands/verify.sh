@@ -16,7 +16,7 @@ fail() { echo "FAILED: $1" >&2; exit 1; }
 step "1/5 build runtime modules"
 mvn clean install -DskipTests \
   -f kelta-platform/pom.xml \
-  -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
+  -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
   -am -B \
   || fail "runtime build"
 

@@ -18,6 +18,9 @@ import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../com
 import { useCollectionSummaries, type CollectionSummary } from '../../hooks/useCollectionSummaries'
 import { cn } from '@/lib/utils'
 import { RulesEditor } from './RulesEditor'
+import { AssignmentRulesEditor } from './components/AssignmentRulesEditor'
+import { LayoutEditorList } from './components/LayoutEditorList'
+import type { FilterExpression } from '@/components/FilterBuilder'
 
 import {
   LayoutEditorProvider,
@@ -74,6 +77,10 @@ interface PageLayoutDetail {
   isDefault: boolean
   sections: ApiSection[]
   relatedLists: ApiRelatedList[]
+  defaultFilter?: FilterExpression | null
+  defaultSortField?: string | null
+  defaultSortDirection?: 'ASC' | 'DESC' | null
+  defaultRowLimit?: number | null
   createdAt: string
   updatedAt: string
 }
@@ -942,6 +949,59 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
     )
   }
 
+  if (layoutDetail?.layoutType === 'LIST' && !collectionDetail) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <LoadingSpinner size="large" label="Loading layout..." />
+      </div>
+    )
+  }
+
+  if (layoutDetail?.layoutType === 'LIST' && collectionDetail) {
+    const firstSection = layoutDetail.sections[0]
+    const fieldMap = new Map(collectionDetail.fields.map((f) => [f.id, f]))
+    const initialColumns = (firstSection?.fields ?? [])
+      .slice()
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map((fp) => {
+        const field = fieldMap.get(fp.fieldId)
+        return {
+          id: fp.id,
+          serverId: fp.id,
+          fieldId: fp.fieldId,
+          fieldName: field?.name,
+          fieldDisplayName: field?.displayName ?? field?.name,
+          fieldType: field?.type,
+          columnSpan: fp.columnSpan ?? 1,
+          labelOverride: fp.labelOverride,
+        }
+      })
+
+    const availableFieldOptions = collectionDetail.fields.map((f) => ({
+      id: f.id,
+      name: f.name,
+      displayName: f.displayName || f.name,
+    }))
+
+    return (
+      <LayoutEditorList
+        initialData={{
+          layoutId: layoutDetail.id,
+          collectionId: layoutDetail.collectionId,
+          layoutName: layoutDetail.name,
+          sectionId: firstSection?.id,
+          initialColumns,
+          defaultFilter: layoutDetail.defaultFilter ?? null,
+          defaultSortField: layoutDetail.defaultSortField ?? undefined,
+          defaultSortDirection: layoutDetail.defaultSortDirection ?? 'ASC',
+          defaultRowLimit: layoutDetail.defaultRowLimit ?? 50,
+        }}
+        availableFields={availableFieldOptions}
+        onBack={handleBack}
+      />
+    )
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden" data-testid="layout-editor">
       <LayoutToolbar
@@ -993,6 +1053,9 @@ export function PageLayoutsPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [layoutToDelete, setLayoutToDelete] = useState<PageLayoutSummary | null>(null)
   const [rulesEditorLayout, setRulesEditorLayout] = useState<PageLayoutSummary | null>(null)
+  const [assignmentEditorLayout, setAssignmentEditorLayout] = useState<PageLayoutSummary | null>(
+    null
+  )
 
   const {
     data: layouts,
@@ -1302,6 +1365,15 @@ export function PageLayoutsPage({
                       </button>
                       <button
                         type="button"
+                        className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
+                        onClick={() => setAssignmentEditorLayout(layout)}
+                        aria-label={`Assignments for ${layout.name}`}
+                        data-testid={`assignments-button-${index}`}
+                      >
+                        Assignments
+                      </button>
+                      <button
+                        type="button"
                         className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-destructive transition-all duration-200 hover:border-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
                         onClick={() => handleDeleteClick(layout)}
                         aria-label={`Delete ${layout.name}`}
@@ -1334,6 +1406,16 @@ export function PageLayoutsPage({
           layoutName={rulesEditorLayout.name}
           fieldNames={[]}
           onClose={() => setRulesEditorLayout(null)}
+        />
+      )}
+
+      {assignmentEditorLayout && (
+        <AssignmentRulesEditor
+          open
+          onClose={() => setAssignmentEditorLayout(null)}
+          layoutId={assignmentEditorLayout.id}
+          layoutName={assignmentEditorLayout.name}
+          collectionId={assignmentEditorLayout.collectionId}
         />
       )}
 

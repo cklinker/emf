@@ -10,6 +10,14 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // Force a single React instance across the app and the file:-linked
+    // @kelta/components / @kelta/formula workspace packages. Without this,
+    // npm hoists a second react@18 inside packages/components/node_modules
+    // (because that package declares react ^18 as a peer/dev dep) while the
+    // app uses react@19 — calling a hook from the components bundle then
+    // hits a different ReactCurrentDispatcher and throws
+    // "Cannot read properties of null (reading 'useRef')".
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime'],
   },
   server: {
     port: 5174,

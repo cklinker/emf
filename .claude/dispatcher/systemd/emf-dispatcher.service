@@ -1,0 +1,43 @@
+[Unit]
+Description=EMF autopilot dispatcher (worker-01)
+Documentation=https://github.com/cklinker/emf/blob/main/.claude/dispatcher/README.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=craig
+Group=craig
+WorkingDirectory=/home/craig/GitHub/emf
+ExecStart=/bin/bash /home/craig/GitHub/emf/.claude/dispatcher/dispatch.sh
+
+# --- Environment ---
+Environment=MAX_PARALLEL=3
+Environment=TICK_SECONDS=30
+Environment=EMF_REPO=/home/craig/GitHub/emf
+Environment=EMF_QUEUE_REPO=/home/craig/GitHub/emf-queue
+Environment=EMF_WT_ROOT=/var/lib/emf-wt
+Environment=EMF_LOG_DIR=/var/log/emf-dispatcher
+Environment=ANTHROPIC_LOG=info
+# Make sure tmux + claude + gh + node + java are on PATH for non-login shells.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# --- Restart + safety ---
+Restart=always
+RestartSec=10
+TimeoutStartSec=60
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+
+# --- Logging ---
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=emf-dispatcher
+
+# --- Resource hints (workers run in tmux outside this cgroup) ---
+MemoryAccounting=yes
+CPUAccounting=yes
+
+[Install]
+WantedBy=multi-user.target

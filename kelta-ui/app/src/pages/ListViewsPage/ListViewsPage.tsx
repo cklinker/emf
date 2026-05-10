@@ -6,6 +6,7 @@ import { useCollectionSummaries, type CollectionSummary } from '../../hooks/useC
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import type { CreateListViewRequest } from '@kelta/sdk'
 import { cn } from '@/lib/utils'
+import { AdminDataTable, type AdminColumn } from '@/components/AdminDataTable'
 
 interface ListView {
   id: string
@@ -600,119 +601,79 @@ export function ListViewsPage({
           <p>No list views found.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table
-            className="w-full border-collapse text-sm"
-            role="grid"
-            aria-label="List Views"
-            data-testid="listviews-table"
-          >
-            <thead>
-              <tr role="row" className="bg-muted">
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Name
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Collection
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Visibility
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Created By
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Created
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {listViewList.map((lv, index) => (
-                <tr
-                  key={lv.id}
-                  role="row"
-                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
-                  data-testid={`listview-row-${index}`}
-                >
-                  <td role="gridcell" className="px-4 py-3 text-foreground">
-                    {lv.name}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-foreground">
-                    {getCollectionName(lv.collectionId)}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3">
+        <div
+          className="overflow-x-auto rounded-lg border border-border bg-card"
+          role="grid"
+          aria-label="List Views"
+          data-testid="listviews-table"
+        >
+          <AdminDataTable
+            tableId="list-views"
+            rows={listViewList}
+            rowKey={(lv) => lv.id}
+            columns={
+              [
+                { id: 'name', header: 'Name', accessor: (r) => r.name },
+                {
+                  id: 'collection',
+                  header: 'Collection',
+                  accessor: (r) => getCollectionName(r.collectionId),
+                },
+                {
+                  id: 'visibility',
+                  header: 'Visibility',
+                  accessor: (r) => r.visibility,
+                  cell: (r) => (
                     <span
                       className={cn(
                         'inline-block rounded px-2 py-0.5 text-xs font-medium',
-                        getVisibilityBadgeClass(lv.visibility)
+                        getVisibilityBadgeClass(r.visibility)
                       )}
                     >
-                      {lv.visibility}
+                      {r.visibility}
                     </span>
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-foreground">
-                    {lv.createdBy}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-foreground">
-                    {formatDate(new Date(lv.createdAt), {
+                  ),
+                },
+                { id: 'createdBy', header: 'Created By', accessor: (r) => r.createdBy },
+                {
+                  id: 'createdAt',
+                  header: 'Created',
+                  accessor: (r) => r.createdAt,
+                  cell: (r) =>
+                    formatDate(new Date(r.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
-                    })}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
-                        onClick={() => handleEdit(lv)}
-                        aria-label={`Edit ${lv.name}`}
-                        data-testid={`edit-button-${index}`}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteClick(lv)}
-                        aria-label={`Delete ${lv.name}`}
-                        data-testid={`delete-button-${index}`}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    }),
+                },
+              ] as AdminColumn<ListView>[]
+            }
+            renderActions={(lv) => {
+              const index = listViewList.indexOf(lv)
+              return (
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
+                    onClick={() => handleEdit(lv)}
+                    aria-label={`Edit ${lv.name}`}
+                    data-testid={`edit-button-${index}`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
+                    onClick={() => handleDeleteClick(lv)}
+                    aria-label={`Delete ${lv.name}`}
+                    data-testid={`delete-button-${index}`}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )
+            }}
+          />
         </div>
       )}
 

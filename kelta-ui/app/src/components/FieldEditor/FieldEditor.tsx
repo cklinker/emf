@@ -25,7 +25,7 @@
  * - Accessible with keyboard navigation and ARIA attributes
  */
 
-import React, { useEffect, useCallback, useMemo } from 'react'
+import React, { useEffect, useCallback, useMemo, useState } from 'react'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -115,17 +115,43 @@ export interface PicklistSummary {
 }
 
 /**
+ * Aggregate function options for rollup_summary fields.
+ */
+export type RollupAggregateFunction = 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX'
+
+/**
+ * Minimal field info exposed to the rollup config picker.
+ */
+export interface RollupChildField {
+  name: string
+  displayName?: string
+  type: FieldType
+  referenceTarget?: string
+}
+
+/**
+ * Async loader used by the rollup config block to fetch child collection
+ * fields once the user picks a child collection. Page-level concern; the
+ * component falls back to an empty list when not provided.
+ */
+export type FetchCollectionFields = (collectionName: string) => Promise<RollupChildField[]>
+
+/**
  * Props for the FieldEditor component
  */
 export interface FieldEditorProps {
   /** Collection ID for context */
   collectionId: string
+  /** Parent collection name (required when configuring rollup_summary fields) */
+  collectionName?: string
   /** Existing field for edit mode */
   field?: FieldDefinition
   /** Available collections for reference field dropdown */
   collections?: CollectionSummary[]
   /** Available global picklists for picklist field dropdown */
   picklists?: PicklistSummary[]
+  /** Loader for child collection fields (used by rollup_summary config) */
+  fetchCollectionFields?: FetchCollectionFields
   /** Callback when form is submitted */
   onSave: (field: FieldDefinition) => Promise<void>
   /** Callback when form is cancelled */
@@ -255,6 +281,10 @@ export const fieldEditorSchema = z
     currencyCode: z.string().max(3).optional().or(z.literal('')),
     currencyPrecision: z.coerce.number().min(0).max(6).optional(),
     globalPicklistId: z.string().optional().or(z.literal('')),
+    rollupChildCollection: z.string().optional().or(z.literal('')),
+    rollupForeignKey: z.string().optional().or(z.literal('')),
+    rollupFunction: z.enum(['COUNT', 'SUM', 'AVG', 'MIN', 'MAX']).optional(),
+    rollupField: z.string().optional().or(z.literal('')),
     description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
     trackHistory: z.boolean(),
     searchable: z.boolean(),
@@ -284,6 +314,47 @@ export const fieldEditorSchema = z
     {
       message: 'validation.picklistRequired',
       path: ['globalPicklistId'],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.type !== 'rollup_summary') return true
+      return !!data.rollupChildCollection
+    },
+    {
+      message: 'validation.rollupChildCollectionRequired',
+      path: ['rollupChildCollection'],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.type !== 'rollup_summary') return true
+      return !!data.rollupForeignKey
+    },
+    {
+      message: 'validation.rollupForeignKeyRequired',
+      path: ['rollupForeignKey'],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.type !== 'rollup_summary') return true
+      return !!data.rollupFunction
+    },
+    {
+      message: 'validation.rollupFunctionRequired',
+      path: ['rollupFunction'],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.type !== 'rollup_summary') return true
+      if (data.rollupFunction === 'COUNT') return true
+      return !!data.rollupField
+    },
+    {
+      message: 'validation.rollupFieldRequired',
+      path: ['rollupField'],
     }
   )
 
@@ -323,9 +394,11 @@ const errorInputClasses = 'border-destructive focus:border-destructive focus:rin
 export function FieldEditor({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   collectionId,
+  collectionName,
   field,
   collections = [],
   picklists = [],
+  fetchCollectionFields,
   onSave,
   onCancel,
   isSubmitting = false,
@@ -375,6 +448,10 @@ export function FieldEditor({
       currencyCode: (parsedConfig.currencyCode as string) ?? '',
       currencyPrecision: (parsedConfig.precision as number) ?? 2,
       globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
+      rollupChildCollection: (parsedConfig.childCollection as string) ?? '',
+      rollupForeignKey: (parsedConfig.foreignKeyField as string) ?? '',
+      rollupFunction: (parsedConfig.aggregateFunction as RollupAggregateFunction) ?? undefined,
+      rollupField: (parsedConfig.aggregateField as string) ?? '',
       description: field?.description ?? '',
       trackHistory: field?.trackHistory ?? false,
       searchable: field?.searchable ?? false,
@@ -406,11 +483,74 @@ export function FieldEditor({
   // Watch field type to show/hide reference target and validation rules
   // eslint-disable-next-line react-hooks/incompatible-library
   const watchedType = watch('type')
+  const watchedRollupChild = watch('rollupChildCollection')
+  const watchedRollupFn = watch('rollupFunction')
 
   // Get available validation rules for current field type
   const availableValidationRules = useMemo(() => {
     return VALIDATION_RULES_BY_TYPE[watchedType] || []
   }, [watchedType])
+
+  // Child collections eligible as rollup targets: those with a master_detail
+  // field whose referenceTarget is the parent collection. We can't tell from
+  // CollectionSummary alone, so we offer the full collection list and rely on
+  // foreign-key dropdown filtering once a child is picked.
+  const rollupChildOptions = useMemo(() => {
+    return collections.filter((c) => !collectionName || c.name !== collectionName)
+  }, [collections, collectionName])
+
+  // Lazily-loaded fields of the selected child collection. Populates the
+  // foreign-key and aggregate-field dropdowns.
+  const [childFields, setChildFields] = useState<RollupChildField[]>([])
+  const [childFieldsLoading, setChildFieldsLoading] = useState(false)
+
+  useEffect(() => {
+    if (watchedType !== 'rollup_summary' || !watchedRollupChild || !fetchCollectionFields) {
+      setChildFields([])
+      return
+    }
+    let cancelled = false
+    setChildFieldsLoading(true)
+    fetchCollectionFields(watchedRollupChild)
+      .then((fields) => {
+        if (!cancelled) setChildFields(fields)
+      })
+      .catch(() => {
+        if (!cancelled) setChildFields([])
+      })
+      .finally(() => {
+        if (!cancelled) setChildFieldsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [watchedType, watchedRollupChild, fetchCollectionFields])
+
+  // Foreign-key candidates: master_detail fields on the child pointing back
+  // at the parent collection. When parent name unknown, accept any
+  // master_detail.
+  const rollupForeignKeyOptions = useMemo(() => {
+    return childFields.filter(
+      (f) =>
+        f.type === 'master_detail' &&
+        (!collectionName || !f.referenceTarget || f.referenceTarget === collectionName)
+    )
+  }, [childFields, collectionName])
+
+  // Aggregate-field candidates: numeric for SUM/AVG, numeric/date/datetime
+  // for MIN/MAX, anything for COUNT (the field is unused).
+  const rollupAggregateFieldOptions = useMemo(() => {
+    if (watchedRollupFn === 'COUNT') return []
+    const numericTypes: FieldType[] = ['number', 'currency', 'percent']
+    const orderableTypes: FieldType[] = [...numericTypes, 'date', 'datetime']
+    if (watchedRollupFn === 'SUM' || watchedRollupFn === 'AVG') {
+      return childFields.filter((f) => numericTypes.includes(f.type))
+    }
+    if (watchedRollupFn === 'MIN' || watchedRollupFn === 'MAX') {
+      return childFields.filter((f) => orderableTypes.includes(f.type))
+    }
+    return childFields
+  }, [childFields, watchedRollupFn])
 
   // Reset form when field prop changes (for edit mode)
   useEffect(() => {
@@ -429,6 +569,11 @@ export function FieldEditor({
         currencyCode: (parsedConfig.currencyCode as string) ?? '',
         currencyPrecision: (parsedConfig.precision as number) ?? 2,
         globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
+        rollupChildCollection: (parsedConfig.childCollection as string) ?? '',
+        rollupForeignKey: (parsedConfig.foreignKeyField as string) ?? '',
+        rollupFunction:
+          (parsedConfig.aggregateFunction as RollupAggregateFunction) ?? undefined,
+        rollupField: (parsedConfig.aggregateField as string) ?? '',
         description: field.description ?? '',
         trackHistory: field.trackHistory ?? false,
         searchable: field.searchable ?? false,
@@ -510,6 +655,16 @@ export function FieldEditor({
         if (data.globalPicklistId) {
           fieldTypeConfig = { globalPicklistId: data.globalPicklistId }
         }
+      } else if (data.type === 'rollup_summary') {
+        const config: Record<string, unknown> = {
+          childCollection: data.rollupChildCollection,
+          foreignKeyField: data.rollupForeignKey,
+          aggregateFunction: data.rollupFunction,
+        }
+        if (data.rollupFunction !== 'COUNT' && data.rollupField) {
+          config.aggregateField = data.rollupField
+        }
+        fieldTypeConfig = config
       }
 
       const needsReferenceTarget = data.type === 'master_detail'
@@ -619,7 +774,7 @@ export function FieldEditor({
         {errors.name && (
           <span
             id="field-name-error"
-            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
             role="alert"
             data-testid="field-name-error"
           >
@@ -662,7 +817,7 @@ export function FieldEditor({
         {errors.displayName && (
           <span
             id="field-display-name-error"
-            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
             role="alert"
             data-testid="field-display-name-error"
           >
@@ -707,7 +862,7 @@ export function FieldEditor({
         {errors.type && (
           <span
             id="field-type-error"
-            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
             role="alert"
             data-testid="field-type-error"
           >
@@ -752,7 +907,7 @@ export function FieldEditor({
           {errors.referenceTarget && (
             <span
               id="field-reference-target-error"
-              className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
+              className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
               role="alert"
               data-testid="field-reference-target-error"
             >
@@ -799,7 +954,7 @@ export function FieldEditor({
           {errors.globalPicklistId && (
             <span
               id="field-global-picklist-error"
-              className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
+              className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
               role="alert"
               data-testid="field-global-picklist-error"
             >
@@ -892,6 +1047,204 @@ export function FieldEditor({
             data-testid="field-currency-precision-input"
             {...register('currencyPrecision')}
           />
+        </div>
+      )}
+
+      {/* Rollup Summary Config */}
+      {watchedType === 'rollup_summary' && (
+        <div
+          className="flex flex-col gap-4 p-4 bg-secondary border border-border rounded-md"
+          data-testid="rollup-config"
+        >
+          <h4 className="m-0 text-base font-medium text-foreground">
+            {t('fieldEditor.rollup.title')}
+          </h4>
+
+          {/* Child collection */}
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="field-rollup-child"
+              className="flex items-center gap-1 text-sm font-medium text-foreground"
+            >
+              {t('fieldEditor.rollup.childCollection')}
+              <span className="text-destructive font-semibold" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <select
+              id="field-rollup-child"
+              className={cn(selectClasses, errors.rollupChildCollection && errorInputClasses)}
+              disabled={isSubmitting}
+              aria-required="true"
+              aria-invalid={!!errors.rollupChildCollection}
+              aria-describedby={
+                errors.rollupChildCollection
+                  ? 'field-rollup-child-error'
+                  : 'field-rollup-child-hint'
+              }
+              data-testid="field-rollup-child-select"
+              {...register('rollupChildCollection')}
+            >
+              <option value="">{t('fieldEditor.selectCollection')}</option>
+              {rollupChildOptions.map((collection) => (
+                <option key={collection.id} value={collection.name}>
+                  {collection.displayName || collection.name}
+                </option>
+              ))}
+            </select>
+            {errors.rollupChildCollection && (
+              <span
+                id="field-rollup-child-error"
+                className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
+                role="alert"
+                data-testid="field-rollup-child-error"
+              >
+                {getErrorMessage(errors.rollupChildCollection.message)}
+              </span>
+            )}
+            <span id="field-rollup-child-hint" className="text-xs text-muted-foreground mt-1">
+              {t('fieldEditor.rollup.childCollectionHint')}
+            </span>
+          </div>
+
+          {/* Foreign key field */}
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="field-rollup-fk"
+              className="flex items-center gap-1 text-sm font-medium text-foreground"
+            >
+              {t('fieldEditor.rollup.foreignKey')}
+              <span className="text-destructive font-semibold" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <select
+              id="field-rollup-fk"
+              className={cn(selectClasses, errors.rollupForeignKey && errorInputClasses)}
+              disabled={isSubmitting || !watchedRollupChild || childFieldsLoading}
+              aria-required="true"
+              aria-invalid={!!errors.rollupForeignKey}
+              aria-describedby={
+                errors.rollupForeignKey ? 'field-rollup-fk-error' : 'field-rollup-fk-hint'
+              }
+              data-testid="field-rollup-fk-select"
+              {...register('rollupForeignKey')}
+            >
+              <option value="">
+                {childFieldsLoading
+                  ? t('common.loading')
+                  : t('fieldEditor.rollup.selectForeignKey')}
+              </option>
+              {rollupForeignKeyOptions.map((f) => (
+                <option key={f.name} value={f.name}>
+                  {f.displayName || f.name}
+                </option>
+              ))}
+            </select>
+            {errors.rollupForeignKey && (
+              <span
+                id="field-rollup-fk-error"
+                className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
+                role="alert"
+                data-testid="field-rollup-fk-error"
+              >
+                {getErrorMessage(errors.rollupForeignKey.message)}
+              </span>
+            )}
+            <span id="field-rollup-fk-hint" className="text-xs text-muted-foreground mt-1">
+              {t('fieldEditor.rollup.foreignKeyHint')}
+            </span>
+          </div>
+
+          {/* Aggregate function */}
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="field-rollup-fn"
+              className="flex items-center gap-1 text-sm font-medium text-foreground"
+            >
+              {t('fieldEditor.rollup.function')}
+              <span className="text-destructive font-semibold" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <select
+              id="field-rollup-fn"
+              className={cn(selectClasses, errors.rollupFunction && errorInputClasses)}
+              disabled={isSubmitting}
+              aria-required="true"
+              aria-invalid={!!errors.rollupFunction}
+              aria-describedby={errors.rollupFunction ? 'field-rollup-fn-error' : undefined}
+              data-testid="field-rollup-fn-select"
+              {...register('rollupFunction')}
+            >
+              <option value="">{t('fieldEditor.rollup.selectFunction')}</option>
+              <option value="COUNT">{t('fieldEditor.rollup.fn.count')}</option>
+              <option value="SUM">{t('fieldEditor.rollup.fn.sum')}</option>
+              <option value="AVG">{t('fieldEditor.rollup.fn.avg')}</option>
+              <option value="MIN">{t('fieldEditor.rollup.fn.min')}</option>
+              <option value="MAX">{t('fieldEditor.rollup.fn.max')}</option>
+            </select>
+            {errors.rollupFunction && (
+              <span
+                id="field-rollup-fn-error"
+                className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
+                role="alert"
+                data-testid="field-rollup-fn-error"
+              >
+                {getErrorMessage(errors.rollupFunction.message)}
+              </span>
+            )}
+          </div>
+
+          {/* Aggregate field (not used for COUNT) */}
+          {watchedRollupFn && watchedRollupFn !== 'COUNT' && (
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="field-rollup-field"
+                className="flex items-center gap-1 text-sm font-medium text-foreground"
+              >
+                {t('fieldEditor.rollup.field')}
+                <span className="text-destructive font-semibold" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <select
+                id="field-rollup-field"
+                className={cn(selectClasses, errors.rollupField && errorInputClasses)}
+                disabled={isSubmitting || !watchedRollupChild || childFieldsLoading}
+                aria-required="true"
+                aria-invalid={!!errors.rollupField}
+                aria-describedby={
+                  errors.rollupField ? 'field-rollup-field-error' : 'field-rollup-field-hint'
+                }
+                data-testid="field-rollup-field-select"
+                {...register('rollupField')}
+              >
+                <option value="">{t('fieldEditor.rollup.selectField')}</option>
+                {rollupAggregateFieldOptions.map((f) => (
+                  <option key={f.name} value={f.name}>
+                    {f.displayName || f.name}
+                  </option>
+                ))}
+              </select>
+              {errors.rollupField && (
+                <span
+                  id="field-rollup-field-error"
+                  className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
+                  role="alert"
+                  data-testid="field-rollup-field-error"
+                >
+                  {getErrorMessage(errors.rollupField.message)}
+                </span>
+              )}
+              <span
+                id="field-rollup-field-hint"
+                className="text-xs text-muted-foreground mt-1"
+              >
+                {t('fieldEditor.rollup.fieldHint')}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -993,7 +1346,7 @@ export function FieldEditor({
         {errors.description && (
           <span
             id="field-description-error"
-            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
             role="alert"
             data-testid="field-description-error"
           >

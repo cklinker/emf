@@ -6,6 +6,7 @@ import io.kelta.runtime.credential.CredentialTypeRegistry;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.runtime.query.DefaultQueryEngine;
 import io.kelta.runtime.query.QueryEngine;
+import io.kelta.runtime.service.RollupSummaryService;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.registry.ConcurrentCollectionRegistry;
 import io.kelta.runtime.router.DynamicCollectionRouter;
@@ -130,10 +131,12 @@ public class KeltaRuntimeAutoConfiguration {
                                     ValidationEngine validationEngine,
                                     @Autowired(required = false) CustomValidationRuleEngine customValidationRuleEngine,
                                     @Autowired(required = false) RecordEventPublisher recordEventPublisher,
-                                    @Autowired(required = false) BeforeSaveHookRegistry beforeSaveHookRegistry) {
+                                    @Autowired(required = false) BeforeSaveHookRegistry beforeSaveHookRegistry,
+                                    @Autowired(required = false) RollupSummaryService rollupSummaryService,
+                                    CollectionRegistry collectionRegistry) {
         return new DefaultQueryEngine(storageAdapter, validationEngine,
-                null, null, null, null, customValidationRuleEngine, recordEventPublisher,
-                beforeSaveHookRegistry);
+                null, null, null, rollupSummaryService, customValidationRuleEngine, recordEventPublisher,
+                beforeSaveHookRegistry, collectionRegistry);
     }
 
     /**

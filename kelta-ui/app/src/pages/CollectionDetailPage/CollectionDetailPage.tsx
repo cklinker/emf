@@ -22,6 +22,7 @@ import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../com
 import {
   FieldEditor,
   type FieldDefinition as FieldEditorDefinition,
+  type RollupChildField,
 } from '../../components/FieldEditor'
 import { ValidationRuleEditor } from '../../components/ValidationRuleEditor'
 import { RecordTypeEditor } from '../../components/RecordTypeEditor'
@@ -315,6 +316,30 @@ export function CollectionDetailPage({
 
   // Fetch all collections for reference field dropdown
   const { summaries: allCollectionSummaries } = useCollectionSummaries()
+
+  // Loader for child collection fields, used by the rollup_summary config UI
+  // in the FieldEditor. Fetches fresh on each invocation; cheap enough since
+  // it's only called when the user actively configures a rollup field.
+  const fetchChildCollectionFields = useCallback(
+    async (childCollectionName: string): Promise<RollupChildField[]> => {
+      const raw = await apiClient.get<{
+        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+      }>(`/api/collections/${encodeURIComponent(childCollectionName)}?include=fields`)
+      if (!raw.included) return []
+      return raw.included
+        .filter((r) => r.type === 'fields')
+        .map((r) => {
+          const attrs = r.attributes as Record<string, unknown>
+          return {
+            name: attrs.name as string,
+            displayName: (attrs.displayName as string | undefined) ?? undefined,
+            type: normalizeFieldType((attrs.type as string) ?? 'string'),
+            referenceTarget: (attrs.referenceTarget as string | undefined) ?? undefined,
+          }
+        })
+    },
+    [apiClient]
+  )
 
   // Fetch global picklists for picklist field dropdown
   const { data: globalPicklists = [] } = useQuery({
@@ -2202,6 +2227,7 @@ export function CollectionDetailPage({
           >
             <FieldEditor
               collectionId={collectionId}
+              collectionName={collection?.name}
               field={editingField}
               collections={allCollectionSummaries.map((c) => ({
                 id: c.id,
@@ -2212,6 +2238,7 @@ export function CollectionDetailPage({
                 id: p.id,
                 name: p.name,
               }))}
+              fetchCollectionFields={fetchChildCollectionFields}
               onSave={handleFieldSave}
               onCancel={handleFieldCancel}
               isSubmitting={addFieldMutation.isPending || updateFieldMutation.isPending}

@@ -12,6 +12,8 @@ import io.kelta.runtime.service.AutoNumberService;
 import io.kelta.runtime.service.FieldEncryptionService;
 import io.kelta.runtime.service.RollupSummaryService;
 import io.kelta.runtime.formula.FormulaEvaluator;
+import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.runtime.storage.PhysicalTableStorageAdapter;
 import io.kelta.runtime.storage.StorageAdapter;
 import io.kelta.runtime.validation.CustomValidationRuleEngine;
 import io.kelta.runtime.validation.OperationType;
@@ -65,6 +67,7 @@ public class DefaultQueryEngine implements QueryEngine {
     private final CustomValidationRuleEngine customValidationRuleEngine;
     private final RecordEventPublisher recordEventPublisher;
     private final BeforeSaveHookRegistry beforeSaveHookRegistry;
+    private final CollectionRegistry collectionRegistry;
 
     /**
      * Creates a new DefaultQueryEngine with all services including workflow engine.
@@ -85,6 +88,22 @@ public class DefaultQueryEngine implements QueryEngine {
                               CustomValidationRuleEngine customValidationRuleEngine,
                               RecordEventPublisher recordEventPublisher,
                               BeforeSaveHookRegistry beforeSaveHookRegistry) {
+        this(storageAdapter, validationEngine, encryptionService, autoNumberService,
+             formulaEvaluator, rollupSummaryService, customValidationRuleEngine,
+             recordEventPublisher, beforeSaveHookRegistry, null);
+    }
+
+    /**
+     * Creates a new DefaultQueryEngine with all services including the collection
+     * registry needed for ROLLUP_SUMMARY child-table resolution.
+     */
+    public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
+                              FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
+                              FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
+                              CustomValidationRuleEngine customValidationRuleEngine,
+                              RecordEventPublisher recordEventPublisher,
+                              BeforeSaveHookRegistry beforeSaveHookRegistry,
+                              CollectionRegistry collectionRegistry) {
         this.storageAdapter = Objects.requireNonNull(storageAdapter, "storageAdapter cannot be null");
         this.validationEngine = validationEngine;
         this.encryptionService = encryptionService;
@@ -94,6 +113,7 @@ public class DefaultQueryEngine implements QueryEngine {
         this.customValidationRuleEngine = customValidationRuleEngine;
         this.recordEventPublisher = recordEventPublisher;
         this.beforeSaveHookRegistry = beforeSaveHookRegistry;
+        this.collectionRegistry = collectionRegistry;
     }
 
     /**
@@ -727,17 +747,80 @@ public class DefaultQueryEngine implements QueryEngine {
     private void computeVirtualFields(CollectionDefinition definition, List<Map<String, Object>> records) {
         for (Map<String, Object> record : records) {
             for (FieldDefinition field : definition.fields()) {
-                // TODO: FORMULA and ROLLUP_SUMMARY require field-type-specific config
-                // (expression, childTable, etc.) which is not yet available on FieldDefinition.
-                // These will be wired once FieldDefinition carries a config map.
                 if (field.type() == FieldType.FORMULA && formulaEvaluator != null) {
-                    // Formula expression would come from field config; skip until available
+                    // FORMULA wiring tracked separately; same fieldTypeConfig path will host
+                    // the expression once the formula DSL stabilizes.
                     logger.debug("Skipping formula field '{}' — config not available on FieldDefinition", field.name());
                 } else if (field.type() == FieldType.ROLLUP_SUMMARY && rollupSummaryService != null) {
-                    // Rollup config would come from field config; skip until available
-                    logger.debug("Skipping rollup field '{}' — config not available on FieldDefinition", field.name());
+                    // TODO(perf): batch rollup compute via GROUP BY parent_fk when
+                    // result sets get large; current impl is one query per record.
+                    Object computed = computeRollupValue(field, record);
+                    if (computed != null) {
+                        record.put(field.name(), computed);
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * Resolves a single ROLLUP_SUMMARY field value for one parent record by
+     * delegating to {@link RollupSummaryService}. Returns null when the field
+     * config is incomplete or the child collection cannot be resolved.
+     */
+    private Object computeRollupValue(FieldDefinition field, Map<String, Object> record) {
+        Map<String, Object> cfg = field.fieldTypeConfig();
+        if (cfg == null || collectionRegistry == null) {
+            return null;
+        }
+        String childCollection = (String) cfg.get("childCollection");
+        String foreignKeyField = (String) cfg.get("foreignKeyField");
+        String aggregateFunction = (String) cfg.get("aggregateFunction");
+        String aggregateField = (String) cfg.get("aggregateField");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> filter = (Map<String, Object>) cfg.get("filter");
+        if (childCollection == null || foreignKeyField == null || aggregateFunction == null) {
+            logger.debug("Rollup field '{}' has incomplete config; skipping", field.name());
+            return null;
+        }
+
+        CollectionDefinition childDef = collectionRegistry.get(childCollection);
+        if (childDef == null) {
+            logger.debug("Rollup field '{}' references unknown child collection '{}'",
+                    field.name(), childCollection);
+            return null;
+        }
+
+        Object parentId = record.get("id");
+        if (parentId == null) {
+            return null;
+        }
+
+        String childTable = resolveTableName(childDef);
+        String fkColumn = resolveColumnName(childDef, foreignKeyField);
+        String aggColumn = aggregateField == null ? null : resolveColumnName(childDef, aggregateField);
+
+        try {
+            return rollupSummaryService.compute(childTable, fkColumn, parentId.toString(),
+                    aggregateFunction, aggColumn, filter);
+        } catch (RuntimeException e) {
+            logger.warn("Rollup compute failed for field '{}' on collection '{}': {}",
+                    field.name(), childDef.name(), e.getMessage());
+            return null;
+        }
+    }
+
+    private String resolveTableName(CollectionDefinition def) {
+        if (def.storageConfig() != null && def.storageConfig().tableName() != null) {
+            return def.storageConfig().tableName();
+        }
+        return def.name();
+    }
+
+    private String resolveColumnName(CollectionDefinition def, String fieldName) {
+        if (def.systemCollection()) {
+            return fieldName;
+        }
+        return PhysicalTableStorageAdapter.toSnakeCase(fieldName);
     }
 }

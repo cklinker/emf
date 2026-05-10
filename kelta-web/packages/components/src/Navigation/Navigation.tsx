@@ -199,7 +199,11 @@ export function Navigation({
   );
 
   // Render a menu item
-  const renderItem = (item: MenuItem, depth: number = 0, visibleItems: MenuItem[]): ReactElement => {
+  const renderItem = (
+    item: MenuItem,
+    depth: number = 0,
+    visibleItems: MenuItem[]
+  ): ReactElement => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems.has(item.id);
     const active = isActive(item.path) || hasActiveChild(item);

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, KeyboardEvent } from 'react';
+import type { ReactElement } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { NavigationProps, MenuItem } from './types';
 
@@ -40,7 +41,7 @@ export function Navigation({
   collapsible = false,
   className = '',
   testId = 'kelta-navigation',
-}: NavigationProps): JSX.Element {
+}: NavigationProps): ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -127,7 +128,7 @@ export function Navigation({
       }
 
       if (item.path) {
-        navigate(item.path);
+        void navigate(item.path);
       }
     },
     [navigate, toggleExpanded]
@@ -198,7 +199,7 @@ export function Navigation({
   );
 
   // Render a menu item
-  const renderItem = (item: MenuItem, depth: number = 0, visibleItems: MenuItem[]): JSX.Element => {
+  const renderItem = (item: MenuItem, depth: number = 0, visibleItems: MenuItem[]): ReactElement => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems.has(item.id);
     const active = isActive(item.path) || hasActiveChild(item);

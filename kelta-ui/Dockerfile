@@ -13,16 +13,18 @@ COPY kelta-web/package.json kelta-web/package-lock.json* kelta-web/tsconfig.json
 COPY kelta-web/packages/sdk/package.json ./kelta-web/packages/sdk/
 COPY kelta-web/packages/components/package.json ./kelta-web/packages/components/
 COPY kelta-web/packages/plugin-sdk/package.json ./kelta-web/packages/plugin-sdk/
+COPY kelta-web/packages/formula/package.json ./kelta-web/packages/formula/
 
 # Install kelta-web dependencies
 WORKDIR /app/kelta-web
 RUN npm install
 
-# Copy kelta-web source and build SDK + plugin-sdk + components
-# (components must be built before kelta-ui since kelta-ui imports from
-# `@kelta/components` and the package's main/module fields point to dist/)
+# Copy kelta-web source and build formula + sdk + plugin-sdk + components.
+# Build order matters: components imports @kelta/formula and @kelta/sdk via
+# package main/module fields (point to dist/), so those must build first.
 COPY kelta-web/packages ./packages
-RUN npm run build --workspace=packages/sdk \
+RUN npm run build --workspace=packages/formula \
+ && npm run build --workspace=packages/sdk \
  && npm run build --workspace=packages/plugin-sdk \
  && npm run build --workspace=packages/components
 

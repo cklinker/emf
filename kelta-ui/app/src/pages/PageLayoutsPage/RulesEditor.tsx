@@ -194,16 +194,25 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
       }
       return apiClient.post('/api/layout-rules', envelope)
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['layout-rules', layoutId] })
+    // Await the refetch before clearing the draft so the side panel reflects
+    // the new rule before the editor pane goes back to the empty state.
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['layout-rules', layoutId] })
+      await qc.refetchQueries({ queryKey: ['layout-rules', layoutId] })
       setDraft(null)
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => apiClient.delete(`/api/layout-rules/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['layout-rules', layoutId] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['layout-rules', layoutId] })
+      await qc.refetchQueries({ queryKey: ['layout-rules', layoutId] })
+    },
   })
+
+  const saveError = saveMutation.error as Error | null
+  const deleteError = deleteMutation.error as Error | null
 
   const formulaError = useMemo(
     () => (draft ? syntaxError(draft.formula) : null),
@@ -360,6 +369,16 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
                 formulaError={formulaError}
                 cycleError={cycleError}
               />
+            )}
+
+            {(saveError || deleteError) && (
+              <div
+                className="mt-4 rounded border border-destructive bg-destructive/10 p-2 text-xs text-destructive"
+                role="alert"
+                data-testid="rules-editor-server-error"
+              >
+                {(saveError ?? deleteError)?.message ?? 'Operation failed'}
+              </div>
             )}
 
             {draft && (

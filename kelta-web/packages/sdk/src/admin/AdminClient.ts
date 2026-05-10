@@ -147,6 +147,14 @@ import {
   extractMetadata,
   buildJsonApiParams,
 } from './jsonapi-helpers';
+import { evaluateFilter } from './filterEval';
+
+function specificity(a: LayoutAssignment, profileId?: string, recordTypeId?: string): number {
+  let score = 0;
+  if (profileId && a.profileId === profileId) score += 2;
+  if (recordTypeId && a.recordTypeId === recordTypeId) score += 1;
+  return score;
+}
 
 /**
  * Default theme and branding constants for bootstrap.
@@ -1226,38 +1234,57 @@ export class AdminClient {
 
     /**
      * Resolve layout for a collection by fetching assignments and picking the match.
-     * Replaces the old /control/layouts/resolve endpoint.
+     *
+     * Walks assignments in ascending evaluationOrder. For each candidate that
+     * matches the requested profile/recordType, evaluates the condition (if any)
+     * against the provided record. Returns the first conditional match; falls
+     * back to the first unconditional candidate. Within identical
+     * evaluationOrder, profile+recordType > profile-only > unconditional acts
+     * as the tiebreaker, preserving legacy resolution semantics.
      */
     resolve: async (
       collectionId: string,
       profileId?: string,
-      recordTypeId?: string
+      recordTypeId?: string,
+      record?: Record<string, unknown>
     ): Promise<PageLayout> => {
-      // Fetch all layout assignments for this collection
       const assignResponse = await this.axios.get(
         `/api/layout-assignments?filter[collectionId][eq]=${encodeURIComponent(collectionId)}`
       );
-      const assignments = unwrapJsonApiList<
-        LayoutAssignment & { layoutId: string; profileId?: string; recordTypeId?: string }
-      >(assignResponse.data);
+      const assignments = unwrapJsonApiList<LayoutAssignment>(assignResponse.data);
 
-      // Find best match: profile + recordType > profile > default
-      let match = assignments.find(
-        (a) => a.profileId === profileId && a.recordTypeId === recordTypeId
-      );
-      if (!match && profileId) {
-        match = assignments.find((a) => a.profileId === profileId && !a.recordTypeId);
-      }
-      if (!match) {
-        match = assignments[0];
+      const candidates = assignments
+        .filter(
+          (a) =>
+            (!a.profileId || !profileId || a.profileId === profileId) &&
+            (!a.recordTypeId || !recordTypeId || a.recordTypeId === recordTypeId)
+        )
+        .sort((a, b) => {
+          const ao = a.evaluationOrder ?? 100;
+          const bo = b.evaluationOrder ?? 100;
+          if (ao !== bo) return ao - bo;
+          return specificity(b, profileId, recordTypeId) - specificity(a, profileId, recordTypeId);
+        });
+
+      let fallback: LayoutAssignment | undefined;
+      let match: LayoutAssignment | undefined;
+      for (const c of candidates) {
+        if (!c.condition) {
+          if (!fallback) fallback = c;
+          continue;
+        }
+        if (record && evaluateFilter(c.condition, record)) {
+          match = c;
+          break;
+        }
       }
 
-      if (!match?.layoutId) {
+      const chosen = match ?? fallback;
+      if (!chosen?.layoutId) {
         return {} as PageLayout;
       }
 
-      // Fetch the resolved layout
-      const layoutResponse = await this.axios.get(`/api/page-layouts/${match.layoutId}`);
+      const layoutResponse = await this.axios.get(`/api/page-layouts/${chosen.layoutId}`);
       return unwrapJsonApiResource<PageLayout>(layoutResponse.data);
     },
   };

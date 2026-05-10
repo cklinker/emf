@@ -887,8 +887,36 @@ export interface PageLayout {
   sections: LayoutSection[];
   relatedLists: LayoutRelatedList[];
   rules?: LayoutRule[];
+  defaultFilter?: LayoutFilter | null;
+  defaultSortField?: string;
+  defaultSortDirection?: 'ASC' | 'DESC';
+  defaultRowLimit?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export type LayoutFilterOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'starts_with'
+  | 'ends_with'
+  | 'gt'
+  | 'lt'
+  | 'gte'
+  | 'lte'
+  | 'is_null'
+  | 'is_not_null';
+
+export interface LayoutFilterClause {
+  field: string;
+  op: LayoutFilterOperator;
+  value?: unknown;
+}
+
+export interface LayoutFilter {
+  logic: 'AND' | 'OR';
+  filters: LayoutFilterClause[];
 }
 
 export type LayoutRuleKind = 'compute' | 'validate' | 'default' | 'transform';
@@ -1009,6 +1037,10 @@ export interface CreatePageLayoutRequest {
   isDefault?: boolean;
   sections?: CreateLayoutSectionRequest[];
   relatedLists?: CreateRelatedListRequest[];
+  defaultFilter?: LayoutFilter | null;
+  defaultSortField?: string;
+  defaultSortDirection?: 'ASC' | 'DESC';
+  defaultRowLimit?: number;
 }
 
 export interface CreateLayoutSectionRequest {
@@ -1052,6 +1084,8 @@ export interface LayoutAssignment {
   profileId?: string;
   recordTypeId?: string;
   layoutId: string;
+  condition?: LayoutFilter | null;
+  evaluationOrder: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -1061,6 +1095,8 @@ export interface LayoutAssignmentRequest {
   profileId?: string;
   recordTypeId?: string;
   layoutId: string;
+  condition?: LayoutFilter | null;
+  evaluationOrder?: number;
 }
 
 /**

@@ -368,13 +368,27 @@ export function CollectionDetailPage({
     },
   })
 
+  // Invalidate every cache that holds a snapshot of this collection's fields:
+  // the admin page query, the bulk store that primes useCollectionSchema, and
+  // the per-collection schema entry that end-user pages consume. Without all
+  // three, end-user sessions silently render stale layouts when an admin adds
+  // a field — the layout placement falls through to a missing schema field
+  // and is dropped without warning.
+  const invalidateCollectionCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
+    queryClient.invalidateQueries({ queryKey: ['collection-store'] })
+    if (collection?.name) {
+      queryClient.invalidateQueries({ queryKey: ['collection-schema', collection.name] })
+    }
+  }
+
   // Add field mutation
   const addFieldMutation = useMutation({
     mutationFn: async (fieldData: Omit<FieldEditorDefinition, 'id' | 'order'>) => {
       await apiClient.postResource(`/api/fields`, { ...fieldData, collectionId })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
+      invalidateCollectionCaches()
       showToast(t('success.created', { item: t('collections.field') }), 'success')
       setFieldEditorOpen(false)
       setEditingField(undefined)
@@ -396,7 +410,7 @@ export function CollectionDetailPage({
       await apiClient.putResource(`/api/fields/${fieldId}`, fieldData)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
+      invalidateCollectionCaches()
       showToast(t('success.updated', { item: t('collections.field') }), 'success')
       setFieldEditorOpen(false)
       setEditingField(undefined)
@@ -863,6 +877,7 @@ export function CollectionDetailPage({
     },
     onSuccess: () => {
       refetchCollection()
+      invalidateCollectionCaches()
       setLocalFieldOrder(null)
     },
     onError: () => {

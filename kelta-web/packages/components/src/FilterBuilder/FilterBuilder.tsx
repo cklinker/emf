@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import type { ReactElement } from 'react';
 import type { FilterExpression } from '@kelta/sdk';
 import type { FilterBuilderProps } from './types';
 import { OPERATORS_BY_TYPE } from './types';
@@ -30,7 +31,7 @@ export function FilterBuilder({
   maxFilters = 10,
   className = '',
   testId = 'kelta-filter-builder',
-}: FilterBuilderProps): JSX.Element {
+}: FilterBuilderProps): ReactElement {
   // Add a new filter
   const addFilter = useCallback(() => {
     if (value.length >= maxFilters || fields.length === 0) return;

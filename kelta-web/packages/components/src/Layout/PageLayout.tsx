@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { PageLayoutProps } from './types';
 
 /**
@@ -26,7 +27,7 @@ export function PageLayout({
   className = '',
   style,
   testId = 'kelta-page-layout',
-}: PageLayoutProps): JSX.Element {
+}: PageLayoutProps): ReactElement {
   return (
     <div className={`kelta-page-layout ${className}`} style={style} data-testid={testId}>
       {header && (

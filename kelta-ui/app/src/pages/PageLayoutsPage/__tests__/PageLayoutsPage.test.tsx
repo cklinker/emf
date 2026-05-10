@@ -273,7 +273,7 @@ describe('PageLayoutsPage', () => {
       })
 
       // First layout is default, others are not
-      const rows = screen.getAllByTestId(/layout-row-/)
+      const rows = screen.getAllByTestId(/admin-data-table-row-/)
       expect(rows).toHaveLength(3)
 
       expect(within(rows[0]).getByText('Yes')).toBeInTheDocument()
@@ -285,7 +285,7 @@ describe('PageLayoutsPage', () => {
       render(<PageLayoutsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        const rows = screen.getAllByTestId(/layout-row-/)
+        const rows = screen.getAllByTestId(/admin-data-table-row-/)
         expect(rows).toHaveLength(3)
       })
     })

@@ -21,6 +21,7 @@ import { RulesEditor } from './RulesEditor'
 import { AssignmentRulesEditor } from './components/AssignmentRulesEditor'
 import { LayoutEditorList } from './components/LayoutEditorList'
 import type { FilterExpression } from '@/components/FilterBuilder'
+import { AdminDataTable, type AdminColumn } from '@/components/AdminDataTable'
 
 import {
   LayoutEditorProvider,
@@ -152,6 +153,54 @@ export interface PageLayoutsPageProps {
 }
 
 const LAYOUT_TYPES = ['DETAIL', 'EDIT', 'MINI', 'LIST'] as const
+
+function pageLayoutColumns(
+  formatDate: (d: Date, opts?: Intl.DateTimeFormatOptions) => string,
+  getCollectionName: (id: string) => string
+): AdminColumn<PageLayoutSummary>[] {
+  return [
+    { id: 'name', header: 'Name', accessor: (r) => r.name },
+    {
+      id: 'collection',
+      header: 'Collection',
+      accessor: (r) => getCollectionName(r.collectionId),
+    },
+    {
+      id: 'layoutType',
+      header: 'Type',
+      accessor: (r) => r.layoutType,
+      cell: (r) => (
+        <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
+          {r.layoutType}
+        </span>
+      ),
+    },
+    {
+      id: 'isDefault',
+      header: 'Default',
+      accessor: (r) => r.isDefault,
+      cell: (r) => (
+        <span
+          className={cn(
+            'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+            r.isDefault
+              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+              : 'bg-muted text-muted-foreground'
+          )}
+        >
+          {r.isDefault ? 'Yes' : 'No'}
+        </span>
+      ),
+    },
+    {
+      id: 'createdAt',
+      header: 'Created',
+      accessor: (r) => r.createdAt,
+      cell: (r) =>
+        formatDate(new Date(r.createdAt), { year: 'numeric', month: 'short', day: 'numeric' }),
+    },
+  ]
+}
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -1243,150 +1292,70 @@ export function PageLayoutsPage({
           <p>No page layouts found. Create one to get started.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-background max-md:overflow-x-auto">
-          <table
-            className="w-full border-collapse max-md:min-w-[700px]"
-            role="grid"
-            aria-label="Page Layouts"
-            data-testid="page-layouts-table"
-          >
-            <thead className="bg-muted">
-              <tr role="row">
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Name
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Collection
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Type
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Default
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Created
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {layoutList.map((layout, index) => (
-                <tr
-                  key={layout.id}
-                  role="row"
-                  className="border-b border-border transition-colors duration-150 last:border-b-0 hover:bg-muted/50"
-                  data-testid={`layout-row-${index}`}
-                >
-                  <td role="gridcell" className="px-4 py-4 text-sm text-foreground">
-                    {layout.name}
-                  </td>
-                  <td role="gridcell" className="px-4 py-4 text-sm text-foreground">
-                    {getCollectionName(layout.collectionId)}
-                  </td>
-                  <td role="gridcell" className="px-4 py-4 text-sm">
-                    <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
-                      {layout.layoutType}
-                    </span>
-                  </td>
-                  <td role="gridcell" className="px-4 py-4 text-sm">
-                    <span
-                      className={cn(
-                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
-                        layout.isDefault
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-muted text-muted-foreground'
-                      )}
-                    >
-                      {layout.isDefault ? 'Yes' : 'No'}
-                    </span>
-                  </td>
-                  <td role="gridcell" className="px-4 py-4 text-sm text-foreground">
-                    {formatDate(new Date(layout.createdAt), {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </td>
-                  <td role="gridcell" className="px-4 py-4 text-right text-sm">
-                    <div className="flex justify-end gap-2 max-md:flex-col">
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all duration-200 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
-                        onClick={() => handleDesign(layout)}
-                        aria-label={`Design ${layout.name}`}
-                        data-testid={`design-button-${index}`}
-                      >
-                        Design
-                      </button>
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
-                        onClick={() => handleEditMetadata(layout)}
-                        aria-label={`Edit ${layout.name}`}
-                        data-testid={`edit-button-${index}`}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
-                        onClick={() => setRulesEditorLayout(layout)}
-                        aria-label={`Rules for ${layout.name}`}
-                        data-testid={`rules-button-${index}`}
-                      >
-                        Rules
-                      </button>
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
-                        onClick={() => setAssignmentEditorLayout(layout)}
-                        aria-label={`Assignments for ${layout.name}`}
-                        data-testid={`assignments-button-${index}`}
-                      >
-                        Assignments
-                      </button>
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-destructive transition-all duration-200 hover:border-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
-                        onClick={() => handleDeleteClick(layout)}
-                        aria-label={`Delete ${layout.name}`}
-                        data-testid={`delete-button-${index}`}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div
+          className="overflow-hidden rounded-lg border border-border bg-background max-md:overflow-x-auto"
+          data-testid="page-layouts-table"
+          aria-label="Page Layouts"
+          role="grid"
+        >
+          <AdminDataTable
+            tableId="page-layouts"
+            rows={layoutList}
+            rowKey={(layout) => layout.id}
+            columns={pageLayoutColumns(formatDate, getCollectionName)}
+            renderActions={(layout) => {
+              const index = layoutList.indexOf(layout)
+              return (
+                <div className="flex justify-end gap-2 max-md:flex-col">
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all duration-200 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
+                    onClick={() => handleDesign(layout)}
+                    aria-label={`Design ${layout.name}`}
+                    data-testid={`design-button-${index}`}
+                  >
+                    Design
+                  </button>
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
+                    onClick={() => handleEditMetadata(layout)}
+                    aria-label={`Edit ${layout.name}`}
+                    data-testid={`edit-button-${index}`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
+                    onClick={() => setRulesEditorLayout(layout)}
+                    aria-label={`Rules for ${layout.name}`}
+                    data-testid={`rules-button-${index}`}
+                  >
+                    Rules
+                  </button>
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
+                    onClick={() => setAssignmentEditorLayout(layout)}
+                    aria-label={`Assignments for ${layout.name}`}
+                    data-testid={`assignments-button-${index}`}
+                  >
+                    Assignments
+                  </button>
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-destructive transition-all duration-200 hover:border-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
+                    onClick={() => handleDeleteClick(layout)}
+                    aria-label={`Delete ${layout.name}`}
+                    data-testid={`delete-button-${index}`}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )
+            }}
+          />
         </div>
       )}
 

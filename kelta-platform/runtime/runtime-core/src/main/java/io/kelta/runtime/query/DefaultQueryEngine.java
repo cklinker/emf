@@ -752,10 +752,16 @@ public class DefaultQueryEngine implements QueryEngine {
                     // FORMULA wiring tracked separately; same fieldTypeConfig path will host
                     // the expression once the formula DSL stabilizes.
                     logger.debug("Skipping formula field '{}' — config not available on FieldDefinition", field.name());
-                } else if (field.type() == FieldType.ROLLUP_SUMMARY && rollupSummaryService != null) {
-                    // TODO(perf): batch rollup compute via GROUP BY parent_fk when
-                    // result sets get large; current impl is one query per record.
+                } else if (field.type() == FieldType.ROLLUP_SUMMARY) {
+                    if (rollupSummaryService == null) {
+                        logger.info("Rollup field '{}' on '{}' skipped: RollupSummaryService bean is null",
+                                field.name(), definition.name());
+                        continue;
+                    }
+                    logger.info("Rollup field '{}' on '{}' computing (config={})",
+                            field.name(), definition.name(), field.fieldTypeConfig());
                     Object computed = computeRollupValue(field, record);
+                    logger.info("Rollup field '{}' computed value: {}", field.name(), computed);
                     if (computed != null) {
                         record.put(field.name(), computed);
                     }
@@ -801,15 +807,15 @@ public class DefaultQueryEngine implements QueryEngine {
         String fkColumn = resolveColumnName(childDef, foreignKeyField);
         String aggColumn = aggregateField == null ? null : resolveColumnName(childDef, aggregateField);
 
+        logger.info("Rollup '{}' executing: {} on {} {} where {}={}", field.name(),
+                aggregateFunction, childTable.toSql(), aggColumn != null ? "(" + aggColumn + ")" : "(*)",
+                fkColumn, parentId);
         try {
-            Object value = rollupSummaryService.compute(childTable, fkColumn, parentId.toString(),
+            return rollupSummaryService.compute(childTable, fkColumn, parentId.toString(),
                     aggregateFunction, aggColumn, filter);
-            logger.debug("Rollup '{}' = {} ({} on {}.{})", field.name(), value,
-                    aggregateFunction, childTable.toSql(), aggColumn != null ? aggColumn : "*");
-            return value;
         } catch (RuntimeException e) {
             logger.warn("Rollup compute failed for field '{}' on collection '{}': {}",
-                    field.name(), childDef.name(), e.getMessage());
+                    field.name(), childDef.name(), e.getMessage(), e);
             return null;
         }
     }

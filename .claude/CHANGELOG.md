@@ -5,3 +5,7 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-05-10
 
 - 2026-05-10 chore(autopilot): seed CHANGELOG.md (CHORE-2026-05-10-0001)
+
+## 2026-05-11
+
+- 2026-05-11 chore(repo): add .editorconfig with project-wide indentation rules (CHORE-2026-05-10-0004)

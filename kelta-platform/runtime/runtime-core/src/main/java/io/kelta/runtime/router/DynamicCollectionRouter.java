@@ -217,9 +217,15 @@ public class DynamicCollectionRouter {
                 return ResponseEntity.notFound().build();
             }
 
-            // Check system collection cache for get-by-id
+            // Parse JSON:API ?include= up front so cache lookup can match the put guard:
+            // the cache only ever stores no-include responses, so include-bearing requests
+            // must skip the lookup or they'd receive a stale parent without included children.
+            List<String> includeNames = parseIncludeParam(params);
+
+            // Check system collection cache for get-by-id (no-include requests only)
             String tenantId = request.getHeader("X-Tenant-ID");
-            if (definition.systemCollection() && systemCollectionCache != null) {
+            if (definition.systemCollection() && systemCollectionCache != null
+                    && includeNames.isEmpty()) {
                 Optional<Map<String, Object>> cached = systemCollectionCache.getByIdResponse(
                         tenantId, collectionName, id);
                 if (cached.isPresent()) {
@@ -242,7 +248,6 @@ public class DynamicCollectionRouter {
             Map<String, Object> response = toJsonApiResponse(record.get(), collectionName, definition);
 
             // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
-            List<String> includeNames = parseIncludeParam(params);
             if (!includeNames.isEmpty()) {
                 List<Map<String, Object>> included = resolveIncludes(
                         includeNames, List.of(record.get()), collectionName, definition, request);

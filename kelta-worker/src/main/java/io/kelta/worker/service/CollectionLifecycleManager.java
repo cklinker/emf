@@ -516,22 +516,36 @@ public class CollectionLifecycleManager {
                 }
             }
 
-            // Parse fieldTypeConfig JSON
+            // Parse fieldTypeConfig JSON. PostgreSQL returns JSONB columns as
+            // org.postgresql.util.PGobject through the standard JDBC API; .toString()
+            // yields the raw JSON. Earlier branches covered the String / Map cases
+            // but missed PGobject, so newly-loaded rollup_summary fields surfaced
+            // with a null fieldTypeConfig and silently skipped compute.
             Map<String, Object> parsedFieldTypeConfig = null;
             Object fieldTypeConfigObj = row.get("field_type_config");
+            String ftcJson = null;
             if (fieldTypeConfigObj instanceof String ftcStr && !ftcStr.isBlank()) {
+                ftcJson = ftcStr;
+            } else if (fieldTypeConfigObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> configMap = (Map<String, Object>) fieldTypeConfigObj;
+                parsedFieldTypeConfig = configMap;
+            } else if (fieldTypeConfigObj != null
+                    && "org.postgresql.util.PGobject".equals(fieldTypeConfigObj.getClass().getName())) {
+                String raw = fieldTypeConfigObj.toString();
+                if (raw != null && !raw.isBlank()) {
+                    ftcJson = raw;
+                }
+            }
+            if (ftcJson != null) {
                 try {
-                    parsedFieldTypeConfig = objectMapper.readValue(ftcStr,
+                    parsedFieldTypeConfig = objectMapper.readValue(ftcJson,
                             objectMapper.getTypeFactory().constructMapType(
                                     HashMap.class, String.class, Object.class));
                 } catch (Exception ex) {
                     log.warn("Failed to parse fieldTypeConfig for field '{}': {}",
                             fieldName, ex.getMessage());
                 }
-            } else if (fieldTypeConfigObj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> configMap = (Map<String, Object>) fieldTypeConfigObj;
-                parsedFieldTypeConfig = configMap;
             }
 
             FieldDefinition fieldDef = new FieldDefinition(

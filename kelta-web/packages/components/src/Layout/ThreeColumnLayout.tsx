@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { ThreeColumnLayoutProps } from './types';
 
 /**
@@ -42,7 +43,7 @@ export function ThreeColumnLayout({
   breakpoints = DEFAULT_BREAKPOINTS,
   collapsibleOnMobile = true,
   testId = 'kelta-three-column-layout',
-}: ThreeColumnLayoutProps): JSX.Element {
+}: ThreeColumnLayoutProps): ReactElement {
   const layoutStyle = {
     ...style,
     '--left-width': leftWidth,

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { ReactElement } from 'react';
 import type { FieldDefinition } from '@kelta/sdk';
 
 /**
@@ -19,7 +20,7 @@ export interface FieldRendererProps {
 /**
  * Field renderer component type (for plugin registry)
  */
-export type FieldRendererComponent = (props: FieldRendererProps) => JSX.Element;
+export type FieldRendererComponent = (props: FieldRendererProps) => ReactElement;
 
 /**
  * Props for ResourceDetail component

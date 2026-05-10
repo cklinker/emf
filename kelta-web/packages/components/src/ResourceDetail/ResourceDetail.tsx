@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import type { ReactElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { FieldDefinition, ResourceMetadata } from '@kelta/sdk';
 import { useKeltaClient, useCurrentUser } from '../context/KeltaContext';
@@ -86,7 +87,7 @@ export function ResourceDetail({
   customRenderers = {},
   className = '',
   testId = 'kelta-resource-detail',
-}: ResourceDetailProps): JSX.Element {
+}: ResourceDetailProps): ReactElement {
   const client = useKeltaClient();
   const user = useCurrentUser();
 

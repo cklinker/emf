@@ -7,6 +7,7 @@ import io.kelta.runtime.model.FieldType;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.service.RollupSummaryService;
 import io.kelta.runtime.storage.StorageAdapter;
+import io.kelta.runtime.storage.TableRef;
 import io.kelta.runtime.validation.ValidationEngine;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -83,9 +84,9 @@ class RollupSummaryComputeTest {
         doReturn(new QueryResult(List.of(row1, row2), new PaginationMetadata(2, 1, 50, 1)))
                 .when(storageAdapter).query(eq(orders), any(QueryRequest.class));
         when(collectionRegistry.get("orderLines")).thenReturn(orderLines());
-        doReturn(12.0).when(rollupSummaryService).compute(eq("orderLines"), eq("order_id"), eq("o1"),
+        doReturn(12.0).when(rollupSummaryService).compute(eq(TableRef.publicSchema("orderLines")), eq("order_id"), eq("o1"),
                 eq("SUM"), eq("amount"), any());
-        doReturn(7.0).when(rollupSummaryService).compute(eq("orderLines"), eq("order_id"), eq("o2"),
+        doReturn(7.0).when(rollupSummaryService).compute(eq(TableRef.publicSchema("orderLines")), eq("order_id"), eq("o2"),
                 eq("SUM"), eq("amount"), any());
 
         QueryResult result = queryEngine.executeQuery(orders, QueryRequest.defaults());
@@ -106,7 +107,7 @@ class RollupSummaryComputeTest {
         doReturn(new QueryResult(List.of(row), new PaginationMetadata(1, 1, 50, 1)))
                 .when(storageAdapter).query(eq(orders), any(QueryRequest.class));
         when(collectionRegistry.get("orderLines")).thenReturn(orderLines());
-        doReturn(3L).when(rollupSummaryService).compute(eq("orderLines"), eq("order_id"), eq("o1"),
+        doReturn(3L).when(rollupSummaryService).compute(eq(TableRef.publicSchema("orderLines")), eq("order_id"), eq("o1"),
                 eq("COUNT"), any(), any());
 
         QueryResult result = queryEngine.executeQuery(orders, QueryRequest.defaults());

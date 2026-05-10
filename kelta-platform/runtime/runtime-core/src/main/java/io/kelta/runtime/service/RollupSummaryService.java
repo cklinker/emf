@@ -1,5 +1,6 @@
 package io.kelta.runtime.service;
 
+import io.kelta.runtime.storage.TableRef;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -23,35 +24,39 @@ public class RollupSummaryService {
     /**
      * Computes rollup summary values for a parent record.
      *
-     * @param childTableName    the child collection's table name
-     * @param foreignKeyField   the FK field on the child table pointing to parent
+     * <p>Schema-per-tenant aware: the caller passes a {@link TableRef} that
+     * resolves to the child collection's tenant-qualified table (or the
+     * public schema for system collections).
+     *
+     * @param childTable        schema-qualified reference to the child table
+     * @param foreignKeyColumn  FK column on the child table pointing at the parent
      * @param parentRecordId    the parent record's ID
      * @param aggregateFunction COUNT, SUM, MIN, MAX, or AVG
-     * @param aggregateField    the field to aggregate (null for COUNT)
-     * @param filter            optional filter criteria for child records
-     * @return the computed value
+     * @param aggregateColumn   the column to aggregate (null for COUNT)
+     * @param filter            optional equality filter applied to child rows
+     * @return the computed value, or null when JDBC returns null
      */
-    public Object compute(String childTableName, String foreignKeyField,
+    public Object compute(TableRef childTable, String foreignKeyColumn,
                           String parentRecordId, String aggregateFunction,
-                          String aggregateField, Map<String, Object> filter) {
+                          String aggregateColumn, Map<String, Object> filter) {
         StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(switch (aggregateFunction) {
             case "COUNT" -> "COUNT(*)";
-            case "SUM" -> "SUM(" + sanitize(aggregateField) + ")";
-            case "MIN" -> "MIN(" + sanitize(aggregateField) + ")";
-            case "MAX" -> "MAX(" + sanitize(aggregateField) + ")";
-            case "AVG" -> "AVG(" + sanitize(aggregateField) + ")";
+            case "SUM" -> "SUM(" + sanitizeColumn(aggregateColumn) + ")";
+            case "MIN" -> "MIN(" + sanitizeColumn(aggregateColumn) + ")";
+            case "MAX" -> "MAX(" + sanitizeColumn(aggregateColumn) + ")";
+            case "AVG" -> "AVG(" + sanitizeColumn(aggregateColumn) + ")";
             default -> throw new IllegalArgumentException("Unknown aggregate function: " + aggregateFunction);
         });
-        sql.append(" FROM ").append(sanitize(childTableName));
-        sql.append(" WHERE ").append(sanitize(foreignKeyField)).append(" = ?");
+        sql.append(" FROM ").append(childTable.toSql());
+        sql.append(" WHERE ").append(sanitizeColumn(foreignKeyColumn)).append(" = ?");
 
         List<Object> params = new ArrayList<>();
         params.add(parentRecordId);
 
         if (filter != null && !filter.isEmpty()) {
             for (Map.Entry<String, Object> entry : filter.entrySet()) {
-                sql.append(" AND ").append(sanitize(entry.getKey())).append(" = ?");
+                sql.append(" AND ").append(sanitizeColumn(entry.getKey())).append(" = ?");
                 params.add(entry.getValue());
             }
         }
@@ -59,7 +64,7 @@ public class RollupSummaryService {
         return jdbcTemplate.queryForObject(sql.toString(), Object.class, params.toArray());
     }
 
-    private String sanitize(String identifier) {
+    private String sanitizeColumn(String identifier) {
         if (identifier == null || !identifier.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
             throw new IllegalArgumentException("Invalid identifier: " + identifier);
         }

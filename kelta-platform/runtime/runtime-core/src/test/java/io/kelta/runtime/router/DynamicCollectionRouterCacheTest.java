@@ -210,6 +210,51 @@ class DynamicCollectionRouterCacheTest {
             // Verify the response was cached
             verify(cache).putByIdResponse(eq("tenant-1"), eq("collections"), eq("abc"), any());
         }
+
+        @Test
+        @DisplayName("Should NOT consult cache when include parameter is present")
+        void get_skipsCacheLookup_whenIncludePresent() throws Exception {
+            // Regression: a cached no-include response must not shadow include-bearing
+            // requests, otherwise newly created child rows are invisible until TTL.
+            CollectionDefinition def = buildSystemCollection("collections");
+            when(registry.get("collections")).thenReturn(def);
+
+            // Cache has a stale no-include response — should be ignored
+            Map<String, Object> stale = Map.of(
+                    "data", Map.of("type", "collections", "id", "abc", "attributes", Map.of("name", "Products"))
+            );
+            when(cache.getByIdResponse("tenant-1", "collections", "abc"))
+                    .thenReturn(Optional.of(stale));
+
+            Map<String, Object> record = Map.of("id", "abc", "name", "Products");
+            when(queryEngine.getById(def, "abc")).thenReturn(Optional.of(record));
+
+            mockMvc.perform(get("/api/collections/abc")
+                            .param("include", "fields")
+                            .header("X-Tenant-ID", "tenant-1"))
+                    .andExpect(status().isOk());
+
+            // Cache lookup must be skipped — fresh DB read instead
+            verify(cache, never()).getByIdResponse(any(), any(), any());
+            verify(queryEngine).getById(def, "abc");
+        }
+
+        @Test
+        @DisplayName("Should NOT cache response when include parameter is present")
+        void get_doesNotCache_whenIncludePresent() throws Exception {
+            CollectionDefinition def = buildSystemCollection("collections");
+            when(registry.get("collections")).thenReturn(def);
+
+            Map<String, Object> record = Map.of("id", "abc", "name", "Products");
+            when(queryEngine.getById(def, "abc")).thenReturn(Optional.of(record));
+
+            mockMvc.perform(get("/api/collections/abc")
+                            .param("include", "fields")
+                            .header("X-Tenant-ID", "tenant-1"))
+                    .andExpect(status().isOk());
+
+            verify(cache, never()).putByIdResponse(any(), any(), any(), any());
+        }
     }
 
     @Nested

@@ -41,6 +41,8 @@ import { MultiPicklistSelect, normalizeMultiPicklistValue } from '@/components/M
 import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
 import { LayoutFormSections } from '@/components/LayoutFormSections'
+import { useLayoutRules } from '@kelta/components'
+import { dtosToLayoutRules } from '@/utils/layoutRules'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
@@ -429,6 +431,35 @@ function ObjectFormBody({
   const [formData, setFormData] = useState<Record<string, unknown>>(initialData)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
+  // Layout client-side rules engine: compute/validate/default/transform rules
+  // attached to the resolved layout. The engine is no-op when the layout has
+  // no rules (engine.enabled === false).
+  const layoutRules = useMemo(
+    () => dtosToLayoutRules(layout?.rules, ''),
+    [layout?.rules],
+  )
+  const setFieldValueForEngine = useCallback((name: string, value: unknown) => {
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }, [])
+  const setFieldErrorForEngine = useCallback((name: string, message: string) => {
+    setFormErrors((prev) => ({ ...prev, [name]: message }))
+  }, [])
+  const clearFieldErrorForEngine = useCallback((name: string) => {
+    setFormErrors((prev) => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+  }, [])
+  const ruleEngine = useLayoutRules({
+    rules: layoutRules,
+    values: formData,
+    setFieldValue: setFieldValueForEngine,
+    setFieldError: setFieldErrorForEngine,
+    clearFieldError: clearFieldErrorForEngine,
+  })
+
   // Editable fields (exclude system, read-only types, and permission-read-only fields)
   const editableFields = useMemo(() => {
     return fields.filter(
@@ -471,21 +502,36 @@ function ObjectFormBody({
   const pageTitle = isNew ? `New ${collectionLabel}` : `Edit ${collectionLabel}`
 
   // Handle field change
-  const handleFieldChange = useCallback((name: string, value: unknown) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
-    // Clear server-side error for this field when user modifies it
-    setFormErrors((prev) => {
-      if (prev[name]) {
-        const next = { ...prev }
-        delete next[name]
-        return next
-      }
-      return prev
-    })
-  }, [])
+  const handleFieldChange = useCallback(
+    (name: string, value: unknown) => {
+      setFormData((prev) => ({ ...prev, [name]: value }))
+      // Clear server-side error for this field when user modifies it
+      setFormErrors((prev) => {
+        if (prev[name]) {
+          const next = { ...prev }
+          delete next[name]
+          return next
+        }
+        return prev
+      })
+      // Drive the layout-rules engine: cascade computes/validations triggered
+      // by this field. The engine writes back via setFieldValue (above), so
+      // dependent fields update in the same render cycle.
+      ruleEngine.onFieldChange(name)
+    },
+    [ruleEngine]
+  )
 
   // Handle save
   const handleSave = useCallback(() => {
+    // Layout-rule beforeSave gate: collect violations from the engine and
+    // block submit for ERROR severity. Warnings allow submit to proceed.
+    const ruleResult = ruleEngine.runBeforeSave()
+    if (ruleResult.blocked) {
+      showToast(ruleResult.violations[0]?.message ?? 'Validation failed', 'error')
+      return
+    }
+
     const attributes: Record<string, unknown> = {}
     for (const field of editableFields) {
       const value = formData[field.name]
@@ -504,7 +550,16 @@ function ObjectFormBody({
     } else {
       mutations.update.mutate({ id: recordId!, data: attributes })
     }
-  }, [editableFields, formData, isNew, mutations, recordId, selectedRecordTypeId])
+  }, [
+    editableFields,
+    formData,
+    isNew,
+    mutations,
+    recordId,
+    selectedRecordTypeId,
+    ruleEngine,
+    showToast,
+  ])
 
   // Handle cancel
   const handleCancel = useCallback(() => {
@@ -602,6 +657,7 @@ function ObjectFormBody({
             sections={layout.sections}
             schemaFields={displayFields}
             record={formData}
+            isComputed={ruleEngine.isComputed}
             renderField={(field) => {
               const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
               const layoutReadOnly = !!field.readOnly

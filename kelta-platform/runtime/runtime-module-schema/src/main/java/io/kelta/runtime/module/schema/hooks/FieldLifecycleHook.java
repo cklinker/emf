@@ -43,6 +43,19 @@ public class FieldLifecycleHook implements BeforeSaveHook {
             "FORMULA", "ROLLUP_SUMMARY", "REFERENCE", "ARRAY"
     );
 
+    /**
+     * UI-style synonyms that don't map to a FieldType enum constant by simple
+     * uppercase. Most lowercase types match their canonical enum directly
+     * (e.g., {@code "string"} → {@code "STRING"}); the entries here cover the
+     * cases where the UI uses a different word than the runtime enum.
+     */
+    private static final Map<String, String> UI_TYPE_TO_CANONICAL = Map.of(
+            "number", "DOUBLE",
+            "object", "JSON",
+            "array", "JSON",
+            "reference", "MASTER_DETAIL"
+    );
+
     static final Set<String> RESERVED_FIELD_NAMES = Set.of(
             "id", "createdAt", "updatedAt", "createdBy", "updatedBy",
             "tenantId", "type", "attributes", "relationships"
@@ -76,6 +89,7 @@ public class FieldLifecycleHook implements BeforeSaveHook {
         }
 
         // Validate field type
+        Map<String, Object> updates = new HashMap<>();
         Object typeObj = record.get("type");
         if (typeObj != null && !typeObj.toString().isBlank()) {
             String type = typeObj.toString();
@@ -83,10 +97,11 @@ public class FieldLifecycleHook implements BeforeSaveHook {
                 return BeforeSaveResult.error("type",
                         "Invalid field type: '" + type + "'");
             }
+            String canonical = canonicalizeType(type);
+            if (!canonical.equals(type)) {
+                updates.put("type", canonical);
+            }
         }
-
-        // Set defaults
-        Map<String, Object> updates = new HashMap<>();
 
         if (!record.containsKey("active")) {
             updates.put("active", true);
@@ -97,6 +112,40 @@ public class FieldLifecycleHook implements BeforeSaveHook {
         }
 
         return BeforeSaveResult.withFieldUpdates(updates);
+    }
+
+    @Override
+    public BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
+                                         Map<String, Object> previous, String tenantId) {
+        // Field type is immutable, but if a request includes it, normalize so
+        // the stored value stays canonical even when the same value is round-
+        // tripped through the UI.
+        Object typeObj = record.get("type");
+        if (typeObj == null || typeObj.toString().isBlank()) {
+            return BeforeSaveResult.ok();
+        }
+        String type = typeObj.toString();
+        if (!VALID_FIELD_TYPES.contains(type)) {
+            return BeforeSaveResult.error("type", "Invalid field type: '" + type + "'");
+        }
+        String canonical = canonicalizeType(type);
+        if (canonical.equals(type)) {
+            return BeforeSaveResult.ok();
+        }
+        return BeforeSaveResult.withFieldUpdates(Map.of("type", canonical));
+    }
+
+    /**
+     * Returns the canonical (uppercase, runtime-enum) form of a field type
+     * accepted by {@link #VALID_FIELD_TYPES}. Already-canonical inputs pass
+     * through unchanged.
+     */
+    static String canonicalizeType(String type) {
+        String mapped = UI_TYPE_TO_CANONICAL.get(type);
+        if (mapped != null) {
+            return mapped;
+        }
+        return type.toUpperCase();
     }
 
     @Override

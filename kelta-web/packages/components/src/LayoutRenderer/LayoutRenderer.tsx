@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, ReactElement } from 'react';
 import type {
   FieldDefinition,
   LayoutSection,
@@ -173,7 +173,7 @@ function FieldCell({
   requiredOnLayout,
   onChange,
   customRenderers,
-}: FieldCellProps): JSX.Element | null {
+}: FieldCellProps): ReactElement | null {
   const fieldName = field?.name ?? '';
 
   const handleChange = useCallback(
@@ -236,7 +236,7 @@ function SectionRenderer({
   onChange,
   customRenderers,
   fieldMap,
-}: SectionRendererProps): JSX.Element | null {
+}: SectionRendererProps): ReactElement | null {
   const [collapsed, setCollapsed] = useState(section.collapsed);
 
   // Sort and filter visible fields
@@ -387,7 +387,7 @@ function TabGroupRenderer({
   onChange,
   customRenderers,
   fieldMap,
-}: TabGroupRendererProps): JSX.Element {
+}: TabGroupRendererProps): ReactElement {
   const [activeTab, setActiveTab] = useState(0);
 
   const visibleSections = useMemo(
@@ -437,7 +437,7 @@ interface RelatedListRendererProps {
   relatedList: LayoutRelatedList;
 }
 
-function RelatedListRenderer({ relatedList }: RelatedListRendererProps): JSX.Element {
+function RelatedListRenderer({ relatedList }: RelatedListRendererProps): ReactElement {
   const columns = relatedList.displayColumns
     ? relatedList.displayColumns.split(',').map((c) => c.trim())
     : [];
@@ -494,7 +494,7 @@ export function LayoutRenderer({
   customRenderers,
   className = '',
   testId = 'kelta-layout-renderer',
-}: LayoutRendererProps): JSX.Element {
+}: LayoutRendererProps): ReactElement {
   // Build field lookup maps
   const fieldMap = useMemo(() => {
     const map = new Map<string, FieldDefinition>();

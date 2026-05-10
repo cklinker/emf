@@ -61,6 +61,25 @@ export {
   isVisible,
 } from './LayoutRenderer/visibilityRule';
 
+// Layout client-side rules engine (compute / validate / default / transform)
+export {
+  RuleEngine,
+  topologicalSort,
+  downstreamRules,
+  useLayoutRules,
+} from './LayoutRenderer/clientRules';
+export type {
+  RuleEngineOptions,
+  UseLayoutRulesOptions,
+  UseLayoutRulesResult,
+  FormBinding,
+  RuleViolation,
+  BeforeSaveResult,
+  RuleEngineDiagnostic,
+  RuleNode,
+  TopoResult,
+} from './LayoutRenderer/clientRules';
+
 // Hooks
 export { useResource } from './hooks/useResource';
 export { useResourceList } from './hooks/useResourceList';

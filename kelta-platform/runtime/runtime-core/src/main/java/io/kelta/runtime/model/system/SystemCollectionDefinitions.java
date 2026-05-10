@@ -74,6 +74,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(layoutFields());
         definitions.add(layoutRelatedLists());
         definitions.add(layoutAssignments());
+        definitions.add(layoutRules());
         definitions.add(listViews());
         definitions.add(uiPages());
         definitions.add(uiMenus());
@@ -416,6 +417,12 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("evaluate_on")
                 .withDefault("CREATE_AND_UPDATE")
                 .withEnumValues(List.of("CREATE", "UPDATE", "CREATE_AND_UPDATE")))
+            .addField(FieldDefinition.bool("enforceOnClient")
+                .withColumnName("enforce_on_client")
+                .withDefault(false))
+            .addField(FieldDefinition.requiredString("severity", 10)
+                .withDefault("ERROR")
+                .withEnumValues(List.of("ERROR", "WARNING")))
             .build();
     }
 
@@ -1154,6 +1161,29 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("visibility_rule"))
             .addField(FieldDefinition.integer("columnSpan")
                 .withColumnName("column_span").withDefault(1))
+            .build();
+    }
+
+    public static CollectionDefinition layoutRules() {
+        return systemBuilder("layout-rules", "Layout Rules", "layout_rule")
+            .displayFieldName("name")
+            .tenantScoped(true)
+            .addField(FieldDefinition.masterDetail("layoutId", "page-layouts", "Layout")
+                .withColumnName("layout_id"))
+            .addField(FieldDefinition.requiredString("name", 100))
+            .addField(FieldDefinition.string("description", 500))
+            .addField(FieldDefinition.requiredString("kind", 20)
+                .withEnumValues(List.of("COMPUTE", "VALIDATE", "DEFAULT", "TRANSFORM")))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .addField(FieldDefinition.requiredJson("whenEvents")
+                .withColumnName("when_events"))
+            .addField(FieldDefinition.string("targetField", 100)
+                .withColumnName("target_field"))
+            .addField(FieldDefinition.json("dependsOn")
+                .withColumnName("depends_on"))
+            .addField(FieldDefinition.requiredJson("body"))
+            .addField(FieldDefinition.requiredInteger("sortOrder")
+                .withColumnName("sort_order"))
             .build();
     }
 

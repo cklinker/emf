@@ -68,6 +68,9 @@ import type {
   CreatePageLayoutRequest,
   LayoutAssignment,
   LayoutAssignmentRequest,
+  LayoutRule,
+  CreateLayoutRuleRequest,
+  UpdateLayoutRuleRequest,
   ListView,
   CreateListViewRequest,
   Report,
@@ -1256,6 +1259,40 @@ export class AdminClient {
       // Fetch the resolved layout
       const layoutResponse = await this.axios.get(`/api/page-layouts/${match.layoutId}`);
       return unwrapJsonApiResource<PageLayout>(layoutResponse.data);
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Layout rules (per-layout client-side rules: compute/validate/default/transform)
+  // ---------------------------------------------------------------------------
+
+  readonly layoutRules = {
+    list: async (layoutId: string): Promise<LayoutRule[]> => {
+      const response = await this.axios.get(
+        `/api/layout-rules?filter[layoutId][eq]=${encodeURIComponent(layoutId)}&sort=sortOrder`
+      );
+      return unwrapJsonApiList<LayoutRule>(response.data);
+    },
+
+    get: async (id: string): Promise<LayoutRule> => {
+      const response = await this.axios.get(`/api/layout-rules/${id}`);
+      return unwrapJsonApiResource<LayoutRule>(response.data);
+    },
+
+    create: async (request: CreateLayoutRuleRequest): Promise<LayoutRule> => {
+      const body = toJsonApiBody('layout-rules', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/layout-rules', body);
+      return unwrapJsonApiResource<LayoutRule>(response.data);
+    },
+
+    update: async (id: string, request: UpdateLayoutRuleRequest): Promise<LayoutRule> => {
+      const body = toJsonApiBody('layout-rules', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/layout-rules/${id}`, body);
+      return unwrapJsonApiResource<LayoutRule>(response.data);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/api/layout-rules/${id}`);
     },
   };
 

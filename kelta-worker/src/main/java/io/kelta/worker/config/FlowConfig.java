@@ -28,6 +28,7 @@ import io.kelta.worker.listener.CredentialEncryptionHook;
 import io.kelta.worker.listener.CredentialEventPublisher;
 import io.kelta.runtime.module.integration.api.OpenApiSpecParser;
 import io.kelta.worker.listener.RecordTypeEnforcementHook;
+import io.kelta.worker.listener.LayoutRuleRefreshHook;
 import io.kelta.worker.listener.ValidationRuleRefreshHook;
 import io.kelta.crypto.EncryptionService;
 import io.kelta.runtime.credential.CredentialTypeRegistry;
@@ -361,6 +362,15 @@ public class FlowConfig {
             JdbcTemplate jdbcTemplate) {
         ValidationRuleRefreshHook hook = new ValidationRuleRefreshHook(
                 eventPublisher, jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public LayoutRuleRefreshHook layoutRuleRefreshHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        LayoutRuleRefreshHook hook = new LayoutRuleRefreshHook(eventPublisher);
         hookRegistry.register(hook);
         return hook;
     }

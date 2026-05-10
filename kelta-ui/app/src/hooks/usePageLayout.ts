@@ -62,6 +62,20 @@ export interface LayoutRelatedListDto {
   sortOrder: number
 }
 
+export interface LayoutRuleDto {
+  id: string
+  layoutId: string
+  name: string
+  description: string | null
+  kind: 'COMPUTE' | 'VALIDATE' | 'DEFAULT' | 'TRANSFORM'
+  active: boolean
+  whenEvents: string[] | string
+  targetField: string | null
+  dependsOn: string[] | string | null
+  body: Record<string, unknown> | string
+  sortOrder: number
+}
+
 export interface PageLayoutDto {
   id: string
   collectionId: string
@@ -71,6 +85,7 @@ export interface PageLayoutDto {
   isDefault: boolean
   sections: LayoutSectionDto[]
   relatedLists: LayoutRelatedListDto[]
+  rules: LayoutRuleDto[]
   createdAt: string
   updatedAt: string
 }
@@ -261,10 +276,23 @@ export function usePageLayout(
           }
         }
 
+        // Step 3: Fetch layout rules separately. The page-layouts include
+        // chain doesn't reach layout-rules, so we issue a parallel request.
+        // Empty result is the common case — no rules configured for this layout.
+        let rules: LayoutRuleDto[] = []
+        try {
+          rules = await apiClient.getList<LayoutRuleDto>(
+            `/api/layout-rules?filter[layoutId][eq]=${layoutId}&filter[active][eq]=true&sort=sortOrder&page[size]=100`,
+          )
+        } catch {
+          rules = []
+        }
+
         const result: PageLayoutDto = {
-          ...(flatLayout as unknown as Omit<PageLayoutDto, 'sections' | 'relatedLists'>),
+          ...(flatLayout as unknown as Omit<PageLayoutDto, 'sections' | 'relatedLists' | 'rules'>),
           sections,
           relatedLists,
+          rules,
         }
 
         if (!result.sections || result.sections.length === 0) {

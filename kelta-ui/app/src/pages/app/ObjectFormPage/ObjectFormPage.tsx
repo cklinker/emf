@@ -16,7 +16,7 @@
  * - Loading states
  */
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Save, X, Loader2, AlertCircle } from 'lucide-react'
@@ -501,23 +501,29 @@ function ObjectFormBody({
 
   const pageTitle = isNew ? `New ${collectionLabel}` : `Edit ${collectionLabel}`
 
-  // Handle field change
+  // Handle field change. Use a functional ref of the latest values so we can
+  // pass the post-mutation map directly to the engine — without that, the
+  // engine reads stale values because setFormData is async and useLayoutRules'
+  // valuesRef only refreshes on the next render.
+  const formDataRef = useRef(formData)
+  formDataRef.current = formData
   const handleFieldChange = useCallback(
     (name: string, value: unknown) => {
-      setFormData((prev) => ({ ...prev, [name]: value }))
+      const next = { ...formDataRef.current, [name]: value }
+      formDataRef.current = next
+      setFormData(next)
       // Clear server-side error for this field when user modifies it
       setFormErrors((prev) => {
         if (prev[name]) {
-          const next = { ...prev }
-          delete next[name]
-          return next
+          const errNext = { ...prev }
+          delete errNext[name]
+          return errNext
         }
         return prev
       })
-      // Drive the layout-rules engine: cascade computes/validations triggered
-      // by this field. The engine writes back via setFieldValue (above), so
-      // dependent fields update in the same render cycle.
-      ruleEngine.onFieldChange(name)
+      // Drive the engine with the freshly computed values map so cascaded
+      // computes/validations see the new value immediately.
+      ruleEngine.onFieldChange(name, next)
     },
     [ruleEngine]
   )

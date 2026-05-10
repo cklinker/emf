@@ -50,6 +50,12 @@ export interface LayoutFormSectionsProps {
    * (e.g. create form with no values yet), all visibility rules pass.
    */
   record?: Record<string, unknown>
+  /**
+   * Optional callback that returns true when the field is the target of a
+   * client-side compute rule. Computed targets render as read-only with a
+   * small "ƒ" adornment so users know the value is derived.
+   */
+  isComputed?: (fieldName: string) => boolean
 }
 
 interface ResolvedField {
@@ -68,7 +74,8 @@ function resolvePlacements(
   fieldsByName: Map<string, LayoutFormFieldDefinition>,
   fieldsById: Map<string, LayoutFormFieldDefinition>,
   columns: number,
-  record: Record<string, unknown> | undefined
+  record: Record<string, unknown> | undefined,
+  isComputed?: (fieldName: string) => boolean,
 ): ResolvedField[] {
   const visiblePlacements = record
     ? placements.filter((p) => isVisible(p.visibilityRule, record))
@@ -98,13 +105,15 @@ function resolvePlacements(
       const schemaField = fieldsById.get(placement.fieldId) || fieldsByName.get(placement.fieldName)
       if (!schemaField) return null
 
+      const computed = isComputed?.(schemaField.name) ?? false
       const resolved: LayoutFormFieldDefinition = {
         ...schemaField,
         displayName: placement.labelOverride || schemaField.displayName || schemaField.name,
         required: placement.requiredOnLayout || schemaField.required,
-        readOnly: placement.readOnlyOnLayout || schemaField.readOnly,
+        readOnly: computed || placement.readOnlyOnLayout || schemaField.readOnly,
         helpText: placement.helpTextOverride || schemaField.helpText,
         columnSpan: placement.columnSpan ?? 1,
+        isComputedField: computed,
       }
       return { field: resolved, placement }
     })
@@ -197,6 +206,7 @@ export function LayoutFormSections({
   schemaFields,
   renderField,
   record,
+  isComputed,
 }: LayoutFormSectionsProps): React.ReactElement {
   const { fieldsByName, fieldsById } = useMemo(() => {
     const byName = new Map<string, LayoutFormFieldDefinition>()
@@ -224,13 +234,14 @@ export function LayoutFormSections({
         fieldsByName,
         fieldsById,
         section.columns || 1,
-        record
+        record,
+        isComputed,
       )
       result.push({ section, resolved, startIndex: acc })
       return acc + resolved.length
     }, 0)
     return result
-  }, [sections, fieldsByName, fieldsById, record])
+  }, [sections, fieldsByName, fieldsById, record, isComputed])
 
   return (
     <div className="flex flex-col gap-4">

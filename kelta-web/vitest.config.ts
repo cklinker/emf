@@ -9,6 +9,7 @@ export default defineConfig({
       '@kelta/sdk': resolve(__dirname, 'packages/sdk/src'),
       '@kelta/components': resolve(__dirname, 'packages/components/src'),
       '@kelta/plugin-sdk': resolve(__dirname, 'packages/plugin-sdk/src'),
+      '@kelta/formula': resolve(__dirname, 'packages/formula/src'),
     },
   },
   test: {

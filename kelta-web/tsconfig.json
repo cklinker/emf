@@ -25,13 +25,16 @@
       "@kelta/components": ["packages/components/src"],
       "@kelta/components/*": ["packages/components/src/*"],
       "@kelta/plugin-sdk": ["packages/plugin-sdk/src"],
-      "@kelta/plugin-sdk/*": ["packages/plugin-sdk/src/*"]
+      "@kelta/plugin-sdk/*": ["packages/plugin-sdk/src/*"],
+      "@kelta/formula": ["packages/formula/src"],
+      "@kelta/formula/*": ["packages/formula/src/*"]
     }
   },
   "references": [
     { "path": "./packages/sdk" },
     { "path": "./packages/components" },
-    { "path": "./packages/plugin-sdk" }
+    { "path": "./packages/plugin-sdk" },
+    { "path": "./packages/formula" }
   ],
   "include": [],
   "exclude": ["node_modules", "dist"]

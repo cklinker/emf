@@ -1,0 +1,108 @@
+{
+  "description": "Shared parity fixtures for FormulaEvaluator (Java) and @kelta/formula (TypeScript). Both implementations MUST produce identical results for these cases. Add new edge cases here when you change either side.",
+  "cases": [
+    { "name": "literal_int", "expression": "42", "context": {}, "expected": 42, "expectedType": "number" },
+    { "name": "literal_decimal", "expression": "3.14", "context": {}, "expected": 3.14, "expectedType": "number" },
+    { "name": "literal_string_single", "expression": "'hello'", "context": {}, "expected": "hello" },
+    { "name": "literal_string_double", "expression": "\"world\"", "context": {}, "expected": "world" },
+    { "name": "literal_true", "expression": "true", "context": {}, "expected": true },
+    { "name": "literal_false", "expression": "FALSE", "context": {}, "expected": false },
+    { "name": "literal_null", "expression": "null", "context": {}, "expected": null },
+
+    { "name": "field_ref_number", "expression": "amount", "context": { "amount": 100 }, "expected": 100 },
+    { "name": "field_ref_string", "expression": "name", "context": { "name": "Alice" }, "expected": "Alice" },
+    { "name": "field_ref_missing", "expression": "missing", "context": {}, "expected": null },
+
+    { "name": "add_numbers", "expression": "2 + 3", "context": {}, "expected": 5 },
+    { "name": "subtract", "expression": "10 - 4", "context": {}, "expected": 6 },
+    { "name": "multiply", "expression": "6 * 7", "context": {}, "expected": 42 },
+    { "name": "divide", "expression": "20 / 4", "context": {}, "expected": 5 },
+    { "name": "div_by_zero_throws", "expression": "1 / 0", "context": {}, "throws": true },
+
+    { "name": "add_string_concat", "expression": "'a' + 'b'", "context": {}, "expected": "ab" },
+    { "name": "add_string_number", "expression": "'count: ' + 5", "context": {}, "expected": "count: 5" },
+    { "name": "add_null_string", "expression": "'x' + null", "context": {}, "expected": "xnull" },
+
+    { "name": "precedence_mul_before_add", "expression": "2 + 3 * 4", "context": {}, "expected": 14 },
+    { "name": "precedence_paren", "expression": "(2 + 3) * 4", "context": {}, "expected": 20 },
+    { "name": "precedence_unary_minus", "expression": "-5 + 10", "context": {}, "expected": 5 },
+    { "name": "precedence_div_left_assoc", "expression": "100 / 5 / 2", "context": {}, "expected": 10 },
+
+    { "name": "compute_line_total", "expression": "(quantity * unit_price) - discount", "context": { "quantity": 3, "unit_price": 24, "discount": 5 }, "expected": 67 },
+
+    { "name": "eq_numbers", "expression": "5 == 5", "context": {}, "expected": true },
+    { "name": "eq_alias_single", "expression": "5 = 5", "context": {}, "expected": true },
+    { "name": "neq_alias_diamond", "expression": "5 <> 6", "context": {}, "expected": true },
+    { "name": "neq_bang", "expression": "5 != 6", "context": {}, "expected": true },
+    { "name": "lt", "expression": "3 < 5", "context": {}, "expected": true },
+    { "name": "gt", "expression": "5 > 3", "context": {}, "expected": true },
+    { "name": "lte_eq", "expression": "5 <= 5", "context": {}, "expected": true },
+    { "name": "gte_eq", "expression": "5 >= 5", "context": {}, "expected": true },
+    { "name": "compare_strings_lex", "expression": "'apple' < 'banana'", "context": {}, "expected": true },
+    { "name": "compare_null_returns_zero_eq", "expression": "amount > 0", "context": { "amount": null }, "expected": false },
+
+    { "name": "and_true", "expression": "true && true", "context": {}, "expected": true },
+    { "name": "and_false", "expression": "true && false", "context": {}, "expected": false },
+    { "name": "or_true", "expression": "false || true", "context": {}, "expected": true },
+    { "name": "not", "expression": "!false", "context": {}, "expected": true },
+    { "name": "complex_logic", "expression": "(a > 0) && (b < 10 || c == 'x')", "context": { "a": 5, "b": 20, "c": "x" }, "expected": true },
+
+    { "name": "if_true_branch", "expression": "IF(score > 50, 'pass', 'fail')", "context": { "score": 75 }, "expected": "pass" },
+    { "name": "if_false_branch", "expression": "IF(score > 50, 'pass', 'fail')", "context": { "score": 30 }, "expected": "fail" },
+
+    { "name": "isblank_null", "expression": "ISBLANK(name)", "context": { "name": null }, "expected": true },
+    { "name": "isblank_empty_string", "expression": "ISBLANK(name)", "context": { "name": "" }, "expected": true },
+    { "name": "isblank_whitespace", "expression": "ISBLANK(name)", "context": { "name": "   " }, "expected": true },
+    { "name": "isblank_value", "expression": "ISBLANK(name)", "context": { "name": "Alice" }, "expected": false },
+
+    { "name": "blankvalue_uses_default", "expression": "BLANKVALUE(name, 'unknown')", "context": { "name": null }, "expected": "unknown" },
+    { "name": "blankvalue_keeps_value", "expression": "BLANKVALUE(name, 'unknown')", "context": { "name": "Alice" }, "expected": "Alice" },
+
+    { "name": "and_fn_all_true", "expression": "AND(true, true, true)", "context": {}, "expected": true },
+    { "name": "and_fn_one_false", "expression": "AND(true, false, true)", "context": {}, "expected": false },
+    { "name": "or_fn_one_true", "expression": "OR(false, false, true)", "context": {}, "expected": true },
+    { "name": "or_fn_all_false", "expression": "OR(false, false)", "context": {}, "expected": false },
+    { "name": "not_fn", "expression": "NOT(true)", "context": {}, "expected": false },
+
+    { "name": "len_string", "expression": "LEN('hello')", "context": {}, "expected": 5 },
+    { "name": "len_field", "expression": "LEN(name)", "context": { "name": "Alice" }, "expected": 5 },
+    { "name": "len_null_zero", "expression": "LEN(name)", "context": { "name": null }, "expected": 0 },
+
+    { "name": "contains_yes", "expression": "CONTAINS('hello world', 'world')", "context": {}, "expected": true },
+    { "name": "contains_no", "expression": "CONTAINS('hello', 'xyz')", "context": {}, "expected": false },
+
+    { "name": "upper", "expression": "UPPER('abc')", "context": {}, "expected": "ABC" },
+    { "name": "lower", "expression": "LOWER('XYZ')", "context": {}, "expected": "xyz" },
+    { "name": "trim", "expression": "TRIM('  hi  ')", "context": {}, "expected": "hi" },
+    { "name": "upper_null", "expression": "UPPER(name)", "context": { "name": null }, "expected": null },
+
+    { "name": "text_number", "expression": "TEXT(42)", "context": {}, "expected": "42" },
+    { "name": "text_null_empty", "expression": "TEXT(name)", "context": { "name": null }, "expected": "" },
+
+    { "name": "value_string", "expression": "VALUE('3.14')", "context": {}, "expected": 3.14, "expectedType": "number" },
+    { "name": "value_null_zero", "expression": "VALUE(missing)", "context": {}, "expected": 0 },
+
+    { "name": "round_two_places", "expression": "ROUND(3.14159, 2)", "context": {}, "expected": 3.14 },
+    { "name": "round_zero_places", "expression": "ROUND(3.7, 0)", "context": {}, "expected": 4 },
+    { "name": "abs_negative", "expression": "ABS(-5)", "context": {}, "expected": 5 },
+    { "name": "max_fn", "expression": "MAX(3, 7)", "context": {}, "expected": 7 },
+    { "name": "min_fn", "expression": "MIN(3, 7)", "context": {}, "expected": 3 },
+
+    { "name": "regex_match", "expression": "REGEX('abc123', '[a-z]+[0-9]+')", "context": {}, "expected": true },
+    { "name": "regex_no_match", "expression": "REGEX('abc', '[0-9]+')", "context": {}, "expected": false },
+
+    { "name": "datediff_days", "expression": "DATEDIFF('2026-01-10', '2026-01-01')", "context": {}, "expected": 9 },
+    { "name": "datediff_negative", "expression": "DATEDIFF('2026-01-01', '2026-01-10')", "context": {}, "expected": -9 },
+
+    { "name": "discount_validation_invalid", "expression": "discount > unit_price * 0.5", "context": { "discount": 20, "unit_price": 30 }, "expected": true },
+    { "name": "discount_validation_valid", "expression": "discount > unit_price * 0.5", "context": { "discount": 5, "unit_price": 30 }, "expected": false },
+
+    { "name": "nested_function_calls", "expression": "TRIM(UPPER(sku))", "context": { "sku": "  abc-123  " }, "expected": "ABC-123" },
+    { "name": "if_with_blankvalue", "expression": "IF(ISBLANK(name), 'anonymous', name)", "context": { "name": null }, "expected": "anonymous" },
+
+    { "name": "unterminated_string_throws", "expression": "'broken", "context": {}, "throws": true },
+    { "name": "unknown_function_throws", "expression": "BOGUS(1)", "context": {}, "throws": true },
+    { "name": "trailing_garbage_throws", "expression": "1 + 2 garbage", "context": {}, "throws": true },
+    { "name": "unbalanced_paren_throws", "expression": "(1 + 2", "context": {}, "throws": true }
+  ]
+}

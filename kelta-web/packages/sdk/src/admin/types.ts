@@ -784,6 +784,8 @@ export interface CollectionValidationRule {
   errorMessage: string;
   errorField?: string;
   evaluateOn: 'CREATE' | 'UPDATE' | 'CREATE_AND_UPDATE';
+  enforceOnClient: boolean;
+  severity: 'ERROR' | 'WARNING';
   createdAt: string;
   updatedAt: string;
 }
@@ -798,6 +800,8 @@ export interface CreateCollectionValidationRuleRequest {
   errorMessage: string;
   errorField?: string;
   evaluateOn?: 'CREATE' | 'UPDATE' | 'CREATE_AND_UPDATE';
+  enforceOnClient?: boolean;
+  severity?: 'ERROR' | 'WARNING';
 }
 
 /**
@@ -882,9 +886,79 @@ export interface PageLayout {
   isDefault: boolean;
   sections: LayoutSection[];
   relatedLists: LayoutRelatedList[];
+  rules?: LayoutRule[];
   createdAt: string;
   updatedAt: string;
 }
+
+export type LayoutRuleKind = 'compute' | 'validate' | 'default' | 'transform';
+export type LayoutRuleEvent = 'onChange' | 'onBlur' | 'onLoad' | 'onBeforeSave';
+export type LayoutRuleEnforce = 'block' | 'warn';
+export type LayoutRuleTransformType = 'upper' | 'lower' | 'trim' | 'titleCase';
+
+interface BaseLayoutRule {
+  id: string;
+  tenantId: string;
+  layoutId: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  when: LayoutRuleEvent[];
+  dependsOn?: string[];
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComputeLayoutRule extends BaseLayoutRule {
+  kind: 'compute';
+  target: string;
+  formula: string;
+}
+
+export interface ValidateLayoutRule extends BaseLayoutRule {
+  kind: 'validate';
+  target?: string;
+  formula: string;
+  errorMessage: string;
+  enforce: LayoutRuleEnforce;
+}
+
+export interface DefaultLayoutRule extends BaseLayoutRule {
+  kind: 'default';
+  target: string;
+  formula: string;
+  triggerFields?: string[];
+}
+
+export interface TransformLayoutRule extends BaseLayoutRule {
+  kind: 'transform';
+  target: string;
+  transform:
+    | { type: 'upper' | 'lower' | 'trim' | 'titleCase' }
+    | { type: 'formula'; formula: string };
+}
+
+export type LayoutRule =
+  | ComputeLayoutRule
+  | ValidateLayoutRule
+  | DefaultLayoutRule
+  | TransformLayoutRule;
+
+export interface CreateLayoutRuleRequest {
+  layoutId: string;
+  name: string;
+  description?: string;
+  kind: 'COMPUTE' | 'VALIDATE' | 'DEFAULT' | 'TRANSFORM';
+  active?: boolean;
+  whenEvents: LayoutRuleEvent[];
+  targetField?: string;
+  dependsOn?: string[];
+  body: Record<string, unknown>;
+  sortOrder: number;
+}
+
+export type UpdateLayoutRuleRequest = Partial<CreateLayoutRuleRequest>;
 
 export interface LayoutSection {
   id: string;

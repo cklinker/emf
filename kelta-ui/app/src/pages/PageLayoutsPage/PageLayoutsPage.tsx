@@ -17,6 +17,7 @@ import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { useCollectionSummaries, type CollectionSummary } from '../../hooks/useCollectionSummaries'
 import { cn } from '@/lib/utils'
+import { RulesEditor } from './RulesEditor'
 
 import {
   LayoutEditorProvider,
@@ -991,6 +992,7 @@ export function PageLayoutsPage({
   const [editingLayout, setEditingLayout] = useState<PageLayoutSummary | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [layoutToDelete, setLayoutToDelete] = useState<PageLayoutSummary | null>(null)
+  const [rulesEditorLayout, setRulesEditorLayout] = useState<PageLayoutSummary | null>(null)
 
   const {
     data: layouts,
@@ -1291,6 +1293,15 @@ export function PageLayoutsPage({
                       </button>
                       <button
                         type="button"
+                        className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
+                        onClick={() => setRulesEditorLayout(layout)}
+                        aria-label={`Rules for ${layout.name}`}
+                        data-testid={`rules-button-${index}`}
+                      >
+                        Rules
+                      </button>
+                      <button
+                        type="button"
                         className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-destructive transition-all duration-200 hover:border-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
                         onClick={() => handleDeleteClick(layout)}
                         aria-label={`Delete ${layout.name}`}
@@ -1314,6 +1325,15 @@ export function PageLayoutsPage({
           onSubmit={handleFormSubmit}
           onCancel={handleCloseForm}
           isSubmitting={isSubmitting}
+        />
+      )}
+
+      {rulesEditorLayout && (
+        <RulesEditor
+          layoutId={rulesEditorLayout.id}
+          layoutName={rulesEditorLayout.name}
+          fieldNames={[]}
+          onClose={() => setRulesEditorLayout(null)}
         />
       )}
 

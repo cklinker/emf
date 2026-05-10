@@ -35,6 +35,7 @@ export default defineConfig({
         'react-hook-form',
         '@tanstack/react-query',
         '@kelta/sdk',
+        '@kelta/formula',
       ],
       output: {
         globals: {
@@ -45,6 +46,7 @@ export default defineConfig({
           'react-hook-form': 'ReactHookForm',
           '@tanstack/react-query': 'ReactQuery',
           '@kelta/sdk': 'KeltaSdk',
+          '@kelta/formula': 'KeltaFormula',
         },
       },
     },

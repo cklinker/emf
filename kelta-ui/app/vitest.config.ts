@@ -35,6 +35,11 @@ export default defineConfig({
       // axios instance so that vi.mock('axios') in vitest.setup.ts intercepts
       // all Axios usage, including KeltaClient's internal axios.create().
       axios: resolve(__dirname, 'node_modules/axios'),
+      // The @kelta/components dist references @kelta/formula as an external
+      // import. Vite needs the alias so its dependency resolver can locate
+      // the workspace package; npm's symlink alone isn't always enough when
+      // the import is hoisted across packages.
+      '@kelta/formula': resolve(__dirname, 'node_modules/@kelta/formula'),
     },
   },
 })

@@ -19,6 +19,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@kelta/components": "file:../../kelta-web/packages/components",
+    "@kelta/formula": "file:../../kelta-web/packages/formula",
     "@kelta/plugin-sdk": "file:../../kelta-web/packages/plugin-sdk",
     "@kelta/sdk": "file:../../kelta-web/packages/sdk",
     "@opentelemetry/api": "^1.9.0",

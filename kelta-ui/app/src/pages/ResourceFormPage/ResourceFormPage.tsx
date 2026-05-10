@@ -24,6 +24,8 @@ import type { LookupOption } from '../../components'
 import { useAuth } from '../../context/AuthContext'
 import { usePageLayout } from '../../hooks/usePageLayout'
 import { LayoutFormSections } from '../../components/LayoutFormSections/LayoutFormSections'
+import { useLayoutRules } from '@kelta/components'
+import { dtosToLayoutRules } from '../../utils/layoutRules'
 import { unwrapResource, extractIncluded, wrapResource } from '../../utils/jsonapi'
 import { ApiError } from '../../services/apiClient'
 import type { ApiClient } from '../../services/apiClient'
@@ -366,6 +368,35 @@ export function ResourceFormPage({
 
   // Resolve page layout for this collection (returns null if none configured)
   const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
+
+  // Convert raw layout-rules DTOs into the typed LayoutRule[] the engine
+  // consumes. Memoized on the rules array so the engine memo inside
+  // useLayoutRules is stable and doesn't rebuild every render.
+  const layoutRules = useMemo(
+    () => dtosToLayoutRules(layout?.rules, ''),
+    [layout?.rules],
+  )
+
+  // Mirror collection-wide validation rules with enforce_on_client = true so
+  // the form can show inline errors live and block submission for ERROR
+  // severity. Server-side enforcement is authoritative — this is a UX layer,
+  // not a security boundary. Only `active` rules with `enforceOnClient` are
+  // returned by the filter.
+  const { data: clientValidationRules = [] } = useQuery({
+    queryKey: ['client-validation-rules', schema?.id],
+    queryFn: async () => {
+      if (!schema?.id) return []
+      try {
+        return await apiClient.getList<import('@kelta/sdk').CollectionValidationRule>(
+          `/api/validation-rules?filter[collectionId][eq]=${schema.id}&filter[active][eq]=true&filter[enforceOnClient][eq]=true&page[size]=100`,
+        )
+      } catch {
+        return []
+      }
+    },
+    enabled: !!schema?.id,
+    staleTime: 5 * 60 * 1000,
+  })
 
   // Identify picklist fields so we can fetch their values
   const picklistFields = useMemo(() => {
@@ -903,6 +934,32 @@ export function ResourceFormPage({
     return isValid
   }, [sortedFields, formData, validateField])
 
+  // Adapter: useLayoutRules speaks a generic FormBinding — wire it to the
+  // useState-based form data and error map this page already owns.
+  const setFieldValue = useCallback((fieldName: string, value: unknown) => {
+    setFormData((prev) => ({ ...prev, [fieldName]: value }))
+  }, [])
+  const setFieldError = useCallback((fieldName: string, message: string) => {
+    setFormErrors((prev) => ({ ...prev, [fieldName]: message }))
+  }, [])
+  const clearFieldError = useCallback((fieldName: string) => {
+    setFormErrors((prev) => {
+      if (!(fieldName in prev)) return prev
+      const next = { ...prev }
+      delete next[fieldName]
+      return next
+    })
+  }, [])
+
+  const ruleEngine = useLayoutRules({
+    rules: layoutRules,
+    validationRules: clientValidationRules,
+    values: formData,
+    setFieldValue,
+    setFieldError,
+    clearFieldError,
+  })
+
   /**
    * Handle field value change
    */
@@ -921,8 +978,20 @@ export function ResourceFormPage({
           return next
         })
       }
+
+      // Drive the layout-rules engine: cascade computes/validations triggered
+      // by this field. The engine writes back via setFieldValue (above), so
+      // dependent fields update in the same render cycle.
+      ruleEngine.onFieldChange(fieldName)
     },
-    [formErrors]
+    [formErrors, ruleEngine]
+  )
+
+  const handleFieldBlur = useCallback(
+    (fieldName: string) => {
+      ruleEngine.onFieldBlur(fieldName)
+    },
+    [ruleEngine],
   )
 
   /**
@@ -934,6 +1003,18 @@ export function ResourceFormPage({
 
       if (!validateForm()) {
         showToast(t('errors.validation'), 'error')
+        return
+      }
+
+      // Layout-rule beforeSave gate: collect violations from the engine and
+      // block the submission for ERROR severity. Warnings are logged but
+      // allow the submit to proceed.
+      const ruleResult = ruleEngine.runBeforeSave()
+      if (ruleResult.blocked) {
+        showToast(
+          ruleResult.violations[0]?.message ?? t('errors.validation'),
+          'error',
+        )
         return
       }
 
@@ -1011,7 +1092,7 @@ export function ResourceFormPage({
         createMutation.mutate(submitData)
       }
     },
-    [validateForm, sortedFields, formData, isEditMode, updateMutation, createMutation, showToast, t]
+    [validateForm, sortedFields, formData, isEditMode, updateMutation, createMutation, showToast, t, ruleEngine]
   )
 
   /**
@@ -1614,6 +1695,13 @@ export function ResourceFormPage({
       <form
         className="flex flex-col gap-6"
         onSubmit={handleSubmit}
+        onBlur={(event) => {
+          // Bubble field blur to the layout-rules engine. We use the input's
+          // `name` attribute (set by every renderField branch via field.name)
+          // to identify the field. Inputs without a name are ignored.
+          const name = (event.target as { name?: string } | null)?.name
+          if (name) handleFieldBlur(name)
+        }}
         noValidate
         data-testid="resource-form"
       >
@@ -1624,6 +1712,7 @@ export function ResourceFormPage({
             schemaFields={sortedFields}
             renderField={renderField}
             record={formData}
+            isComputed={ruleEngine.isComputed}
           />
         ) : (
           <div className="flex flex-col gap-6 rounded-md border border-border bg-card p-6 max-md:p-4">

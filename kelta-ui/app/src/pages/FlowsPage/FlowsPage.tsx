@@ -15,6 +15,7 @@ import {
 import type { LogColumn } from '../../components'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { AdminDataTable, type AdminColumn } from '@/components/AdminDataTable'
 import { CreateFlowWizard } from './CreateFlowWizard'
 import { TestFlowDialog } from '../FlowDesignerPage/components/TestFlowDialog'
 
@@ -287,153 +288,125 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
           <p>No flows found.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table
-            className="w-full border-collapse"
-            role="grid"
-            aria-label="Flows"
-            data-testid="flows-table"
-          >
-            <thead>
-              <tr role="row" className="bg-muted">
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Name
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Flow Type
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Active
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Created
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {flowList.map((flow, index) => (
-                <tr
-                  key={flow.id}
-                  role="row"
-                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
-                  data-testid={`flow-row-${index}`}
-                >
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    {flow.name}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+        <div
+          className="overflow-x-auto rounded-lg border border-border bg-card"
+          role="grid"
+          aria-label="Flows"
+          data-testid="flows-table"
+        >
+          <AdminDataTable
+            tableId="flows"
+            rows={flowList}
+            rowKey={(f) => f.id}
+            columns={
+              [
+                { id: 'name', header: 'Name', accessor: (r) => r.name },
+                {
+                  id: 'flowType',
+                  header: 'Flow Type',
+                  accessor: (r) => r.flowType,
+                  cell: (r) => (
                     <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
-                      {flow.flowType}
+                      {r.flowType}
                     </span>
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                  ),
+                },
+                {
+                  id: 'active',
+                  header: 'Active',
+                  accessor: (r) => r.active,
+                  cell: (r) => (
                     <span
                       className={cn(
                         'inline-block rounded-full px-3 py-1 text-xs font-semibold',
-                        flow.active
+                        r.active
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                           : 'bg-muted text-muted-foreground'
                       )}
                     >
-                      {flow.active ? 'Yes' : 'No'}
+                      {r.active ? 'Yes' : 'No'}
                     </span>
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    {formatDate(new Date(flow.createdAt), {
+                  ),
+                },
+                {
+                  id: 'createdAt',
+                  header: 'Created',
+                  accessor: (r) => r.createdAt,
+                  cell: (r) =>
+                    formatDate(new Date(r.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
-                    })}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-right text-sm">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/${getTenantSlug()}/flows/${flow.id}/design`)}
-                        aria-label={`Design ${flow.name}`}
-                        data-testid={`design-button-${index}`}
-                      >
-                        Design
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setExecItemId(flow.id)
-                          setExecItemName(flow.name)
-                        }}
-                        aria-label={`View executions for ${flow.name}`}
-                        data-testid={`executions-button-${index}`}
-                      >
-                        {t('flows.executions')}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setRunFlowTarget(flow)
-                          setRunDialogOpen(true)
-                        }}
-                        disabled={!flow.active || executeMutation.isPending}
-                        aria-label={`Run ${flow.name}`}
-                        data-testid={`run-button-${index}`}
-                      >
-                        {t('flows.runFlow')}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/${getTenantSlug()}/flows/${flow.id}/design`)}
-                        aria-label={`Edit ${flow.name}`}
-                        data-testid={`edit-button-${index}`}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-destructive/30 text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteClick(flow)}
-                        aria-label={`Delete ${flow.name}`}
-                        data-testid={`delete-button-${index}`}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    }),
+                },
+              ] as AdminColumn<Flow>[]
+            }
+            renderActions={(flow) => {
+              const index = flowList.indexOf(flow)
+              return (
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/${getTenantSlug()}/flows/${flow.id}/design`)}
+                    aria-label={`Design ${flow.name}`}
+                    data-testid={`design-button-${index}`}
+                  >
+                    Design
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setExecItemId(flow.id)
+                      setExecItemName(flow.name)
+                    }}
+                    aria-label={`View executions for ${flow.name}`}
+                    data-testid={`executions-button-${index}`}
+                  >
+                    {t('flows.executions')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setRunFlowTarget(flow)
+                      setRunDialogOpen(true)
+                    }}
+                    disabled={!flow.active || executeMutation.isPending}
+                    aria-label={`Run ${flow.name}`}
+                    data-testid={`run-button-${index}`}
+                  >
+                    {t('flows.runFlow')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/${getTenantSlug()}/flows/${flow.id}/design`)}
+                    aria-label={`Edit ${flow.name}`}
+                    data-testid={`edit-button-${index}`}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDeleteClick(flow)}
+                    aria-label={`Delete ${flow.name}`}
+                    data-testid={`delete-button-${index}`}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              )
+            }}
+          />
         </div>
       )}
 

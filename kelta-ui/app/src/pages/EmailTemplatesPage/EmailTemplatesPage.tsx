@@ -13,6 +13,7 @@ import type { LogColumn } from '../../components'
 import type { CreateEmailTemplateRequest, EmailTemplate as SdkEmailTemplate } from '@kelta/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { AdminDataTable, type AdminColumn } from '@/components/AdminDataTable'
 import { Plus } from 'lucide-react'
 import { FieldExpressionPicker, type StaticNamespace } from '../../components/FieldExpressionPicker'
 import { RichTextEditor, type RichTextEditorHandle } from '../../components/RichTextEditor'
@@ -879,137 +880,98 @@ export function EmailTemplatesPage({
           <p>No email templates found.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table
-            className="w-full border-collapse"
-            role="grid"
-            aria-label="Email Templates"
-            data-testid="email-templates-table"
-          >
-            <thead>
-              <tr role="row" className="bg-muted">
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Name
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Subject
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Folder
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Active
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Created
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
-                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {templateList.map((template, index) => (
-                <tr
-                  key={template.id}
-                  role="row"
-                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
-                  data-testid={`email-template-row-${index}`}
-                >
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    {template.name}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    {template.subject}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    {template.folder || '-'}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+        <div
+          className="overflow-x-auto rounded-lg border border-border bg-card"
+          role="grid"
+          aria-label="Email Templates"
+          data-testid="email-templates-table"
+        >
+          <AdminDataTable
+            tableId="email-templates"
+            rows={templateList}
+            rowKey={(t) => t.id}
+            columns={
+              [
+                { id: 'name', header: 'Name', accessor: (r) => r.name },
+                { id: 'subject', header: 'Subject', accessor: (r) => r.subject },
+                {
+                  id: 'folder',
+                  header: 'Folder',
+                  accessor: (r) => r.folder ?? '',
+                  cell: (r) => r.folder || '-',
+                },
+                {
+                  id: 'active',
+                  header: 'Active',
+                  accessor: (r) => r.active,
+                  cell: (r) => (
                     <span
                       className={cn(
                         'inline-block rounded-full px-3 py-1 text-xs font-semibold',
-                        template.active
+                        r.active
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                           : 'bg-muted text-muted-foreground'
                       )}
                     >
-                      {template.active ? 'Yes' : 'No'}
+                      {r.active ? 'Yes' : 'No'}
                     </span>
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    {formatDate(new Date(template.createdAt), {
+                  ),
+                },
+                {
+                  id: 'createdAt',
+                  header: 'Created',
+                  accessor: (r) => r.createdAt,
+                  cell: (r) =>
+                    formatDate(new Date(r.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
-                    })}
-                  </td>
-                  <td role="gridcell" className="px-4 py-3 text-right text-sm">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setLogsItemId(template.id)
-                          setLogsItemName(template.name)
-                        }}
-                        aria-label={`View logs for ${template.name}`}
-                        data-testid={`logs-button-${index}`}
-                      >
-                        Logs
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(template)}
-                        aria-label={`Edit ${template.name}`}
-                        data-testid={`edit-button-${index}`}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-destructive/30 text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteClick(template)}
-                        aria-label={`Delete ${template.name}`}
-                        data-testid={`delete-button-${index}`}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    }),
+                },
+              ] as AdminColumn<EmailTemplate>[]
+            }
+            renderActions={(template) => {
+              const index = templateList.indexOf(template)
+              return (
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setLogsItemId(template.id)
+                      setLogsItemName(template.name)
+                    }}
+                    aria-label={`View logs for ${template.name}`}
+                    data-testid={`logs-button-${index}`}
+                  >
+                    Logs
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(template)}
+                    aria-label={`Edit ${template.name}`}
+                    data-testid={`edit-button-${index}`}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDeleteClick(template)}
+                    aria-label={`Delete ${template.name}`}
+                    data-testid={`delete-button-${index}`}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              )
+            }}
+          />
         </div>
       )}
 

@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS layout_rule (
     sort_order      INTEGER      NOT NULL DEFAULT 0,
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_by      VARCHAR(255),
+    updated_by      VARCHAR(255),
     CONSTRAINT uq_layout_rule_name UNIQUE (tenant_id, layout_id, name),
     CONSTRAINT chk_layout_rule_kind CHECK (kind IN ('COMPUTE','VALIDATE','DEFAULT','TRANSFORM'))
 );

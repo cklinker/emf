@@ -11,6 +11,12 @@
 - **MockWebServer** — HTTP service mocks
 - **Awaitility** — async assertions
 
+### Integration harness (`kelta-test-harness`)
+
+Boots a full mini-stack (Postgres, Redis, NATS, Cerbos, worker, auth, gateway) via Testcontainers and runs `*ScenarioTest.java` against it under the `integration-tests` profile.
+
+**Database selection**: `KeltaStack` reads `CI_DB_JDBC_URL` at startup. When set (CI), it skips the Testcontainers PG and points worker + auth at the shared `kelta-ci-db` pool — the URL emitted by `scripts/ci/checkout-db.sh` already pins `currentSchema=ci_<run-tag>` for per-run isolation. When unset (local dev), it falls back to a Testcontainers PG on the docker network alias `postgres`. The Testcontainers dependency stays in `pom.xml` either way.
+
 ### Organization
 - Unit tests: `src/test/java/io/kelta/...Test.java`
 - Test resources: `src/test/resources/`

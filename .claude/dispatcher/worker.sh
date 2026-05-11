@@ -157,9 +157,25 @@ if git -C "$WT" diff --quiet origin/main && [[ -z "$(git -C "$WT" status --porce
 fi
 
 # Stage anything left unstaged + create a final commit if needed.
+# Use a conventional-commit message built from the task's title + type so
+# that `gh pr create --fill` derives a useful PR title (the title is taken
+# from the first commit on the branch).
 git -C "$WT" add -A
 if ! git -C "$WT" diff --cached --quiet; then
-  git -C "$WT" commit -m "autopilot: $ID — final commit by worker.sh" >/dev/null
+  TASK_TITLE="$(queue_get_field "$TASK_FILE" title)"
+  TASK_TYPE="$(queue_get_field "$TASK_FILE" type)"
+  case "$TASK_TYPE" in
+    feature)        CC_PREFIX="feat"  ;;
+    bug|security)   CC_PREFIX="fix"   ;;
+    doc)            CC_PREFIX="docs"  ;;
+    chore|*)        CC_PREFIX="chore" ;;
+  esac
+  if [[ -n "$TASK_TITLE" ]]; then
+    FALLBACK_MSG="${CC_PREFIX}: ${TASK_TITLE}"
+  else
+    FALLBACK_MSG="${CC_PREFIX}: ${ID} — final commit by worker.sh"
+  fi
+  git -C "$WT" commit -m "$FALLBACK_MSG" >/dev/null
 fi
 
 # Rebase onto latest origin/main BEFORE pushing. Other autopilot workers

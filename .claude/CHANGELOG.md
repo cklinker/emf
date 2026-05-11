@@ -12,3 +12,4 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 - 2026-05-11 doc(architecture): document the autopilot loop — topology, queue lifecycle, label gate, migration lock, bug ingress (DOC-2026-05-10-0001)
 - 2026-05-11 chore(security): add SECURITY.md with vuln reporting policy and autopilot gating note (CHORE-2026-05-10-0002)
 - 2026-05-11 chore(docs): add CONTRIBUTING.md outlining the autopilot workflow (CHORE-2026-05-10-0003)
+- 2026-05-11 chore(autopilot): use task title+type for fallback commit message in worker.sh so `gh pr create --fill` produces a useful PR title (CHORE-2026-05-10-0005)

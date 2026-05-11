@@ -6,6 +6,7 @@ import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
+import io.kelta.worker.listener.CustomDomainEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -47,12 +48,15 @@ public class TenantDomainController {
     private final JdbcTemplate jdbcTemplate;
     private final WorkerCacheManager cacheManager;
     private final RecordEventPublisher recordEventPublisher;
+    private final CustomDomainEventPublisher domainEventPublisher;
 
     public TenantDomainController(JdbcTemplate jdbcTemplate, WorkerCacheManager cacheManager,
-                                   RecordEventPublisher recordEventPublisher) {
+                                   RecordEventPublisher recordEventPublisher,
+                                   CustomDomainEventPublisher domainEventPublisher) {
         this.jdbcTemplate = jdbcTemplate;
         this.cacheManager = cacheManager;
         this.recordEventPublisher = recordEventPublisher;
+        this.domainEventPublisher = domainEventPublisher;
     }
 
     @GetMapping("/api/admin/domains")
@@ -103,6 +107,7 @@ public class TenantDomainController {
 
         cacheManager.evictCustomDomain(domain);
         publishRecordEvent("record.created", tenantId, id, Map.of("domain", domain));
+        domainEventPublisher.publishCreated(id, domain, tenantId);
         log.info("Custom domain registered: {} → tenant {}", domain, tenantId);
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("data", Map.of("id", id, "domain", domain)));
     }
@@ -126,6 +131,7 @@ public class TenantDomainController {
             String domain = (String) domainRows.get(0).get("domain");
             cacheManager.evictCustomDomain(domain);
             publishRecordEvent("record.deleted", tenantId, domainId, Map.of("domain", domain));
+            domainEventPublisher.publishDeleted(domainId, domain, tenantId);
         }
 
         log.info("Custom domain removed: id={} tenant={}", domainId, tenantId);

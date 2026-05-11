@@ -1,9 +1,11 @@
 package io.kelta.worker.controller;
 
 import io.kelta.runtime.event.PlatformEvent;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
+import io.kelta.worker.listener.SystemFeatureEventPublisher;
 import io.kelta.worker.repository.GovernorLimitsRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import tools.jackson.databind.ObjectMapper;
@@ -38,6 +40,8 @@ class GovernorLimitsControllerTest {
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOps;
     private RecordEventPublisher recordEventPublisher;
+    private PlatformEventPublisher platformEventPublisher;
+    private SystemFeatureEventPublisher featureEventPublisher;
     private GovernorLimitsController controller;
 
     @SuppressWarnings("unchecked")
@@ -48,11 +52,13 @@ class GovernorLimitsControllerTest {
         redisTemplate = mock(StringRedisTemplate.class);
         valueOps = mock(ValueOperations.class);
         recordEventPublisher = mock(RecordEventPublisher.class);
+        platformEventPublisher = mock(PlatformEventPublisher.class);
+        featureEventPublisher = new SystemFeatureEventPublisher(platformEventPublisher);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         // Default: Redis returns null (0 API calls)
         when(valueOps.get(anyString())).thenReturn(null);
         WorkerCacheManager cacheManager = new WorkerCacheManager(new SimpleMeterRegistry());
-        controller = new GovernorLimitsController(repository, objectMapper, redisTemplate, recordEventPublisher, cacheManager);
+        controller = new GovernorLimitsController(repository, objectMapper, redisTemplate, recordEventPublisher, cacheManager, featureEventPublisher);
     }
 
     /** Extracts the attributes map from a JSON:API single-resource response body. */

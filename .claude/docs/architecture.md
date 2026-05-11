@@ -106,6 +106,20 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 6. CollectionRegistry updated
 7. Downstream: SearchIndexListener syncs OpenSearch, SvixWebhookPublisher notifies
 
+**Config-change NATS subjects** (broadcast, every pod consumes):
+
+| Subject | Published by | Consumed by | Purpose |
+|---------|--------------|-------------|---------|
+| `kelta.config.collection.changed.<id>` | `CollectionConfigEventPublisher` (BeforeSaveHook) | `CollectionSchemaListener`, gateway route registry | Collection metadata changed |
+| `kelta.config.flow.changed.<tenantId>` | `FlowConfigEventPublisher` (BeforeSaveHook) | `FlowEventListener` | Flow trigger cache refresh |
+| `kelta.config.credential.changed.<id>` | `CredentialEventPublisher` (BeforeSaveHook) | `CredentialCacheInvalidationListener` | Credential vault cache |
+| `kelta.config.domain.changed.<domainId>` | `CustomDomainEventPublisher` (called from `TenantDomainController`) | `CustomDomainCacheInvalidationListener` | Custom domain → tenant slug cache |
+| `kelta.config.feature.changed.<tenantId>` | `SystemFeatureEventPublisher` (called from `GovernorLimitsController`) | `SystemFeatureCacheInvalidationListener` | Tenant limits / feature toggle caches |
+
+Custom domains and tenant settings live in raw JDBC tables rather than
+system collections, so the publishers are invoked directly from the
+controller after the mutation rather than via the BeforeSaveHook registry.
+
 ## Key Abstractions
 
 | Abstraction | Purpose | Location |

@@ -1,8 +1,10 @@
 package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
+import io.kelta.worker.listener.CustomDomainEventPublisher;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,12 +26,16 @@ class TenantDomainControllerTest {
 
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private RecordEventPublisher recordEventPublisher;
+    @Mock private PlatformEventPublisher platformEventPublisher;
     private TenantDomainController controller;
 
     @BeforeEach
     void setUp() {
         WorkerCacheManager cacheManager = new WorkerCacheManager(new SimpleMeterRegistry());
-        controller = new TenantDomainController(jdbcTemplate, cacheManager, recordEventPublisher);
+        CustomDomainEventPublisher domainEventPublisher =
+                new CustomDomainEventPublisher(platformEventPublisher);
+        controller = new TenantDomainController(jdbcTemplate, cacheManager, recordEventPublisher,
+                domainEventPublisher);
         TenantContext.set("tenant-1");
     }
 

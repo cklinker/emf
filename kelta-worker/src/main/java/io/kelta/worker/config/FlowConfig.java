@@ -28,7 +28,11 @@ import io.kelta.worker.listener.CredentialEncryptionHook;
 import io.kelta.worker.listener.CredentialEventPublisher;
 import io.kelta.runtime.module.integration.api.OpenApiSpecParser;
 import io.kelta.worker.listener.RecordTypeEnforcementHook;
+import io.kelta.worker.listener.LayoutFieldRefreshHook;
+import io.kelta.worker.listener.LayoutRelatedListRefreshHook;
 import io.kelta.worker.listener.LayoutRuleRefreshHook;
+import io.kelta.worker.listener.LayoutSectionRefreshHook;
+import io.kelta.worker.listener.PageLayoutConfigEventPublisher;
 import io.kelta.worker.listener.ValidationRuleRefreshHook;
 import io.kelta.crypto.EncryptionService;
 import io.kelta.runtime.credential.CredentialTypeRegistry;
@@ -371,6 +375,43 @@ public class FlowConfig {
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher) {
         LayoutRuleRefreshHook hook = new LayoutRuleRefreshHook(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public PageLayoutConfigEventPublisher pageLayoutConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        PageLayoutConfigEventPublisher hook = new PageLayoutConfigEventPublisher(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public LayoutSectionRefreshHook layoutSectionRefreshHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        LayoutSectionRefreshHook hook = new LayoutSectionRefreshHook(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public LayoutFieldRefreshHook layoutFieldRefreshHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher,
+            JdbcTemplate jdbcTemplate) {
+        LayoutFieldRefreshHook hook = new LayoutFieldRefreshHook(eventPublisher, jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public LayoutRelatedListRefreshHook layoutRelatedListRefreshHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        LayoutRelatedListRefreshHook hook = new LayoutRelatedListRefreshHook(eventPublisher);
         hookRegistry.register(hook);
         return hook;
     }

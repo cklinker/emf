@@ -305,7 +305,7 @@ export function usePageLayout(
       }
     },
     enabled: !!collectionId && !!profileId,
-    staleTime: 5 * 60 * 1000, // Layouts rarely change; cache for 5 min
+    staleTime: 30 * 1000,
   })
 
   return {

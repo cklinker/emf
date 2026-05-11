@@ -970,6 +970,7 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
       queryClient.invalidateQueries({ queryKey: ['pageLayout', layoutId] })
+      queryClient.invalidateQueries({ queryKey: ['page-layout-resolve'] })
       markSaved()
       showToast('Layout saved successfully', 'success')
     },

@@ -10,3 +10,4 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 
 - 2026-05-11 chore(repo): add .editorconfig with project-wide indentation rules (CHORE-2026-05-10-0004)
 - 2026-05-11 doc(architecture): document the autopilot loop — topology, queue lifecycle, label gate, migration lock, bug ingress (DOC-2026-05-10-0001)
+- 2026-05-11 chore(security): add SECURITY.md with vuln reporting policy and autopilot gating note (CHORE-2026-05-10-0002)

@@ -13,6 +13,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../../../context/ApiContext'
 import { useCollectionSummaries } from '../../../hooks/useCollectionSummaries'
 import { useLayoutEditor, type EditorRelatedList } from './LayoutEditorContext'
+import {
+  computeDisplayOrder,
+  reorderColumns,
+  selectedInDisplayOrder,
+  swapAdjacent,
+} from './relatedListColumnOrder'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,6 +84,9 @@ export function RelatedListPanel(): React.ReactElement {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<RelatedListFormData>(INITIAL_FORM_DATA)
+  const [orderedFieldNames, setOrderedFieldNames] = useState<string[]>([])
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null)
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
 
   // Fetch all collections for the dropdown
   const { summaries: collections } = useCollectionSummaries()
@@ -257,6 +266,7 @@ export function RelatedListPanel(): React.ReactElement {
   const handleOpenForm = useCallback(() => {
     setEditingId(null)
     setFormData(INITIAL_FORM_DATA)
+    setOrderedFieldNames([])
     setIsFormOpen(true)
   }, [])
 
@@ -301,6 +311,8 @@ export function RelatedListPanel(): React.ReactElement {
       sortDirection: rl.sortDirection,
       rowLimit: rl.rowLimit,
     })
+    // Seed user-arranged order from saved columns so reopening preserves it
+    setOrderedFieldNames(parsedColumns)
     setIsFormOpen(true)
   }, [])
 
@@ -308,6 +320,9 @@ export function RelatedListPanel(): React.ReactElement {
     setIsFormOpen(false)
     setEditingId(null)
     setFormData(INITIAL_FORM_DATA)
+    setOrderedFieldNames([])
+    setDraggedColumn(null)
+    setDragOverColumn(null)
   }, [])
 
   const handleCollectionChange = useCallback((value: string) => {
@@ -318,6 +333,7 @@ export function RelatedListPanel(): React.ReactElement {
       selectedDisplayColumns: [],
       sortField: '',
     }))
+    setOrderedFieldNames([])
   }, [])
 
   const handleToggleDisplayColumn = useCallback((fieldName: string) => {
@@ -330,13 +346,94 @@ export function RelatedListPanel(): React.ReactElement {
     })
   }, [])
 
+  // Render order = user-arranged prefix (orderedFieldNames) followed by any
+  // remaining displayable fields in their natural order. Computed each render
+  // so we don't need an effect to reconcile when fields load or change.
+  const displayOrder = useMemo(
+    () => computeDisplayOrder(displayableFields.map((f) => f.name), orderedFieldNames),
+    [displayableFields, orderedFieldNames]
+  )
+
+  const handleReorderColumn = useCallback(
+    (draggedName: string, targetName: string) => {
+      setOrderedFieldNames(reorderColumns(displayOrder, draggedName, targetName))
+    },
+    [displayOrder]
+  )
+
+  const handleColumnDragStart = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, fieldName: string) => {
+      setDraggedColumn(fieldName)
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('text/plain', fieldName)
+    },
+    []
+  )
+
+  const handleColumnDragEnd = useCallback(() => {
+    setDraggedColumn(null)
+    setDragOverColumn(null)
+  }, [])
+
+  const handleColumnDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, fieldName: string) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      if (draggedColumn && draggedColumn !== fieldName) {
+        setDragOverColumn(fieldName)
+      }
+    },
+    [draggedColumn]
+  )
+
+  const handleColumnDragLeave = useCallback(() => {
+    setDragOverColumn(null)
+  }, [])
+
+  const handleColumnDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, targetName: string) => {
+      e.preventDefault()
+      setDragOverColumn(null)
+      if (!draggedColumn || draggedColumn === targetName) return
+      handleReorderColumn(draggedColumn, targetName)
+    },
+    [draggedColumn, handleReorderColumn]
+  )
+
+  const handleColumnKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>, index: number) => {
+      if (!e.altKey) return
+      if (e.key === 'ArrowUp' && index > 0) {
+        e.preventDefault()
+        setOrderedFieldNames(swapAdjacent(displayOrder, index, -1))
+      } else if (e.key === 'ArrowDown' && index < displayOrder.length - 1) {
+        e.preventDefault()
+        setOrderedFieldNames(swapAdjacent(displayOrder, index, 1))
+      }
+    },
+    [displayOrder]
+  )
+
+  const fieldByName = useMemo(() => {
+    const map = new Map<string, CollectionFieldDetail>()
+    for (const f of displayableFields) map.set(f.name, f)
+    return map
+  }, [displayableFields])
+
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault()
       if (!formData.relatedCollectionId || !formData.relationshipFieldId) return
 
+      // Persist in the order the user arranged in the modal: filter the
+      // ordered list to checked items, falling back to the toggle order if
+      // the ordered list hasn't been seeded yet.
+      const orderedSelection =
+        displayOrder.length > 0
+          ? selectedInDisplayOrder(displayOrder, formData.selectedDisplayColumns)
+          : formData.selectedDisplayColumns
       // Store as JSON array string since the backend column is JSONB
-      const displayColumns = JSON.stringify(formData.selectedDisplayColumns)
+      const displayColumns = JSON.stringify(orderedSelection)
 
       if (editingId) {
         updateRelatedList(editingId, {
@@ -361,7 +458,15 @@ export function RelatedListPanel(): React.ReactElement {
       }
       handleCloseForm()
     },
-    [formData, editingId, relatedLists, addRelatedList, updateRelatedList, handleCloseForm]
+    [
+      formData,
+      displayOrder,
+      editingId,
+      relatedLists,
+      addRelatedList,
+      updateRelatedList,
+      handleCloseForm,
+    ]
   )
 
   const handleDelete = useCallback(
@@ -522,27 +627,72 @@ export function RelatedListPanel(): React.ReactElement {
                 ) : displayableFields.length === 0 ? (
                   <div className="text-[12px] text-muted-foreground">No fields available</div>
                 ) : (
-                  <div
-                    className="flex max-h-[160px] flex-col gap-1 overflow-y-auto rounded-md border border-input bg-background p-2"
-                    data-testid="rl-form-display-columns"
-                  >
-                    {displayableFields.map((f) => (
-                      <label
-                        key={f.id}
-                        className="flex items-center gap-2 rounded px-1.5 py-1 text-[13px] text-foreground cursor-pointer hover:bg-muted"
-                      >
-                        <input
-                          type="checkbox"
-                          className="h-3.5 w-3.5 accent-primary"
-                          checked={formData.selectedDisplayColumns.includes(f.name)}
-                          onChange={() => handleToggleDisplayColumn(f.name)}
-                        />
-                        <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-                          {f.displayName || f.name}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                  <>
+                    <div
+                      className="flex max-h-[200px] flex-col gap-1 overflow-y-auto rounded-md border border-input bg-background p-2"
+                      data-testid="rl-form-display-columns"
+                      role="list"
+                      aria-label="Display columns, drag to reorder"
+                    >
+                      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
+                      {displayOrder.map((fieldName, index) => {
+                        const f = fieldByName.get(fieldName)
+                        if (!f) return null
+                        const checked = formData.selectedDisplayColumns.includes(f.name)
+                        const isDragging = draggedColumn === f.name
+                        const isDragOver = dragOverColumn === f.name
+                        return (
+                          <div
+                            key={f.id}
+                            className={`flex items-center gap-2 rounded px-1.5 py-1 text-[13px] text-foreground cursor-grab transition-colors duration-150 hover:bg-muted focus:outline-2 focus:outline-primary focus:-outline-offset-2 ${
+                              isDragging ? 'opacity-50 bg-muted' : ''
+                            } ${
+                              isDragOver
+                                ? 'bg-primary/10 shadow-[inset_0_-2px_0_hsl(var(--primary))]'
+                                : ''
+                            }`}
+                            role="listitem"
+                            draggable
+                            tabIndex={0}
+                            onDragStart={(e) => handleColumnDragStart(e, f.name)}
+                            onDragEnd={handleColumnDragEnd}
+                            onDragOver={(e) => handleColumnDragOver(e, f.name)}
+                            onDragLeave={handleColumnDragLeave}
+                            onDrop={(e) => handleColumnDrop(e, f.name)}
+                            onKeyDown={(e) => handleColumnKeyDown(e, index)}
+                            aria-label={`${f.displayName || f.name}${checked ? ', selected' : ''}`}
+                            data-testid={`rl-form-column-${f.name}`}
+                          >
+                            <span
+                              className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground active:cursor-grabbing"
+                              aria-hidden="true"
+                              data-testid={`rl-form-column-drag-handle-${f.name}`}
+                            >
+                              <span className="text-[12px] leading-none tracking-[-2px]">
+                                &#x22EE;&#x22EE;
+                              </span>
+                            </span>
+                            <input
+                              type="checkbox"
+                              className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                              checked={checked}
+                              onChange={() => handleToggleDisplayColumn(f.name)}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Include ${f.displayName || f.name}`}
+                              data-testid={`rl-form-column-checkbox-${f.name}`}
+                            />
+                            <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                              {f.displayName || f.name}
+                            </span>
+                          </div>
+                        )
+                      })}
+                      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      Drag rows or press Alt+Up/Down to reorder columns.
+                    </div>
+                  </>
                 )}
               </fieldset>
 

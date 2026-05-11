@@ -79,6 +79,10 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 - **Hooks**: `src/hooks/` — Custom React hooks
 - **Services**: `src/services/` — API integration layer
 
+### Component layering — admin app vs. plugin library
+
+`kelta-ui/app/src/components/` and `kelta-web/packages/components/src/` have grown overlapping families of components (data tables, filter builders, field renderers, forms). The consolidation strategy — which variant becomes the base, what features fold in, dependency order, and breaking-change risk for the public `@kelta/components` plugin API — is tracked in `.claude/docs/ui-consolidation-plan.md`. Consult that document before adding a new shared list/form/filter component on either side; reuse a unified component or extend it rather than forking a new variant.
+
 ## Data Flow
 
 **HTTP Request (Client -> Gateway -> Worker):**

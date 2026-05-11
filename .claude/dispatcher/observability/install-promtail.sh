@@ -20,8 +20,9 @@ DATA_DIR="/var/lib/promtail"
 SYSTEMD_DIR="/etc/systemd/system"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "[install-promtail] requesting sudo (will prompt once if not cached)..."
-sudo -v
+# No upfront `sudo -v` — that always prompts for a password even when
+# specific commands are NOPASSWD-allowed. Each sudo call below is an
+# allowed command (install, cp, systemctl).
 
 # 1. Binary
 if ! command -v promtail >/dev/null 2>&1 || ! promtail --version 2>&1 | grep -q "${PROMTAIL_VERSION#v}"; then

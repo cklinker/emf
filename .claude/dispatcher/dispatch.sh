@@ -43,7 +43,7 @@ active_sessions() {
 }
 
 prune_orphans() {
-  local active dead_count=0 owner sess
+  local active dead_count=0 owner sess pr id pr_state
   active="$(active_sessions)"
   shopt -s nullglob
   for f in "$EMF_QUEUE_REPO"/in-progress/*.md; do
@@ -53,11 +53,39 @@ prune_orphans() {
       continue
     fi
     sess="$TMUX_PREFIX-$(basename "$f" .md)"
-    if ! grep -qx "$sess" <<<"$active"; then
-      log_warn "orphan detected, releasing" file="$f" session="$sess"
-      queue_release_orphan "$f" || true
-      dead_count=$((dead_count + 1))
+    grep -qx "$sess" <<<"$active" && continue   # tmux session alive — not orphan
+
+    # Tmux session gone, but the worker may have completed its push and
+    # the PR may still be in flight (waiting on CI / auto-merge). Don't
+    # release in that case — releasing would re-spawn a new worker that
+    # races against the existing PR.
+    pr="$(queue_get_field "$f" pr)"
+    if [[ -n "$pr" && "$pr" != "null" ]]; then
+      pr_state="$(gh pr view "$pr" -R cklinker/emf --json state --jq '.state' 2>/dev/null || echo UNKNOWN)"
+      id="$(basename "$f" .md)"
+      case "$pr_state" in
+        OPEN)
+          # PR still open: leave the task in in-progress until the PR
+          # merges or closes, then mark accordingly.
+          continue
+          ;;
+        MERGED)
+          log_info "tmux gone but PR merged; archiving" task="$id" pr="$pr"
+          queue_done "$f" "$pr" || true
+          continue
+          ;;
+        CLOSED)
+          log_warn "tmux gone and PR closed; releasing for retry" task="$id" pr="$pr"
+          ;;
+        *)
+          log_warn "tmux gone, PR state $pr_state; releasing for retry" task="$id" pr="$pr"
+          ;;
+      esac
     fi
+
+    log_warn "orphan detected, releasing" file="$f" session="$sess"
+    queue_release_orphan "$f" || true
+    dead_count=$((dead_count + 1))
   done
   shopt -u nullglob
   (( dead_count > 0 )) && log_info "released $dead_count orphan(s)"

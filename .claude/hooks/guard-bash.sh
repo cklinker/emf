@@ -37,9 +37,13 @@ block() {
   exit 2
 }
 
-# Direct push/force-push to main
-if [[ "$cmd_scan" =~ git[[:space:]]+push[[:space:]]+(--force|-f|origin[[:space:]]+main\b) ]]; then
-  block "no force-push or direct push to main"
+# Direct push to main, or unsafe force-push.
+# --force-with-lease and --force-if-includes are the safe forms (only succeed
+# if remote ref matches the expected commit) — allow those.
+if [[ "$cmd_scan" =~ git[[:space:]]+push[[:space:]]+([^[:space:]]+[[:space:]]+)*--force([[:space:]]|$) ]] \
+   || [[ "$cmd_scan" =~ git[[:space:]]+push[[:space:]]+([^[:space:]]+[[:space:]]+)*-f([[:space:]]|$) ]] \
+   || [[ "$cmd_scan" =~ git[[:space:]]+push[[:space:]]+origin[[:space:]]+main\b ]]; then
+  block "no unsafe force-push or direct push to main (use --force-with-lease for force-push)"
 fi
 
 # Hook bypass flags

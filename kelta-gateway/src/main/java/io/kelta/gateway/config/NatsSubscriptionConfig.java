@@ -2,6 +2,7 @@ package io.kelta.gateway.config;
 
 import io.kelta.gateway.listener.CerbosCacheInvalidationListener;
 import io.kelta.gateway.listener.ConfigEventListener;
+import io.kelta.gateway.listener.CustomDomainCacheInvalidationListener;
 import io.kelta.gateway.listener.RealtimeBridge;
 import io.kelta.gateway.listener.SystemCollectionRouteListener;
 import io.kelta.runtime.event.EventSubscription;
@@ -26,17 +27,20 @@ public class NatsSubscriptionConfig {
     private final SystemCollectionRouteListener systemCollectionRouteListener;
     private final ConfigEventListener configEventListener;
     private final CerbosCacheInvalidationListener cerbosCacheInvalidationListener;
+    private final CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener;
 
     public NatsSubscriptionConfig(NatsSubscriptionManager subscriptionManager,
                                    RealtimeBridge realtimeBridge,
                                    SystemCollectionRouteListener systemCollectionRouteListener,
                                    ConfigEventListener configEventListener,
-                                   CerbosCacheInvalidationListener cerbosCacheInvalidationListener) {
+                                   CerbosCacheInvalidationListener cerbosCacheInvalidationListener,
+                                   CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.realtimeBridge = realtimeBridge;
         this.systemCollectionRouteListener = systemCollectionRouteListener;
         this.configEventListener = configEventListener;
         this.cerbosCacheInvalidationListener = cerbosCacheInvalidationListener;
+        this.customDomainCacheInvalidationListener = customDomainCacheInvalidationListener;
     }
 
     @EventListener(ApplicationStartedEvent.class)
@@ -60,5 +64,9 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.broadcast(
                 "gateway-cerbos-cache", "kelta.cerbos.policies.changed.*",
                 cerbosCacheInvalidationListener::handlePolicyChanged));
+
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-domain-cache", "kelta.config.domain.changed.*",
+                customDomainCacheInvalidationListener::handleDomainChanged));
     }
 }

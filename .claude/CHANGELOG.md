@@ -15,3 +15,4 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 - 2026-05-11 chore(autopilot): use task title+type for fallback commit message in worker.sh so `gh pr create --fill` produces a useful PR title (CHORE-2026-05-10-0005)
 - 2026-05-11 doc(ui): add UI component consolidation plan covering DataTable/FilterBuilder/FieldRenderer/ResourceForm/RelatedList unification, feature superset, and migration order (DOC-2026-05-10-0002)
 - 2026-05-11 chore(cache): wire NATS broadcast listeners on gateway and worker for `kelta.config.domain.changed.*` and `kelta.config.feature.changed.*` cache invalidation (CHORE-2026-05-10-0007)
+- 2026-05-11 chore(ci): wire checkout-db/release-db into integration-tests job and drop postgres:15-alpine pre-pull so KeltaStack uses the kelta-ci-db pool (CHORE-2026-05-10-0009)

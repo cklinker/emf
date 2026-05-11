@@ -194,12 +194,39 @@ jobs:
         # Docker's cache and the registry is slow or unreachable from the K8s pod,
         # the pull blocks the test JVM thread indefinitely. Pre-pulling all images
         # here ensures everything is cached before the test process starts.
+        # Note: postgres:15-alpine is no longer pulled — KeltaStack bypasses
+        # Testcontainers PG when $CI_DB_JDBC_URL is set (kelta-ci-db pool).
         run: |
-          docker pull postgres:15-alpine
           docker pull redis:7-alpine
           docker pull nats:2.10-alpine
           docker pull ghcr.io/cerbos/cerbos:0.40.0
           docker pull eclipse-temurin:25-jre-alpine
+
+      - name: Install psql client
+        # checkout-db.sh / release-db.sh need psql to create/drop the per-run
+        # schema on the kelta-ci-db pool. The runner image
+        # (harbor.rzware.com/emf/github-runner-emf) does not bake in
+        # postgresql-client yet; install it here. TODO: move into the runner
+        # Dockerfile at homelab-argo/github-runner/Dockerfile when convenient.
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y --no-install-recommends postgresql-client
+          fi
+          psql --version
+
+      - name: Checkout CI DB schema
+        # Claim a throwaway schema on the kelta-ci-db pool and expose
+        # $CI_DB_JDBC_URL / $CI_DB_USER / $CI_DB_PASSWORD to subsequent steps.
+        # KeltaStack honours these env vars and skips its Testcontainers PG.
+        run: |
+          eval "$(scripts/ci/checkout-db.sh)"
+          echo "::add-mask::$CI_DB_PASSWORD"
+          {
+            echo "CI_DB_JDBC_URL=$CI_DB_JDBC_URL"
+            echo "CI_DB_USER=$CI_DB_USER"
+            echo "CI_DB_PASSWORD=$CI_DB_PASSWORD"
+          } >> "$GITHUB_ENV"
 
       - name: Pre-build service images
         # Build the three service container images using the pre-built fat JARs.
@@ -247,6 +274,13 @@ jobs:
           name: harness-failsafe-reports
           path: kelta-test-harness/target/failsafe-reports/
           retention-days: 7
+
+      - name: Release CI DB schema
+        # Drop the per-run schema even when tests fail, so the kelta-ci-db pool
+        # does not leak schemas. release-db.sh is a no-op if checkout-db.sh
+        # never ran (e.g. the install-psql step failed first).
+        if: always()
+        run: scripts/ci/release-db.sh
 
   # ===========================================================================
   # Quality gate - all checks must pass

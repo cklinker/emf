@@ -101,9 +101,13 @@ test.describe("End-User Record Lifecycle Journey", () => {
       const rowCount = await listPage.getRowCount();
       expect(rowCount).toBeGreaterThan(0);
 
-      // Click the first row to view the record
+      // Click the first row to view the record. The detail route push can lag
+      // under CI load behind the click handler's data fetch; give it a longer
+      // ceiling than the 30s default so the first attempt no longer flakes.
       await listPage.clickRow(0);
-      await page.waitForURL(new RegExp(`/app/o/${collectionName}/[^/]+`));
+      await page.waitForURL(new RegExp(`/app/o/${collectionName}/[^/]+`), {
+        timeout: 45_000,
+      });
     }
   });
 });

@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -390,6 +391,14 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     public Map<String, Object> create(CollectionDefinition definition, Map<String, Object> data) {
         TableRef tableRef = getTableRef(definition);
 
+        // Surface payload keys that don't map to a known field — these are
+        // silently dropped by the INSERT loop below. The most common cause is
+        // an in-flight schema propagation race where this pod's in-memory
+        // CollectionDefinition has not yet been refreshed with the latest
+        // field set (rollup_summary tests have caught this). A WARN log keeps
+        // the drop visible in CI artifacts so the race is debuggable.
+        warnOnUnknownPayloadKeys(definition, data);
+
         // Build column names, placeholders, and values.
         // JSONB columns need ?::jsonb placeholders so PostgreSQL accepts the
         // value as JSONB instead of VARCHAR.
@@ -481,6 +490,37 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 definition.name(), fieldName, data.get(fieldName), e);
         } catch (DataAccessException e) {
             throw new StorageException("Failed to create record in collection: " + definition.name(), e);
+        }
+    }
+
+    private static final Set<String> PAYLOAD_SYSTEM_KEYS = Set.of(
+        "id", "createdAt", "updatedAt", "createdBy", "updatedBy",
+        "tenantId", "recordTypeId"
+    );
+
+    private void warnOnUnknownPayloadKeys(CollectionDefinition definition, Map<String, Object> data) {
+        if (data == null || data.isEmpty()) {
+            return;
+        }
+        Set<String> knownFieldNames = new HashSet<>();
+        for (FieldDefinition field : definition.fields()) {
+            knownFieldNames.add(field.name());
+            if (field.type() == FieldType.CURRENCY) {
+                knownFieldNames.add(field.name() + "_currency_code");
+            }
+            if (field.type() == FieldType.GEOLOCATION) {
+                knownFieldNames.add(field.name() + "_longitude");
+                knownFieldNames.add(field.name() + "_latitude");
+            }
+        }
+        for (String key : data.keySet()) {
+            if (PAYLOAD_SYSTEM_KEYS.contains(key) || knownFieldNames.contains(key)) {
+                continue;
+            }
+            log.warn("Dropping unknown payload key '{}' on INSERT into collection '{}' — "
+                    + "field not present in in-memory CollectionDefinition (likely a "
+                    + "schema-propagation race). Known field count: {}.",
+                    key, definition.name(), knownFieldNames.size());
         }
     }
 

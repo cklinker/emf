@@ -14,7 +14,9 @@ Phase 1 of the autonomous feature lifecycle planned in [`~/.claude/plans/i-want-
 | `lib/log.sh` | Structured JSON logging to stderr + `$EMF_LOG_DIR/<component>.jsonl` |
 | `status.sh` | One-screen queue summary; safe on either machine |
 | `systemd/emf-dispatcher.service` | systemd unit for `worker-01` |
+| `launchd/com.cklinker.emf-planner.plist` | every-10-min planner run on Mac |
 | `launchd/com.cklinker.emf-status.plist` | every-1-min status refresh on Mac |
+| `launchd/install-launchd.sh` | idempotent installer for both agents |
 
 ## Install on worker-01
 
@@ -40,12 +42,14 @@ journalctl -fu emf-dispatcher -o cat
 ## Install on Mac
 
 ```sh
-cp ~/GitHub/emf/.claude/dispatcher/launchd/com.cklinker.emf-status.plist \
-   ~/Library/LaunchAgents/
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cklinker.emf-status.plist
+# Installs both plists, reloads launchd, verifies registration. Idempotent —
+# re-run any time a plist changes. A plain `cp` is NOT enough; launchd holds
+# the old definition until it is booted out + bootstrapped.
+bash ~/GitHub/emf/.claude/dispatcher/launchd/install-launchd.sh
 
 # Verify
-cat /tmp/emf-status.txt   # refreshes every minute
+cat /tmp/emf-status.txt          # refreshes every minute
+tail -f /tmp/emf-planner.launchd.log
 
 # Add an SSH config entry for worker-01 if not already
 cat >> ~/.ssh/config <<'EOF'

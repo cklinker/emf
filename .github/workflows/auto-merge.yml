@@ -18,9 +18,17 @@ jobs:
        github.event.pull_request.user.login == 'github-actions[bot]') &&
       github.event.pull_request.draft == false
     steps:
+      # Use a Personal Access Token instead of GITHUB_TOKEN. Merges performed
+      # via GITHUB_TOKEN are attributed to github-actions[bot] and the
+      # resulting push to main does NOT trigger downstream workflows
+      # (GitHub anti-recursion safety). With a PAT, the squash-merge push is
+      # attributed to the PAT owner and `Build and Deploy` fires normally.
+      #
+      # ARGOCD_REPO_TOKEN already exists with `repo` scope and is used by the
+      # deploy job. Reuse here rather than introducing a new secret.
       - name: Enable auto-merge (squash)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.ARGOCD_REPO_TOKEN }}
         run: |
           gh pr merge "${{ github.event.pull_request.number }}" \
             --auto --squash \

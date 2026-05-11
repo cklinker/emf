@@ -194,35 +194,51 @@ export class DataFactory {
   }
 
   /**
-   * Poll the fields system collection until a field with the given name is
-   * visible on the given collection. Issues several extra confirming reads in
-   * a row to bias for catching the slowest pod in a multi-replica deployment.
+   * Poll `GET /api/collections/{id}?include=fields` until a field with the
+   * given name appears in the response's `included` array. Issues several
+   * extra confirming reads in a row to bias for catching the slowest pod in
+   * a multi-replica deployment — gateway routing is round-robin and a single
+   * "yes" can land on a pod that has already refreshed while the next POST
+   * lands on a stale one.
    */
   async waitForFieldVisible(
     collectionId: string,
     fieldName: string,
     timeoutMs = STORAGE_READY_TIMEOUT_MS,
   ): Promise<void> {
+    const url = `${this.api.baseUrl}/${this.api.tenantSlug}/api/collections/${collectionId}?include=fields`;
     const deadline = Date.now() + timeoutMs;
-    const requiredConsecutive = 4;
+    const requiredConsecutive = 2;
     let consecutive = 0;
     while (Date.now() < deadline) {
       try {
-        const response = await this.request(
-          "GET",
-          `/api/fields?filter[collectionId][eq]=${collectionId}`,
-        );
-        const data = response.data as JsonApiResource[] | JsonApiResource;
-        const list = Array.isArray(data) ? data : [data];
-        const present = list.some(
-          (r) =>
-            r &&
-            r.attributes &&
-            (r.attributes.name as string | undefined) === fieldName,
-        );
-        if (present) {
-          consecutive += 1;
-          if (consecutive >= requiredConsecutive) return;
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/vnd.api+json",
+            Authorization: `Bearer ${this.currentToken}`,
+          },
+        });
+        if (response.ok) {
+          const body = (await response.json()) as {
+            included?: Array<{
+              type?: string;
+              attributes?: Record<string, unknown>;
+            }>;
+          };
+          const present = (body.included ?? []).some(
+            (r) =>
+              r &&
+              r.type === "fields" &&
+              r.attributes &&
+              (r.attributes.name as string | undefined) === fieldName,
+          );
+          if (present) {
+            consecutive += 1;
+            if (consecutive >= requiredConsecutive) return;
+          } else {
+            consecutive = 0;
+          }
         } else {
           consecutive = 0;
         }

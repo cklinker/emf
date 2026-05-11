@@ -57,6 +57,7 @@ trap cleanup_worktree EXIT
 
 # ---- 1. Worktree ------------------------------------------------------------
 
+WORKER_START_TS="$(date +%s)"
 log_event worker_start task="$ID" attempts="$ATTEMPTS" max="$MAX_ATTEMPTS" branch="$BRANCH"
 
 if ! git -C "$EMF_REPO" fetch --quiet origin main; then
@@ -267,11 +268,22 @@ if [[ -z "$final_state" ]]; then
   log_warn "ci poll timed out" minutes="$PR_TIMEOUT_MIN"
 fi
 
-# ---- 7. Archive -------------------------------------------------------------
+# ---- 7. Cost telemetry ------------------------------------------------------
+# Aggregate the claude session's usage events into a one-line JSON summary so
+# Promtail can ship it to Loki for per-task / per-day cost panels.
+WORKER_END_TS="$(date +%s)"
+DURATION_SEC=$(( WORKER_END_TS - WORKER_START_TS ))
+COST_LOG="${EMF_LOG_DIR:-/var/log/emf-dispatcher}/cost-${ID}.json"
+if [[ -x "$SELF_DIR/lib/parse-usage.sh" ]]; then
+  bash "$SELF_DIR/lib/parse-usage.sh" "$JSONL_LOG" "$ID" "$final_state" "$DURATION_SEC" \
+    > "$COST_LOG" 2>/dev/null || log_warn "parse-usage failed"
+fi
+
+# ---- 8. Archive -------------------------------------------------------------
 
 case "$final_state" in
   MERGED)
-    log_event task_done task="$ID" pr="$PR_NUM"
+    log_event task_done task="$ID" pr="$PR_NUM" duration_sec="$DURATION_SEC"
     queue_done "$TASK_FILE" "$PR_NUM"
     ;;
   CHECK_FAIL|CLOSED|TIMEOUT)

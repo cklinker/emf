@@ -1,0 +1,70 @@
+groups:
+  - name: emf-autopilot
+    interval: 1m
+    rules:
+
+      # ---- Volume / health -----------------------------------------------------
+
+      - alert: EMFAutopilotFailedTasksHigh
+        expr: |
+          sum(count_over_time({source="emf-dispatcher", stream_type="task"} |~ "queue_fail" [1d])) > 3
+        for: 5m
+        labels: {severity: warning, component: autopilot}
+        annotations:
+          summary: 'Autopilot failed-task count > 3 in 24h ({{ $value }} so far)'
+          runbook: 'Check emf-queue/failed/ and tail per-task jsonl logs on worker-01.'
+
+      - alert: EMFAutopilotWorkerHostDown
+        expr: |
+          up{instance=~".*worker-01.*"} == 0
+        for: 5m
+        labels: {severity: critical, component: autopilot}
+        annotations:
+          summary: 'worker-01 (craig@192.168.0.232) is unreachable'
+          runbook: 'ssh worker-01; if up, check `systemctl status emf-dispatcher`.'
+
+      - alert: EMFAutopilotDispatcherFlapping
+        expr: |
+          sum(rate({source="emf-dispatcher", stream_type="systemd"} |~ "Started emf-dispatcher" [10m])) > 0.05
+        for: 10m
+        labels: {severity: warning, component: autopilot}
+        annotations:
+          summary: 'emf-dispatcher systemd unit restarting > 0.05 r/s'
+          runbook: '`journalctl -u emf-dispatcher --since "30 min ago"` and look for the crash reason.'
+
+      # ---- CI duration ---------------------------------------------------------
+
+      - alert: EMFAutopilotCIMedianSlow
+        expr: |
+          quantile_over_time(0.5,
+            {source="emf-dispatcher", stream_type="cost"}
+            | json | unwrap duration_sec [1h]
+          ) > 480
+        for: 30m
+        labels: {severity: warning, component: autopilot}
+        annotations:
+          summary: 'Autopilot task median duration > 8 min (currently {{ $value | humanizeDuration }})'
+          runbook: 'Check Github Actions queue depth + runner health on fc17.'
+
+      # ---- Cost ---------------------------------------------------------------
+
+      - alert: EMFAutopilotDailySpendHigh
+        # Threshold should be set after 1 week of baseline data per the plan.
+        # Default: $50/day. Edit before deploying.
+        expr: |
+          sum(sum_over_time({source="emf-dispatcher", stream_type="cost"} | json | unwrap estimated_cost_usd [1d])) > 50
+        for: 10m
+        labels: {severity: warning, component: autopilot}
+        annotations:
+          summary: 'Autopilot daily $ spend > $50 (currently ${{ $value | humanize }})'
+          runbook: 'Check Top 10 most expensive tasks panel; drill into longest-running attempts.'
+
+      - alert: EMFAutopilotSingleTaskSpendHigh
+        # Catches runaway loops where one task burns the budget.
+        expr: |
+          max by (task) (sum_over_time({source="emf-dispatcher", stream_type="cost"} | json | unwrap estimated_cost_usd [1h])) > 10
+        for: 5m
+        labels: {severity: warning, component: autopilot}
+        annotations:
+          summary: 'Single autopilot task ({{ $labels.task }}) > $10 in 1h'
+          runbook: 'tmux attach -r -t emf-worker-{{ $labels.task }} on worker-01 and inspect.'

@@ -77,7 +77,32 @@ PROMPT_FILE="$EMF_REPO/.claude/planner/planner-prompt.md"
 
 cd "$EMF_QUEUE_REPO" || exit 1
 
-timeout --preserve-status "$MAX_RUNTIME_SEC" \
+# Pick a timeout wrapper. Linux has 'timeout'; macOS only has 'gtimeout'
+# (from coreutils via Homebrew) if anything. Fall back to a watchdog
+# implemented in shell so the planner remains portable.
+TIMEOUT_BIN=""
+if command -v timeout  >/dev/null 2>&1; then TIMEOUT_BIN="timeout";
+elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_BIN="gtimeout";
+fi
+
+# Defensively unset CLAUDECODE so claude doesn't refuse to launch when this
+# script is invoked from inside an existing Claude Code session (e.g. during
+# a manual test). Launchd-triggered runs don't have CLAUDECODE set anyway.
+unset CLAUDECODE
+
+if [[ -n "$TIMEOUT_BIN" ]]; then
+  "$TIMEOUT_BIN" --preserve-status "$MAX_RUNTIME_SEC" \
+    "$CLAUDE_BIN" \
+      -p "$USER_PROMPT" \
+      --append-system-prompt "$(cat "$PROMPT_FILE")" \
+      --output-format stream-json \
+      --include-partial-messages \
+      --verbose \
+      --dangerously-skip-permissions \
+    >> "$LOG" 2>&1
+  RC=$?
+else
+  # Watchdog fallback: launch claude in background, kill after MAX_RUNTIME_SEC.
   "$CLAUDE_BIN" \
     -p "$USER_PROMPT" \
     --append-system-prompt "$(cat "$PROMPT_FILE")" \
@@ -85,8 +110,14 @@ timeout --preserve-status "$MAX_RUNTIME_SEC" \
     --include-partial-messages \
     --verbose \
     --dangerously-skip-permissions \
-  >> "$LOG" 2>&1
-RC=$?
+    >> "$LOG" 2>&1 &
+  CLAUDE_PID=$!
+  ( sleep "$MAX_RUNTIME_SEC"; kill -TERM "$CLAUDE_PID" 2>/dev/null; sleep 5; kill -KILL "$CLAUDE_PID" 2>/dev/null ) &
+  WATCHDOG_PID=$!
+  wait "$CLAUDE_PID"
+  RC=$?
+  kill "$WATCHDOG_PID" 2>/dev/null
+fi
 
 if (( RC == 0 )); then
   log "planner session ok (log: $LOG)"

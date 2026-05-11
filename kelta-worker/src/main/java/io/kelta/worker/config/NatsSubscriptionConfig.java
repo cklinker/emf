@@ -5,10 +5,12 @@ import io.kelta.runtime.messaging.nats.NatsSubscriptionManager;
 import io.kelta.worker.listener.CerbosCacheInvalidationListener;
 import io.kelta.worker.listener.CollectionSchemaListener;
 import io.kelta.worker.listener.CredentialCacheInvalidationListener;
+import io.kelta.worker.listener.CustomDomainCacheInvalidationListener;
 import io.kelta.worker.listener.FlowEventListener;
 import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SupersetCollectionSyncListener;
 import io.kelta.worker.listener.SvixWebhookPublisher;
+import io.kelta.worker.listener.SystemFeatureCacheInvalidationListener;
 import io.kelta.worker.module.ModuleEventListener;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -38,6 +40,8 @@ public class NatsSubscriptionConfig {
     private final CollectionSchemaListener collectionSchemaListener;
     private final ModuleEventListener moduleEventListener;
     private final CerbosCacheInvalidationListener cerbosCacheInvalidationListener;
+    private final CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener;
+    private final SystemFeatureCacheInvalidationListener systemFeatureCacheInvalidationListener;
 
     @Autowired(required = false)
     private CredentialCacheInvalidationListener credentialCacheInvalidationListener;
@@ -53,13 +57,17 @@ public class NatsSubscriptionConfig {
                                    SearchIndexListener searchIndexListener,
                                    CollectionSchemaListener collectionSchemaListener,
                                    ModuleEventListener moduleEventListener,
-                                   CerbosCacheInvalidationListener cerbosCacheInvalidationListener) {
+                                   CerbosCacheInvalidationListener cerbosCacheInvalidationListener,
+                                   CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener,
+                                   SystemFeatureCacheInvalidationListener systemFeatureCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.flowEventListener = flowEventListener;
         this.searchIndexListener = searchIndexListener;
         this.collectionSchemaListener = collectionSchemaListener;
         this.moduleEventListener = moduleEventListener;
         this.cerbosCacheInvalidationListener = cerbosCacheInvalidationListener;
+        this.customDomainCacheInvalidationListener = customDomainCacheInvalidationListener;
+        this.systemFeatureCacheInvalidationListener = systemFeatureCacheInvalidationListener;
     }
 
     @PostConstruct
@@ -105,6 +113,20 @@ public class NatsSubscriptionConfig {
                 "worker-flow-cache", "kelta.config.flow.changed.>",
                 flowEventListener::handleFlowConfigChanged));
 
+        // Custom domain cache invalidation — every pod drops its cached
+        // domain → tenantSlug mapping when a custom domain row changes
+        // upstream, so the next /internal/domains/resolve query hits the DB.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-custom-domain-cache", "kelta.config.domain.changed.*",
+                customDomainCacheInvalidationListener::handleDomainChanged));
+
+        // System feature cache invalidation — every pod drops its tenant
+        // limits cache when a feature toggle changes, so subsequent reads
+        // reflect the new state immediately rather than after TTL expiry.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-system-feature-cache", "kelta.config.feature.changed.*",
+                systemFeatureCacheInvalidationListener::handleFeatureChanged));
+
         // Optional queue group subscriptions — only registered when the integration is enabled
         if (supersetCollectionSyncListener != null) {
             subscriptionManager.register(EventSubscription.queueGroup(
@@ -120,7 +142,7 @@ public class NatsSubscriptionConfig {
             log.info("Registered NATS subscription for Svix webhook publisher");
         }
 
-        log.info("Registered {} worker NATS subscriptions", 6
+        log.info("Registered {} worker NATS subscriptions", 8
                 + (credentialCacheInvalidationListener != null ? 1 : 0)
                 + (supersetCollectionSyncListener != null ? 1 : 0)
                 + (svixWebhookPublisher != null ? 1 : 0));

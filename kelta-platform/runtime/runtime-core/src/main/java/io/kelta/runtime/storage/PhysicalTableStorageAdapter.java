@@ -222,6 +222,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         try {
             jdbcTemplate.execute(sql.toString());
 
+            // Reconcile schema BEFORE running post-create statements. If the table
+            // already existed, CREATE TABLE IF NOT EXISTS was a no-op and columns
+            // for any later-added fields are missing. The FK constraint statements
+            // in postCreateStatements reference those columns and would fail with
+            // "column does not exist" until reconcileSchema fills them in. This
+            // happens whenever a NATS UPDATED event reaches a worker pod that
+            // hadn't yet registered the collection and falls into the initialize
+            // path instead of the migrate path.
+            migrationEngine.reconcileSchema(definition, tableRef);
+
             for (String stmt : postCreateStatements) {
                 jdbcTemplate.execute(stmt);
             }
@@ -229,11 +239,6 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             // Record the migration in history
             migrationEngine.recordMigration(definition.name(),
                 SchemaMigrationEngine.MigrationType.CREATE_TABLE, sql.toString());
-
-            // Reconcile schema: if the table already existed, CREATE TABLE IF NOT EXISTS
-            // was a no-op and the table may be missing columns added after its creation.
-            // This introspects the actual table columns and adds any missing ones.
-            migrationEngine.reconcileSchema(definition, tableRef);
 
             log.info("Initialized table '{}' for collection '{}'", qualifiedName, definition.name());
         } catch (DataAccessException e) {

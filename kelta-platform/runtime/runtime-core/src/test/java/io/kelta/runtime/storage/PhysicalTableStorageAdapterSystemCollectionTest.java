@@ -5,6 +5,7 @@ import io.kelta.runtime.model.CollectionDefinitionBuilder;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.model.FieldDefinitionBuilder;
 import io.kelta.runtime.model.FieldType;
+import io.kelta.runtime.model.ReferenceConfig;
 import io.kelta.runtime.model.StorageConfig;
 import io.kelta.runtime.query.FilterCondition;
 import io.kelta.runtime.query.FilterOperator;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
@@ -155,6 +157,38 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
                     eq("products"), typeCaptor.capture(), anyString());
             assertEquals(SchemaMigrationEngine.MigrationType.CREATE_TABLE, typeCaptor.getValue());
             verify(migrationEngine).reconcileSchema(eq(nonSystemDef), any(TableRef.class));
+        }
+
+        @Test
+        @DisplayName("Should reconcile schema before issuing FK constraint statements")
+        void initializeCollection_reconcilesSchema_beforeForeignKeyStatements() {
+            // A collection with a MASTER_DETAIL field generates a FK constraint
+            // statement in the post-create batch. When the underlying table was
+            // created earlier without this column (e.g. the field was added later
+            // and a NATS UPDATED event lands on a worker pod that fell into the
+            // initialize path), CREATE TABLE IF NOT EXISTS is a no-op and the FK
+            // statement references a column that doesn't yet exist. reconcileSchema
+            // must run first to add the missing columns; otherwise the ADD
+            // CONSTRAINT FOREIGN KEY fails with "column does not exist".
+            CollectionDefinition childDef = new CollectionDefinitionBuilder()
+                    .name("order_lines")
+                    .displayName("Order Lines")
+                    .addField(FieldDefinition.requiredString("amount"))
+                    .addField(new FieldDefinitionBuilder()
+                            .name("parentRef")
+                            .type(FieldType.MASTER_DETAIL)
+                            .referenceConfig(ReferenceConfig.masterDetail("orders", "parent"))
+                            .build())
+                    .build();
+
+            adapter.initializeCollection(childDef);
+
+            InOrder inOrder = inOrder(migrationEngine, jdbcTemplate);
+            inOrder.verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("CREATE TABLE IF NOT EXISTS")));
+            inOrder.verify(migrationEngine).reconcileSchema(eq(childDef), any(TableRef.class));
+            inOrder.verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("FOREIGN KEY") && sql.contains("parent_ref")));
         }
     }
 

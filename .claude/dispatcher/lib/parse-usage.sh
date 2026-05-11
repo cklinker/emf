@@ -45,21 +45,27 @@ PRICE_OUTPUT="${PRICE_OUTPUT:-0.000075}"
 # block. Use awk on the jq stream — faster than letting jq do the math for
 # multi-MB logs. Each usage object's totals already accumulate within a
 # single Claude turn; multiple turns concatenate.
-# The log file mixes claude CLI stream-json output with worker.sh's own
-# stderr lines (status messages, log_event records). Pre-filter to JSON
-# lines only, then ask jq for the usage block from anywhere in the object
-# tree (`..` recursive descent — handles both .event.usage from
-# stream_event message_delta and .message.usage from assistant events).
+# Each turn's `claude -p --output-format stream-json --include-partial-messages`
+# stream produces THREE records that all carry usage for the same turn:
+#   1. {type:"stream_event", event:{type:"message_start", message:{usage:...}}}
+#   2. {type:"stream_event", event:{type:"message_delta", usage:...}} (incremental)
+#   3. {type:"assistant",    message:{usage:...}}                    (final, cumulative)
+# Recursive descent (..|objects|select(has("usage"))) double/triple-counts.
+# Only sum from the final assistant message — that's the cumulative total
+# Anthropic actually bills against. Skip stream_event entirely.
+#
+# The log file also mixes worker.sh stderr (non-JSON status lines) with the
+# stream-json output, so filter to lines starting with `{` first.
 read_tokens="$(grep -E '^[[:space:]]*\{' "$JSONL" 2>/dev/null \
   | jq -r '
-      [.. | objects | select(has("usage")) | .usage]
-      | map(select(. != null))
-      | (.[]?
-         | [(.input_tokens // 0),
-            (.cache_creation_input_tokens // 0),
-            (.cache_read_input_tokens // 0),
-            (.output_tokens // 0)]
-         | @tsv)
+      select(.type == "assistant")
+      | .message.usage
+      | select(. != null)
+      | [(.input_tokens // 0),
+         (.cache_creation_input_tokens // 0),
+         (.cache_read_input_tokens // 0),
+         (.output_tokens // 0)]
+      | @tsv
     ' 2>/dev/null \
   | awk '
       BEGIN { i=0; cc=0; cr=0; o=0; n=0 }

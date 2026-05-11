@@ -224,59 +224,45 @@ jobs:
         id: sha
         run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Update image tags
+      - name: Install kustomize
+        run: |
+          if ! command -v kustomize >/dev/null 2>&1; then
+            curl -fsSL "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" \
+              | bash -s -- 5.4.3 /usr/local/bin
+          fi
+          kustomize version
+
+      - name: Update image tags via kustomize
         working-directory: homelab-argo
         run: |
           IMAGE_TAG="main-${{ steps.sha.outputs.short }}"
 
-          # Support both kelta/ (new) and emf/ (legacy) manifest paths
-          for DIR in kelta emf; do
-            if [ -d "$DIR" ]; then
-              echo "Found $DIR/ directory, updating image tags..."
+          # Bump every image listed in emf/kustomization.yaml's `images:` block
+          # by setting newTag=$IMAGE_TAG. Atomic per-file write — no regex
+          # substitution across deployment YAMLs.
+          if [ -d emf ]; then
+            cd emf
+            for img in \
+              harbor.rzware.com/emf/emf-gateway \
+              harbor.rzware.com/emf/emf-worker \
+              harbor.rzware.com/emf/emf-worker-migrate \
+              harbor.rzware.com/emf/emf-auth \
+              harbor.rzware.com/emf/emf-ui \
+              harbor.rzware.com/emf/emf-ai \
+              harbor.rzware.com/emf/emf-mcp ; do
+              kustomize edit set image "${img}:${IMAGE_TAG}"
+            done
+            cd ..
+          fi
 
-              # Determine image name prefix based on directory
-              if [ "$DIR" = "kelta" ]; then
-                PREFIX="kelta"
-              else
-                PREFIX="emf"
-              fi
-
-              # Update gateway deployment
-              if [ -f "$DIR/gateway-deployment.yaml" ]; then
-                sed -i "s|image: .*${PREFIX}-gateway:.*|image: harbor.rzware.com/emf/${PREFIX}-gateway:${IMAGE_TAG}|g" "$DIR/gateway-deployment.yaml"
-              fi
-
-              # Update admin UI deployment
-              if [ -f "$DIR/ui-deployment.yaml" ]; then
-                sed -i "s|image: .*${PREFIX}-ui:.*|image: harbor.rzware.com/emf/${PREFIX}-ui:${IMAGE_TAG}|g" "$DIR/ui-deployment.yaml"
-              fi
-
-              # Update worker deployment
-              if [ -f "$DIR/worker-deployment.yaml" ]; then
-                sed -i "s|image: .*${PREFIX}-worker:.*|image: harbor.rzware.com/emf/${PREFIX}-worker:${IMAGE_TAG}|g" "$DIR/worker-deployment.yaml"
-              fi
-
-              # Update worker migration Job (uses a separate JVM-based image — not the native worker binary)
-              if [ -f "$DIR/worker-migrate-job.yaml" ]; then
-                sed -i "s|image: .*${PREFIX}-worker-migrate:.*|image: harbor.rzware.com/emf/${PREFIX}-worker-migrate:${IMAGE_TAG}|g" "$DIR/worker-migrate-job.yaml"
-              fi
-
-              # Update auth server deployment
-              if [ -f "$DIR/auth-deployment.yaml" ]; then
-                sed -i "s|image: .*${PREFIX}-auth:.*|image: harbor.rzware.com/emf/${PREFIX}-auth:${IMAGE_TAG}|g" "$DIR/auth-deployment.yaml"
-              fi
-
-              # Update AI service deployment
-              if [ -f "$DIR/ai-deployment.yaml" ]; then
-                sed -i "s|image: .*${PREFIX}-ai:.*|image: harbor.rzware.com/emf/${PREFIX}-ai:${IMAGE_TAG}|g" "$DIR/ai-deployment.yaml"
-              fi
-
-              # Update MCP service deployment
-              if [ -f "$DIR/mcp-deployment.yaml" ]; then
-                sed -i "s|image: .*${PREFIX}-mcp:.*|image: harbor.rzware.com/emf/${PREFIX}-mcp:${IMAGE_TAG}|g" "$DIR/mcp-deployment.yaml"
-              fi
-            fi
-          done
+          # Smoke-check: confirm the rendered manifests use the new tag.
+          rendered_tags="$(kustomize build emf/ | grep -oE 'harbor\.rzware\.com/emf/emf-[a-z-]+:[^[:space:]]+' | sort -u)"
+          echo "Rendered images:"
+          echo "$rendered_tags"
+          if ! echo "$rendered_tags" | grep -q ":${IMAGE_TAG}\$"; then
+            echo "ERROR: expected at least one image tagged :${IMAGE_TAG}"
+            exit 1
+          fi
 
       - name: Commit and push
         working-directory: homelab-argo

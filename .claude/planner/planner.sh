@@ -85,6 +85,11 @@ if command -v timeout  >/dev/null 2>&1; then TIMEOUT_BIN="timeout";
 elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_BIN="gtimeout";
 fi
 
+# Defensively unset CLAUDECODE so claude doesn't refuse to launch when this
+# script is invoked from inside an existing Claude Code session (e.g. during
+# a manual test). Launchd-triggered runs don't have CLAUDECODE set anyway.
+unset CLAUDECODE
+
 if [[ -n "$TIMEOUT_BIN" ]]; then
   "$TIMEOUT_BIN" --preserve-status "$MAX_RUNTIME_SEC" \
     "$CLAUDE_BIN" \

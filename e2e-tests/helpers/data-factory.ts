@@ -184,7 +184,58 @@ export class DataFactory {
         },
       },
     );
+    // Field add propagates across worker pods asynchronously via NATS. Without
+    // a barrier here, the very next createRecord may land on a pod whose
+    // in-memory CollectionDefinition does not yet include the new field, and
+    // its INSERT loop will silently drop the value — caught only later by a
+    // surprising NULL or missing-attribute assertion.
+    await this.waitForFieldVisible(collectionId, field.name);
     return result.data as JsonApiResource;
+  }
+
+  /**
+   * Poll the fields system collection until a field with the given name is
+   * visible on the given collection. Issues several extra confirming reads in
+   * a row to bias for catching the slowest pod in a multi-replica deployment.
+   */
+  async waitForFieldVisible(
+    collectionId: string,
+    fieldName: string,
+    timeoutMs = STORAGE_READY_TIMEOUT_MS,
+  ): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    const requiredConsecutive = 4;
+    let consecutive = 0;
+    while (Date.now() < deadline) {
+      try {
+        const response = await this.request(
+          "GET",
+          `/api/fields?filter[collectionId][eq]=${collectionId}`,
+        );
+        const data = response.data as JsonApiResource[] | JsonApiResource;
+        const list = Array.isArray(data) ? data : [data];
+        const present = list.some(
+          (r) =>
+            r &&
+            r.attributes &&
+            (r.attributes.name as string | undefined) === fieldName,
+        );
+        if (present) {
+          consecutive += 1;
+          if (consecutive >= requiredConsecutive) return;
+        } else {
+          consecutive = 0;
+        }
+      } catch {
+        consecutive = 0;
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, STORAGE_READY_POLL_MS / 4),
+      );
+    }
+    throw new Error(
+      `Field '${fieldName}' on collection '${collectionId}' not visible after ${timeoutMs}ms`,
+    );
   }
 
   async createRecord(

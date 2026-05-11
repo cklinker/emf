@@ -20,7 +20,7 @@
     <key>EMF_QUEUE_REPO</key>
     <string>/Users/craigklinker/GitHub/emf-queue</string>
     <key>PATH</key>
-    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>/Users/craigklinker/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>
 
   <key>StartInterval</key>

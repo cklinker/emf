@@ -162,6 +162,39 @@ if ! git -C "$WT" diff --cached --quiet; then
   git -C "$WT" commit -m "autopilot: $ID — final commit by worker.sh" >/dev/null
 fi
 
+# Rebase onto latest origin/main BEFORE pushing. Other autopilot workers
+# may have merged since this worktree was created (e.g. all four touch
+# .claude/CHANGELOG.md — first one wins, the rest hit conflicts that
+# auto-merge then refuses to merge).
+git -C "$WT" fetch --quiet origin main
+if ! git -C "$WT" rebase origin/main 2>&1; then
+  # Auto-resolve append-only conflicts in .claude/CHANGELOG.md: keep both
+  # sides. Every worker appends one line to CHANGELOG.md; conflicts there
+  # are spurious. Other conflicts are real and a retry won't help.
+  conflicting="$(git -C "$WT" diff --name-only --diff-filter=U)"
+  if [[ "$conflicting" == ".claude/CHANGELOG.md" ]]; then
+    log_warn "auto-resolving CHANGELOG.md append conflict"
+    git -C "$WT" checkout --theirs -- .claude/CHANGELOG.md
+    # 'theirs' during rebase = the rebased-onto branch (origin/main). Now
+    # re-append our line: pull it from the original commit's CHANGELOG.md.
+    if our_line="$(git -C "$WT" show "ORIG_HEAD:.claude/CHANGELOG.md" 2>/dev/null | tail -1)"; then
+      [[ -n "$our_line" ]] && printf '%s\n' "$our_line" >> "$WT/.claude/CHANGELOG.md"
+    fi
+    git -C "$WT" add .claude/CHANGELOG.md
+    if ! git -C "$WT" -c core.editor=true rebase --continue 2>&1; then
+      log_error "rebase --continue failed after CHANGELOG resolve"
+      git -C "$WT" rebase --abort >/dev/null 2>&1
+      queue_release_orphan "$TASK_FILE"
+      exit 1
+    fi
+  else
+    log_error "rebase failed with non-CHANGELOG conflicts" files="$conflicting"
+    git -C "$WT" rebase --abort >/dev/null 2>&1
+    queue_release_orphan "$TASK_FILE"
+    exit 1
+  fi
+fi
+
 if ! git -C "$WT" push -u origin "$BRANCH" 2>&1; then
   log_error "git push failed"
   queue_fail "$TASK_FILE" "git push origin $BRANCH failed"

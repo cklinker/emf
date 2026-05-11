@@ -50,6 +50,10 @@ class GatewayMetricsTest {
 - Immutable test data: `List.of(...)` for constants
 - Focus on behavior over state
 
+### Cross-service harness Postgres
+
+`kelta-test-harness` (`KeltaStack`) boots a Testcontainers Postgres by default for local runs. In CI, set `CI_DB_JDBC_URL`, `CI_DB_USER`, and `CI_DB_PASSWORD` (the trio emitted by `scripts/ci/checkout-db.sh` against the `kelta-ci-db` pool) and `KeltaStack` will reuse that database directly — the Testcontainers PG container is not started. The pool URL pins `currentSchema=ci_<run-tag>`, so Flyway migrations land in that schema and the rest of the stack inherits it. Local dev with the env var unset retains the Testcontainers behavior unchanged.
+
 ## TypeScript Testing
 
 ### Frameworks

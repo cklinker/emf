@@ -60,14 +60,43 @@ public final class KeltaStack {
         }
     }
 
+    // ── Database resolution: external (CI pool) or Testcontainers (local) ────
+    //
+    // When CI_DB_JDBC_URL is set (e.g. by scripts/ci/checkout-db.sh against the
+    // shared kelta-ci-db pool), reuse that database directly and skip booting a
+    // Testcontainers Postgres. The pool-issued URL already targets a per-run
+    // schema via currentSchema=ci_<run-tag>, so Flyway migrates into that schema
+    // and the rest of the harness inherits it as the default.
+    //
+    // Without the env var, fall back to the Testcontainers PG container so local
+    // dev runs are self-contained.
+
+    private static final boolean USE_EXTERNAL_DB =
+            System.getenv("CI_DB_JDBC_URL") != null && !System.getenv("CI_DB_JDBC_URL").isBlank();
+
+    private static final String DB_JDBC_URL =
+            USE_EXTERNAL_DB
+                    ? System.getenv("CI_DB_JDBC_URL")
+                    : "jdbc:postgresql://postgres:5432/kelta_control_plane";
+
+    private static final String DB_USERNAME =
+            USE_EXTERNAL_DB ? requireEnv("CI_DB_USER") : "kelta";
+
+    private static final String DB_PASSWORD =
+            USE_EXTERNAL_DB ? requireEnv("CI_DB_PASSWORD") : "kelta";
+
     // ── Docker network shared by all containers ──────────────────────────────
 
     public static final Network NETWORK = Network.newNetwork();
 
     // ── Infrastructure containers ────────────────────────────────────────────
 
+    /**
+     * Null when {@link #USE_EXTERNAL_DB} is true — services in that mode
+     * connect to the externally-supplied JDBC URL instead.
+     */
     @SuppressWarnings("resource")
-    public static final PostgreSQLContainer<?> POSTGRES =
+    public static final PostgreSQLContainer<?> POSTGRES = USE_EXTERNAL_DB ? null :
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
                     .withNetworkAliases("postgres")
                     .withNetwork(NETWORK)
@@ -121,9 +150,9 @@ public final class KeltaStack {
     public static final GenericContainer<?> WORKER = serviceContainer("kelta-worker")
             .withNetworkAliases("kelta-worker")
             .withNetwork(NETWORK)
-            .withEnv("SPRING_DATASOURCE_URL",     "jdbc:postgresql://postgres:5432/kelta_control_plane")
-            .withEnv("SPRING_DATASOURCE_USERNAME", "kelta")
-            .withEnv("SPRING_DATASOURCE_PASSWORD", "kelta")
+            .withEnv("SPRING_DATASOURCE_URL",      DB_JDBC_URL)
+            .withEnv("SPRING_DATASOURCE_USERNAME", DB_USERNAME)
+            .withEnv("SPRING_DATASOURCE_PASSWORD", DB_PASSWORD)
             .withEnv("SPRING_DATA_REDIS_HOST",     "redis")
             .withEnv("SPRING_DATA_REDIS_PORT",     "6379")
             .withEnv("NATS_URL",                   "nats://nats:4222")
@@ -144,9 +173,9 @@ public final class KeltaStack {
     public static final GenericContainer<?> AUTH = serviceContainer("kelta-auth")
             .withNetworkAliases("kelta-auth")
             .withNetwork(NETWORK)
-            .withEnv("SPRING_DATASOURCE_URL",     "jdbc:postgresql://postgres:5432/kelta_control_plane")
-            .withEnv("SPRING_DATASOURCE_USERNAME", "kelta")
-            .withEnv("SPRING_DATASOURCE_PASSWORD", "kelta")
+            .withEnv("SPRING_DATASOURCE_URL",      DB_JDBC_URL)
+            .withEnv("SPRING_DATASOURCE_USERNAME", DB_USERNAME)
+            .withEnv("SPRING_DATASOURCE_PASSWORD", DB_PASSWORD)
             .withEnv("SPRING_DATA_REDIS_HOST",    "redis")
             .withEnv("SPRING_DATA_REDIS_PORT",    "6379")
             .withEnv("KELTA_AUTH_ISSUER_URI",     "http://kelta-auth:8080")
@@ -201,6 +230,9 @@ public final class KeltaStack {
      */
     public static void start() {
         log.info("Starting Kelta test stack...");
+        if (USE_EXTERNAL_DB) {
+            log.info("CI_DB_JDBC_URL set; using external Postgres (Testcontainers PG skipped)");
+        }
 
         // Phase 1: infrastructure in parallel.
         // Use a dedicated 4-thread executor rather than ForkJoinPool.commonPool().
@@ -216,11 +248,13 @@ public final class KeltaStack {
             return t;
         });
         try {
-            CompletableFuture<Void> postgresF = CompletableFuture.runAsync(() -> {
-                log.info("  [POSTGRES] starting...");
-                POSTGRES.start();
-                log.info("  [POSTGRES] up");
-            }, infra);
+            CompletableFuture<Void> postgresF = USE_EXTERNAL_DB
+                    ? CompletableFuture.completedFuture(null)
+                    : CompletableFuture.runAsync(() -> {
+                        log.info("  [POSTGRES] starting...");
+                        POSTGRES.start();
+                        log.info("  [POSTGRES] up");
+                    }, infra);
             CompletableFuture<Void> redisF = CompletableFuture.runAsync(() -> {
                 log.info("  [REDIS] starting...");
                 REDIS.start();
@@ -265,7 +299,7 @@ public final class KeltaStack {
         CERBOS.stop();
         NATS.stop();
         REDIS.stop();
-        POSTGRES.stop();
+        if (POSTGRES != null) POSTGRES.stop();
         NETWORK.close();
     }
 
@@ -360,6 +394,17 @@ public final class KeltaStack {
     private static String cerbosPoliciesPath() {
         return Path.of(harnessBasedir()).getParent()
                    .resolve("docker/cerbos/policies").toAbsolutePath().toString();
+    }
+
+    private static String requireEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(
+                    "CI_DB_JDBC_URL is set but " + name + " is missing. " +
+                    "Both CI_DB_USER and CI_DB_PASSWORD must accompany CI_DB_JDBC_URL " +
+                    "(see scripts/ci/checkout-db.sh).");
+        }
+        return value;
     }
 
     private static String generateEncryptionKey() {

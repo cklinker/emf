@@ -16,6 +16,7 @@
 | Store | Purpose | Config Key | Details |
 |-------|---------|-----------|---------|
 | PostgreSQL 15 | Primary DB | `${SPRING_DATASOURCE_URL}` | Multi-tenant per-tenant schemas, Flyway migrations in `kelta-worker/.../db/migration/` |
+| `kelta-ci-db` pool | Shared CI Postgres | `${CI_DB_JDBC_URL}` | 4-replica StatefulSet on node `fc17`; per-run schemas via `scripts/ci/checkout-db.sh` / `release-db.sh`. `KeltaStack` skips Testcontainers PG when `CI_DB_JDBC_URL` is set. |
 | OpenSearch 2.17.1 | Full-text search + audit | Port 9200 | `kelta-worker/.../service/OpenSearchQueryService.java`, `OpenSearchAuditService.java` |
 | Redis 7 | Cache + sessions | `${REDIS_HOST}:${REDIS_PORT:6379}` | Route caching, permission caching, session management |
 | Caffeine | Local in-memory cache | — | Hot-path caching alongside Redis |

@@ -71,9 +71,11 @@ The `k8s-runner-integration` pool already has `kubectl` and runs inside the
 cluster, so DNS works directly. For external runners add a sidecar that
 exposes the pool via NodePort or LoadBalancer.
 
-## What's NOT included
+## Java test harness integration
 
-- The Java test harness (`kelta-test-harness`) currently uses Testcontainers
-  to boot its own PG. Migrating the harness to read `CI_DB_JDBC_URL` from
-  env (and skip Testcontainers when set) is a follow-up task. The pool is
-  ready; the integration is the next PR.
+`kelta-test-harness` (`KeltaStack`) honours `CI_DB_JDBC_URL`: when set, it
+skips its Testcontainers Postgres and points the in-stack `kelta-worker` and
+`kelta-auth` containers at the pool URL using `CI_DB_USER` / `CI_DB_PASSWORD`
+for credentials. The pool URL already pins `currentSchema=ci_<run-tag>`, so
+Flyway migrates into that schema. Without the env var the harness keeps the
+Testcontainers PG fallback for local dev.

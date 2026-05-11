@@ -6,6 +6,7 @@ import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
+import io.kelta.worker.listener.SystemFeatureEventPublisher;
 import io.kelta.worker.repository.GovernorLimitsRepository;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -56,16 +57,19 @@ public class GovernorLimitsController {
     private final StringRedisTemplate redisTemplate;
     private final RecordEventPublisher recordEventPublisher;
     private final WorkerCacheManager cacheManager;
+    private final SystemFeatureEventPublisher featureEventPublisher;
 
     public GovernorLimitsController(GovernorLimitsRepository repository, ObjectMapper objectMapper,
                                      StringRedisTemplate redisTemplate,
                                      RecordEventPublisher recordEventPublisher,
-                                     WorkerCacheManager cacheManager) {
+                                     WorkerCacheManager cacheManager,
+                                     SystemFeatureEventPublisher featureEventPublisher) {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.redisTemplate = redisTemplate;
         this.recordEventPublisher = recordEventPublisher;
         this.cacheManager = cacheManager;
+        this.featureEventPublisher = featureEventPublisher;
     }
 
     /**
@@ -140,6 +144,8 @@ public class GovernorLimitsController {
 
             // Publish a record change event so the gateway refreshes its cache
             publishTenantChangedEvent(tenantId, body);
+            // Broadcast a feature change so all pods evict their tenant limits caches
+            featureEventPublisher.publishUpdated(tenantId, "limits");
 
             // Return the updated status (re-read to confirm)
             return getStatus(tenantId);

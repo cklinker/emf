@@ -55,6 +55,7 @@ class GatewayMetricsTest {
 - MockServerHttpRequest/Exchange for gateway filter tests
 - Immutable test data: `List.of(...)` for constants
 - Focus on behavior over state
+- `Mockito.inOrder(mockA, mockB)` when the bug is about *ordering* of side-effects across collaborators (e.g. "reconcile schema must run before FK constraint statements"). Plain `verify()` checks only that calls happened, not the sequence — `InOrder` is what catches re-ordering regressions. See `PhysicalTableStorageAdapterSystemCollectionTest.initializeCollection_reconcilesSchema_beforeForeignKeyStatements` for an example.
 
 ## TypeScript Testing
 

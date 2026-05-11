@@ -51,6 +51,14 @@ public final class KeltaStack {
     private static final String JWK_SET;
     private static final String INTERNAL_TOKEN = "harness-internal-token";
 
+    /**
+     * Datasource configuration for the worker + auth services. Built once from env
+     * via {@link HarnessDbConfig#resolve}: external when {@code CI_DB_JDBC_URL}
+     * is set (shared {@code kelta-ci-db} pool, schema-isolated per CI run), otherwise
+     * a Testcontainers PG (local dev fallback).
+     */
+    static final HarnessDbConfig DB_CONFIG = HarnessDbConfig.resolve(System::getenv);
+
     static {
         try {
             ENCRYPTION_KEY = generateEncryptionKey();
@@ -66,9 +74,14 @@ public final class KeltaStack {
 
     // ── Infrastructure containers ────────────────────────────────────────────
 
+    /**
+     * Testcontainers PG. {@code null} when an external DB is supplied via
+     * {@code CI_DB_JDBC_URL} — see {@link HarnessDbConfig#resolve}.
+     */
     @SuppressWarnings("resource")
-    public static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+    public static final PostgreSQLContainer<?> POSTGRES = DB_CONFIG.external()
+            ? null
+            : new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
                     .withNetworkAliases("postgres")
                     .withNetwork(NETWORK)
                     .withDatabaseName("kelta_control_plane")
@@ -121,9 +134,9 @@ public final class KeltaStack {
     public static final GenericContainer<?> WORKER = serviceContainer("kelta-worker")
             .withNetworkAliases("kelta-worker")
             .withNetwork(NETWORK)
-            .withEnv("SPRING_DATASOURCE_URL",     "jdbc:postgresql://postgres:5432/kelta_control_plane")
-            .withEnv("SPRING_DATASOURCE_USERNAME", "kelta")
-            .withEnv("SPRING_DATASOURCE_PASSWORD", "kelta")
+            .withEnv("SPRING_DATASOURCE_URL",      DB_CONFIG.jdbcUrl())
+            .withEnv("SPRING_DATASOURCE_USERNAME", DB_CONFIG.username())
+            .withEnv("SPRING_DATASOURCE_PASSWORD", DB_CONFIG.password())
             .withEnv("SPRING_DATA_REDIS_HOST",     "redis")
             .withEnv("SPRING_DATA_REDIS_PORT",     "6379")
             .withEnv("NATS_URL",                   "nats://nats:4222")
@@ -144,9 +157,9 @@ public final class KeltaStack {
     public static final GenericContainer<?> AUTH = serviceContainer("kelta-auth")
             .withNetworkAliases("kelta-auth")
             .withNetwork(NETWORK)
-            .withEnv("SPRING_DATASOURCE_URL",     "jdbc:postgresql://postgres:5432/kelta_control_plane")
-            .withEnv("SPRING_DATASOURCE_USERNAME", "kelta")
-            .withEnv("SPRING_DATASOURCE_PASSWORD", "kelta")
+            .withEnv("SPRING_DATASOURCE_URL",      DB_CONFIG.jdbcUrl())
+            .withEnv("SPRING_DATASOURCE_USERNAME", DB_CONFIG.username())
+            .withEnv("SPRING_DATASOURCE_PASSWORD", DB_CONFIG.password())
             .withEnv("SPRING_DATA_REDIS_HOST",    "redis")
             .withEnv("SPRING_DATA_REDIS_PORT",    "6379")
             .withEnv("KELTA_AUTH_ISSUER_URI",     "http://kelta-auth:8080")
@@ -201,6 +214,9 @@ public final class KeltaStack {
      */
     public static void start() {
         log.info("Starting Kelta test stack...");
+        if (DB_CONFIG.external()) {
+            log.info("Using external Postgres via $CI_DB_JDBC_URL — skipping Testcontainers PG");
+        }
 
         // Phase 1: infrastructure in parallel.
         // Use a dedicated 4-thread executor rather than ForkJoinPool.commonPool().
@@ -216,11 +232,13 @@ public final class KeltaStack {
             return t;
         });
         try {
-            CompletableFuture<Void> postgresF = CompletableFuture.runAsync(() -> {
-                log.info("  [POSTGRES] starting...");
-                POSTGRES.start();
-                log.info("  [POSTGRES] up");
-            }, infra);
+            CompletableFuture<Void> postgresF = POSTGRES == null
+                    ? CompletableFuture.completedFuture(null)
+                    : CompletableFuture.runAsync(() -> {
+                        log.info("  [POSTGRES] starting...");
+                        POSTGRES.start();
+                        log.info("  [POSTGRES] up");
+                    }, infra);
             CompletableFuture<Void> redisF = CompletableFuture.runAsync(() -> {
                 log.info("  [REDIS] starting...");
                 REDIS.start();
@@ -265,7 +283,9 @@ public final class KeltaStack {
         CERBOS.stop();
         NATS.stop();
         REDIS.stop();
-        POSTGRES.stop();
+        if (POSTGRES != null) {
+            POSTGRES.stop();
+        }
         NETWORK.close();
     }
 

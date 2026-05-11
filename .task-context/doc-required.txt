@@ -1,1 +1,2 @@
-architecture.md
+integrations.md
+testing.md

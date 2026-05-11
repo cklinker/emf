@@ -17,3 +17,4 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 - 2026-05-11 chore(cache): wire NATS broadcast listeners on gateway and worker for `kelta.config.domain.changed.*` and `kelta.config.feature.changed.*` cache invalidation (CHORE-2026-05-10-0007)
 - 2026-05-11 chore(events): publish `kelta.config.domain.changed.<id>` and `kelta.config.feature.changed.<tenantId>` from admin domain/governor-limits endpoints so all pods evict caches across the fleet (CHORE-2026-05-10-0006)
 - 2026-05-11 chore(events): publish `kelta.config.domain.changed.<id>` and `kelta.config.feature.changed.<tenantId>` from admin domain/governor-limits endpoints so all pods evict caches across the fleet (CHORE-2026-05-10-0006)
+- 2026-05-11 chore(test-harness): skip Testcontainers PG in `KeltaStack` when `$CI_DB_JDBC_URL` is set; use shared `kelta-ci-db` pool with per-run schema isolation (CHORE-2026-05-10-0008)

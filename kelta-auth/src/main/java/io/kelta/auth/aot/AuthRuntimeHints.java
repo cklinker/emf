@@ -102,6 +102,22 @@ public class AuthRuntimeHints implements RuntimeHintsRegistrar {
                 "org.springframework.security.jackson2.UsernamePasswordAuthenticationTokenDeserializer",
                 "org.springframework.security.jackson2.UsernamePasswordAuthenticationTokenMixin",
 
+                // spring-security-web (servlet) — registers mixins for
+                // WebAuthenticationDetails, DefaultSavedRequest, SavedCookie,
+                // Cookie, and SwitchUserGrantedAuthority. All persisted on the
+                // OAuth2Authorization row when form login completes.
+                "org.springframework.security.web.jackson2.WebServletJackson2Module",
+                "org.springframework.security.web.jackson2.WebJackson2Module",
+                "org.springframework.security.web.jackson2.CookieMixin",
+                "org.springframework.security.web.jackson2.CookieDeserializer",
+                "org.springframework.security.web.jackson2.DefaultCsrfTokenMixin",
+                "org.springframework.security.web.jackson2.DefaultSavedRequestMixin",
+                "org.springframework.security.web.jackson2.PreAuthenticatedAuthenticationTokenDeserializer",
+                "org.springframework.security.web.jackson2.PreAuthenticatedAuthenticationTokenMixin",
+                "org.springframework.security.web.jackson2.SavedCookieMixin",
+                "org.springframework.security.web.jackson2.SwitchUserGrantedAuthorityMixIn",
+                "org.springframework.security.web.jackson2.WebAuthenticationDetailsMixin",
+
                 // spring-security-oauth2-authorization-server
                 "org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module",
                 "org.springframework.security.oauth2.server.authorization.jackson2.DurationMixin",

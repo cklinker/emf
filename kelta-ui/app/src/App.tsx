@@ -690,7 +690,9 @@ function TenantRoutes(): React.ReactElement {
         }
       />
 
-      {/* Legacy routes — redirect to analytics */}
+      {/* Permanent backward-compat aliases for /reports and /dashboards.
+          The original ReportsPage and DashboardsPage components have been removed;
+          both paths now render AnalyticsPage so external bookmarks keep working. */}
       <Route
         path="reports"
         element={

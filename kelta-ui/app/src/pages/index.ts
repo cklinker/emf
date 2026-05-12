@@ -150,10 +150,6 @@ export type { SetupAuditTrailPageProps } from './SetupAuditTrailPage'
 export { GovernorLimitsPage } from './GovernorLimitsPage'
 export type { GovernorLimitsPageProps } from './GovernorLimitsPage'
 
-// MetricsPage - Tenant metrics dashboard
-export { MetricsPage } from './MetricsPage'
-export type { MetricsPageProps } from './MetricsPage'
-
 // PageLayoutsPage - Page layout management page
 export { PageLayoutsPage } from './PageLayoutsPage'
 export type { PageLayoutsPageProps } from './PageLayoutsPage'
@@ -161,14 +157,6 @@ export type { PageLayoutsPageProps } from './PageLayoutsPage'
 // ListViewsPage - List view management page
 export { ListViewsPage } from './ListViewsPage'
 export type { ListViewsPageProps } from './ListViewsPage'
-
-// ReportsPage - Report builder management page
-export { ReportsPage } from './ReportsPage'
-export type { ReportsPageProps } from './ReportsPage'
-
-// DashboardsPage - Dashboard builder management page
-export { DashboardsPage } from './DashboardsPage'
-export type { DashboardsPageProps } from './DashboardsPage'
 
 // AnalyticsPage - Superset-powered analytics dashboards
 export { AnalyticsPage } from './AnalyticsPage'

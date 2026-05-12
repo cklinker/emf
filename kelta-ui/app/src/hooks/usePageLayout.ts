@@ -165,17 +165,28 @@ export function usePageLayout(
           }
         }
 
-        // Final fallback: query page-layouts directly for a default layout
-        // matching this collection. This handles the common case where
-        // layouts exist but no layout-assignment records have been created.
+        // Final fallback: query page-layouts directly for a default DETAIL
+        // layout matching this collection. Filtering by layoutType prevents
+        // a LIST layout sharing the same collection from being resolved here
+        // (both can have isDefault=true). Sort + larger page size so the
+        // result is deterministic even if multiple defaults exist for the
+        // same type — the oldest by createdAt wins, and a console warning
+        // surfaces the conflict.
         if (!layoutId) {
           const defaultLayouts = await apiClient.getList<{
             id: string
             collectionId: string
             isDefault: boolean
+            layoutType?: string
+            createdAt?: string
           }>(
-            `/api/page-layouts?filter[collectionId][eq]=${collectionId}&filter[isDefault][eq]=true&page[size]=1`
+            `/api/page-layouts?filter[collectionId][eq]=${collectionId}&filter[isDefault][eq]=true&filter[layoutType][eq]=DETAIL&sort=createdAt&page[size]=10`
           )
+          if (defaultLayouts.length > 1) {
+            console.warn(
+              `[usePageLayout] Multiple default DETAIL layouts for collection ${collectionId}; using oldest (${defaultLayouts[0].id}). Clean up duplicate is_default flags.`
+            )
+          }
           if (defaultLayouts.length > 0) {
             layoutId = defaultLayouts[0].id
           }
@@ -213,6 +224,15 @@ export function usePageLayout(
 
         const flatLayout = flatten(raw.data)
         const included = raw.included ?? []
+
+        // Guard: an assignment can point at a LIST layout for the same
+        // collection. Detail rendering must ignore non-DETAIL layouts so we
+        // don't show empty sections / fall back unexpectedly.
+        const resolvedType =
+          typeof flatLayout.layoutType === 'string' ? flatLayout.layoutType : 'DETAIL'
+        if (resolvedType !== 'DETAIL') {
+          return null
+        }
 
         // Extract and sort sections
         const sections: LayoutSectionDto[] = included

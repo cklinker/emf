@@ -273,10 +273,12 @@ public class AuthorizationServerConfig {
         JdbcOAuth2AuthorizationService service =
                 new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
 
-        // Register KeltaUserDetails in the Jackson allowlist so the JDBC service
-        // can serialize/deserialize the principal stored in authorization records.
-        JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper rowMapper =
-                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper(registeredClientRepository);
+        // The JDBC authorization service round-trips OAuth2Authorization through Jackson.
+        // Both the read (RowMapper) and write (ParametersMapper) paths must use the
+        // same ObjectMapper — otherwise the writer succeeds but the reader cannot
+        // deserialize the stored principal (KeltaUserDetails), surfacing as a 500
+        // at /oauth2/token. Register the Security Jackson modules + the platform
+        // mixin so KeltaUserDetails is in the allowlist for both directions.
         com.fasterxml.jackson.databind.ObjectMapper objectMapper =
                 new com.fasterxml.jackson.databind.ObjectMapper();
         objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
@@ -284,8 +286,16 @@ public class AuthorizationServerConfig {
         objectMapper.registerModules(org.springframework.security.jackson2.SecurityJackson2Modules.getModules(classLoader));
         objectMapper.registerModule(new org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module());
         objectMapper.addMixIn(io.kelta.auth.model.KeltaUserDetails.class, io.kelta.auth.model.KeltaUserDetailsMixin.class);
+
+        JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper rowMapper =
+                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper(registeredClientRepository);
         rowMapper.setObjectMapper(objectMapper);
         service.setAuthorizationRowMapper(rowMapper);
+
+        JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper parametersMapper =
+                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper();
+        parametersMapper.setObjectMapper(objectMapper);
+        service.setAuthorizationParametersMapper(parametersMapper);
 
         return service;
     }

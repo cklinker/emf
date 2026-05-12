@@ -26,6 +26,8 @@ public class AuthRuntimeHints implements RuntimeHintsRegistrar {
         registerKeltaModels(hints);
         registerWorkerClientPayloads(hints);
         registerSpringSecurityJackson2(hints);
+        registerOAuth2DomainTypes(hints);
+        registerJdkPolymorphicTypes(hints);
         registerSerialization(hints);
         registerResources(hints);
     }
@@ -139,6 +141,91 @@ public class AuthRuntimeHints implements RuntimeHintsRegistrar {
                 "org.springframework.security.oauth2.client.jackson2.StdConverters$AuthenticationMethodConverter",
                 "org.springframework.security.oauth2.client.jackson2.StdConverters$AuthorizationGrantTypeConverter",
                 "org.springframework.security.oauth2.client.jackson2.StdConverters$ClientAuthenticationMethodConverter"
+        };
+        for (String name : classNames) {
+            hints.reflection().registerType(TypeReference.of(name), MemberCategory.values());
+        }
+    }
+
+    /**
+     * Domain classes referenced by @class type IDs in serialized OAuth2 client
+     * settings + authorization payloads. AllowlistTypeIdResolver calls
+     * Class.forName() on these names, so the native image must keep them.
+     */
+    private void registerOAuth2DomainTypes(RuntimeHints hints) {
+        String[] classNames = {
+                // Token + client settings values
+                "org.springframework.security.oauth2.server.authorization.settings.OAuth2TokenFormat",
+                "org.springframework.security.oauth2.server.authorization.settings.ConfigurationSettingNames",
+                "org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings",
+                "org.springframework.security.oauth2.server.authorization.settings.ClientSettings",
+                "org.springframework.security.oauth2.server.authorization.settings.TokenSettings",
+                "org.springframework.security.oauth2.jose.jws.SignatureAlgorithm",
+                "org.springframework.security.oauth2.jose.jws.MacAlgorithm",
+                "org.springframework.security.oauth2.jose.jws.JwsAlgorithm",
+
+                // OAuth2 core types
+                "org.springframework.security.oauth2.core.AuthorizationGrantType",
+                "org.springframework.security.oauth2.core.ClientAuthenticationMethod",
+                "org.springframework.security.oauth2.core.AuthenticationMethod",
+                "org.springframework.security.oauth2.core.OAuth2AccessToken",
+                "org.springframework.security.oauth2.core.OAuth2AccessToken$TokenType",
+                "org.springframework.security.oauth2.core.OAuth2RefreshToken",
+                "org.springframework.security.oauth2.core.OAuth2Token",
+                "org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest",
+                "org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationResponseType",
+                "org.springframework.security.oauth2.core.oidc.IdTokenClaimNames",
+                "org.springframework.security.oauth2.core.oidc.OidcIdToken",
+
+                // Authorization server authentication tokens
+                "org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeActor",
+                "org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeCompositeAuthenticationToken",
+                "org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken",
+                "org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken",
+
+                // Spring Security core authentication tokens commonly serialized
+                "org.springframework.security.authentication.UsernamePasswordAuthenticationToken",
+                "org.springframework.security.authentication.AnonymousAuthenticationToken",
+                "org.springframework.security.authentication.RememberMeAuthenticationToken",
+                "org.springframework.security.core.authority.SimpleGrantedAuthority",
+                "org.springframework.security.core.authority.AuthorityUtils",
+                "org.springframework.security.core.userdetails.User",
+                "org.springframework.security.web.savedrequest.DefaultSavedRequest",
+                "org.springframework.security.web.savedrequest.SavedCookie",
+                "org.springframework.security.web.authentication.WebAuthenticationDetails"
+        };
+        for (String name : classNames) {
+            hints.reflection().registerType(TypeReference.of(name), MemberCategory.values());
+        }
+    }
+
+    /**
+     * JDK types that show up as @class type IDs after Spring Security wraps
+     * collections in unmodifiable views or stores enums/durations.
+     */
+    private void registerJdkPolymorphicTypes(RuntimeHints hints) {
+        String[] classNames = {
+                "java.time.Duration",
+                "java.time.Instant",
+                "java.util.HashSet",
+                "java.util.LinkedHashSet",
+                "java.util.TreeSet",
+                "java.util.HashMap",
+                "java.util.LinkedHashMap",
+                "java.util.TreeMap",
+                "java.util.ArrayList",
+                "java.util.LinkedList",
+                "java.util.Collections$UnmodifiableMap",
+                "java.util.Collections$UnmodifiableList",
+                "java.util.Collections$UnmodifiableSet",
+                "java.util.Collections$UnmodifiableCollection",
+                "java.util.Collections$UnmodifiableRandomAccessList",
+                "java.util.Collections$EmptyMap",
+                "java.util.Collections$EmptyList",
+                "java.util.Collections$EmptySet",
+                "java.util.Collections$SingletonMap",
+                "java.util.Collections$SingletonList",
+                "java.util.Collections$SingletonSet"
         };
         for (String name : classNames) {
             hints.reflection().registerType(TypeReference.of(name), MemberCategory.values());

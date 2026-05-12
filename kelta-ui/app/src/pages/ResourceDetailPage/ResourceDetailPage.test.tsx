@@ -495,12 +495,13 @@ describe('ResourceDetailPage', () => {
       expect(screen.getByText('Boolean')).toBeInTheDocument()
     })
 
-    it('should display metadata section with timestamps', async () => {
+    it('should display system information panel with timestamps', async () => {
       renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('created-at')).toBeInTheDocument()
-        expect(screen.getByTestId('updated-at')).toBeInTheDocument()
+        expect(screen.getByTestId('system-created-at')).toBeInTheDocument()
+        expect(screen.getByTestId('system-updated-at')).toBeInTheDocument()
+        expect(screen.getByTestId('system-internal-id')).toBeInTheDocument()
       })
     })
 
@@ -825,7 +826,7 @@ describe('ResourceDetailPage', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: 'Fields' })).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'Metadata' })).toBeInTheDocument()
+        expect(screen.getByTestId('detail-tab-system')).toBeInTheDocument()
       })
     })
   })

@@ -14,6 +14,7 @@ on:
       - 'kelta-ui/**'
       - 'e2e-tests/**'
       - '.github/workflows/build-and-publish-containers.yml'
+      - '.github/path-filters.yml'
   workflow_dispatch:
     inputs:
       push_images:
@@ -25,6 +26,11 @@ on:
         description: 'Update ArgoCD manifests to trigger deployment'
         required: false
         default: 'true'
+        type: boolean
+      force_build_all:
+        description: 'Build all services regardless of path filter (use for full rebuild)'
+        required: false
+        default: 'false'
         type: boolean
 
 concurrency:
@@ -41,22 +47,97 @@ env:
 
 jobs:
   # ===========================================================================
-  # Build runtime + test all Java services in a single job
+  # Detect which paths changed since the previous push to main.
+  # workflow_dispatch with force_build_all=true treats every service as changed.
   # ===========================================================================
-  test-java:
-    name: Build & Test Java
+  changes:
+    name: Detect Changes
     runs-on: k8s-runner
+    outputs:
+      runtime: ${{ steps.resolved.outputs.runtime }}
+      gateway: ${{ steps.resolved.outputs.gateway }}
+      worker: ${{ steps.resolved.outputs.worker }}
+      auth: ${{ steps.resolved.outputs.auth }}
+      ai: ${{ steps.resolved.outputs.ai }}
+      mcp: ${{ steps.resolved.outputs.mcp }}
+      web: ${{ steps.resolved.outputs.web }}
+      ui: ${{ steps.resolved.outputs.ui }}
+      any_java: ${{ steps.resolved.outputs.any_java }}
+      workflows: ${{ steps.resolved.outputs.workflows }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: .github/path-filters.yml
+
+      - name: Resolve overrides
+        id: resolved
+        run: |
+          force_all='${{ github.event_name == 'workflow_dispatch' && inputs.force_build_all == true }}'
+          resolve() {
+            if [[ "$force_all" == "true" ]]; then echo true; else echo "$1"; fi
+          }
+          {
+            echo "runtime=$(resolve '${{ steps.filter.outputs.runtime }}')"
+            echo "gateway=$(resolve '${{ steps.filter.outputs.gateway }}')"
+            echo "worker=$(resolve '${{ steps.filter.outputs.worker }}')"
+            echo "auth=$(resolve '${{ steps.filter.outputs.auth }}')"
+            echo "ai=$(resolve '${{ steps.filter.outputs.ai }}')"
+            echo "mcp=$(resolve '${{ steps.filter.outputs.mcp }}')"
+            echo "web=$(resolve '${{ steps.filter.outputs.web }}')"
+            echo "ui=$(resolve '${{ steps.filter.outputs.ui }}')"
+            echo "any_java=$(resolve '${{ steps.filter.outputs.any_java }}')"
+            echo "workflows=${{ steps.filter.outputs.workflows }}"
+          } >> "$GITHUB_OUTPUT"
+
+  # ===========================================================================
+  # Test changed Java services in parallel
+  # ===========================================================================
+  test-java:
+    name: Test ${{ matrix.service }}
+    needs: changes
+    if: needs.changes.outputs.any_java == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: k8s-runner
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: gateway
+            changed: ${{ needs.changes.outputs.gateway }}
+          - service: worker
+            changed: ${{ needs.changes.outputs.worker }}
+          - service: auth
+            changed: ${{ needs.changes.outputs.auth }}
+          - service: ai
+            changed: ${{ needs.changes.outputs.ai }}
+          - service: mcp
+            changed: ${{ needs.changes.outputs.mcp }}
+    steps:
+      - name: Skip if unchanged
+        if: matrix.changed != 'true' && needs.changes.outputs.workflows != 'true'
+        run: |
+          echo "No changes affecting ${{ matrix.service }} — skipping."
+          exit 0
+
+      - name: Checkout code
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
+        uses: actions/checkout@v4
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
 
       - name: Install Maven
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         run: |
           if ! command -v mvn &> /dev/null; then
             curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
@@ -64,6 +145,7 @@ jobs:
           fi
 
       - name: Cache Maven dependencies
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
@@ -72,31 +154,24 @@ jobs:
             maven-${{ runner.os }}-
 
       - name: Clean stale Kelta artifacts
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         run: rm -rf ~/.m2/repository/io/kelta
 
       - name: Build runtime modules
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         run: mvn clean install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
 
-      - name: Test Gateway
-        run: mvn verify -f kelta-gateway/pom.xml -B
-
-      - name: Test Worker
-        run: mvn verify -f kelta-worker/pom.xml -B
-
-      - name: Test Auth Server
-        run: mvn verify -f kelta-auth/pom.xml -B
-
-      - name: Test AI Service
-        run: mvn verify -f kelta-ai/pom.xml -B
-
-      - name: Test MCP Service
-        run: mvn verify -f kelta-mcp/pom.xml -B
+      - name: Test ${{ matrix.service }}
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
+        run: mvn verify -f kelta-${{ matrix.service }}/pom.xml -B
 
   # ===========================================================================
   # Test Frontend
   # ===========================================================================
   test-frontend:
     name: Test Frontend
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.ui == 'true' || needs.changes.outputs.workflows == 'true'
     runs-on: k8s-runner
     defaults:
       run:
@@ -127,10 +202,15 @@ jobs:
 
   # ===========================================================================
   # Build and Push Container Images (parallel via matrix)
+  # Each matrix entry only runs its build steps when its source changed.
+  # worker-migrate shares the worker Dockerfile so it rebuilds on worker change.
   # ===========================================================================
   build-and-push:
     name: Build & Push ${{ matrix.service }}
-    needs: [test-java, test-frontend]
+    needs: [changes, test-java, test-frontend]
+    # `if: always()` lets us run after test-java/test-frontend skip;
+    # the per-step `matrix.changed` check still gates each image.
+    if: always() && !cancelled() && needs.test-java.result != 'failure' && needs.test-frontend.result != 'failure'
     runs-on: k8s-runner
     strategy:
       fail-fast: false
@@ -139,40 +219,55 @@ jobs:
           - service: gateway
             dockerfile: kelta-gateway/Dockerfile
             image: kelta-gateway
+            changed: ${{ needs.changes.outputs.gateway }}
           - service: worker
             dockerfile: kelta-worker/Dockerfile
             image: kelta-worker
+            changed: ${{ needs.changes.outputs.worker }}
           - service: worker-migrate
             dockerfile: kelta-worker/Dockerfile.migrate
             image: kelta-worker-migrate
+            changed: ${{ needs.changes.outputs.worker }}
           - service: auth
             dockerfile: kelta-auth/Dockerfile
             image: kelta-auth
+            changed: ${{ needs.changes.outputs.auth }}
           - service: ui
             dockerfile: kelta-ui/Dockerfile
             image: kelta-ui
+            changed: ${{ needs.changes.outputs.ui }}
           - service: ai
             dockerfile: kelta-ai/Dockerfile
             image: kelta-ai
+            changed: ${{ needs.changes.outputs.ai }}
           - service: mcp
             dockerfile: kelta-mcp/Dockerfile
             image: kelta-mcp
+            changed: ${{ needs.changes.outputs.mcp }}
     steps:
+      - name: Skip if unchanged
+        if: matrix.changed != 'true' && needs.changes.outputs.workflows != 'true'
+        run: |
+          echo "No changes affecting ${{ matrix.service }} — skipping image build."
+          exit 0
+
       - name: Checkout code
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to DockerHub
-        if: github.event_name != 'workflow_dispatch' || inputs.push_images
+        if: (matrix.changed == 'true' || needs.changes.outputs.workflows == 'true') && (github.event_name != 'workflow_dispatch' || inputs.push_images)
         uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to Harbor
-        if: github.event_name != 'workflow_dispatch' || inputs.push_images
+        if: (matrix.changed == 'true' || needs.changes.outputs.workflows == 'true') && (github.event_name != 'workflow_dispatch' || inputs.push_images)
         uses: docker/login-action@v3
         with:
           registry: harbor.rzware.com
@@ -180,14 +275,17 @@ jobs:
           password: ${{ secrets.HARBOR_PASSWORD }}
 
       - name: Get short SHA
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         id: sha
         run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Determine legacy image name
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         id: legacy
         run: echo "image=emf-${{ matrix.service }}" >> $GITHUB_OUTPUT
 
       - name: Build and push ${{ matrix.service }}
+        if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -205,12 +303,17 @@ jobs:
           platforms: linux/amd64
 
   # ===========================================================================
-  # Update ArgoCD manifests to trigger deployment
+  # Update ArgoCD manifests for services that were actually built.
+  # Skipping services keep their previous image tag.
   # ===========================================================================
   deploy:
     name: Update ArgoCD Manifests
-    needs: [build-and-push]
-    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy)
+    needs: [changes, build-and-push]
+    if: |
+      always() && !cancelled()
+      && needs.build-and-push.result != 'failure'
+      && github.ref == 'refs/heads/main'
+      && (github.event_name != 'workflow_dispatch' || inputs.deploy)
     runs-on: k8s-runner
     steps:
       - name: Checkout ArgoCD repo
@@ -234,35 +337,43 @@ jobs:
 
       - name: Update image tags via kustomize
         working-directory: homelab-argo
+        env:
+          GATEWAY_CHANGED: ${{ needs.changes.outputs.gateway }}
+          WORKER_CHANGED: ${{ needs.changes.outputs.worker }}
+          AUTH_CHANGED: ${{ needs.changes.outputs.auth }}
+          AI_CHANGED: ${{ needs.changes.outputs.ai }}
+          MCP_CHANGED: ${{ needs.changes.outputs.mcp }}
+          UI_CHANGED: ${{ needs.changes.outputs.ui }}
+          WORKFLOWS_CHANGED: ${{ needs.changes.outputs.workflows }}
         run: |
           IMAGE_TAG="main-${{ steps.sha.outputs.short }}"
 
-          # Bump every image listed in emf/kustomization.yaml's `images:` block
-          # by setting newTag=$IMAGE_TAG. Atomic per-file write — no regex
-          # substitution across deployment YAMLs.
+          bump() {
+            local img="$1"
+            local changed_flag="$2"
+            if [[ "$changed_flag" == "true" || "$WORKFLOWS_CHANGED" == "true" ]]; then
+              echo "Bumping ${img} → ${IMAGE_TAG}"
+              kustomize edit set image "${img}:${IMAGE_TAG}"
+            else
+              echo "Skipping ${img} (no changes)"
+            fi
+          }
+
           if [ -d emf ]; then
             cd emf
-            for img in \
-              harbor.rzware.com/emf/emf-gateway \
-              harbor.rzware.com/emf/emf-worker \
-              harbor.rzware.com/emf/emf-worker-migrate \
-              harbor.rzware.com/emf/emf-auth \
-              harbor.rzware.com/emf/emf-ui \
-              harbor.rzware.com/emf/emf-ai \
-              harbor.rzware.com/emf/emf-mcp ; do
-              kustomize edit set image "${img}:${IMAGE_TAG}"
-            done
+            bump "harbor.rzware.com/emf/emf-gateway"        "$GATEWAY_CHANGED"
+            bump "harbor.rzware.com/emf/emf-worker"         "$WORKER_CHANGED"
+            bump "harbor.rzware.com/emf/emf-worker-migrate" "$WORKER_CHANGED"
+            bump "harbor.rzware.com/emf/emf-auth"           "$AUTH_CHANGED"
+            bump "harbor.rzware.com/emf/emf-ui"             "$UI_CHANGED"
+            bump "harbor.rzware.com/emf/emf-ai"             "$AI_CHANGED"
+            bump "harbor.rzware.com/emf/emf-mcp"            "$MCP_CHANGED"
             cd ..
           fi
 
-          # Smoke-check: confirm the rendered manifests use the new tag.
           rendered_tags="$(kustomize build emf/ | grep -oE 'harbor\.rzware\.com/emf/emf-[a-z-]+:[^[:space:]]+' | sort -u)"
           echo "Rendered images:"
           echo "$rendered_tags"
-          if ! echo "$rendered_tags" | grep -q ":${IMAGE_TAG}\$"; then
-            echo "ERROR: expected at least one image tagged :${IMAGE_TAG}"
-            exit 1
-          fi
 
       - name: Commit and push
         working-directory: homelab-argo
@@ -271,7 +382,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
-            echo "No changes to commit"
+            echo "No image tag changes — nothing to commit (all builds were skipped)."
           else
             git commit -m "chore: update Kelta images to main-${{ steps.sha.outputs.short }}"
             git push
@@ -283,13 +394,13 @@ jobs:
   smoke-test:
     name: Smoke Test
     needs: deploy
+    if: needs.deploy.result == 'success'
     runs-on: k8s-runner
     timeout-minutes: 10
     steps:
       - name: Detect namespace and deployment names
         id: k8s
         run: |
-          # Check if kelta namespace has deployments, otherwise fall back to emf
           if kubectl -n kelta get deploy kelta-gateway &>/dev/null; then
             echo "ns=kelta" >> $GITHUB_OUTPUT
             echo "gateway=kelta-gateway" >> $GITHUB_OUTPUT
@@ -345,7 +456,6 @@ jobs:
 
   # ===========================================================================
   # Auto-rollback on smoke-test failure — reverts the image bump in homelab-argo.
-  # Runs only if smoke-test failed; ArgoCD reconciles within ~30s.
   # ===========================================================================
   rollback-on-smoke-failure:
     name: Auto-rollback (smoke failed)
@@ -377,6 +487,7 @@ jobs:
   e2e-test:
     name: E2E Tests
     needs: smoke-test
+    if: needs.smoke-test.result == 'success'
     runs-on: k8s-runner
     timeout-minutes: 25
     steps:

@@ -237,7 +237,35 @@ public class AuthorizationServerConfig {
 
     @Bean
     public RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcRegisteredClientRepository(jdbcTemplate);
+        JdbcRegisteredClientRepository repository = new JdbcRegisteredClientRepository(jdbcTemplate);
+
+        // Spring AS 7.x defaults to its Jackson 3 row/params mappers
+        // (JsonMapperRegisteredClientRowMapper, JsonMapperRegisteredClientParametersMapper).
+        // Jackson 3's BasicPolymorphicTypeValidator denies the JDK collection types
+        // (Collections$UnmodifiableMap etc.) that Spring Security wrote in earlier
+        // versions, so existing oauth2_registered_client rows fail to deserialize.
+        // Spring Security's allowlist modules (SecurityJackson2Modules) are
+        // Jackson 2-only — substitute the Jackson 2 mappers and wire those modules.
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+        ClassLoader classLoader = JdbcRegisteredClientRepository.class.getClassLoader();
+        objectMapper.registerModules(
+                org.springframework.security.jackson2.SecurityJackson2Modules.getModules(classLoader));
+        objectMapper.registerModule(
+                new org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module());
+
+        JdbcRegisteredClientRepository.RegisteredClientRowMapper rowMapper =
+                new JdbcRegisteredClientRepository.RegisteredClientRowMapper();
+        rowMapper.setObjectMapper(objectMapper);
+        repository.setRegisteredClientRowMapper(rowMapper);
+
+        JdbcRegisteredClientRepository.RegisteredClientParametersMapper paramsMapper =
+                new JdbcRegisteredClientRepository.RegisteredClientParametersMapper();
+        paramsMapper.setObjectMapper(objectMapper);
+        repository.setRegisteredClientParametersMapper(paramsMapper);
+
+        return repository;
     }
 
     @Bean

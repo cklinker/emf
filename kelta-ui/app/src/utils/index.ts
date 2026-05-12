@@ -5,17 +5,6 @@
  * Utilities include: formatting, validation helpers, storage helpers, etc.
  */
 
-// Route guard utilities
-export {
-  checkPageAuthorization,
-  checkPolicyAuthorization,
-  checkAuthorization,
-  getRedirectPath,
-  filterAuthorizedPages,
-  canAccessRoute,
-} from './routeGuards'
-export type { AuthorizationResult } from './routeGuards'
-
 // JSON:API response utilities
 export { flattenResource, unwrapResource, unwrapCollection } from './jsonapi'
 export type { JsonApiResource, JsonApiResponse, JsonApiCollectionResponse } from './jsonapi'

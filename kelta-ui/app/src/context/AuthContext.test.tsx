@@ -40,9 +40,17 @@ let mockLocationHref = 'http://localhost:3000/dashboard'
 const mockBootstrapConfig = {
   oidcProviders: [
     {
-      id: 'provider-1',
-      name: 'Test Provider',
+      id: 'internal-1',
+      name: 'Kelta Platform (Internal)',
       issuer: 'https://auth.example.com',
+      clientId: 'kelta-platform',
+      isInternal: true,
+    },
+    {
+      id: 'provider-1',
+      name: 'External IdP',
+      issuer: 'https://external.example.com',
+      clientId: 'external-client',
     },
   ],
   pages: [],
@@ -397,7 +405,7 @@ describe('AuthContext', () => {
         expiresAt: Date.now() + 3600000,
       }
       mockSessionStorage['kelta_auth_tokens'] = JSON.stringify(storedTokens)
-      mockSessionStorage['kelta_auth_provider_id'] = 'provider-1'
+      mockSessionStorage['kelta_auth_provider_id'] = 'internal-1'
 
       const user = userEvent.setup()
       renderWithAuth()
@@ -496,6 +504,38 @@ describe('AuthContext', () => {
 
       // Should be unauthenticated
       expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated')
+    })
+  })
+
+  describe('Login Routes Through Internal Provider', () => {
+    it('targets the internal provider and forwards an idp_hint for externals', async () => {
+      let authValue: ReturnType<typeof useAuth> | undefined
+
+      renderWithAuth(
+        <TestComponent
+          onRender={(auth) => {
+            authValue = auth
+          }}
+        />
+      )
+
+      await waitFor(() => {
+        expect(authValue?.isLoading).toBe(false)
+      })
+
+      await authValue?.login('provider-1').catch(() => {})
+
+      // The browser is redirected to kelta-auth (the internal provider's
+      // authorization endpoint) with idp_hint = {tenantId}:{externalProviderId}.
+      // The external IdP token is never seen by the SPA — kelta-auth federates
+      // server-side and mints its own platform JWT.
+      expect(mockLocationHref).toContain('https://auth.example.com/authorize')
+      expect(mockLocationHref).toContain('client_id=kelta-platform')
+      expect(mockLocationHref).toContain('idp_hint=tenant-1%3Aprovider-1')
+
+      // Stored PROVIDER_ID is the internal provider so refresh and callback
+      // always target kelta-auth, never the external IdP.
+      expect(mockSessionStorage['kelta_auth_provider_id']).toBe('internal-1')
     })
   })
 

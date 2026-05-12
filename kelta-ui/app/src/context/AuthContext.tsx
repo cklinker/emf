@@ -34,7 +34,19 @@ import type {
 } from '../types/auth'
 import type { OIDCProviderSummary } from '../types/config'
 import { fetchBootstrapConfig } from '../utils/bootstrapCache'
-import { getTenantSlug, setResolvedTenantId } from './TenantContext'
+import { getTenantSlug, setResolvedTenantId, getResolvedTenantId } from './TenantContext'
+
+/**
+ * Find the internal kelta-auth provider in a list of OIDC providers.
+ * The internal provider is the OAuth target for ALL logins — external providers
+ * are passed as an idp_hint so kelta-auth handles the federation server-side
+ * and mints a platform-issued token.
+ */
+function findInternalProvider(
+  providers: OIDCProviderSummary[]
+): OIDCProviderSummary | undefined {
+  return providers.find((p) => p.isInternal === true)
+}
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -236,23 +248,21 @@ export function AuthProvider({
       return null
     }
 
-    const providerId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
-    if (!providerId) {
-      return null
-    }
-
-    const provider = providers.find((p) => p.id === providerId)
-    if (!provider) {
+    // Refresh always targets the internal kelta-auth provider — it is the
+    // issuer of the stored token regardless of which external IdP federated
+    // the original login.
+    const internal = findInternalProvider(providers)
+    if (!internal) {
       return null
     }
 
     try {
-      const discovery = await fetchDiscoveryDocument(provider.issuer)
+      const discovery = await fetchDiscoveryDocument(internal.issuer)
       const tokenUrl = discovery.token_endpoint
 
       const params = new URLSearchParams({
         grant_type: 'refresh_token',
-        client_id: provider.clientId,
+        client_id: internal.clientId,
         refresh_token: storedTokens.refreshToken,
       })
 
@@ -427,15 +437,19 @@ export function AuthProvider({
         return
       }
 
-      // Use specified provider or the only available one
-      const selectedProviderId = providerId || providers[0]?.id
-      if (!selectedProviderId) {
+      // All logins authenticate against the internal kelta-auth provider.
+      // When the caller picks an external provider, we forward its id as an
+      // idp_hint so kelta-auth runs the federation server-side and returns
+      // a platform-issued token (iss=auth.rzware.com).
+      const internal = findInternalProvider(providers)
+      if (!internal) {
         loginInProgress = false
-        throw new Error('No OIDC providers configured')
+        throw new Error('Internal kelta-auth provider not configured for this tenant')
       }
 
-      const provider = providers.find((p) => p.id === selectedProviderId)
-      if (!provider) {
+      const selectedProviderId = providerId || internal.id
+      const target = providers.find((p) => p.id === selectedProviderId)
+      if (!target) {
         loginInProgress = false
         throw new Error(`Provider not found: ${selectedProviderId}`)
       }
@@ -450,28 +464,39 @@ export function AuthProvider({
         const state = generateRandomString(32)
         const nonce = generateRandomString(32)
 
-        // Store auth parameters immediately (before async calls)
+        // Store auth parameters immediately (before async calls). PROVIDER_ID
+        // tracks the internal provider so refresh and callback always target
+        // kelta-auth — the selected external provider is only a hint.
         sessionStorage.setItem(STORAGE_KEYS.CODE_VERIFIER, codeVerifier)
         sessionStorage.setItem(STORAGE_KEYS.STATE, state)
         sessionStorage.setItem(STORAGE_KEYS.NONCE, nonce)
-        sessionStorage.setItem(STORAGE_KEYS.PROVIDER_ID, selectedProviderId)
+        sessionStorage.setItem(STORAGE_KEYS.PROVIDER_ID, internal.id)
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, window.location.pathname)
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_URI, redirectUri)
 
         // Now do async operations (these are what caused the race condition)
-        const discovery = await fetchDiscoveryDocument(provider.issuer)
+        const discovery = await fetchDiscoveryDocument(internal.issuer)
         const codeChallenge = await generateCodeChallenge(codeVerifier)
 
-        // Build authorization URL
+        // Build authorization URL targeting kelta-auth (the internal provider).
         const authUrl = new URL(discovery.authorization_endpoint)
         authUrl.searchParams.set('response_type', 'code')
-        authUrl.searchParams.set('client_id', provider.clientId)
+        authUrl.searchParams.set('client_id', internal.clientId)
         authUrl.searchParams.set('scope', 'openid profile email')
         authUrl.searchParams.set('redirect_uri', redirectUri)
         authUrl.searchParams.set('state', state)
         authUrl.searchParams.set('nonce', nonce)
         authUrl.searchParams.set('code_challenge', codeChallenge)
         authUrl.searchParams.set('code_challenge_method', 'S256')
+
+        // For external providers, pass an idp_hint matching the kelta-auth
+        // ClientRegistration id ({tenantId}:{providerId}) so kelta-auth auto-
+        // federates to that IdP without rendering its login page.
+        if (!target.isInternal) {
+          const tenantId = getResolvedTenantId()
+          const hint = tenantId ? `${tenantId}:${target.id}` : target.id
+          authUrl.searchParams.set('idp_hint', hint)
+        }
 
         // If user just logged out, force the IdP to show the login form
         // instead of silently re-authenticating with the existing session
@@ -497,22 +522,13 @@ export function AuthProvider({
    * Requirement 2.6: Clear tokens and redirect on logout
    */
   const logout = useCallback(async (): Promise<void> => {
-    const providerId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
     const storedTokens = getStoredTokens()
+    const internal = findInternalProvider(providers)
 
     // Set logout flag BEFORE clearing storage so LoginPage knows to skip auto-login.
     // This survives clearAuthStorage() because it's set after the clear,
     // and it's more reliable than URL params which the IdP may strip.
     sessionStorage.setItem(STORAGE_KEYS.JUST_LOGGED_OUT, 'true')
-
-    // Clear SSO session with kelta-auth (fire-and-forget)
-    const authBaseUrl = (window as Record<string, unknown>).__KELTA_AUTH_URL__ as string | undefined
-    if (authBaseUrl) {
-      fetch(`${authBaseUrl}/auth/session`, {
-        method: 'DELETE',
-        credentials: 'include',
-      }).catch((err: unknown) => console.warn('[Auth] SSO session cleanup failed:', err))
-    }
 
     // Clear local auth state
     clearAuthStorage()
@@ -527,22 +543,19 @@ export function AuthProvider({
     logoutRedirect.searchParams.set('logged_out', 'true')
     const logoutRedirectStr = logoutRedirect.toString()
 
-    // If we have provider info, try to do OIDC logout
-    if (providerId && storedTokens?.idToken) {
-      const provider = providers.find((p) => p.id === providerId)
-      if (provider) {
-        try {
-          const discovery = await fetchDiscoveryDocument(provider.issuer)
-          if (discovery.end_session_endpoint) {
-            const logoutUrl = new URL(discovery.end_session_endpoint)
-            logoutUrl.searchParams.set('id_token_hint', storedTokens.idToken)
-            logoutUrl.searchParams.set('post_logout_redirect_uri', logoutRedirectStr)
-            window.location.href = logoutUrl.toString()
-            return
-          }
-        } catch (err) {
-          console.error('[Auth] OIDC logout failed:', err)
+    // Terminate the kelta-auth session via its OIDC end_session_endpoint.
+    if (internal && storedTokens?.idToken) {
+      try {
+        const discovery = await fetchDiscoveryDocument(internal.issuer)
+        if (discovery.end_session_endpoint) {
+          const logoutUrl = new URL(discovery.end_session_endpoint)
+          logoutUrl.searchParams.set('id_token_hint', storedTokens.idToken)
+          logoutUrl.searchParams.set('post_logout_redirect_uri', logoutRedirectStr)
+          window.location.href = logoutUrl.toString()
+          return
         }
+      } catch (err) {
+        console.error('[Auth] OIDC logout failed:', err)
       }
     }
 
@@ -574,20 +587,21 @@ export function AuthProvider({
 
       // Get stored parameters
       const codeVerifier = sessionStorage.getItem(STORAGE_KEYS.CODE_VERIFIER)
-      const providerId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
 
-      if (!code || !codeVerifier || !providerId) {
+      if (!code || !codeVerifier) {
         throw new Error('Missing authentication parameters')
       }
 
-      // Get provider info
-      const provider = availableProviders.find((p) => p.id === providerId)
-      if (!provider) {
-        throw new Error(`Provider not found: ${providerId}`)
+      // Token exchange always targets the internal kelta-auth provider —
+      // that is the OAuth client we initiated the flow with, regardless of
+      // which external IdP federated the user.
+      const internal = findInternalProvider(availableProviders)
+      if (!internal) {
+        throw new Error('Internal kelta-auth provider not configured for this tenant')
       }
 
       // Get discovery document
-      const discovery = await fetchDiscoveryDocument(provider.issuer)
+      const discovery = await fetchDiscoveryDocument(internal.issuer)
 
       // Use the stored redirect_uri (exact match with authorization request)
       const storedRedirectUri = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_URI) || redirectUri
@@ -596,7 +610,7 @@ export function AuthProvider({
       const tokenUrl = discovery.token_endpoint
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: provider.clientId,
+        client_id: internal.clientId,
         code,
         redirect_uri: storedRedirectUri,
         code_verifier: codeVerifier,
@@ -633,27 +647,6 @@ export function AuthProvider({
         setUser(newUser)
       } else {
         throw new Error('Failed to extract user information from tokens')
-      }
-
-      // Establish SSO session with kelta-auth for connected app SSO (fire-and-forget).
-      // Skip if the user logged in via kelta-auth itself (session already exists).
-      const authBaseUrl = (window as Record<string, unknown>).__KELTA_AUTH_URL__ as
-        | string
-        | undefined
-      if (authBaseUrl) {
-        const currentProviderId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
-        const currentProvider = availableProviders.find((p) => p.id === currentProviderId)
-        const isInternalProvider = currentProvider?.isInternal === true
-        if (!isInternalProvider) {
-          fetch(`${authBaseUrl}/auth/session`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${tokens.accessToken}`,
-              'X-Tenant-Slug': getTenantSlug(),
-            },
-            credentials: 'include',
-          }).catch((err: unknown) => console.warn('[Auth] SSO session establishment failed:', err))
-        }
       }
 
       // Clean up temporary storage

@@ -185,7 +185,6 @@ public final class KeltaStack {
             .withEnv("AI_SERVICE_URL",          "http://kelta-ai:8080")
             .withEnv("CERBOS_HOST",             "cerbos")
             .withEnv("CERBOS_GRPC_PORT",        "3593")
-            .withEnv("SINGLE_ISSUER",                 "true")
             .withEnv("CORS_ALLOWED_ORIGIN_PATTERN",   "http://localhost:5173")
             .withEnv("TENANT_SLUG_REQUIRE_PREFIX",    "true")
             .withEnv("PERMISSIONS_ENABLED",           "false")

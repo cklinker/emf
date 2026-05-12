@@ -31,7 +31,6 @@ import org.springframework.security.config.annotation.web.configurers.oauth2.ser
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
@@ -94,7 +93,7 @@ public class AuthorizationServerConfig {
             .cors(Customizer.withDefaults())
             .exceptionHandling(exceptions -> exceptions
                 .defaultAuthenticationEntryPointFor(
-                        new LoginUrlAuthenticationEntryPoint("/login"),
+                        new IdpHintAwareLoginEntryPoint("/login"),
                         new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
                 ))
             .with(authorizationServerConfigurer, Customizer.withDefaults());

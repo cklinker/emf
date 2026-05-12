@@ -216,8 +216,6 @@ services:
       # Cerbos
       CERBOS_HOST: cerbos
       CERBOS_GRPC_PORT: "3593"
-      # Single issuer: all JWTs must come from kelta-auth
-      SINGLE_ISSUER: "true"
       LOG_LEVEL: INFO
     ports:
       - "8080:8080"

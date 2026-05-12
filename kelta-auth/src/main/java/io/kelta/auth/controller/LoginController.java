@@ -2,16 +2,22 @@ package io.kelta.auth.controller;
 
 import io.kelta.auth.federation.DynamicClientRegistrationRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Controller
 public class LoginController {
+
+    private static final Logger log = LoggerFactory.getLogger(LoginController.class);
 
     private final ClientRegistrationRepository clientRegistrationRepository;
 
@@ -29,6 +35,18 @@ public class LoginController {
         }
         if (request.getParameter("federation") != null) {
             model.addAttribute("federationError", true);
+        }
+
+        String idpHint = request.getParameter("idp_hint");
+        if (idpHint != null && !idpHint.isBlank()
+                && clientRegistrationRepository instanceof DynamicClientRegistrationRepository dynamicRepo) {
+            ClientRegistration hinted = dynamicRepo.findByRegistrationId(idpHint);
+            if (hinted != null) {
+                log.info("Auto-federating login via idp_hint registration={}", idpHint);
+                return "redirect:/oauth2/authorization/"
+                        + URLEncoder.encode(idpHint, StandardCharsets.UTF_8);
+            }
+            log.warn("Ignoring idp_hint={} — no matching client registration", idpHint);
         }
 
         // Resolve tenant from the request to load SSO providers

@@ -67,33 +67,44 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
     }
   }, [isAuthenticated, authLoading, navigate, from])
 
-  // Get OIDC providers from config — split internal from external
+  // Get OIDC providers from config — split internal from external.
+  // All logins route through the internal kelta-auth provider; external
+  // providers are surfaced as one-click buttons that pass an idp_hint.
   const providers = config?.oidcProviders || []
+  const internalProvider = providers.find((p) => p.isInternal)
   const externalProviders = providers.filter((p) => !p.isInternal)
 
   // Track whether auto-login has been attempted to prevent duplicate calls
   const autoLoginAttempted = useRef(false)
 
-  // Auto-login only when there is exactly one *external* provider.
-  // Internal providers (kelta-auth itself) must not be auto-initiated because
-  // that would create a redirect loop: kelta-ui → kelta-auth → kelta-ui → …
+  // Auto-login when there is a single sensible choice:
+  //  - exactly one external provider (one-click SSO via kelta-auth federation), OR
+  //  - only the internal provider (redirect straight to kelta-auth's login form).
   useEffect(() => {
     if (
-      !authLoading &&
-      !configLoading &&
-      externalProviders.length === 1 &&
-      !isAuthenticated &&
-      !authError &&
-      !autoLoginAttempted.current &&
-      !justLoggedOut
+      authLoading ||
+      configLoading ||
+      isAuthenticated ||
+      authError ||
+      autoLoginAttempted.current ||
+      justLoggedOut
     ) {
-      autoLoginAttempted.current = true
-      // Clear any persisted login error and redirect directly
-      sessionStorage.removeItem('kelta_auth_login_error')
-      login(externalProviders[0].id).catch(() => {
-        // Error will be shown via authError from AuthContext
-      })
+      return
     }
+
+    let targetId: string | null = null
+    if (externalProviders.length === 1) {
+      targetId = externalProviders[0].id
+    } else if (externalProviders.length === 0 && internalProvider) {
+      targetId = internalProvider.id
+    }
+    if (!targetId) return
+
+    autoLoginAttempted.current = true
+    sessionStorage.removeItem('kelta_auth_login_error')
+    login(targetId).catch(() => {
+      // Error will be shown via authError from AuthContext
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, configLoading, isAuthenticated, authError, justLoggedOut])
 
@@ -179,34 +190,36 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
             <p className="p-6 text-center text-muted-foreground">{t('login.noProviders')}</p>
           ) : (
             <div className="flex flex-col gap-2">
-              {providers.map((provider) => (
-                <button
-                  key={provider.id}
-                  type="button"
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded-lg border border-border bg-muted p-4 text-left',
-                    'transition-colors duration-200',
-                    'hover:bg-accent hover:border-primary',
-                    'focus:outline-2 focus:outline-offset-2 focus:outline-ring',
-                    'disabled:cursor-not-allowed disabled:opacity-70'
-                  )}
-                  onClick={() => handleLogin(provider.id)}
-                  disabled={isLoggingIn}
-                  aria-busy={isLoggingIn && selectedProvider === provider.id}
-                >
-                  {isLoggingIn && selectedProvider === provider.id ? (
-                    <LoadingSpinner size="small" />
-                  ) : (
-                    <span className="text-2xl" aria-hidden="true">
-                      <KeyRound size={20} />
+              {[...externalProviders, ...(internalProvider ? [internalProvider] : [])].map(
+                (provider) => (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-lg border border-border bg-muted p-4 text-left',
+                      'transition-colors duration-200',
+                      'hover:bg-accent hover:border-primary',
+                      'focus:outline-2 focus:outline-offset-2 focus:outline-ring',
+                      'disabled:cursor-not-allowed disabled:opacity-70'
+                    )}
+                    onClick={() => handleLogin(provider.id)}
+                    disabled={isLoggingIn}
+                    aria-busy={isLoggingIn && selectedProvider === provider.id}
+                  >
+                    {isLoggingIn && selectedProvider === provider.id ? (
+                      <LoadingSpinner size="small" />
+                    ) : (
+                      <span className="text-2xl" aria-hidden="true">
+                        <KeyRound size={20} />
+                      </span>
+                    )}
+                    <span className="flex-1 font-medium text-foreground">{provider.name}</span>
+                    <span className="max-w-[150px] truncate text-sm text-muted-foreground max-[480px]:hidden">
+                      {provider.issuer}
                     </span>
-                  )}
-                  <span className="flex-1 font-medium text-foreground">{provider.name}</span>
-                  <span className="max-w-[150px] truncate text-sm text-muted-foreground max-[480px]:hidden">
-                    {provider.issuer}
-                  </span>
-                </button>
-              ))}
+                  </button>
+                )
+              )}
             </div>
           )}
         </div>

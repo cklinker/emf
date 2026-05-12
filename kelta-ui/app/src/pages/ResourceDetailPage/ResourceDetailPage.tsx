@@ -23,15 +23,12 @@ import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { useFavorites } from '../../hooks/useFavorites'
 import { RecordHeader } from '../../components/RecordHeader/RecordHeader'
 import { RecordActionsBar } from '../../components/RecordActionsBar/RecordActionsBar'
-import { RelatedRecordsSection } from '../../components/RelatedRecordsSection/RelatedRecordsSection'
 import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTimeline'
-import { NotesSection } from '../../components/NotesSection/NotesSection'
-import { AttachmentsSection } from '../../components/AttachmentsSection/AttachmentsSection'
 import { useRecordContext } from '../../hooks/useRecordContext'
 import { usePageLayout } from '../../hooks/usePageLayout'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { LayoutFieldSections } from '../../components/LayoutFieldSections/LayoutFieldSections'
-import { LayoutRelatedLists } from '../../components/LayoutRelatedLists/LayoutRelatedLists'
+import { DetailTabBar } from './DetailTabBar'
 import { unwrapResource, extractIncluded } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
 
@@ -865,90 +862,6 @@ export function ResourceDetailPage({
         </section>
       )}
 
-      {/* Metadata Section */}
-      <section
-        className="rounded-md border border-border bg-card p-6 max-md:p-4"
-        aria-labelledby="metadata-heading"
-      >
-        <h2 id="metadata-heading" className="m-0 mb-4 text-lg font-semibold text-foreground">
-          Metadata
-        </h2>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 max-md:grid-cols-1">
-          {(resource.created_at || resource.createdAt) && (
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-muted-foreground">
-                {t('collections.created')}
-              </span>
-              <span className="text-base text-foreground" data-testid="created-at">
-                {formatDate(new Date((resource.created_at || resource.createdAt) as string), {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
-            </div>
-          )}
-          {(resource.updated_at || resource.updatedAt) && (
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-muted-foreground">
-                {t('collections.updated')}
-              </span>
-              <span className="text-base text-foreground" data-testid="updated-at">
-                {formatDate(new Date((resource.updated_at || resource.updatedAt) as string), {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
-            </div>
-          )}
-          {resource.created_by && (
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-muted-foreground">Created by</span>
-              <span className="text-base text-foreground" data-testid="created-by">
-                {(() => {
-                  const display = getUserDisplay(String(resource.created_by))
-                  return display ? (
-                    <Link
-                      to={display.linkTo}
-                      className="text-primary no-underline hover:underline hover:text-primary/80"
-                    >
-                      {display.name}
-                    </Link>
-                  ) : (
-                    String(resource.created_by)
-                  )
-                })()}
-              </span>
-            </div>
-          )}
-          {resource.updated_by && (
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-muted-foreground">Last modified by</span>
-              <span className="text-base text-foreground" data-testid="updated-by">
-                {(() => {
-                  const display = getUserDisplay(String(resource.updated_by))
-                  return display ? (
-                    <Link
-                      to={display.linkTo}
-                      className="text-primary no-underline hover:underline hover:text-primary/80"
-                    >
-                      {display.name}
-                    </Link>
-                  ) : (
-                    String(resource.updated_by)
-                  )
-                })()}
-              </span>
-            </div>
-          )}
-        </div>
-      </section>
-
       {/* Sharing Section */}
       <section
         className="rounded-md border border-border bg-card p-6 max-md:p-4"
@@ -1036,37 +949,18 @@ export function ResourceDetailPage({
         )}
       </section>
 
-      {/* Related Records Section (T6) — use layout related lists when available */}
-      {layout && layout.relatedLists.length > 0 ? (
-        <LayoutRelatedLists
-          relatedLists={layout.relatedLists}
-          parentRecordId={resourceId}
-          tenantSlug={getTenantSlug()}
-        />
-      ) : (
-        <RelatedRecordsSection
-          collectionName={collectionName}
-          recordId={resourceId}
-          apiClient={apiClient}
-        />
-      )}
-
-      {/* Notes Section (T20) */}
-      <NotesSection
-        collectionId={schema.id}
+      {/* Bottom tab bar: related lists + Notes + Attachments + System Information */}
+      <DetailTabBar
+        relatedLists={layout?.relatedLists ?? []}
         recordId={resourceId}
-        apiClient={apiClient}
+        collectionId={schema.id}
+        tenantSlug={getTenantSlug()}
+        resource={resource as Record<string, unknown> & { id: string }}
         notes={notes}
-        onMutate={invalidateRecordContext}
-      />
-
-      {/* Attachments Section (T20) */}
-      <AttachmentsSection
-        collectionId={schema.id}
-        recordId={resourceId}
-        apiClient={apiClient}
         attachments={attachments}
-        onMutate={invalidateRecordContext}
+        apiClient={apiClient}
+        invalidateRecordContext={invalidateRecordContext}
+        getUserDisplay={getUserDisplay}
       />
 
       {/* Activity Timeline (T7) */}

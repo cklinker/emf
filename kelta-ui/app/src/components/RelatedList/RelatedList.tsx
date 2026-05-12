@@ -13,7 +13,7 @@
  * - Loading skeleton and empty state
  */
 
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -90,6 +90,12 @@ export interface RelatedListProps {
    * network requests when the parent fetches with reverse includes.
    */
   includedData?: unknown
+  /**
+   * Optional: called when the total record count resolves or changes. Used by
+   * containers (e.g. the detail-page tab bar) that need to surface the count
+   * outside the list itself.
+   */
+  onTotalChange?: (total: number) => void
 }
 
 /**
@@ -122,6 +128,7 @@ export function RelatedList({
   sortField,
   sortDirection,
   includedData,
+  onTotalChange,
 }: RelatedListProps): React.ReactElement {
   const navigate = useNavigate()
   const basePath = `/${tenantSlug}/app`
@@ -249,6 +256,12 @@ export function RelatedList({
     (collectionName ? collectionName.charAt(0).toUpperCase() + collectionName.slice(1) : 'Related')
 
   const isLoading = schemaLoading || (!hasPreloadedData && recordsLoading)
+
+  useEffect(() => {
+    if (!onTotalChange) return
+    if (isLoading) return
+    onTotalChange(total)
+  }, [total, isLoading, onTotalChange])
 
   // Handle row click → navigate to record detail
   const handleRowClick = (record: CollectionRecord) => {

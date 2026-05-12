@@ -16,6 +16,7 @@ import { RelatedList } from '@/components/RelatedList'
 import { NotesSection } from '@/components/NotesSection/NotesSection'
 import { AttachmentsSection } from '@/components/AttachmentsSection/AttachmentsSection'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
+import { useCollectionStore } from '@/context/CollectionStoreContext'
 import { parseDisplayColumns } from '@/components/LayoutRelatedLists/parseDisplayColumns'
 import { useI18n } from '@/context/I18nContext'
 import { useToast } from '@/components'
@@ -61,21 +62,73 @@ function normalizeSortDirection(raw: string | null | undefined): 'asc' | 'desc' 
   return raw && raw.trim().toLowerCase() === 'desc' ? 'desc' : 'asc'
 }
 
+function useResolvedRelatedCollection(rl: LayoutRelatedListDto): {
+  collectionName: string
+  relationshipFieldName: string
+} {
+  const collectionStore = useCollectionStore()
+  const collection =
+    !rl.relatedCollectionName && rl.relatedCollectionId
+      ? collectionStore.getCollectionById(rl.relatedCollectionId)
+      : undefined
+  const collectionName = rl.relatedCollectionName || collection?.name || ''
+  let relationshipFieldName = rl.relationshipFieldName
+  if (!relationshipFieldName && rl.relationshipFieldId) {
+    relationshipFieldName = collectionStore.getFieldById(rl.relationshipFieldId)?.name || ''
+  }
+  return { collectionName, relationshipFieldName }
+}
+
 interface RelatedListTabTriggerProps {
   rl: LayoutRelatedListDto
   count: number | undefined
 }
 
 function RelatedListTabTrigger({ rl, count }: RelatedListTabTriggerProps): React.ReactElement {
-  const { schema } = useCollectionSchema(rl.relatedCollectionName)
-  const fallback =
-    rl.relatedCollectionName.charAt(0).toUpperCase() + rl.relatedCollectionName.slice(1)
+  const { collectionName } = useResolvedRelatedCollection(rl)
+  const { schema } = useCollectionSchema(collectionName || undefined)
+  const fallback = collectionName
+    ? collectionName.charAt(0).toUpperCase() + collectionName.slice(1)
+    : 'Related'
   const label = schema?.displayName ?? fallback
   return (
-    <TabsTrigger value={rl.id} data-testid={`detail-tab-${rl.relatedCollectionName}`}>
+    <TabsTrigger value={rl.id} data-testid={`detail-tab-${collectionName || 'related'}`}>
       {label}
       {typeof count === 'number' ? ` (${count})` : ''}
     </TabsTrigger>
+  )
+}
+
+interface RelatedListTabContentProps {
+  rl: LayoutRelatedListDto
+  parentRecordId: string
+  tenantSlug: string
+  includedData?: unknown
+  onTotalChange: (n: number) => void
+}
+
+function RelatedListTabContent({
+  rl,
+  parentRecordId,
+  tenantSlug,
+  includedData,
+  onTotalChange,
+}: RelatedListTabContentProps): React.ReactElement | null {
+  const { collectionName, relationshipFieldName } = useResolvedRelatedCollection(rl)
+  if (!collectionName || !relationshipFieldName) return null
+  return (
+    <RelatedList
+      collectionName={collectionName}
+      foreignKeyField={relationshipFieldName}
+      parentRecordId={parentRecordId}
+      tenantSlug={tenantSlug}
+      limit={rl.rowLimit}
+      displayColumns={parseDisplayColumns(rl.displayColumns)}
+      sortField={rl.sortField ?? undefined}
+      sortDirection={normalizeSortDirection(rl.sortDirection)}
+      includedData={includedData}
+      onTotalChange={onTotalChange}
+    />
   )
 }
 
@@ -148,15 +201,10 @@ export function DetailTabBar({
 
         {sortedLists.map((rl) => (
           <TabsContent forceMount key={rl.id} value={rl.id} className="mt-4">
-            <RelatedList
-              collectionName={rl.relatedCollectionName}
-              foreignKeyField={rl.relationshipFieldName}
+            <RelatedListTabContent
+              rl={rl}
               parentRecordId={recordId}
               tenantSlug={tenantSlug}
-              limit={rl.rowLimit}
-              displayColumns={parseDisplayColumns(rl.displayColumns)}
-              sortField={rl.sortField ?? undefined}
-              sortDirection={normalizeSortDirection(rl.sortDirection)}
               includedData={includedData}
               onTotalChange={(n) => setCount(rl.id, n)}
             />

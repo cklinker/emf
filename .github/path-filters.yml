@@ -1,0 +1,65 @@
+# Shared path filters for selective CI builds.
+# Used by both ci.yml (PR validation) and build-and-publish-containers.yml (main deploy).
+#
+# Convention: any change under kelta-platform/runtime/** invalidates every Java
+# service since they all depend on the runtime modules. dorny/paths-filter@v3
+# flattens one level of nested YAML anchors, so we anchor list patterns and
+# splice them via `*alias` references below.
+
+runtime: &runtime
+  - 'kelta-platform/**'
+
+gateway:
+  - *runtime
+  - 'kelta-gateway/**'
+
+worker:
+  - *runtime
+  - 'kelta-worker/**'
+
+auth:
+  - *runtime
+  - 'kelta-auth/**'
+
+ai:
+  - *runtime
+  - 'kelta-ai/**'
+
+mcp:
+  - *runtime
+  - 'kelta-mcp/**'
+
+# Frontend — kelta-ui depends on kelta-web packages, so a web change
+# requires rebuilding ui as well.
+web: &web
+  - 'kelta-web/**'
+
+ui:
+  - *web
+  - 'kelta-ui/**'
+
+# Any Java service change triggers integration tests.
+any_java:
+  - *runtime
+  - 'kelta-gateway/**'
+  - 'kelta-worker/**'
+  - 'kelta-auth/**'
+  - 'kelta-ai/**'
+  - 'kelta-mcp/**'
+
+# E2E tests — run on any backend, frontend, or e2e suite change.
+e2e:
+  - *runtime
+  - 'kelta-gateway/**'
+  - 'kelta-worker/**'
+  - 'kelta-auth/**'
+  - 'kelta-ai/**'
+  - 'kelta-mcp/**'
+  - *web
+  - 'kelta-ui/**'
+  - 'e2e-tests/**'
+
+# Workflow plumbing changed — run everything.
+workflows:
+  - '.github/workflows/**'
+  - '.github/path-filters.yml'

@@ -156,15 +156,38 @@ export function AttachmentsSection({
     },
   })
 
-  // Upload attachment mutation
+  // Upload attachment mutation — 3-step presigned URL flow
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData()
-      formData.append('file', file)
-      return apiClient.postFormData<Attachment>(
-        `/api/attachments?filter[collectionId][eq]=${collectionId}&filter[recordId][eq]=${recordId}`,
-        formData
-      )
+      // Step 1: request presigned S3 PUT URL
+      const uploadUrlResp = await apiClient.post<{
+        data: {
+          id: string
+          attributes: { uploadUrl: string; headers: Record<string, string> }
+        }
+      }>('/api/attachments/upload-url', {
+        fileName: file.name,
+        contentType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        collectionId,
+        recordId,
+      })
+      const { id: attachmentId, attributes } = uploadUrlResp.data
+      const { uploadUrl, headers } = attributes
+
+      // Step 2: PUT bytes directly to S3 via raw fetch
+      // (apiClient would attach tenant/auth headers that S3 would reject)
+      const s3Resp = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers,
+        body: file,
+      })
+      if (!s3Resp.ok) {
+        throw new Error(`S3 upload failed: ${s3Resp.status} ${s3Resp.statusText}`)
+      }
+
+      // Step 3: finalize
+      return apiClient.post<Attachment>(`/api/attachments/${attachmentId}/finalize`)
     },
     onSuccess: () => {
       invalidateCache()

@@ -4,10 +4,6 @@
  * Returns both object-level CRUD permissions and field-level visibility
  * for a collection. Reads from the shared /api/me/permissions cache
  * populated by useSystemPermissions.
- *
- * The individual hooks (useObjectPermissions, useFieldPermissions) still
- * exist for backward compatibility but app route pages should prefer
- * this combined hook.
  */
 
 import { useMemo } from 'react'

@@ -284,6 +284,13 @@ public class AuthorizationServerConfig {
         objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         ClassLoader classLoader = JdbcOAuth2AuthorizationService.class.getClassLoader();
         objectMapper.registerModules(org.springframework.security.jackson2.SecurityJackson2Modules.getModules(classLoader));
+        // SecurityJackson2Modules detects WebServletJackson2Module reflectively; in
+        // the GraalVM native image that detection silently fails, so we register the
+        // module explicitly. Without it, WebAuthenticationDetails (set on the
+        // authentication during the form-login flow and persisted with the
+        // OAuth2Authorization) is rejected by AllowlistTypeIdResolver and
+        // /oauth2/token returns 500.
+        objectMapper.registerModule(new org.springframework.security.web.jackson2.WebServletJackson2Module());
         objectMapper.registerModule(new org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module());
         objectMapper.addMixIn(io.kelta.auth.model.KeltaUserDetails.class, io.kelta.auth.model.KeltaUserDetailsMixin.class);
 

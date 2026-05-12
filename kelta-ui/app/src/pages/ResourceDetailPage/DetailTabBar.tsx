@@ -116,6 +116,8 @@ export function DetailTabBar({
 
   const createdAt = (resource.created_at ?? resource.createdAt) as string | undefined
   const updatedAt = (resource.updated_at ?? resource.updatedAt) as string | undefined
+  const createdBy = (resource.created_by ?? resource.createdBy) as string | number | undefined
+  const updatedBy = (resource.updated_by ?? resource.updatedBy) as string | number | undefined
 
   return (
     <section
@@ -238,12 +240,12 @@ export function DetailTabBar({
                 </span>
               </div>
             )}
-            {resource.created_by != null && (
+            {createdBy != null && (
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-muted-foreground">Created by</span>
                 <span className="text-base text-foreground" data-testid="system-created-by">
                   {(() => {
-                    const display = getUserDisplay(String(resource.created_by))
+                    const display = getUserDisplay(String(createdBy))
                     return display ? (
                       <Link
                         to={display.linkTo}
@@ -252,18 +254,18 @@ export function DetailTabBar({
                         {display.name}
                       </Link>
                     ) : (
-                      String(resource.created_by)
+                      String(createdBy)
                     )
                   })()}
                 </span>
               </div>
             )}
-            {resource.updated_by != null && (
+            {updatedBy != null && (
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-muted-foreground">Last modified by</span>
                 <span className="text-base text-foreground" data-testid="system-updated-by">
                   {(() => {
-                    const display = getUserDisplay(String(resource.updated_by))
+                    const display = getUserDisplay(String(updatedBy))
                     return display ? (
                       <Link
                         to={display.linkTo}
@@ -272,7 +274,7 @@ export function DetailTabBar({
                         {display.name}
                       </Link>
                     ) : (
-                      String(resource.updated_by)
+                      String(updatedBy)
                     )
                   })()}
                 </span>

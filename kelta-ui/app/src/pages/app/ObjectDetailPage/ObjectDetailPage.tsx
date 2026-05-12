@@ -52,12 +52,10 @@ import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
-import { RelatedList } from '@/components/RelatedList'
-import { LayoutRelatedLists } from '@/components/LayoutRelatedLists'
 import { LayoutFieldSections } from '@/components/LayoutFieldSections'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
-import { NotesSection } from '@/components/NotesSection/NotesSection'
-import { AttachmentsSection } from '@/components/AttachmentsSection/AttachmentsSection'
+import { DetailTabBar } from '@/pages/ResourceDetailPage/DetailTabBar'
+import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
 import { useAppContext } from '@/context/AppContext'
@@ -90,45 +88,6 @@ const SYSTEM_FIELDS = new Set([
   'created_by',
   'updated_by',
 ])
-
-/**
- * Synthesized system field definitions for audit fields.
- * These fields exist as physical columns on every tenant table but are not
- * in the field table. We define them here so the System Information section
- * can render them with proper types and lookup resolution.
- */
-const SYSTEM_FIELD_DEFINITIONS: FieldDefinition[] = [
-  {
-    id: '__sys_createdBy',
-    name: 'createdBy',
-    displayName: 'Created By',
-    type: 'lookup',
-    required: false,
-    referenceTarget: 'users',
-  },
-  {
-    id: '__sys_createdAt',
-    name: 'createdAt',
-    displayName: 'Created',
-    type: 'datetime',
-    required: false,
-  },
-  {
-    id: '__sys_updatedBy',
-    name: 'updatedBy',
-    displayName: 'Updated By',
-    type: 'lookup',
-    required: false,
-    referenceTarget: 'users',
-  },
-  {
-    id: '__sys_updatedAt',
-    name: 'updatedAt',
-    displayName: 'Updated',
-    type: 'datetime',
-    required: false,
-  },
-]
 
 /** Max fields to show in the highlights panel */
 const MAX_HIGHLIGHT_FIELDS = 4
@@ -369,14 +328,6 @@ export function ObjectDetailPage(): React.ReactElement {
     return userFields.slice(MAX_HIGHLIGHT_FIELDS)
   }, [userFields])
 
-  // System fields for the system info section.
-  // For tenant collections, schema fields won't include audit fields (they're
-  // not in the field table), so we always use the synthesized definitions.
-  const systemFields = useMemo(() => {
-    const fromSchema = fields.filter((f) => SYSTEM_FIELDS.has(f.name))
-    return fromSchema.length > 0 ? fromSchema : SYSTEM_FIELD_DEFINITIONS
-  }, [fields])
-
   // Discover reverse relationships (fallback when no layout is configured).
   // Uses the centralized collection store to find collections with master_detail
   // fields pointing to the current collection (e.g., Order Items on Orders).
@@ -408,6 +359,38 @@ export function ObjectDetailPage(): React.ReactElement {
     collectionStore.isLoading,
     collectionName,
   ])
+
+  // Resolve a user id to display + link using the lookup map, falling back to null.
+  const getUserDisplay = useCallback(
+    (userId: string) => {
+      const name =
+        lookupDisplayMap?.['createdBy']?.[userId] ??
+        lookupDisplayMap?.['updatedBy']?.[userId] ??
+        lookupDisplayMap?.['created_by']?.[userId] ??
+        lookupDisplayMap?.['updated_by']?.[userId]
+      if (!name) return null
+      return { name, linkTo: `${basePath}/o/users/${userId}` }
+    },
+    [lookupDisplayMap, basePath]
+  )
+
+  // Tab-bar related lists: prefer layout configuration; otherwise synthesize
+  // entries from auto-discovered reverse relationships so each one becomes a tab.
+  const tabBarRelatedLists = useMemo<LayoutRelatedListDto[]>(() => {
+    if (hasLayoutRelatedLists) return layout!.relatedLists
+    return relatedCollections.map((rel, index) => ({
+      id: `auto-${rel.collectionName}-${rel.foreignKeyField}`,
+      relatedCollectionId: '',
+      relatedCollectionName: rel.collectionName,
+      relationshipFieldId: '',
+      relationshipFieldName: rel.foreignKeyField,
+      displayColumns: '',
+      sortField: null,
+      sortDirection: 'asc',
+      rowLimit: 5,
+      sortOrder: index,
+    }))
+  }, [hasLayoutRelatedLists, layout, relatedCollections])
 
   // Handlers
   const handleEdit = useCallback(() => {
@@ -645,64 +628,22 @@ export function ObjectDetailPage(): React.ReactElement {
         </div>
       )}
 
-      {/* Related Lists — use layout when available, otherwise auto-discover reverse relationships */}
-      {recordId && hasLayoutRelatedLists ? (
-        <div className="space-y-4">
-          <Separator />
-          <LayoutRelatedLists
-            relatedLists={layout!.relatedLists}
-            parentRecordId={recordId}
-            tenantSlug={tenantSlug || ''}
-            includedData={rawResponse}
-          />
-        </div>
-      ) : relatedCollections.length > 0 && recordId ? (
-        <div className="space-y-4">
-          <Separator />
-          {relatedCollections.map((rel) => (
-            <RelatedList
-              key={`${rel.collectionName}-${rel.foreignKeyField}`}
-              collectionName={rel.collectionName}
-              foreignKeyField={rel.foreignKeyField}
-              parentRecordId={recordId}
-              tenantSlug={tenantSlug || ''}
-              includedData={rawResponse}
-            />
-          ))}
-        </div>
-      ) : null}
-
-      {/* System Information section — after related lists, before notes */}
-      {systemFields.length > 0 && record && (
-        <div className="space-y-4">
-          <Separator />
-          <DetailSection
-            title="System Information"
-            fields={systemFields}
-            record={record}
-            tenantSlug={tenantSlug}
-            lookupDisplayMap={lookupDisplayMap}
-          />
-        </div>
-      )}
-
-      {/* Notes & Attachments */}
+      {/* Bottom tab bar: related lists + Notes + Attachments + System Information */}
       {schema && recordId && (
         <div className="space-y-4">
           <Separator />
-          <NotesSection
-            collectionId={schema.id}
+          <DetailTabBar
+            relatedLists={tabBarRelatedLists}
             recordId={recordId}
-            apiClient={apiClient}
+            collectionId={schema.id}
+            tenantSlug={tenantSlug || ''}
+            includedData={rawResponse}
+            resource={record}
             notes={notes}
-            onMutate={invalidateRecordContext}
-          />
-          <AttachmentsSection
-            collectionId={schema.id}
-            recordId={recordId}
-            apiClient={apiClient}
             attachments={attachments}
-            onMutate={invalidateRecordContext}
+            apiClient={apiClient}
+            invalidateRecordContext={invalidateRecordContext}
+            getUserDisplay={getUserDisplay}
           />
         </div>
       )}

@@ -154,8 +154,21 @@ describe('AttachmentsSection', () => {
     expect(fileInput.getAttribute('type')).toBe('file')
   })
 
-  it('triggers file upload when file is selected', async () => {
-    mockApiClient.postFormData.mockResolvedValue(sampleAttachment)
+  it('triggers 3-step upload flow when file is selected', async () => {
+    mockApiClient.post
+      .mockResolvedValueOnce({
+        data: {
+          id: 'att-new',
+          attributes: {
+            uploadUrl: 'https://s3.test/presigned-put',
+            headers: { 'Content-Type': 'text/plain' },
+          },
+        },
+      })
+      .mockResolvedValueOnce(sampleAttachment)
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: 'OK' })
+    vi.stubGlobal('fetch', fetchMock)
 
     render(
       <TestWrapper>
@@ -174,11 +187,33 @@ describe('AttachmentsSection', () => {
     fireEvent.change(fileInput, { target: { files: [file] } })
 
     await waitFor(() => {
-      expect(mockApiClient.postFormData).toHaveBeenCalledTimes(1)
-      const [url, formData] = mockApiClient.postFormData.mock.calls[0]
-      expect(url).toBe('/api/attachments?filter[collectionId][eq]=col-1&filter[recordId][eq]=rec-1')
-      expect(formData).toBeInstanceOf(FormData)
+      expect(mockApiClient.post).toHaveBeenCalledTimes(2)
     })
+
+    // Step 1: request upload URL
+    const [step1Url, step1Body] = mockApiClient.post.mock.calls[0]
+    expect(step1Url).toBe('/api/attachments/upload-url')
+    expect(step1Body).toMatchObject({
+      fileName: 'test.txt',
+      contentType: 'text/plain',
+      fileSize: file.size,
+      collectionId: 'col-1',
+      recordId: 'rec-1',
+    })
+
+    // Step 2: PUT to S3 via fetch
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [s3Url, s3Init] = fetchMock.mock.calls[0]
+    expect(s3Url).toBe('https://s3.test/presigned-put')
+    expect(s3Init.method).toBe('PUT')
+    expect(s3Init.headers).toEqual({ 'Content-Type': 'text/plain' })
+    expect(s3Init.body).toBe(file)
+
+    // Step 3: finalize
+    const [step3Url] = mockApiClient.post.mock.calls[1]
+    expect(step3Url).toBe('/api/attachments/att-new/finalize')
+
+    vi.unstubAllGlobals()
   })
 
   it('renders download button for each attachment', () => {

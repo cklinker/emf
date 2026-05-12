@@ -27,17 +27,37 @@ vi.mock('../../context/TenantContext', () => ({
   getTenantSlug: () => 'default',
 }))
 
-// Mock the AppShell context
-vi.mock('../AppShell', () => ({
-  useAppShell: vi.fn(() => ({
-    screenSize: 'desktop',
-    sidebarCollapsed: false,
-    sidebarOpen: false,
-    toggleSidebar: vi.fn(),
-    toggleMobileSidebar: vi.fn(),
-    closeMobileSidebar: vi.fn(),
-  })),
-}))
+// Stub matchMedia for the responsive logic inside Header
+const mockMatchMedia = (matches: boolean) => {
+  const listeners = new Set<(e: MediaQueryListEvent) => void>()
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn((_e: string, cb: (e: MediaQueryListEvent) => void) =>
+        listeners.add(cb)
+      ),
+      removeEventListener: vi.fn((_e: string, cb: (e: MediaQueryListEvent) => void) =>
+        listeners.delete(cb)
+      ),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
+
+const setViewport = (size: 'mobile' | 'desktop') => {
+  Object.defineProperty(window, 'innerWidth', {
+    writable: true,
+    configurable: true,
+    value: size === 'mobile' ? 600 : 1440,
+  })
+  mockMatchMedia(size === 'mobile')
+}
 
 // Mock SearchModal and RecentItemsDropdown to isolate Header tests
 vi.mock('../SearchModal', () => ({
@@ -67,10 +87,6 @@ vi.mock('../UserMenu', () => ({
   ),
 }))
 
-// Import the mocked module to control it in tests
-import { useAppShell } from '../AppShell'
-const mockUseAppShell = vi.mocked(useAppShell)
-
 describe('Header', () => {
   // Default test props
   const defaultBranding: BrandingConfig = {
@@ -94,14 +110,7 @@ describe('Header', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseAppShell.mockReturnValue({
-      screenSize: 'desktop',
-      sidebarCollapsed: false,
-      sidebarOpen: false,
-      toggleSidebar: vi.fn(),
-      toggleMobileSidebar: vi.fn(),
-      closeMobileSidebar: vi.fn(),
-    })
+    setViewport('desktop')
   })
 
   afterEach(() => {
@@ -136,14 +145,7 @@ describe('Header', () => {
     })
 
     it('should hide application name on mobile', () => {
-      mockUseAppShell.mockReturnValue({
-        screenSize: 'mobile',
-        sidebarCollapsed: false,
-        sidebarOpen: false,
-        toggleSidebar: vi.fn(),
-        toggleMobileSidebar: vi.fn(),
-        closeMobileSidebar: vi.fn(),
-      })
+      setViewport('mobile')
 
       render(<Header {...defaultProps} />)
       expect(screen.queryByTestId('header-app-name')).not.toBeInTheDocument()
@@ -167,14 +169,7 @@ describe('Header', () => {
     })
 
     it('should pass compact=true to UserMenu on mobile', () => {
-      mockUseAppShell.mockReturnValue({
-        screenSize: 'mobile',
-        sidebarCollapsed: false,
-        sidebarOpen: false,
-        toggleSidebar: vi.fn(),
-        toggleMobileSidebar: vi.fn(),
-        closeMobileSidebar: vi.fn(),
-      })
+      setViewport('mobile')
 
       render(<Header {...defaultProps} />)
       expect(screen.getByTestId('user-menu')).toHaveAttribute('data-compact', 'true')
@@ -217,28 +212,14 @@ describe('Header', () => {
 
   describe('Responsive Behavior', () => {
     it('should show full layout on desktop', () => {
-      mockUseAppShell.mockReturnValue({
-        screenSize: 'desktop',
-        sidebarCollapsed: false,
-        sidebarOpen: false,
-        toggleSidebar: vi.fn(),
-        toggleMobileSidebar: vi.fn(),
-        closeMobileSidebar: vi.fn(),
-      })
+      setViewport('desktop')
 
       render(<Header {...defaultProps} />)
       expect(screen.getByTestId('header-app-name')).toBeInTheDocument()
     })
 
     it('should show compact layout on mobile', () => {
-      mockUseAppShell.mockReturnValue({
-        screenSize: 'mobile',
-        sidebarCollapsed: false,
-        sidebarOpen: false,
-        toggleSidebar: vi.fn(),
-        toggleMobileSidebar: vi.fn(),
-        closeMobileSidebar: vi.fn(),
-      })
+      setViewport('mobile')
 
       render(<Header {...defaultProps} />)
       expect(screen.queryByTestId('header-app-name')).not.toBeInTheDocument()

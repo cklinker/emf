@@ -15,11 +15,12 @@ import { useNavigate } from 'react-router-dom'
 import { Search, ArrowLeft } from 'lucide-react'
 import type { BrandingConfig } from '../../types/config'
 import type { User } from '../../types/auth'
-import { useAppShell } from '../AppShell'
 import { SearchModal } from '../SearchModal'
 import { RecentItemsDropdown } from '../RecentItemsDropdown'
 import { UserMenu } from '../UserMenu'
 import { getTenantSlug } from '../../context/TenantContext'
+
+const MOBILE_BREAKPOINT_PX = 768
 
 /**
  * Props for the Header component
@@ -40,15 +41,18 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
   const navigate = useNavigate()
   const tenantSlug = getTenantSlug()
   const [searchOpen, setSearchOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window === 'undefined' ? false : window.innerWidth < MOBILE_BREAKPOINT_PX
+  )
 
-  // Get screen size from AppShell context for responsive behavior
-  let screenSize: 'mobile' | 'tablet' | 'desktop' = 'desktop'
-  try {
-    const appShell = useAppShell()
-    screenSize = appShell.screenSize
-  } catch {
-    // AppShell context not available, use default
-  }
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    setIsMobile(mql.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
 
   // Global Cmd+K / Ctrl+K shortcut
   useEffect(() => {
@@ -61,8 +65,6 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
     document.addEventListener('keydown', handleGlobalKeyDown)
     return () => document.removeEventListener('keydown', handleGlobalKeyDown)
   }, [])
-
-  const isMobile = screenSize === 'mobile'
 
   return (
     <>

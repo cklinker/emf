@@ -4,92 +4,51 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
-import org.springframework.lang.Nullable;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Dynamic JWT decoder that resolves the OIDC provider from the token's issuer claim.
- * Only accepts issuers registered in the worker's OIDC provider database.
+ * Reactive JWT decoder for the API gateway. Accepts only tokens issued by the
+ * internal kelta-auth provider — external IdPs federate through kelta-auth,
+ * which mints platform-issued JWTs.
  *
  * <p>Validation flow:
  * <ol>
- *   <li>Parse the JWT to extract the issuer (without signature validation)</li>
- *   <li>Look up the OIDC provider configuration from the worker service (cached in Redis)</li>
- *   <li>Reject the token if the issuer is not registered</li>
- *   <li>Create/cache a NimbusReactiveJwtDecoder per JWKS URI</li>
- *   <li>Validate the token with the correct decoder</li>
+ *   <li>Parse the JWT to extract the {@code iss} claim (without signature validation).</li>
+ *   <li>Reject if {@code iss} does not match the configured kelta-auth issuer.</li>
+ *   <li>Validate signature and timestamps against kelta-auth's JWKS.</li>
  * </ol>
  */
 public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
 
     private static final Logger log = LoggerFactory.getLogger(DynamicReactiveJwtDecoder.class);
-    private static final Duration PROVIDER_CACHE_TTL = Duration.ofMinutes(15);
-    private static final String REDIS_PREFIX = "oidc:provider:";
 
-    private final WebClient workerClient;
-    private final ReactiveStringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
-    private final String fallbackIssuerUri;
+    private final String issuerUri;
     private final Duration clockSkew;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private volatile NimbusReactiveJwtDecoder delegate;
 
-    // In-memory cache of JwtDecoders keyed by JWKS URI
-    private final ConcurrentHashMap<String, NimbusReactiveJwtDecoder> decoderCache = new ConcurrentHashMap<>();
-
-    // In-memory cache of expected audiences keyed by issuer URI
-    private final ConcurrentHashMap<String, String> audienceCache = new ConcurrentHashMap<>();
-
-    /**
-     * Holds provider configuration resolved from the worker service.
-     */
-    record ProviderInfo(String jwksUri, String audience) {}
-
-    /**
-     * Creates a DynamicReactiveJwtDecoder with default clock skew (0 seconds).
-     */
-    public DynamicReactiveJwtDecoder(
-            WebClient workerClient,
-            @Nullable ReactiveStringRedisTemplate redisTemplate,
-            String fallbackIssuerUri) {
-        this(workerClient, redisTemplate, fallbackIssuerUri, Duration.ZERO);
+    public DynamicReactiveJwtDecoder(String issuerUri) {
+        this(issuerUri, Duration.ZERO);
     }
 
-    /**
-     * Creates a DynamicReactiveJwtDecoder with configurable clock skew tolerance.
-     *
-     * @param workerClient WebClient for worker service internal API calls
-     * @param redisTemplate Redis template for caching (nullable)
-     * @param fallbackIssuerUri fallback OIDC issuer URI
-     * @param clockSkew tolerance for clock drift between gateway and identity provider
-     */
-    public DynamicReactiveJwtDecoder(
-            WebClient workerClient,
-            @Nullable ReactiveStringRedisTemplate redisTemplate,
-            String fallbackIssuerUri,
-            Duration clockSkew) {
-        this.workerClient = workerClient;
-        this.redisTemplate = redisTemplate;
-        this.objectMapper = new ObjectMapper();
-        this.fallbackIssuerUri = fallbackIssuerUri;
+    public DynamicReactiveJwtDecoder(String issuerUri, Duration clockSkew) {
+        if (issuerUri == null || issuerUri.isBlank()) {
+            throw new IllegalArgumentException("issuerUri must be set to the internal kelta-auth issuer");
+        }
+        this.issuerUri = issuerUri;
         this.clockSkew = clockSkew != null ? clockSkew : Duration.ZERO;
-        log.info("DynamicReactiveJwtDecoder initialized: fallbackIssuerUri={}, redis={}, clockSkew={}s",
-                fallbackIssuerUri, redisTemplate != null ? "enabled" : "disabled",
-                this.clockSkew.getSeconds());
+        log.info("DynamicReactiveJwtDecoder initialized: issuerUri={}, clockSkew={}s",
+                issuerUri, this.clockSkew.getSeconds());
     }
 
     @Override
@@ -98,14 +57,9 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     }
 
     /**
-     * Decodes a JWT token with tenant-scoped OIDC provider validation.
-     * When tenantId is provided, the OIDC provider lookup is scoped to that tenant,
-     * preventing cross-tenant JWT acceptance.
-     *
-     * @param token the JWT token string
-     * @param tenantId the tenant ID for scoped provider lookup (null for unscoped — not recommended)
-     * @return a Mono emitting the decoded JWT
-     * @throws JwtException if the token is invalid or the issuer is not registered for the tenant
+     * Decodes a JWT. The {@code tenantId} parameter is retained for source
+     * compatibility with callers and ignored — issuer validation is global
+     * because only kelta-auth-issued tokens are accepted.
      */
     public Mono<Jwt> decode(String token, String tenantId) throws JwtException {
         String issuer;
@@ -119,72 +73,33 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
             return Mono.error(new JwtException("JWT missing issuer (iss) claim"));
         }
 
-        return resolveProviderInfo(issuer, tenantId)
-                .flatMap(info -> decodeWithProviderInfo(token, info));
-    }
-
-    private Mono<Jwt> decodeWithProviderInfo(String token, ProviderInfo info) {
-        NimbusReactiveJwtDecoder decoder = decoderCache.computeIfAbsent(
-                info.jwksUri(),
-                uri -> {
-                    NimbusReactiveJwtDecoder d = NimbusReactiveJwtDecoder.withJwkSetUri(uri).build();
-                    // Build a composite validator: timestamp (with clock skew) + optional audience
-                    List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
-
-                    // Always add timestamp validation with clock skew tolerance
-                    JwtTimestampValidator timestampValidator = new JwtTimestampValidator(clockSkew);
-                    validators.add(timestampValidator);
-                    if (!clockSkew.isZero()) {
-                        log.debug("Added clock skew tolerance of {}s for JWKS URI {}",
-                                clockSkew.getSeconds(), uri);
-                    }
-
-                    // If audience is configured, add audience validation
-                    if (info.audience() != null && !info.audience().isBlank()) {
-                        log.debug("Adding audience validation for JWKS URI {}: expected audience={}",
-                                uri, info.audience());
-                        validators.add(new AudienceValidator(info.audience()));
-                    }
-
-                    d.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
-                    return d;
-                });
-        return decoder.decode(token);
-    }
-
-    /**
-     * JWT validator that checks the 'aud' claim contains the expected audience.
-     */
-    static class AudienceValidator implements OAuth2TokenValidator<Jwt> {
-        private final String expectedAudience;
-
-        AudienceValidator(String expectedAudience) {
-            this.expectedAudience = expectedAudience;
+        if (!issuerUri.equals(issuer)) {
+            log.warn("Rejecting JWT: iss={} expected={}", issuer, issuerUri);
+            return Mono.error(new JwtException(
+                    "JWT issuer not accepted: only tokens issued by " + issuerUri + " are allowed"));
         }
 
-        @Override
-        public OAuth2TokenValidatorResult validate(Jwt jwt) {
-            List<String> audiences = jwt.getAudience();
-            if (audiences != null && audiences.contains(expectedAudience)) {
-                return OAuth2TokenValidatorResult.success();
+        return delegate().decode(token);
+    }
+
+    private NimbusReactiveJwtDecoder delegate() {
+        NimbusReactiveJwtDecoder local = delegate;
+        if (local != null) {
+            return local;
+        }
+        synchronized (this) {
+            if (delegate == null) {
+                String jwksUri = issuerUri.endsWith("/") ? issuerUri + "oauth2/jwks" : issuerUri + "/oauth2/jwks";
+                NimbusReactiveJwtDecoder nimbus = NimbusReactiveJwtDecoder.withJwkSetUri(jwksUri).build();
+                nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                        List.of(new JwtTimestampValidator(clockSkew))));
+                log.debug("Initialized JWKS decoder for {}", jwksUri);
+                delegate = nimbus;
             }
-            log.debug("JWT audience validation failed: expected={}, actual={}",
-                    expectedAudience, audiences);
-            return OAuth2TokenValidatorResult.failure(
-                    new org.springframework.security.oauth2.core.OAuth2Error(
-                            "invalid_token",
-                            "JWT audience does not contain expected value: " + expectedAudience,
-                            null));
-        }
-
-        String getExpectedAudience() {
-            return expectedAudience;
+            return delegate;
         }
     }
 
-    /**
-     * Extracts the issuer from the JWT payload without signature validation.
-     */
     private String extractIssuer(String token) {
         String[] parts = token.split("\\.");
         if (parts.length < 2) {
@@ -201,80 +116,13 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     }
 
     /**
-     * Resolves the provider info (JWKS URI + audience) for an issuer, scoped to a tenant.
-     * Checks Redis cache first for JWKS URI, then calls the worker's internal API.
-     *
-     * @param issuer the OIDC issuer URI from the JWT
-     * @param tenantId the tenant ID for scoped lookup (null for unscoped — not recommended)
-     */
-    private Mono<ProviderInfo> resolveProviderInfo(String issuer, String tenantId) {
-        // Short-circuit for the internal kelta-auth issuer: the JWKS URI is well-known
-        // and does not need a worker round-trip. This avoids a 404 (→ 500) when
-        // kelta-auth is not registered as an OIDC federation provider in the worker DB.
-        if (fallbackIssuerUri != null && fallbackIssuerUri.equals(issuer)) {
-            String jwksUri = issuer.endsWith("/") ? issuer + "oauth2/jwks" : issuer + "/oauth2/jwks";
-            log.debug("Using built-in JWKS URI for internal issuer: {}", jwksUri);
-            return Mono.just(new ProviderInfo(jwksUri, null));
-        }
-
-        // Cache key includes tenant ID to prevent cross-tenant cache poisoning
-        String cacheKey = tenantId != null ? tenantId + ":" + issuer : issuer;
-
-        if (redisTemplate == null) {
-            return lookupFromWorker(issuer, tenantId);
-        }
-
-        String redisKey = REDIS_PREFIX + cacheKey;
-        return redisTemplate.opsForValue().get(redisKey)
-                .map(jwksUri -> new ProviderInfo(jwksUri, audienceCache.get(cacheKey)))
-                .switchIfEmpty(
-                        lookupFromWorker(issuer, tenantId)
-                                .flatMap(info ->
-                                        redisTemplate.opsForValue()
-                                                .set(redisKey, info.jwksUri(), PROVIDER_CACHE_TTL)
-                                                .thenReturn(info)));
-    }
-
-    private Mono<ProviderInfo> lookupFromWorker(String issuer, String tenantId) {
-        log.debug("Looking up OIDC provider from worker for issuer={} tenant={}", issuer, tenantId);
-
-        String uri = tenantId != null
-                ? "/internal/oidc/by-issuer?issuer={issuer}&tenantId={tenantId}"
-                : "/internal/oidc/by-issuer?issuer={issuer}";
-
-        // Cache key includes tenant ID to prevent cross-tenant cache poisoning
-        String cacheKey = tenantId != null ? tenantId + ":" + issuer : issuer;
-
-        WebClient.RequestHeadersSpec<?> request = tenantId != null
-                ? workerClient.get().uri(uri, issuer, tenantId)
-                : workerClient.get().uri(uri, issuer);
-
-        return request
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .map(json -> {
-                    String jwksUri = json.get("jwksUri").asText();
-                    String audience = null;
-                    JsonNode audienceNode = json.get("audience");
-                    if (audienceNode != null && !audienceNode.isNull() && !audienceNode.asText().isBlank()) {
-                        audience = audienceNode.asText();
-                        audienceCache.put(cacheKey, audience);
-                        log.debug("Worker returned audience: {} for issuer: {}", audience, issuer);
-                    }
-                    log.debug("Worker returned JWKS URI: {} for issuer={} tenant={}", jwksUri, issuer, tenantId);
-                    return new ProviderInfo(jwksUri, audience);
-                });
-        // No fallback — if the issuer is not registered in the worker's OIDC provider
-        // database for this tenant, the token is rejected. This prevents cross-tenant
-        // JWT acceptance and attackers from using arbitrary issuers.
-    }
-
-    /**
-     * Evicts all cached decoders (called when OIDC configuration changes).
+     * Drops the cached JWKS decoder so the next decode rebuilds it. Called when
+     * key rotation or configuration changes are signaled.
      */
     public void evictAll() {
-        decoderCache.clear();
-        audienceCache.clear();
-        log.info("Evicted all cached JWT decoders and audience cache");
+        synchronized (this) {
+            delegate = null;
+        }
+        log.info("Evicted cached JWT decoder");
     }
 }

@@ -5,8 +5,6 @@ import io.kelta.gateway.auth.PatAwareBearerTokenConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
-import org.springframework.lang.Nullable;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
@@ -15,7 +13,6 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,12 +39,6 @@ public class SecurityConfig {
 
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
     private String issuerUri;
-
-    @Value("${kelta.gateway.security.internal-issuer-uri:#{null}}")
-    private String internalIssuerUri;
-
-    @Value("${kelta.gateway.worker-service-url:http://kelta-worker:80}")
-    private String workerServiceUrl;
 
     @Value("${CORS_ALLOWED_ORIGIN_PATTERN:}")
     private String corsAllowedOriginPattern;
@@ -136,37 +127,13 @@ public class SecurityConfig {
     }
 
     /**
-     * Creates the JWT decoder bean.
-     *
-     * <p>When {@code kelta.gateway.security.single-issuer} is true (default), uses a
-     * simple {@link NimbusReactiveJwtDecoder} pointing at the configured issuer's JWKS.
-     * This is the recommended mode when kelta-auth is the sole token issuer.
-     *
-     * <p>When false, uses the legacy {@link DynamicReactiveJwtDecoder} that resolves
-     * JWKS URIs dynamically from the worker's OIDC provider database (multi-issuer).
+     * Creates the JWT decoder bean. The gateway accepts only tokens issued by
+     * the internal kelta-auth provider; external IdPs federate through kelta-auth,
+     * which mints platform JWTs.
      */
     @Bean
-    public DynamicReactiveJwtDecoder jwtDecoder(
-            @Nullable ReactiveStringRedisTemplate redisTemplate,
-            WebClient.Builder webClientBuilder,
-            @Value("${kelta.gateway.security.single-issuer:true}") boolean singleIssuer) {
-
-        if (singleIssuer) {
-            log.info("Gateway configured for single-issuer mode: {}", issuerUri);
-        }
-
-        // Use the shared builder so /internal/oidc/by-issuer lookups inherit the
-        // internal-auth bearer filter when the rollout flag is enabled.
-        WebClient workerClient = webClientBuilder
-                .baseUrl(workerServiceUrl)
-                .build();
-        // Use the dedicated internal-issuer-uri for the kelta-auth JWKS shortcut so it
-        // works even when OIDC_ISSUER_URI points to an external provider (e.g. Authentik).
-        String fallback = (internalIssuerUri != null && !internalIssuerUri.isBlank()) ? internalIssuerUri : issuerUri;
-        if (!fallback.equals(issuerUri)) {
-            log.info("Gateway internal kelta-auth issuer: {} (primary OIDC: {})", fallback, issuerUri);
-        }
-        return new DynamicReactiveJwtDecoder(workerClient, redisTemplate, fallback,
-                Duration.ofSeconds(jwtClockSkewSeconds));
+    public DynamicReactiveJwtDecoder jwtDecoder() {
+        log.info("Gateway JWT decoder: only tokens issued by {} accepted", issuerUri);
+        return new DynamicReactiveJwtDecoder(issuerUri, Duration.ofSeconds(jwtClockSkewSeconds));
     }
 }

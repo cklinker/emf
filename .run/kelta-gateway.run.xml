@@ -10,8 +10,8 @@
       <env name="NATS_URL" value="nats://localhost:4222" />
       <!--
         CRITICAL: must exactly match KELTA_AUTH_ISSUER_URI in kelta-auth.
-        With SINGLE_ISSUER=true the gateway validates all JWTs against this URI.
-        See /etc/hosts note in kelta-auth.run.xml.
+        The gateway validates all JWTs against this URI — only kelta-auth-issued
+        tokens are accepted. See /etc/hosts note in kelta-auth.run.xml.
       -->
       <env name="KELTA_AUTH_ISSUER_URI" value="http://kelta-auth:8080" />
       <!-- Route to worker and AI on host ports -->
@@ -20,7 +20,6 @@
       <!-- Cerbos (from compose stack) -->
       <env name="CERBOS_HOST" value="localhost" />
       <env name="CERBOS_GRPC_PORT" value="3593" />
-      <env name="SINGLE_ISSUER" value="true" />
       <!-- Logging -->
       <env name="LOG_LEVEL" value="INFO" />
     </envs>

@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -22,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("LoginController Tests")
 class LoginControllerTest {
 
@@ -85,6 +88,31 @@ class LoginControllerTest {
 
             assertThat(view).isEqualTo("login");
             assertThat(model.containsAttribute("ssoProviders")).isFalse();
+        }
+
+        @Test
+        void shouldRedirectToFederationWhenIdpHintMatchesRegistration() {
+            doReturn("tenant-1:provider-1").when(request).getParameter("idp_hint");
+            ClientRegistration reg = buildRegistration("tenant-1:provider-1", "Google SSO");
+            doReturn(reg).when(dynamicRepo).findByRegistrationId("tenant-1:provider-1");
+
+            Model model = new ConcurrentModel();
+            String view = controller.login(model, request);
+
+            assertThat(view).isEqualTo("redirect:/oauth2/authorization/tenant-1%3Aprovider-1");
+            verify(dynamicRepo).findByRegistrationId("tenant-1:provider-1");
+            verify(dynamicRepo, never()).findByTenantId(any());
+        }
+
+        @Test
+        void shouldFallBackToLoginPageWhenIdpHintIsUnknown() {
+            doReturn("tenant-1:unknown").when(request).getParameter("idp_hint");
+            doReturn(null).when(dynamicRepo).findByRegistrationId("tenant-1:unknown");
+
+            Model model = new ConcurrentModel();
+            String view = controller.login(model, request);
+
+            assertThat(view).isEqualTo("login");
         }
     }
 

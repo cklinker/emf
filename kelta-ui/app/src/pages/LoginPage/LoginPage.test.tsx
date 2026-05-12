@@ -15,7 +15,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { LoginPage } from './LoginPage'
 
 // Mock auth context
-const mockLogin = vi.fn()
+const mockLogin = vi.fn(() => Promise.resolve())
 const mockAuthContext = {
   user: null as { id: string; email: string; name: string } | null,
   isAuthenticated: false,
@@ -39,8 +39,25 @@ const mockConfigContext = {
       faviconUrl: '/favicon.ico',
     },
     oidcProviders: [
-      { id: 'provider-1', name: 'Google', issuer: 'https://accounts.google.com' },
-      { id: 'provider-2', name: 'Okta', issuer: 'https://okta.example.com' },
+      {
+        id: 'provider-1',
+        name: 'Google',
+        issuer: 'https://accounts.google.com',
+        clientId: 'google-client',
+      },
+      {
+        id: 'provider-2',
+        name: 'Okta',
+        issuer: 'https://okta.example.com',
+        clientId: 'okta-client',
+      },
+      {
+        id: 'internal-1',
+        name: 'Kelta Platform (Internal)',
+        issuer: 'https://auth.example.com',
+        clientId: 'kelta-platform',
+        isInternal: true,
+      },
     ],
   },
   isLoading: false,
@@ -213,6 +230,31 @@ describe('LoginPage', () => {
       )
 
       expect(screen.getByText('No identity providers configured.')).toBeInTheDocument()
+    })
+
+    it('auto-redirects to the internal provider when no externals are configured', async () => {
+      mockConfigContext.config = {
+        ...mockConfigContext.config,
+        oidcProviders: [
+          {
+            id: 'internal-1',
+            name: 'Kelta Platform (Internal)',
+            issuer: 'https://auth.example.com',
+            clientId: 'kelta-platform',
+            isInternal: true,
+          },
+        ],
+      }
+
+      render(
+        <TestWrapper>
+          <LoginPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith('internal-1')
+      })
     })
   })
 

@@ -1,101 +1,105 @@
 package io.kelta.gateway.auth;
 
-import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
 import reactor.test.StepVerifier;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Base64;
-import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("DynamicReactiveJwtDecoder")
 class DynamicReactiveJwtDecoderTest {
+
+    private static final String INTERNAL_ISSUER = "https://auth.rzware.com";
 
     private DynamicReactiveJwtDecoder decoder;
 
     @BeforeEach
     void setUp() {
-        // No Redis, no control plane — will fall back to default issuer
-        decoder = new DynamicReactiveJwtDecoder(
-                null, null, "http://localhost:9000/realms/emf");
+        decoder = new DynamicReactiveJwtDecoder(INTERNAL_ISSUER);
     }
 
     @Test
-    @DisplayName("should reject invalid JWT format")
+    @DisplayName("rejects invalid JWT format")
     void rejectInvalidJwt() {
         StepVerifier.create(decoder.decode("not.a.jwt"))
                 .expectError(JwtException.class)
                 .verify();
     }
 
-
     @Test
-    @DisplayName("should reject token without issuer")
+    @DisplayName("rejects token without iss claim")
     void rejectTokenWithoutIssuer() {
-        String header = Base64.getUrlEncoder().withoutPadding().encodeToString("{}".getBytes());
-        String payload = Base64.getUrlEncoder().withoutPadding().encodeToString("{\"sub\":\"user\"}".getBytes());
-        String token = header + "." + payload + ".signature";
+        String token = unsignedToken("{\"sub\":\"user\"}");
 
         StepVerifier.create(decoder.decode(token))
-                .expectError(JwtException.class)
+                .expectErrorSatisfies(err -> {
+                    assertThat(err).isInstanceOf(JwtException.class);
+                    assertThat(err.getMessage()).contains("missing issuer");
+                })
                 .verify();
     }
 
     @Test
-    @DisplayName("evictAll should clear decoder cache")
+    @DisplayName("rejects token whose iss is not the internal kelta-auth issuer")
+    void rejectsForeignIssuer() {
+        String token = unsignedToken(
+                "{\"iss\":\"https://idp.rzware.com/realms/rzWare\",\"sub\":\"u\"}");
+
+        StepVerifier.create(decoder.decode(token))
+                .expectErrorSatisfies(err -> {
+                    assertThat(err).isInstanceOf(JwtException.class);
+                    assertThat(err.getMessage()).contains("only tokens issued by");
+                })
+                .verify();
+    }
+
+    @Test
+    @DisplayName("constructor rejects null or blank issuer")
+    void constructorRejectsBlankIssuer() {
+        assertThatThrownBy(() -> new DynamicReactiveJwtDecoder(null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DynamicReactiveJwtDecoder(""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("evictAll clears the cached delegate")
     void evictAllClearsCache() {
         decoder.evictAll();
         // no exception — cache is empty
     }
 
     @Nested
-    @DisplayName("Clock Skew Configuration")
+    @DisplayName("Clock Skew")
     class ClockSkewTest {
 
         @Test
-        @DisplayName("should accept zero clock skew via 3-arg constructor")
-        void shouldAcceptZeroClockSkewDefault() {
+        @DisplayName("accepts explicit clock skew")
+        void acceptsExplicitClockSkew() {
             DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(
-                    null, null, "http://localhost:9000/realms/emf");
-            // No exception — default clock skew is Duration.ZERO
+                    INTERNAL_ISSUER, Duration.ofSeconds(30));
             d.evictAll();
         }
 
         @Test
-        @DisplayName("should accept explicit clock skew via 4-arg constructor")
-        void shouldAcceptExplicitClockSkew() {
-            DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(
-                    null, null, "http://localhost:9000/realms/emf",
-                    Duration.ofSeconds(30));
-            // No exception — clock skew is 30 seconds
+        @DisplayName("treats null clock skew as zero")
+        void nullClockSkewBecomesZero() {
+            DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(INTERNAL_ISSUER, null);
             d.evictAll();
         }
 
         @Test
-        @DisplayName("should handle null clock skew gracefully")
-        void shouldHandleNullClockSkew() {
+        @DisplayName("rejects invalid JWT even when clock skew is configured")
+        void rejectsInvalidJwtWithClockSkew() {
             DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(
-                    null, null, "http://localhost:9000/realms/emf", null);
-            // No exception — null clock skew defaults to Duration.ZERO
-            d.evictAll();
-        }
-
-        @Test
-        @DisplayName("should reject invalid JWT even with clock skew configured")
-        void shouldStillRejectInvalidJwtWithClockSkew() {
-            DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(
-                    null, null, "http://localhost:9000/realms/emf",
-                    Duration.ofSeconds(60));
+                    INTERNAL_ISSUER, Duration.ofSeconds(60));
 
             StepVerifier.create(d.decode("not.a.jwt"))
                     .expectError(JwtException.class)
@@ -103,70 +107,11 @@ class DynamicReactiveJwtDecoderTest {
         }
     }
 
-    @Nested
-    @DisplayName("AudienceValidator")
-    class AudienceValidatorTest {
-
-        @Test
-        @DisplayName("should succeed when JWT audience contains expected value")
-        void shouldSucceedWhenAudienceMatches() {
-            DynamicReactiveJwtDecoder.AudienceValidator validator =
-                    new DynamicReactiveJwtDecoder.AudienceValidator("my-client");
-
-            Jwt jwt = Jwt.withTokenValue("token")
-                    .header("alg", "RS256")
-                    .claim("aud", List.of("my-client", "other-client"))
-                    .claim("sub", "user")
-                    .issuedAt(Instant.now())
-                    .expiresAt(Instant.now().plusSeconds(3600))
-                    .build();
-
-            OAuth2TokenValidatorResult result = validator.validate(jwt);
-            assertThat(result.hasErrors()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should fail when JWT audience does not contain expected value")
-        void shouldFailWhenAudienceDoesNotMatch() {
-            DynamicReactiveJwtDecoder.AudienceValidator validator =
-                    new DynamicReactiveJwtDecoder.AudienceValidator("my-client");
-
-            Jwt jwt = Jwt.withTokenValue("token")
-                    .header("alg", "RS256")
-                    .claim("aud", List.of("other-client"))
-                    .claim("sub", "user")
-                    .issuedAt(Instant.now())
-                    .expiresAt(Instant.now().plusSeconds(3600))
-                    .build();
-
-            OAuth2TokenValidatorResult result = validator.validate(jwt);
-            assertThat(result.hasErrors()).isTrue();
-        }
-
-        @Test
-        @DisplayName("should fail when JWT has no audience claim")
-        void shouldFailWhenNoAudience() {
-            DynamicReactiveJwtDecoder.AudienceValidator validator =
-                    new DynamicReactiveJwtDecoder.AudienceValidator("my-client");
-
-            Jwt jwt = Jwt.withTokenValue("token")
-                    .header("alg", "RS256")
-                    .claim("sub", "user")
-                    .issuedAt(Instant.now())
-                    .expiresAt(Instant.now().plusSeconds(3600))
-                    .build();
-
-            OAuth2TokenValidatorResult result = validator.validate(jwt);
-            assertThat(result.hasErrors()).isTrue();
-        }
-
-        @Test
-        @DisplayName("should return expected audience value")
-        void shouldReturnExpectedAudience() {
-            DynamicReactiveJwtDecoder.AudienceValidator validator =
-                    new DynamicReactiveJwtDecoder.AudienceValidator("my-client");
-
-            assertThat(validator.getExpectedAudience()).isEqualTo("my-client");
-        }
+    private static String unsignedToken(String payloadJson) {
+        String header = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("{\"alg\":\"RS256\"}".getBytes());
+        String payload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(payloadJson.getBytes());
+        return header + "." + payload + ".signature";
     }
 }

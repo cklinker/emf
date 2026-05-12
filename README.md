@@ -116,7 +116,7 @@ make debug SVC=kelta-worker
 
 This is necessary because `KELTA_AUTH_ISSUER_URI=http://kelta-auth:8080` is used
 everywhere — inside Docker via container DNS and from the IDE via this hosts entry.
-Without it, gateway's `single-issuer` validation will reject tokens issued by
+Without it, the gateway's issuer validation will reject tokens issued by
 kelta-auth running in the IDE.
 
 **Secrets in run configs** — the `.run/*.run.xml` files use `$VAR_NAME$` for

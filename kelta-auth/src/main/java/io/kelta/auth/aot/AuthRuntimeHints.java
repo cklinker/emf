@@ -189,6 +189,15 @@ public class AuthRuntimeHints implements RuntimeHintsRegistrar {
                 "org.springframework.security.authentication.RememberMeAuthenticationToken",
                 "org.springframework.security.core.authority.SimpleGrantedAuthority",
                 "org.springframework.security.core.authority.AuthorityUtils",
+                // Spring Security 7 stamps authentication tokens with a
+                // FactorGrantedAuthority describing the auth factor (password,
+                // OTT, passkey, ...). The JdbcOAuth2AuthorizationService
+                // serializes the principal's authorities, and the strict
+                // AllowlistTypeIdResolver loads each authority class by name on
+                // read — without these entries the native image can't resolve
+                // FactorGrantedAuthority and /oauth2/token returns 500.
+                "org.springframework.security.core.authority.FactorGrantedAuthority",
+                "org.springframework.security.core.authority.FactorGrantedAuthority$Builder",
                 "org.springframework.security.core.userdetails.User",
                 "org.springframework.security.web.savedrequest.DefaultSavedRequest",
                 "org.springframework.security.web.savedrequest.SavedCookie",

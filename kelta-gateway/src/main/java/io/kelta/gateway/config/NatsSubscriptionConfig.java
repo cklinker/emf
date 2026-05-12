@@ -3,6 +3,7 @@ package io.kelta.gateway.config;
 import io.kelta.gateway.listener.CerbosCacheInvalidationListener;
 import io.kelta.gateway.listener.ConfigEventListener;
 import io.kelta.gateway.listener.CustomDomainCacheInvalidationListener;
+import io.kelta.gateway.listener.LayoutCacheInvalidationListener;
 import io.kelta.gateway.listener.RealtimeBridge;
 import io.kelta.gateway.listener.SystemCollectionRouteListener;
 import io.kelta.runtime.event.EventSubscription;
@@ -28,19 +29,22 @@ public class NatsSubscriptionConfig {
     private final ConfigEventListener configEventListener;
     private final CerbosCacheInvalidationListener cerbosCacheInvalidationListener;
     private final CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener;
+    private final LayoutCacheInvalidationListener layoutCacheInvalidationListener;
 
     public NatsSubscriptionConfig(NatsSubscriptionManager subscriptionManager,
                                    RealtimeBridge realtimeBridge,
                                    SystemCollectionRouteListener systemCollectionRouteListener,
                                    ConfigEventListener configEventListener,
                                    CerbosCacheInvalidationListener cerbosCacheInvalidationListener,
-                                   CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener) {
+                                   CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener,
+                                   LayoutCacheInvalidationListener layoutCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.realtimeBridge = realtimeBridge;
         this.systemCollectionRouteListener = systemCollectionRouteListener;
         this.configEventListener = configEventListener;
         this.cerbosCacheInvalidationListener = cerbosCacheInvalidationListener;
         this.customDomainCacheInvalidationListener = customDomainCacheInvalidationListener;
+        this.layoutCacheInvalidationListener = layoutCacheInvalidationListener;
     }
 
     @EventListener(ApplicationStartedEvent.class)
@@ -68,5 +72,9 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.broadcast(
                 "gateway-domain-cache", "kelta.config.domain.changed.*",
                 customDomainCacheInvalidationListener::handleDomainChanged));
+
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-layout-cache", "kelta.config.layout.changed.*",
+                layoutCacheInvalidationListener::handleLayoutChanged));
     }
 }

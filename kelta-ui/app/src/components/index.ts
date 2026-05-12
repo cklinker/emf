@@ -5,19 +5,9 @@
  * Components include: Header, Sidebar, Toast, ConfirmDialog, LoadingSpinner, ErrorMessage, etc.
  */
 
-// Export shared components
-export { AppShell, useAppShell } from './AppShell'
-export type { AppShellProps, AppShellContextValue } from './AppShell'
-export { BREAKPOINTS } from './AppShell'
-export type { ScreenSize } from './AppShell'
-
 // Header component
 export { Header } from './Header'
 export type { HeaderProps } from './Header'
-
-// Sidebar component
-export { Sidebar } from './Sidebar'
-export type { SidebarProps } from './Sidebar'
 
 // ErrorBoundary component
 export { ErrorBoundary, ErrorFallback } from './ErrorBoundary'
@@ -65,10 +55,6 @@ export type {
   Collection as CollectionFormCollection,
   AvailableField,
 } from './CollectionForm'
-
-// FieldsPanel component
-export { FieldsPanel } from './FieldsPanel'
-export type { FieldsPanelProps, FieldDefinition, FieldType, ValidationRule } from './FieldsPanel'
 
 // FieldEditor component
 export {

@@ -90,6 +90,11 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'CUSTOMIZE_APPLICATION',
       },
       {
+        name: 'Resources',
+        path: '/resources',
+        description: 'Browse and edit records in every collection',
+      },
+      {
         name: 'Picklists',
         path: '/picklists',
         description: 'Manage global picklist values',

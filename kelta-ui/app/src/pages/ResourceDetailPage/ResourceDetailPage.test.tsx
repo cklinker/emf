@@ -179,10 +179,6 @@ vi.mock('../../components/RecordActionsBar/RecordActionsBar', () => ({
   ),
 }))
 
-vi.mock('../../components/RelatedRecordsSection/RelatedRecordsSection', () => ({
-  RelatedRecordsSection: () => <div data-testid="related-records-section">Related Records</div>,
-}))
-
 vi.mock('../../components/ActivityTimeline/ActivityTimeline', () => ({
   ActivityTimeline: () => <div data-testid="activity-timeline">Activity</div>,
 }))
@@ -204,9 +200,6 @@ vi.mock('../../components/LayoutFieldSections/LayoutFieldSections', () => ({
   LayoutFieldSections: () => <div data-testid="layout-field-sections">Layout Fields</div>,
 }))
 
-vi.mock('../../components/LayoutRelatedLists/LayoutRelatedLists', () => ({
-  LayoutRelatedLists: () => <div data-testid="layout-related-lists">Layout Related</div>,
-}))
 
 // Sample test data
 const mockSchema: CollectionSchema = {

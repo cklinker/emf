@@ -28,9 +28,6 @@ export { useFavorites, type FavoriteItem, type UseFavoritesReturn } from './useF
 // Global keyboard shortcuts hook
 export { useGlobalShortcuts } from './useGlobalShortcuts'
 
-// Tenant ID hook for centralized tenant resolution
-export { useTenantId, getTenantId } from './useTenantId'
-
 // Collection schema hook for fetching collection metadata
 export {
   useCollectionSchema,
@@ -69,14 +66,6 @@ export {
   type UseObjectPermissionsReturn,
 } from './useObjectPermissions'
 
-// Field-level permission hook (visibility per field)
-export {
-  useFieldPermissions,
-  type FieldVisibility,
-  type FieldPermissionMap,
-  type UseFieldPermissionsReturn,
-} from './useFieldPermissions'
-
 // Quick actions hook for fetching action definitions
 export {
   useQuickActions,
@@ -113,37 +102,6 @@ export {
   type MyPermissionsResponse,
   type UseSystemPermissionsReturn,
 } from './useSystemPermissions'
-
-// Generic resource hooks — unified API for all collections (system + user-defined)
-export { useResources, type UseResourcesOptions, type UseResourcesReturn } from './useResources'
-
-export { useResource, type UseResourceOptions, type UseResourceReturn } from './useResource'
-
-export {
-  useCreateResource,
-  type UseCreateResourceOptions,
-  type UseCreateResourceReturn,
-} from './useCreateResource'
-
-export {
-  useUpdateResource,
-  type UseUpdateResourceOptions,
-  type UpdateParams,
-  type UseUpdateResourceReturn,
-} from './useUpdateResource'
-
-export {
-  useDeleteResource,
-  type UseDeleteResourceOptions,
-  type UseDeleteResourceReturn,
-} from './useDeleteResource'
-
-export {
-  useResourceAction,
-  type UseResourceActionOptions,
-  type ActionParams,
-  type UseResourceActionReturn,
-} from './useResourceAction'
 
 // Included resources hook — extract display maps from JSON:API includes
 export {

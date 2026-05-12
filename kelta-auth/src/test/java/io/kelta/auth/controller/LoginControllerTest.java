@@ -114,6 +114,28 @@ class LoginControllerTest {
 
             assertThat(view).isEqualTo("login");
         }
+
+        @Test
+        void shouldRenderSsoButtonsForHintTenantWhenAutoFederationFails() {
+            // Hint short-circuit can't match a registration (e.g. provider missing
+            // client_secret), so the user lands on /login. They must still see the
+            // tenant's SSO buttons so they can pick a provider manually.
+            doReturn("tenant-7:does-not-exist").when(request).getParameter("idp_hint");
+            doReturn(null).when(dynamicRepo).findByRegistrationId("tenant-7:does-not-exist");
+            when(session.getAttribute("tenantId")).thenReturn(null);
+            ClientRegistration reg = buildRegistration("tenant-7:authentik", "Authentik");
+            when(dynamicRepo.findByTenantId("tenant-7")).thenReturn(List.of(reg));
+
+            Model model = new ConcurrentModel();
+            String view = controller.login(model, request);
+
+            assertThat(view).isEqualTo("login");
+            verify(session).setAttribute("tenantId", "tenant-7");
+            @SuppressWarnings("unchecked")
+            var providers = (List<LoginController.SsoProviderInfo>) model.getAttribute("ssoProviders");
+            assertThat(providers).hasSize(1);
+            assertThat(providers.get(0).name()).isEqualTo("Authentik");
+        }
     }
 
     @Nested

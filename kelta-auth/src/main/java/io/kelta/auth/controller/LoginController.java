@@ -77,6 +77,22 @@ public class LoginController {
             return param;
         }
 
+        // Fall back to the tenant prefix of idp_hint ({tenantId}:{providerId}) so SSO
+        // buttons render even when the auto-federation short-circuit could not match
+        // a client registration. Without this, a user hitting /login?idp_hint=...
+        // with no prior session sees only the password form and is stuck.
+        String hint = request.getParameter("idp_hint");
+        if (hint != null && !hint.isBlank()) {
+            int colon = hint.indexOf(':');
+            if (colon > 0) {
+                String hintTenant = hint.substring(0, colon);
+                if (!hintTenant.isBlank()) {
+                    request.getSession().setAttribute("tenantId", hintTenant);
+                    return hintTenant;
+                }
+            }
+        }
+
         return null;
     }
 

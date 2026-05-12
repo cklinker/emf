@@ -7,6 +7,7 @@ import io.kelta.worker.listener.CollectionSchemaListener;
 import io.kelta.worker.listener.CredentialCacheInvalidationListener;
 import io.kelta.worker.listener.CustomDomainCacheInvalidationListener;
 import io.kelta.worker.listener.FlowEventListener;
+import io.kelta.worker.listener.LayoutCacheInvalidationListener;
 import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SystemFeatureCacheInvalidationListener;
 import io.kelta.worker.module.ModuleEventListener;
@@ -37,7 +38,8 @@ class NatsSubscriptionConfigTest {
                 mock(ModuleEventListener.class),
                 mock(CerbosCacheInvalidationListener.class),
                 mock(CustomDomainCacheInvalidationListener.class),
-                mock(SystemFeatureCacheInvalidationListener.class));
+                mock(SystemFeatureCacheInvalidationListener.class),
+                mock(LayoutCacheInvalidationListener.class));
     }
 
     @Test
@@ -47,10 +49,10 @@ class NatsSubscriptionConfigTest {
         // when kelta.encryption.key is not configured.
         config.registerSubscriptions();
 
-        // Eight always-on subscriptions: worker-flows, worker-search-index, worker-schema,
+        // Nine always-on subscriptions: worker-flows, worker-search-index, worker-schema,
         // worker-modules, worker-cerbos, worker-flow-cache, worker-domain-cache,
-        // worker-feature-cache. Credential/Superset/Svix are conditional.
-        verify(subscriptionManager, times(8)).register(any(EventSubscription.class));
+        // worker-feature-cache, worker-layout-cache. Credential/Superset/Svix are conditional.
+        verify(subscriptionManager, times(9)).register(any(EventSubscription.class));
     }
 
     @Test
@@ -61,6 +63,6 @@ class NatsSubscriptionConfigTest {
 
         config.registerSubscriptions();
 
-        verify(subscriptionManager, times(9)).register(any(EventSubscription.class));
+        verify(subscriptionManager, times(10)).register(any(EventSubscription.class));
     }
 }

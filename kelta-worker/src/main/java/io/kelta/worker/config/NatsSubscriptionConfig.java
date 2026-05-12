@@ -7,6 +7,7 @@ import io.kelta.worker.listener.CollectionSchemaListener;
 import io.kelta.worker.listener.CredentialCacheInvalidationListener;
 import io.kelta.worker.listener.CustomDomainCacheInvalidationListener;
 import io.kelta.worker.listener.FlowEventListener;
+import io.kelta.worker.listener.LayoutCacheInvalidationListener;
 import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SupersetCollectionSyncListener;
 import io.kelta.worker.listener.SvixWebhookPublisher;
@@ -42,6 +43,7 @@ public class NatsSubscriptionConfig {
     private final CerbosCacheInvalidationListener cerbosCacheInvalidationListener;
     private final CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener;
     private final SystemFeatureCacheInvalidationListener systemFeatureCacheInvalidationListener;
+    private final LayoutCacheInvalidationListener layoutCacheInvalidationListener;
 
     @Autowired(required = false)
     private CredentialCacheInvalidationListener credentialCacheInvalidationListener;
@@ -59,7 +61,8 @@ public class NatsSubscriptionConfig {
                                    ModuleEventListener moduleEventListener,
                                    CerbosCacheInvalidationListener cerbosCacheInvalidationListener,
                                    CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener,
-                                   SystemFeatureCacheInvalidationListener systemFeatureCacheInvalidationListener) {
+                                   SystemFeatureCacheInvalidationListener systemFeatureCacheInvalidationListener,
+                                   LayoutCacheInvalidationListener layoutCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.flowEventListener = flowEventListener;
         this.searchIndexListener = searchIndexListener;
@@ -68,6 +71,7 @@ public class NatsSubscriptionConfig {
         this.cerbosCacheInvalidationListener = cerbosCacheInvalidationListener;
         this.customDomainCacheInvalidationListener = customDomainCacheInvalidationListener;
         this.systemFeatureCacheInvalidationListener = systemFeatureCacheInvalidationListener;
+        this.layoutCacheInvalidationListener = layoutCacheInvalidationListener;
     }
 
     @PostConstruct
@@ -125,6 +129,10 @@ public class NatsSubscriptionConfig {
                 "worker-feature-cache", "kelta.config.feature.changed.*",
                 systemFeatureCacheInvalidationListener::handleFeatureChanged));
 
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-layout-cache", "kelta.config.layout.changed.*",
+                layoutCacheInvalidationListener::handleLayoutChanged));
+
         // Optional queue group subscriptions — only registered when the integration is enabled
         if (supersetCollectionSyncListener != null) {
             subscriptionManager.register(EventSubscription.queueGroup(
@@ -140,7 +148,7 @@ public class NatsSubscriptionConfig {
             log.info("Registered NATS subscription for Svix webhook publisher");
         }
 
-        log.info("Registered {} worker NATS subscriptions", 8
+        log.info("Registered {} worker NATS subscriptions", 9
                 + (credentialCacheInvalidationListener != null ? 1 : 0)
                 + (supersetCollectionSyncListener != null ? 1 : 0)
                 + (svixWebhookPublisher != null ? 1 : 0));

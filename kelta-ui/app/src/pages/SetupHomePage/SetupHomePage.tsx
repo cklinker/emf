@@ -438,17 +438,47 @@ function sanitizeTestPath(path: string): string {
   return path.replace(/\//g, '').replace(/-/g, '')
 }
 
+// Module-level minute-tick store: getSnapshot must be stable between ticks,
+// otherwise useSyncExternalStore re-renders every call and React bails with
+// "Maximum update depth exceeded" (#185).
+let cachedNow = 0
+const tickListeners = new Set<() => void>()
+let tickIntervalId: number | null = null
+
+function ensureTicker(): void {
+  if (tickIntervalId !== null) return
+  cachedNow = Date.now()
+  tickIntervalId = window.setInterval(() => {
+    cachedNow = Date.now()
+    tickListeners.forEach((listener) => listener())
+  }, 60_000)
+}
+
 function subscribeMinute(callback: () => void): () => void {
-  const id = window.setInterval(callback, 60_000)
-  return () => window.clearInterval(id)
+  ensureTicker()
+  tickListeners.add(callback)
+  // ensureTicker just set cachedNow above; notify the subscriber so React
+  // re-reads the snapshot (transitioning from the 0 it captured during render).
+  queueMicrotask(callback)
+  return () => {
+    tickListeners.delete(callback)
+    if (tickListeners.size === 0 && tickIntervalId !== null) {
+      window.clearInterval(tickIntervalId)
+      tickIntervalId = null
+    }
+  }
+}
+
+function getNowSnapshot(): number {
+  return cachedNow
+}
+
+function getNowServerSnapshot(): number {
+  return 0
 }
 
 function useNow(): number {
-  return useSyncExternalStore(
-    subscribeMinute,
-    () => Date.now(),
-    () => 0
-  )
+  return useSyncExternalStore(subscribeMinute, getNowSnapshot, getNowServerSnapshot)
 }
 
 function formatRelative(

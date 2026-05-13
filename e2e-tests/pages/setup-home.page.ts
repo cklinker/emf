@@ -7,6 +7,8 @@ export class SetupHomePage extends BasePage {
   readonly searchClear: Locator;
   readonly stats: Locator;
   readonly noResults: Locator;
+  readonly pinned: Locator;
+  readonly recent: Locator;
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
@@ -15,6 +17,39 @@ export class SetupHomePage extends BasePage {
     this.searchClear = this.testId("setup-search-clear");
     this.stats = this.testId("setup-stats");
     this.noResults = this.testId("setup-no-results");
+    this.pinned = this.testId("setup-pinned");
+    this.recent = this.testId("setup-recent");
+  }
+
+  filterTab(key: "all" | "core" | "automation" | "platform"): Locator {
+    return this.testId(`setup-filter-${key}`);
+  }
+
+  group(key: "core" | "automation" | "platform"): Locator {
+    return this.testId(`setup-group-${key}`);
+  }
+
+  pinButton(path: string): Locator {
+    const sanitizedPath = path.replace(/\//g, "").replace(/-/g, "");
+    return this.testId(`setup-pin-${sanitizedPath}`);
+  }
+
+  pinnedChip(path: string): Locator {
+    const sanitizedPath = path.replace(/\//g, "").replace(/-/g, "");
+    return this.testId(`setup-pinned-${sanitizedPath}`);
+  }
+
+  recentChip(path: string): Locator {
+    const sanitizedPath = path.replace(/\//g, "").replace(/-/g, "");
+    return this.testId(`setup-recent-${sanitizedPath}`);
+  }
+
+  async clearLocalShortcuts(): Promise<void> {
+    await this.page.evaluate(() => {
+      Object.keys(window.localStorage)
+        .filter((k) => k.startsWith("kelta:setup:"))
+        .forEach((k) => window.localStorage.removeItem(k));
+    });
   }
 
   async goto(): Promise<void> {

@@ -1237,12 +1237,40 @@
   },
   "setup": {
     "title": "Configuracao",
-    "searchPlaceholder": "Buscar configuracao...",
+    "subtitle": "Configure seu tenant — modelos de dados, seguranca, automacao, integracoes.",
+    "breadcrumbLabel": "Administracao",
+    "searchPlaceholder": "Buscar configuracao…",
+    "shortcutHint": "⌘K",
     "stats": {
-      "collections": "Total de Colecoes",
-      "users": "Total de Usuarios",
-      "reports": "Total de Relatorios",
-      "dashboards": "Total de Paineis"
+      "collections": "Colecoes",
+      "users": "Usuarios",
+      "reports": "Relatorios",
+      "dashboards": "Paineis"
+    },
+    "filters": {
+      "all": "Todos",
+      "core": "Nucleo",
+      "automation": "Automacao",
+      "platform": "Plataforma"
+    },
+    "groups": {
+      "core": "Configuracao do Nucleo",
+      "automation": "Automacao e Integracao",
+      "platform": "Plataforma e Analise"
+    },
+    "groupMeta": "{{sections}} secoes · {{items}} itens",
+    "pinned": "Fixados",
+    "recent": "Visitados recentemente",
+    "addPin": "Fixar",
+    "removePin": "Remover",
+    "emptyPinned": "Fixe os itens de configuracao mais usados.",
+    "emptyRecent": "Os itens visitados aparecerao aqui.",
+    "relativeTime": {
+      "now": "agora",
+      "minutes": "{{count}}min atras",
+      "hours": "{{count}}h atras",
+      "yesterday": "ontem",
+      "days": "{{count}}d atras"
     },
     "categories": {
       "administration": "Administracao",
@@ -1253,6 +1281,16 @@
       "analytics": "Analise",
       "uiCustomization": "Interface e Personalizacao",
       "platform": "Plataforma"
+    },
+    "categoryDescriptions": {
+      "administration": "Identidade, acesso e permissoes",
+      "dataModel": "O que seu tenant rastreia",
+      "security": "Politicas, login e historico",
+      "automation": "Aprovacoes, fluxos e jobs",
+      "integration": "Apps, credenciais, APIs e webhooks",
+      "analytics": "Paineis e relatorios",
+      "uiCustomization": "Paginas, menus e plugins",
+      "platform": "Pacotes, migracoes, monitoramento"
     }
   },
   "relatedRecords": {

@@ -114,10 +114,16 @@
   }
 
   .dark {
-    /* shadcn/ui dark theme (Slate base, Blue-400 primary) */
+    /* shadcn/ui dark theme (Slate base, Blue-400 primary)
+     *
+     * --card is intentionally lifted off --background so cards, highlights
+     * panels, and tab containers separate visually on the dark slate page
+     * background. Matches design tokens at
+     * design_handoff_kelta_detail_layout/colors_and_type.css
+     * (--surface: #0F172A on --bg: #020617). */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 222 47% 11%;
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;

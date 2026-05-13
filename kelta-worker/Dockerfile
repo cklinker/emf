@@ -65,7 +65,12 @@ COPY kelta-worker/pom.xml .
 RUN mvn dependency:go-offline -B -Pnative || true
 
 COPY kelta-worker/src ./src
-RUN mvn -Pnative native:compile -DskipTests -B
+# Spring Boot AOT evaluates @ConditionalOnProperty at build time and bakes the
+# decision into the native image. Bake S3 enabled so S3StorageService (and the
+# attachment upload controller that depends on it) are included in the binary.
+# Runtime env vars (KELTA_S3_*) still configure endpoint, bucket, credentials.
+RUN mvn -Pnative native:compile -DskipTests -B \
+    -Dkelta.storage.s3.enabled=true
 
 # =============================================================================
 # Stage 3: Minimal runtime (no JRE — binary is self-contained)

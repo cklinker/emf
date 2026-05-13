@@ -43,21 +43,24 @@ public class AttachmentUploadController {
             "application/x-msdos-program"
     );
 
+    // file_attachment.id is VARCHAR(36) (see V42 migration), so do NOT cast to ::uuid —
+    // PostgreSQL has no implicit varchar=uuid operator and the comparison fails with
+    // SQLState 42883 (BadSqlGrammarException). Pass UUID strings as plain text.
     private static final String INSERT_ATTACHMENT = """
             INSERT INTO file_attachment (id, tenant_id, collection_id, record_id,
                 file_name, file_size, content_type, storage_key, uploaded_by, created_at, updated_at)
-            VALUES (?::uuid, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             """;
 
     private static final String UPDATE_ATTACHMENT_STORAGE_KEY = """
             UPDATE file_attachment SET storage_key = ?, uploaded_at = NOW(), updated_at = NOW()
-            WHERE id = ?::uuid AND tenant_id = ?
+            WHERE id = ? AND tenant_id = ?
             """;
 
     private static final String SELECT_ATTACHMENT = """
             SELECT id, tenant_id, collection_id, record_id, file_name, file_size,
                    content_type, storage_key, uploaded_by, uploaded_at, created_at
-            FROM file_attachment WHERE id = ?::uuid AND tenant_id = ?
+            FROM file_attachment WHERE id = ? AND tenant_id = ?
             """;
 
     private final S3StorageService storageService;

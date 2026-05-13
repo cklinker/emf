@@ -3,7 +3,6 @@ package io.kelta.worker.service;
 import io.kelta.worker.config.S3ConfigProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -35,12 +34,15 @@ import java.time.Duration;
  * <p>Uses a separate public endpoint for presigned URLs (browser access) and
  * an internal endpoint for server-side streaming (FileController).
  *
- * <p>This service is only activated when {@code kelta.storage.s3.enabled=true}.
+ * <p>The bean is always registered so that GraalVM native-image AOT processing
+ * always includes it. S3 client construction is gated at runtime on
+ * {@code kelta.storage.s3.enabled}; when disabled, clients are not built and
+ * any operation requiring S3 throws {@link IllegalStateException}. Use
+ * {@link #isEnabled()} to check availability before calling.
  *
  * @since 1.0.0
  */
 @Service
-@ConditionalOnProperty(name = "kelta.storage.s3.enabled", havingValue = "true")
 public class S3StorageService {
 
     private static final Logger logger = LoggerFactory.getLogger(S3StorageService.class);
@@ -51,10 +53,30 @@ public class S3StorageService {
 
     public S3StorageService(S3ConfigProperties config) {
         this.config = config;
-        this.s3Presigner = buildPresigner(config);
-        this.s3Client = buildS3Client(config);
-        logger.info("S3StorageService initialized with bucket '{}', publicEndpoint '{}'",
-                config.getBucket(), config.getPublicEndpoint());
+        if (config.isEnabled()) {
+            this.s3Presigner = buildPresigner(config);
+            this.s3Client = buildS3Client(config);
+            logger.info("S3StorageService initialized with bucket '{}', publicEndpoint '{}'",
+                    config.getBucket(), config.getPublicEndpoint());
+        } else {
+            logger.info("S3StorageService disabled (kelta.storage.s3.enabled=false); S3 operations will fail");
+        }
+    }
+
+    /**
+     * Returns whether S3 storage is enabled and ready for use.
+     *
+     * @return true if S3 clients are initialized
+     */
+    public boolean isEnabled() {
+        return config.isEnabled() && s3Presigner != null && s3Client != null;
+    }
+
+    private void requireEnabled() {
+        if (!isEnabled()) {
+            throw new IllegalStateException(
+                    "S3 storage is not enabled (kelta.storage.s3.enabled=false)");
+        }
     }
 
     /**
@@ -82,6 +104,7 @@ public class S3StorageService {
      * @return the presigned download URL
      */
     public String getPresignedDownloadUrl(String storageKey, Duration expiry) {
+        requireEnabled();
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(config.getBucket())
                 .key(storageKey)
@@ -105,6 +128,7 @@ public class S3StorageService {
      * @return the presigned upload URL
      */
     public String getPresignedUploadUrl(String storageKey, String contentType, Duration expiry) {
+        requireEnabled();
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(config.getBucket())
                 .key(storageKey)
@@ -146,6 +170,7 @@ public class S3StorageService {
      * @throws NoSuchKeyException if the key does not exist
      */
     public StorageObject streamObject(String storageKey) {
+        requireEnabled();
         GetObjectRequest request = GetObjectRequest.builder()
                 .bucket(config.getBucket())
                 .key(storageKey)
@@ -173,6 +198,7 @@ public class S3StorageService {
      * @return a StorageObject containing the partial stream
      */
     public StorageObject streamObjectRange(String storageKey, String rangeHeader) {
+        requireEnabled();
         GetObjectRequest request = GetObjectRequest.builder()
                 .bucket(config.getBucket())
                 .key(storageKey)
@@ -200,6 +226,7 @@ public class S3StorageService {
      * @param contentType the content type (e.g., "application/java-archive")
      */
     public void uploadObject(String storageKey, byte[] data, String contentType) {
+        requireEnabled();
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(config.getBucket())
                 .key(storageKey)
@@ -218,6 +245,7 @@ public class S3StorageService {
      * @param storageKey the S3 object key
      */
     public void deleteObject(String storageKey) {
+        requireEnabled();
         s3Client.deleteObject(software.amazon.awssdk.services.s3.model.DeleteObjectRequest.builder()
                 .bucket(config.getBucket())
                 .key(storageKey)
@@ -229,6 +257,7 @@ public class S3StorageService {
      * Checks if an S3 object exists without downloading it.
      */
     public boolean objectExists(String storageKey) {
+        requireEnabled();
         try {
             s3Client.headObject(HeadObjectRequest.builder()
                     .bucket(config.getBucket())

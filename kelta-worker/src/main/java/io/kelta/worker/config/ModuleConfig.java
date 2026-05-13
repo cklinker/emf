@@ -14,7 +14,6 @@ import io.kelta.worker.service.S3StorageService;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
@@ -48,9 +47,18 @@ public class ModuleConfig {
         return new JdbcModuleStore(jdbcTemplate);
     }
 
+    /**
+     * Returns a {@link ModuleJarService} backed by S3 when storage is enabled at
+     * runtime, otherwise {@code null}. The bean is always defined so AOT
+     * processing for native images doesn't exclude it; the runtime decision is
+     * based on {@link S3StorageService#isEnabled()}.
+     */
     @Bean
-    @ConditionalOnBean(S3StorageService.class)
+    @Nullable
     public ModuleJarService moduleJarService(S3StorageService s3StorageService) {
+        if (!s3StorageService.isEnabled()) {
+            return null;
+        }
         return new ModuleJarService(s3StorageService);
     }
 

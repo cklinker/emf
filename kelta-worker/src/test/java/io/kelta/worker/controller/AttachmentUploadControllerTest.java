@@ -38,6 +38,7 @@ class AttachmentUploadControllerTest {
     @BeforeEach
     void setUp() {
         controller = new AttachmentUploadController(storageService, governorLimitsRepository, jdbcTemplate);
+        lenient().when(storageService.isEnabled()).thenReturn(true);
     }
 
     private Map<String, Object> validUploadBody() {

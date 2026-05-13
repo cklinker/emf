@@ -3,12 +3,12 @@
  *
  * Resolves display labels for reference/lookup/master_detail field values.
  * Builds a map of { fieldName: { recordId: displayLabel } } that can be
- * passed to DetailSection, ObjectDataTable, or FieldRenderer to show
+ * passed to FieldSection, ObjectDataTable, or FieldRenderer to show
  * human-readable names instead of raw UUIDs.
  *
  * Usage:
  *   const { lookupDisplayMap } = useLookupDisplayMap(fields)
- *   <DetailSection ... lookupDisplayMap={lookupDisplayMap} />
+ *   <FieldSection ... lookupDisplayMap={lookupDisplayMap} />
  */
 
 import { useMemo } from 'react'

@@ -125,3 +125,183 @@ body {
   box-shadow: 0 10px 24px -8px rgba(59, 130, 246, 0.6);
   z-index: 100;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Record detail layout — handoff design tokens
+   See: design_handoff_kelta_detail_layout/README.md
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* 72×72 gradient hero avatar w/ inset highlight + cyan glow */
+.kelta-hero-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: var(--kelta-gradient);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  box-shadow:
+    0 12px 28px -10px rgba(6, 182, 212, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Online presence dot — bottom-right, 3px ring of page bg */
+.kelta-presence-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 3px hsl(var(--background));
+}
+
+/* Page title — 32/700/-0.025em */
+.kelta-page-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: hsl(var(--foreground));
+}
+
+/* Field grid for detail sections — handoff: 22px row × 40px col gaps */
+.kelta-field-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--kelta-grid-cols, 2), minmax(0, 1fr));
+  row-gap: 22px;
+  column-gap: 40px;
+}
+
+/* Underline tab bar — 38px tall, 13/500, active gets 2px primary border */
+.kelta-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  border-bottom: 1px solid hsl(var(--border));
+  overflow-x: auto;
+}
+
+.kelta-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 150ms var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.kelta-tab:hover {
+  color: hsl(var(--foreground));
+}
+
+.kelta-tab[data-state='active'],
+.kelta-tab[aria-selected='true'] {
+  color: hsl(var(--foreground));
+  border-bottom-color: hsl(var(--primary));
+}
+
+.kelta-tab-count {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  line-height: 1;
+}
+
+.kelta-tab[data-state='active'] .kelta-tab-count,
+.kelta-tab[aria-selected='true'] .kelta-tab-count {
+  background: rgba(96, 165, 250, 0.15);
+  color: #93c5fd;
+}
+
+/* Breadcrumb stepper — 1px square nav buttons + "N of M" */
+.kelta-crumb-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: background 120ms var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.kelta-crumb-step:hover:not(:disabled) {
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+}
+
+.kelta-crumb-step:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.kelta-crumb-pos {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Section chevron rotation respects reduced motion */
+.kelta-chev {
+  transition: transform 200ms var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kelta-chev {
+    transition: none;
+  }
+}
+
+/* Inline copy-icon button used in field renderer + record header */
+.kelta-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 150ms var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    color 120ms var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.kelta-copy-host:hover .kelta-copy-btn,
+.kelta-copy-btn:focus-visible {
+  opacity: 1;
+}
+
+.kelta-copy-btn:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--accent));
+}

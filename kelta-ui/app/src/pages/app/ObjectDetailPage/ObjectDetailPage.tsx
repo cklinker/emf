@@ -12,16 +12,8 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Loader2, AlertCircle, Pencil, Copy, Trash2, MoreHorizontal } from 'lucide-react'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Loader2, AlertCircle, Pencil, Copy, Trash2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -33,17 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
 import { useRecord } from '@/hooks/useRecord'
@@ -51,10 +35,11 @@ import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { FieldRenderer } from '@/components/FieldRenderer'
-import { DetailSection } from '@/components/DetailSection'
 import { LayoutFieldSections } from '@/components/LayoutFieldSections'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { DetailTabBar } from '@/pages/ResourceDetailPage/DetailTabBar'
+import { RecordHeader, FieldSection, Crumb } from '@/components/detail'
+import type { RecordHeaderAction } from '@/components/detail'
 import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
@@ -425,6 +410,20 @@ export function ObjectDetailPage(): React.ReactElement {
 
   const isLoading = schemaLoading || recordLoading || permissionsLoading || layoutLoading
 
+  const headerActions = useMemo<RecordHeaderAction[]>(() => {
+    const list: RecordHeaderAction[] = []
+    if (permissions.canEdit) {
+      list.push({
+        label: 'Edit',
+        icon: <Pencil className="h-3.5 w-3.5" aria-hidden="true" />,
+        onClick: handleEdit,
+        variant: 'ghost',
+        testId: 'edit-button',
+      })
+    }
+    return list
+  }, [permissions.canEdit, handleEdit])
+
   // Loading state
   if (isLoading) {
     return (
@@ -478,90 +477,64 @@ export function ObjectDetailPage(): React.ReactElement {
   }
 
   return (
-    <div className="space-y-4 p-6">
-      {/* Breadcrumb */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to={`${basePath}/home`}>Home</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to={`${basePath}/o/${collectionName}`}>{collectionLabel}</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{recordTitle}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className="space-y-6 p-6">
+      <Crumb
+        trail={[
+          { label: 'Home', to: `${basePath}/home` },
+          { label: collectionLabel, to: `${basePath}/o/${collectionName}` },
+          { label: recordTitle },
+        ]}
+      />
 
-      {/* Record Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-[26px] font-bold tracking-[-0.01em] text-foreground">
-              {recordTitle}
-            </h1>
-            {mutations.remove.isPending && (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">{collectionLabel}</Badge>
-            <span className="font-mono text-xs text-muted-foreground">{recordId}</span>
-          </div>
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <RecordHeader
+            record={record}
+            recordId={recordId || ''}
+            collectionLabel={collectionLabel}
+            fallbackTitle={recordTitle}
+            actions={headerActions}
+            moreMenu={
+              <>
+                {permissions.canCreate && (
+                  <DropdownMenuItem onClick={handleClone}>
+                    <Copy className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Clone
+                  </DropdownMenuItem>
+                )}
+                {permissions.canCreate && permissions.canDelete && <DropdownMenuSeparator />}
+                {permissions.canDelete && (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={handleDelete}
+                    data-testid="delete-button"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
+              </>
+            }
+          />
+          {mutations.remove.isPending && (
+            <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              Deleting…
+            </div>
+          )}
         </div>
-
-        <div className="flex flex-shrink-0 items-center gap-2">
-          {/* Quick Actions menu (only shown when actions are configured) */}
+        <div className="flex-shrink-0 pt-1">
           <QuickActionsMenu
             collectionName={collectionName || ''}
             context="record"
             executionContext={quickActionContext}
           />
-          {permissions.canEdit && (
-            <Button size="sm" variant="outline" onClick={handleEdit} data-testid="edit-button">
-              <Pencil className="mr-1.5 h-3.5 w-3.5" />
-              Edit
-            </Button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" aria-label="More actions">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {permissions.canCreate && (
-                <DropdownMenuItem onClick={handleClone}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Clone
-                </DropdownMenuItem>
-              )}
-              {permissions.canCreate && permissions.canDelete && <DropdownMenuSeparator />}
-              {permissions.canDelete && (
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={handleDelete}
-                  data-testid="delete-button"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
       {/* Field Sections — use page layout sections when available, otherwise fall back to generic highlights + details */}
       {hasLayoutSections ? (
-        <div data-testid="field-values">
+        <div data-testid="field-values" className="space-y-4">
           <LayoutFieldSections
             sections={layout!.sections}
             schemaFields={fields}
@@ -571,12 +544,12 @@ export function ObjectDetailPage(): React.ReactElement {
           />
         </div>
       ) : (
-        <div data-testid="field-values">
+        <div data-testid="field-values" className="space-y-4">
           {/* Highlights Panel (fallback) */}
           {highlightFields.length > 0 && record && (
-            <Card>
-              <CardContent className="py-4">
-                <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-4">
+            <Card className="overflow-hidden rounded-xl border border-border bg-card">
+              <CardContent className="py-5">
+                <div className="grid grid-cols-2 gap-x-10 gap-y-5 md:grid-cols-4">
                   {highlightFields.map((field) => {
                     const value = record[field.name]
                     const isRef =
@@ -589,8 +562,8 @@ export function ObjectDetailPage(): React.ReactElement {
                         : undefined
 
                     return (
-                      <div key={field.name} className="space-y-1">
-                        <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <div key={field.name} className="min-w-0 space-y-1">
+                        <dt className="kelta-field-label">
                           {field.displayName || field.name}
                         </dt>
                         <dd className="text-sm font-medium">
@@ -613,11 +586,9 @@ export function ObjectDetailPage(): React.ReactElement {
             </Card>
           )}
 
-          <Separator />
-
           {/* Detail fields section (fallback) */}
           {detailFields.length > 0 && (
-            <DetailSection
+            <FieldSection
               title="Details"
               fields={detailFields}
               record={record}
@@ -631,7 +602,6 @@ export function ObjectDetailPage(): React.ReactElement {
       {/* Bottom tab bar: related lists + Notes + Attachments + System Information */}
       {schema && recordId && (
         <div className="space-y-4">
-          <Separator />
           <DetailTabBar
             relatedLists={tabBarRelatedLists}
             recordId={recordId}

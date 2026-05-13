@@ -2,7 +2,7 @@
  * LayoutFieldSections Component
  *
  * Renders record fields organized by a page layout's sections.
- * Each section becomes a collapsible DetailSection with the configured
+ * Each section becomes a collapsible FieldSection with the configured
  * column count, field placements, and label overrides.
  *
  * Falls through gracefully when layout fields reference schema fields
@@ -10,7 +10,7 @@
  */
 
 import React, { useMemo } from 'react'
-import { DetailSection } from '@/components/DetailSection'
+import { FieldSection } from '@/components/detail'
 import type { LayoutSectionDto, LayoutFieldPlacementDto } from '@/hooks/usePageLayout'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
@@ -29,7 +29,7 @@ export interface LayoutFieldSectionsProps {
 }
 
 /**
- * Maps layout field placements to FieldDefinition objects that DetailSection expects.
+ * Maps layout field placements to FieldDefinition objects that FieldSection expects.
  * Applies label overrides from the layout and preserves schema metadata (type, reference info).
  *
  * Fields are interleaved by column so that CSS grid auto-placement (left-to-right,
@@ -115,7 +115,7 @@ export function LayoutFieldSections({
         if (fields.length === 0) return null
 
         return (
-          <DetailSection
+          <FieldSection
             key={section.id}
             title={section.heading || 'Details'}
             fields={fields}
@@ -123,7 +123,7 @@ export function LayoutFieldSections({
             tenantSlug={tenantSlug}
             lookupDisplayMap={lookupDisplayMap}
             defaultCollapsed={section.collapsed}
-            columns={(section.columns as 1 | 2 | 3) || 2}
+            columns={(section.columns as 1 | 2 | 3 | 4) || 2}
           />
         )
       })}

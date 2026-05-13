@@ -20,9 +20,18 @@ import { useCollectionStore } from '@/context/CollectionStoreContext'
 import { parseDisplayColumns } from '@/utils/parseDisplayColumns'
 import { useI18n } from '@/context/I18nContext'
 import { useToast } from '@/components'
+import { cn } from '@/lib/utils'
 import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
 import type { Note, Attachment } from '@/hooks/useRecordContext'
 import type { ApiClient } from '@/services/apiClient'
+
+/**
+ * Shared className applied to every detail-page TabsTrigger so it picks up the
+ * handoff styling: primary-colored 2px underline on active + brand-toned count
+ * pill. The `!important` on `after:bg-primary` overrides the shadcn line variant
+ * which hardcodes `after:bg-foreground`.
+ */
+const DETAIL_TAB_TRIGGER = 'group/tab data-[state=active]:after:!bg-primary'
 
 const NOTES_TAB = '__notes__'
 const ATTACHMENTS_TAB = '__attachments__'
@@ -92,10 +101,34 @@ function RelatedListTabTrigger({ rl, count }: RelatedListTabTriggerProps): React
     : 'Related'
   const label = schema?.displayName ?? fallback
   return (
-    <TabsTrigger value={rl.id} data-testid={`detail-tab-${collectionName || 'related'}`}>
+    <TabsTrigger
+      value={rl.id}
+      data-testid={`detail-tab-${collectionName || 'related'}`}
+      className={DETAIL_TAB_TRIGGER}
+    >
       {label}
-      {typeof count === 'number' ? ` (${count})` : ''}
+      {typeof count === 'number' && <TabCountPill count={count} />}
     </TabsTrigger>
+  )
+}
+
+/**
+ * Brand-toned count pill that appears on a tab trigger. Inherits its active
+ * styling from the parent TabsTrigger's `data-state` via Tailwind group syntax,
+ * matching the handoff: muted by default, blue-tinted when the tab is active.
+ */
+function TabCountPill({ count }: { count: number }): React.ReactElement {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'ml-1 inline-flex h-[18px] items-center rounded-full px-1.5 text-[11px] font-semibold leading-none tabular-nums',
+        'bg-muted text-muted-foreground',
+        'group-data-[state=active]/tab:bg-blue-400/15 group-data-[state=active]/tab:text-blue-300'
+      )}
+    >
+      {count}
+    </span>
   )
 }
 
@@ -187,13 +220,27 @@ export function DetailTabBar({
             {sortedLists.map((rl) => (
               <RelatedListTabTrigger key={rl.id} rl={rl} count={counts[rl.id]} />
             ))}
-            <TabsTrigger value={NOTES_TAB} data-testid="detail-tab-notes">
-              Notes ({notes.length})
+            <TabsTrigger
+              value={NOTES_TAB}
+              data-testid="detail-tab-notes"
+              className={DETAIL_TAB_TRIGGER}
+            >
+              Notes
+              <TabCountPill count={notes.length} />
             </TabsTrigger>
-            <TabsTrigger value={ATTACHMENTS_TAB} data-testid="detail-tab-attachments">
-              Attachments ({attachments.length})
+            <TabsTrigger
+              value={ATTACHMENTS_TAB}
+              data-testid="detail-tab-attachments"
+              className={DETAIL_TAB_TRIGGER}
+            >
+              Attachments
+              <TabCountPill count={attachments.length} />
             </TabsTrigger>
-            <TabsTrigger value={SYSTEM_TAB} data-testid="detail-tab-system">
+            <TabsTrigger
+              value={SYSTEM_TAB}
+              data-testid="detail-tab-system"
+              className={DETAIL_TAB_TRIGGER}
+            >
               System Information
             </TabsTrigger>
           </TabsList>

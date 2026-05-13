@@ -1237,12 +1237,40 @@
   },
   "setup": {
     "title": "Einrichtung",
-    "searchPlaceholder": "Einrichtung durchsuchen...",
+    "subtitle": "Konfigurieren Sie Ihren Mandanten — Datenmodelle, Sicherheit, Automatisierung, Integrationen.",
+    "breadcrumbLabel": "Verwaltung",
+    "searchPlaceholder": "Einrichtung durchsuchen…",
+    "shortcutHint": "⌘K",
     "stats": {
-      "collections": "Sammlungen gesamt",
-      "users": "Benutzer gesamt",
-      "reports": "Berichte gesamt",
-      "dashboards": "Dashboards gesamt"
+      "collections": "Sammlungen",
+      "users": "Benutzer",
+      "reports": "Berichte",
+      "dashboards": "Dashboards"
+    },
+    "filters": {
+      "all": "Alle",
+      "core": "Kern",
+      "automation": "Automatisierung",
+      "platform": "Plattform"
+    },
+    "groups": {
+      "core": "Kernkonfiguration",
+      "automation": "Automatisierung & Integration",
+      "platform": "Plattform & Analytik"
+    },
+    "groupMeta": "{{sections}} Bereiche · {{items}} Einträge",
+    "pinned": "Angeheftet",
+    "recent": "Zuletzt besucht",
+    "addPin": "Anheften",
+    "removePin": "Lösen",
+    "emptyPinned": "Heften Sie häufig besuchte Elemente an.",
+    "emptyRecent": "Besuchte Einträge erscheinen hier.",
+    "relativeTime": {
+      "now": "jetzt",
+      "minutes": "vor {{count}} Min.",
+      "hours": "vor {{count}} Std.",
+      "yesterday": "gestern",
+      "days": "vor {{count}} T."
     },
     "categories": {
       "administration": "Verwaltung",
@@ -1253,6 +1281,16 @@
       "analytics": "Analytik",
       "uiCustomization": "UI & Anpassung",
       "platform": "Plattform"
+    },
+    "categoryDescriptions": {
+      "administration": "Identität, Zugriff und Berechtigungen",
+      "dataModel": "Was Ihr Mandant erfasst",
+      "security": "Richtlinien und Ereignisverlauf",
+      "automation": "Genehmigungen, Flows und Aufgaben",
+      "integration": "Apps, Anmeldedaten, APIs und Webhooks",
+      "analytics": "Dashboards und Berichte",
+      "uiCustomization": "Seiten, Menüs und Plugins",
+      "platform": "Pakete, Migrationen, Überwachung"
     }
   },
   "relatedRecords": {

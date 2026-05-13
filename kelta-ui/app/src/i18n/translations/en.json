@@ -1279,12 +1279,40 @@
   },
   "setup": {
     "title": "Setup",
-    "searchPlaceholder": "Search setup...",
+    "subtitle": "Configure your tenant — data models, security, automation, integrations. Everything that powers the runtime experience.",
+    "breadcrumbLabel": "Administration",
+    "searchPlaceholder": "Search setup… try \"password policy\", \"webhook\", \"tenant\"",
+    "shortcutHint": "⌘K",
     "stats": {
-      "collections": "Total Collections",
-      "users": "Total Users",
-      "reports": "Total Reports",
-      "dashboards": "Total Dashboards"
+      "collections": "Collections",
+      "users": "Users",
+      "reports": "Reports",
+      "dashboards": "Dashboards"
+    },
+    "filters": {
+      "all": "All",
+      "core": "Core",
+      "automation": "Automation",
+      "platform": "Platform"
+    },
+    "groups": {
+      "core": "Core Configuration",
+      "automation": "Automation & Integration",
+      "platform": "Platform & Analytics"
+    },
+    "groupMeta": "{{sections}} sections · {{items}} items",
+    "pinned": "Pinned",
+    "recent": "Recently visited",
+    "addPin": "Pin",
+    "removePin": "Unpin",
+    "emptyPinned": "Pin setup items you visit often.",
+    "emptyRecent": "Items you visit will appear here.",
+    "relativeTime": {
+      "now": "now",
+      "minutes": "{{count}}m ago",
+      "hours": "{{count}}h ago",
+      "yesterday": "yesterday",
+      "days": "{{count}}d ago"
     },
     "categories": {
       "administration": "Administration",
@@ -1295,6 +1323,16 @@
       "analytics": "Analytics",
       "uiCustomization": "UI & Customization",
       "platform": "Platform"
+    },
+    "categoryDescriptions": {
+      "administration": "Identity, access, and permissions",
+      "dataModel": "Define what your tenant tracks",
+      "security": "Policy, sign-in, and event history",
+      "automation": "Approvals, flows, and scheduled jobs",
+      "integration": "Apps, credentials, APIs, and webhooks",
+      "analytics": "Dashboards and reports",
+      "uiCustomization": "Pages, menus, and plugins",
+      "platform": "Packages, migrations, monitoring"
     }
   },
   "relatedRecords": {

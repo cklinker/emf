@@ -65,4 +65,53 @@ test.describe("Setup Home", () => {
     const statCards = await setupPage.getStatCards();
     expect(statCards.length).toBeGreaterThan(0);
   });
+
+  test("filter tab narrows the visible groups", async ({ page }) => {
+    const setupPage = new SetupHomePage(page, tenantSlug);
+    await setupPage.goto();
+
+    await expect(setupPage.group("core")).toBeVisible();
+    await expect(setupPage.group("automation")).toBeVisible();
+
+    await setupPage.filterTab("core").click();
+
+    await expect(setupPage.group("core")).toBeVisible();
+    await expect(setupPage.group("automation")).toBeHidden();
+    await expect(setupPage.group("platform")).toBeHidden();
+  });
+
+  test("pinning an item persists across reload", async ({ page }) => {
+    const setupPage = new SetupHomePage(page, tenantSlug);
+    await setupPage.goto();
+    await setupPage.clearLocalShortcuts();
+    await page.reload();
+    await setupPage.waitForPageLoad();
+
+    const card = page.locator('[data-testid="setup-category-dataModel"]');
+    await card.hover();
+    await setupPage.pinButton("/collections").click();
+
+    await expect(setupPage.pinnedChip("/collections")).toBeVisible();
+
+    await page.reload();
+    await setupPage.waitForPageLoad();
+
+    await expect(setupPage.pinnedChip("/collections")).toBeVisible();
+  });
+
+  test("visiting a setup item adds it to recently visited", async ({
+    page,
+  }) => {
+    const setupPage = new SetupHomePage(page, tenantSlug);
+    await setupPage.goto();
+    await setupPage.clearLocalShortcuts();
+    await page.reload();
+    await setupPage.waitForPageLoad();
+
+    await setupPage.clickItem("collections");
+    await page.waitForURL(/\/collections/);
+
+    await setupPage.goto();
+    await expect(setupPage.recentChip("/collections")).toBeVisible();
+  });
 });

@@ -5,7 +5,6 @@ import io.kelta.worker.repository.GovernorLimitsRepository;
 import io.kelta.worker.service.S3StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,7 +30,6 @@ import java.util.*;
  */
 @RestController
 @RequestMapping("/api/attachments")
-@ConditionalOnBean(S3StorageService.class)
 public class AttachmentUploadController {
 
     private static final Logger log = LoggerFactory.getLogger(AttachmentUploadController.class);
@@ -90,6 +88,12 @@ public class AttachmentUploadController {
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestHeader("X-User-Email") String userEmail,
             @RequestBody Map<String, Object> body) {
+
+        if (!storageService.isEnabled()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                    JsonApiResponseBuilder.error("503", "Storage unavailable",
+                            "S3 storage is not enabled on this server"));
+        }
 
         String fileName = getStringRequired(body, "fileName");
         String contentType = getStringRequired(body, "contentType");
@@ -194,6 +198,12 @@ public class AttachmentUploadController {
             @PathVariable String id,
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestHeader("X-User-Email") String userEmail) {
+
+        if (!storageService.isEnabled()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                    JsonApiResponseBuilder.error("503", "Storage unavailable",
+                            "S3 storage is not enabled on this server"));
+        }
 
         // Look up the attachment
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_ATTACHMENT, id, tenantId);

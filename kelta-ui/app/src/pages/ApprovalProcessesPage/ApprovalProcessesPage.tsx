@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Braces } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import {
@@ -13,6 +14,7 @@ import type { LogColumn } from '../../components'
 import type { CreateApprovalProcessRequest } from '@kelta/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { FieldExpressionPicker } from '../../components/FieldExpressionPicker'
 
 interface ApprovalProcess {
   id: string
@@ -123,7 +125,9 @@ function ApprovalProcessForm({
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [entryCriteriaPickerOpen, setEntryCriteriaPickerOpen] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const entryCriteriaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     nameInputRef.current?.focus()
@@ -177,6 +181,20 @@ function ApprovalProcessForm({
     },
     [onCancel]
   )
+
+  const handleEntryCriteriaInsert = useCallback((token: string) => {
+    const el = entryCriteriaRef.current
+    const start = el?.selectionStart ?? el?.value.length ?? 0
+    const end = el?.selectionEnd ?? el?.value.length ?? 0
+    const current = el?.value ?? ''
+    const next = current.slice(0, start) + token + current.slice(end)
+    setFormData((prev) => ({ ...prev, entryCriteria: next }))
+    setEntryCriteriaPickerOpen(false)
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(start + token.length, start + token.length)
+    })
+  }, [])
 
   const title = isEditing ? 'Edit Approval Process' : 'Create Approval Process'
 
@@ -308,13 +326,26 @@ function ApprovalProcessForm({
             </div>
 
             <div className="flex flex-col gap-2">
-              <label
-                htmlFor="approval-process-entry-criteria"
-                className="text-sm font-medium text-foreground"
-              >
-                Entry Criteria
-              </label>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="approval-process-entry-criteria"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Entry Criteria
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setEntryCriteriaPickerOpen(true)}
+                  disabled={isSubmitting}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="entry-criteria-insert-field"
+                >
+                  <Braces className="h-3.5 w-3.5" />
+                  Insert field
+                </button>
+              </div>
               <textarea
+                ref={entryCriteriaRef}
                 id="approval-process-entry-criteria"
                 className={cn(
                   'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
@@ -336,6 +367,17 @@ function ApprovalProcessForm({
                 </span>
               )}
             </div>
+
+            <FieldExpressionPicker
+              open={entryCriteriaPickerOpen}
+              onOpenChange={setEntryCriteriaPickerOpen}
+              rootCollectionId={formData.collectionId || null}
+              mode="expression"
+              allowedTypes={['boolean']}
+              onInsert={handleEntryCriteriaInsert}
+              title="Insert field or function"
+              testId="approval-entry-criteria-picker"
+            />
 
             <div className="flex flex-col gap-2">
               <label

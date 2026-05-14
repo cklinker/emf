@@ -1,10 +1,12 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Braces } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../LoadingSpinner'
+import { FieldExpressionPicker } from '../FieldExpressionPicker'
 import type { CollectionValidationRule } from '../../types/collections'
 
 const validationRuleSchema = z.object({
@@ -48,6 +50,7 @@ const inputClasses = cn(
 const errorInputClasses = 'border-destructive focus:border-destructive focus:ring-destructive/25'
 
 export function ValidationRuleEditor({
+  collectionId,
   rule,
   onSave,
   onCancel,
@@ -55,11 +58,14 @@ export function ValidationRuleEditor({
 }: ValidationRuleEditorProps): React.ReactElement {
   const { t } = useI18n()
   const isEditMode = !!rule
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const formulaTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<ValidationRuleFormData>({
     resolver: zodResolver(validationRuleSchema),
@@ -99,6 +105,23 @@ export function ValidationRuleEditor({
       })
     },
     [onSave]
+  )
+
+  const handleFormulaInsert = useCallback(
+    (token: string) => {
+      const el = formulaTextareaRef.current
+      const start = el?.selectionStart ?? el?.value.length ?? 0
+      const end = el?.selectionEnd ?? el?.value.length ?? 0
+      const current = el?.value ?? ''
+      const next = current.slice(0, start) + token + current.slice(end)
+      setValue('errorConditionFormula', next, { shouldDirty: true, shouldValidate: true })
+      setPickerOpen(false)
+      requestAnimationFrame(() => {
+        el?.focus()
+        el?.setSelectionRange(start + token.length, start + token.length)
+      })
+    },
+    [setValue]
   )
 
   return (
@@ -167,30 +190,52 @@ export function ValidationRuleEditor({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label
-          htmlFor="rule-formula"
-          className="flex items-center gap-1 text-sm font-medium text-foreground"
-        >
-          {t('validationRules.formula')}
-          <span className="text-destructive font-semibold" aria-hidden="true">
-            *
-          </span>
-        </label>
-        <textarea
-          id="rule-formula"
-          className={cn(
-            inputClasses,
-            'resize-y font-mono text-sm',
-            errors.errorConditionFormula && errorInputClasses
-          )}
-          placeholder={t('validationRules.formulaPlaceholder')}
-          disabled={isSubmitting}
-          rows={4}
-          aria-required="true"
-          aria-invalid={!!errors.errorConditionFormula}
-          data-testid="rule-formula-input"
-          {...register('errorConditionFormula')}
-        />
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="rule-formula"
+            className="flex items-center gap-1 text-sm font-medium text-foreground"
+          >
+            {t('validationRules.formula')}
+            <span className="text-destructive font-semibold" aria-hidden="true">
+              *
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            disabled={isSubmitting}
+            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid="rule-formula-insert-field"
+          >
+            <Braces className="h-3.5 w-3.5" />
+            Insert field
+          </button>
+        </div>
+        {(() => {
+          const { ref: rhfRef, ...rest } = register('errorConditionFormula')
+          return (
+            <textarea
+              id="rule-formula"
+              ref={(el) => {
+                rhfRef(el)
+                ;(formulaTextareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current =
+                  el
+              }}
+              className={cn(
+                inputClasses,
+                'resize-y font-mono text-sm',
+                errors.errorConditionFormula && errorInputClasses
+              )}
+              placeholder={t('validationRules.formulaPlaceholder')}
+              disabled={isSubmitting}
+              rows={4}
+              aria-required="true"
+              aria-invalid={!!errors.errorConditionFormula}
+              data-testid="rule-formula-input"
+              {...rest}
+            />
+          )
+        })()}
         {errors.errorConditionFormula && (
           <span className="flex items-center gap-1 text-sm text-destructive mt-1" role="alert">
             {errors.errorConditionFormula.message}
@@ -323,6 +368,17 @@ export function ValidationRuleEditor({
           )}
         </button>
       </div>
+
+      <FieldExpressionPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        rootCollectionId={collectionId}
+        mode="expression"
+        allowedTypes={['boolean']}
+        onInsert={handleFormulaInsert}
+        title="Insert field or function"
+        testId="validation-rule-formula-picker"
+      />
     </form>
   )
 }

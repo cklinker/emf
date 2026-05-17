@@ -7,3 +7,13 @@ storage:
   disk:
     directory: /policies
     watchForChanges: true
+
+engine:
+  # Dev/CI only: the static allow-all policies in ./policies declare no
+  # `scope:`. The gateway and worker issue Cerbos checks scoped to the
+  # tenant id (`.withScope(tenantId)`). Cerbos 0.40 denies a scoped
+  # request when no policy exists at that exact scope unless lenient
+  # scope search is enabled — with it, Cerbos falls back up the scope
+  # chain to the root (unscoped) policy. Production provisions real
+  # per-tenant scoped policies, which still take precedence over root.
+  lenientScopeSearch: true

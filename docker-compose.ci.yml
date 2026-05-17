@@ -3,6 +3,11 @@
 # Production images continue to be built from each service's original Dockerfile
 # by build-and-publish-containers.yml on main.
 #
+# Concurrency note: the e2e job in ci.yml uses a global `e2e-shared-runner`
+# concurrency group with cancel-in-progress: false so only one PR runs the
+# stack at a time on the shared k8s-runner Docker daemon. This avoids host
+# port collisions on 5432/6379/4222/8080/etc.
+#
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.ci.yml build
 #   docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait

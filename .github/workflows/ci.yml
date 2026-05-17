@@ -312,9 +312,14 @@ jobs:
     if: needs.changes.outputs.e2e == 'true' || needs.changes.outputs.workflows == 'true'
     runs-on: k8s-runner-integration
     timeout-minutes: 45
+    # Global concurrency: only one e2e run at a time across all PRs.
+    # The stack binds fixed host ports (5432/6379/4222/8080/...) and the
+    # k8s-runner shares a Docker daemon, so parallel runs would collide.
+    # cancel-in-progress: false so a queued PR run still gets a turn after
+    # the current one finishes.
     concurrency:
-      group: e2e-${{ github.head_ref || github.ref }}
-      cancel-in-progress: true
+      group: e2e-shared-runner
+      cancel-in-progress: false
     env:
       COMPOSE_PROJECT_NAME: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:

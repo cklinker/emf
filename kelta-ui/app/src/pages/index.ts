@@ -276,6 +276,10 @@ export type { AiSettingsPageProps } from './AiSettingsPage'
 export { EmailSettingsPage } from './EmailSettingsPage'
 export type { EmailSettingsPageProps } from './EmailSettingsPage'
 
+// MapSettingsPage - tenant Mapbox token + style for AddressMap rendering
+export { MapSettingsPage } from './MapSettingsPage'
+export type { MapSettingsPageProps } from './MapSettingsPage'
+
 // PasswordPolicyPage - Password policy configuration page
 export { PasswordPolicyPanel as PasswordPolicyPage } from './SecuritySettingsPage/PasswordPolicyPanel'
 

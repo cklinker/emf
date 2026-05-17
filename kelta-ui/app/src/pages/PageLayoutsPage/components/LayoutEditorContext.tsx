@@ -8,6 +8,7 @@
  */
 
 import React, { createContext, useContext, useReducer, useCallback, useMemo } from 'react'
+import type { RailBlockDto, RecordHeaderConfigDto } from '@/hooks/usePageLayout'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,6 +87,10 @@ export interface LayoutEditorState {
   collectionId: string | null
   sections: EditorSection[]
   relatedLists: EditorRelatedList[]
+  /** Detail-page record header overrides; null/undefined = auto-derive */
+  headerConfig: RecordHeaderConfigDto | null
+  /** Detail-page side-rail blocks; null/empty = auto-derive system info card */
+  railBlocks: RailBlockDto[] | null
   availableFields: AvailableField[]
   placedFieldIds: Set<string>
   selectedSectionId: string | null
@@ -103,6 +108,8 @@ const initialState: LayoutEditorState = {
   collectionId: null,
   sections: [],
   relatedLists: [],
+  headerConfig: null,
+  railBlocks: null,
   availableFields: [],
   placedFieldIds: new Set<string>(),
   selectedSectionId: null,
@@ -125,8 +132,12 @@ type LayoutEditorAction =
         collectionId: string
         sections: EditorSection[]
         relatedLists: EditorRelatedList[]
+        headerConfig: RecordHeaderConfigDto | null
+        railBlocks: RailBlockDto[] | null
       }
     }
+  | { type: 'SET_HEADER_CONFIG'; payload: { headerConfig: RecordHeaderConfigDto | null } }
+  | { type: 'SET_RAIL_BLOCKS'; payload: { railBlocks: RailBlockDto[] | null } }
   | { type: 'SET_AVAILABLE_FIELDS'; payload: { fields: AvailableField[] } }
   | { type: 'ADD_SECTION'; payload: { sectionType?: string } }
   | { type: 'REMOVE_SECTION'; payload: { sectionId: string } }
@@ -218,18 +229,36 @@ function layoutEditorReducer(
     // -- Initialization (no undo) ------------------------------------------
 
     case 'SET_LAYOUT': {
-      const { collectionId, sections, relatedLists } = action.payload
+      const { collectionId, sections, relatedLists, headerConfig, railBlocks } = action.payload
       return {
         ...state,
         collectionId,
         sections,
         relatedLists,
+        headerConfig,
+        railBlocks,
         placedFieldIds: computePlacedFieldIds(sections),
         isDirty: false,
         undoStack: [],
         redoStack: [],
         selectedSectionId: null,
         selectedFieldPlacementId: null,
+      }
+    }
+
+    case 'SET_HEADER_CONFIG': {
+      return {
+        ...state,
+        headerConfig: action.payload.headerConfig,
+        isDirty: true,
+      }
+    }
+
+    case 'SET_RAIL_BLOCKS': {
+      return {
+        ...state,
+        railBlocks: action.payload.railBlocks,
+        isDirty: true,
       }
     }
 
@@ -638,9 +667,13 @@ export interface LayoutEditorContextValue {
   setLayout: (
     collectionId: string,
     sections: EditorSection[],
-    relatedLists: EditorRelatedList[]
+    relatedLists: EditorRelatedList[],
+    headerConfig?: RecordHeaderConfigDto | null,
+    railBlocks?: RailBlockDto[] | null
   ) => void
   setAvailableFields: (fields: AvailableField[]) => void
+  setHeaderConfig: (headerConfig: RecordHeaderConfigDto | null) => void
+  setRailBlocks: (railBlocks: RailBlockDto[] | null) => void
   undo: () => void
   redo: () => void
   markSaved: () => void
@@ -777,14 +810,31 @@ export function LayoutEditorProvider({ children }: LayoutEditorProviderProps): R
   }, [])
 
   const setLayout = useCallback(
-    (collectionId: string, sections: EditorSection[], relatedLists: EditorRelatedList[]) => {
-      dispatch({ type: 'SET_LAYOUT', payload: { collectionId, sections, relatedLists } })
+    (
+      collectionId: string,
+      sections: EditorSection[],
+      relatedLists: EditorRelatedList[],
+      headerConfig: RecordHeaderConfigDto | null = null,
+      railBlocks: RailBlockDto[] | null = null
+    ) => {
+      dispatch({
+        type: 'SET_LAYOUT',
+        payload: { collectionId, sections, relatedLists, headerConfig, railBlocks },
+      })
     },
     []
   )
 
   const setAvailableFields = useCallback((fields: AvailableField[]) => {
     dispatch({ type: 'SET_AVAILABLE_FIELDS', payload: { fields } })
+  }, [])
+
+  const setHeaderConfig = useCallback((headerConfig: RecordHeaderConfigDto | null) => {
+    dispatch({ type: 'SET_HEADER_CONFIG', payload: { headerConfig } })
+  }, [])
+
+  const setRailBlocks = useCallback((railBlocks: RailBlockDto[] | null) => {
+    dispatch({ type: 'SET_RAIL_BLOCKS', payload: { railBlocks } })
   }, [])
 
   const undo = useCallback(() => {
@@ -820,6 +870,8 @@ export function LayoutEditorProvider({ children }: LayoutEditorProviderProps): R
       setPreviewDevice,
       setLayout,
       setAvailableFields,
+      setHeaderConfig,
+      setRailBlocks,
       undo,
       redo,
       markSaved,
@@ -844,6 +896,8 @@ export function LayoutEditorProvider({ children }: LayoutEditorProviderProps): R
       setPreviewDevice,
       setLayout,
       setAvailableFields,
+      setHeaderConfig,
+      setRailBlocks,
       undo,
       redo,
       markSaved,

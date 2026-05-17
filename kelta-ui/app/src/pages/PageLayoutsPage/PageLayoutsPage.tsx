@@ -22,6 +22,7 @@ import { AssignmentRulesEditor } from './components/AssignmentRulesEditor'
 import { LayoutEditorList } from './components/LayoutEditorList'
 import type { FilterExpression } from '@/components/FilterBuilder'
 import { AdminDataTable, type AdminColumn } from '@/components/AdminDataTable'
+import type { RailBlockDto, RecordHeaderConfigDto } from '@/hooks/usePageLayout'
 
 import {
   LayoutEditorProvider,
@@ -31,6 +32,7 @@ import {
   PropertyPanel,
   MobilePreview,
   RelatedListPanel,
+  DetailExtrasPanel,
 } from './components'
 import type {
   EditorSection,
@@ -82,6 +84,8 @@ interface PageLayoutDetail {
   defaultSortField?: string | null
   defaultSortDirection?: 'ASC' | 'DESC' | null
   defaultRowLimit?: number | null
+  headerConfig?: RecordHeaderConfigDto | null
+  railBlocks?: RailBlockDto[] | null
   createdAt: string
   updatedAt: string
 }
@@ -712,7 +716,13 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
       })
 
       const relatedLists = (layoutDetail.relatedLists ?? []).map(apiRelatedListToEditor)
-      setLayout(layoutDetail.collectionId, sections, relatedLists)
+      setLayout(
+        layoutDetail.collectionId,
+        sections,
+        relatedLists,
+        layoutDetail.headerConfig ?? null,
+        layoutDetail.railBlocks ?? null
+      )
 
       // Also populate the available fields palette
       const fields: AvailableField[] = collectionDetail.fields.map((f) => ({
@@ -761,18 +771,35 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
       // changed. The editor doesn't currently expose layout-level attributes
       // for editing, so this is a near-perfect skip in practice — but the
       // diff guards future edits, too.
+      // Stable JSON serialization for change-detection on JSONB attributes.
+      // `headerConfig` + `railBlocks` are deep objects edited in-place by the
+      // DetailExtrasPanel; comparing stringified JSON is good enough because
+      // the editor always produces canonical shapes (no key reordering).
+      const headerConfigJson = state.headerConfig ? JSON.stringify(state.headerConfig) : null
+      const originalHeaderConfigJson = layoutDetail?.headerConfig
+        ? JSON.stringify(layoutDetail.headerConfig)
+        : null
+      const railBlocksJson = state.railBlocks ? JSON.stringify(state.railBlocks) : null
+      const originalRailBlocksJson = layoutDetail?.railBlocks
+        ? JSON.stringify(layoutDetail.railBlocks)
+        : null
+
       const layoutPayload = {
         name: layoutDetail!.name,
         description: layoutDetail!.description ?? '',
         layoutType: layoutDetail!.layoutType,
         isDefault: layoutDetail!.isDefault,
+        headerConfig: state.headerConfig,
+        railBlocks: state.railBlocks,
       }
       const layoutChanged =
         !layoutDetail ||
         layoutPayload.name !== layoutDetail.name ||
         layoutPayload.description !== (layoutDetail.description ?? '') ||
         layoutPayload.layoutType !== layoutDetail.layoutType ||
-        layoutPayload.isDefault !== layoutDetail.isDefault
+        layoutPayload.isDefault !== layoutDetail.isDefault ||
+        headerConfigJson !== originalHeaderConfigJson ||
+        railBlocksJson !== originalRailBlocksJson
       if (layoutChanged) {
         await apiClient.putResource(`/api/page-layouts/${layoutId}`, layoutPayload)
       }
@@ -1065,9 +1092,8 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
         <MobilePreview />
         <div className="flex w-[300px] flex-col overflow-y-auto border-l border-border bg-background max-md:w-full max-md:max-h-[300px] max-md:border-l-0 max-md:border-t">
           <PropertyPanel />
-          <div className="border-t border-border">
-            <RelatedListPanel />
-          </div>
+          <RelatedListPanel />
+          {layoutDetail?.layoutType === 'DETAIL' && <DetailExtrasPanel />}
         </div>
       </div>
     </div>

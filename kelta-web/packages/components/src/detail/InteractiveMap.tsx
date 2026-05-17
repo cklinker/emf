@@ -11,17 +11,17 @@
  * available; otherwise it stays with the cheaper static-image rendering.
  */
 
-import React, { Suspense } from 'react'
-import { cn } from './_utils'
+import React, { Suspense } from 'react';
+import { cn } from './_utils';
 
-const InteractiveMapImpl = React.lazy(() => import('./InteractiveMap.impl'))
+const InteractiveMapImpl = React.lazy(() => import('./InteractiveMap.impl'));
 
 export interface InteractiveMapProps {
-  lat: number
-  lng: number
-  label?: string
-  zoom?: number
-  className?: string
+  lat: number;
+  lng: number;
+  label?: string;
+  zoom?: number;
+  className?: string;
 }
 
 export function InteractiveMap(props: InteractiveMapProps): React.ReactElement {
@@ -43,21 +43,18 @@ export function InteractiveMap(props: InteractiveMapProps): React.ReactElement {
         <InteractiveMapImpl {...props} />
       </Suspense>
     </ErrorBoundary>
-  )
+  );
 }
 
 interface ErrorBoundaryState {
-  hasError: boolean
+  hasError: boolean;
 }
 
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  ErrorBoundaryState
-> {
-  state: ErrorBoundaryState = { hasError: false }
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): ErrorBoundaryState {
-    return { hasError: true }
+    return { hasError: true };
   }
 
   render(): React.ReactNode {
@@ -66,8 +63,8 @@ class ErrorBoundary extends React.Component<
         <div className="flex h-full w-full items-center justify-center bg-muted text-[11px] text-muted-foreground">
           Map unavailable — install `maplibre-gl` to enable interactive maps.
         </div>
-      )
+      );
     }
-    return this.props.children
+    return this.props.children;
   }
 }

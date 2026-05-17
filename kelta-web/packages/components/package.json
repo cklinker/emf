@@ -27,17 +27,24 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "lucide-react": "^0.500.0",
+    "maplibre-gl": "^4.0.0 || ^5.0.0",
     "radix-ui": "^1.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.0.0",
     "react-router-dom": "^7.0.0"
   },
+  "peerDependenciesMeta": {
+    "maplibre-gl": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@tanstack/react-query": "^5.24.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",
+    "maplibre-gl": "^5.0.0",
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

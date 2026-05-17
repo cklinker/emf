@@ -15,6 +15,7 @@ import { ChevronRight, MapPin } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { cn } from './_utils';
+import { InteractiveMap } from './InteractiveMap';
 import type { DetailField, FieldSectionRenderContext } from './FieldSection';
 
 export interface AddressMapProps<F extends DetailField = DetailField> {
@@ -27,6 +28,13 @@ export interface AddressMapProps<F extends DetailField = DetailField> {
   lookupDisplayMap?: Record<string, Record<string, string>>;
   defaultCollapsed?: boolean;
   renderField: (ctx: FieldSectionRenderContext<F>) => React.ReactNode;
+  /**
+   * When true and coordinates are present, render a pan/zoom-capable map
+   * (lazy-loaded maplibre-gl). Defaults to the cheaper static-image
+   * rendering so most pages don't pay the bundle cost. Requires the
+   * consumer to install `maplibre-gl` and import its CSS.
+   */
+  interactive?: boolean;
 }
 
 interface GeoPoint {
@@ -84,6 +92,7 @@ export function AddressMap<F extends DetailField = DetailField>({
   lookupDisplayMap,
   defaultCollapsed = false,
   renderField,
+  interactive = false,
 }: AddressMapProps<F>): React.ReactElement | null {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
   if (fields.length === 0) return null;
@@ -151,7 +160,18 @@ export function AddressMap<F extends DetailField = DetailField>({
             </div>
 
             {point ? (
-              <StaticMap point={point} label={mapLabel || 'Address'} />
+              interactive ? (
+                <div className="relative h-[220px] overflow-hidden rounded-[10px]">
+                  <InteractiveMap
+                    lat={point.lat}
+                    lng={point.lng}
+                    label={mapLabel || 'Address'}
+                    className="h-full w-full"
+                  />
+                </div>
+              ) : (
+                <StaticMap point={point} label={mapLabel || 'Address'} />
+              )
             ) : (
               <MapPlaceholder label={mapLabel || 'Address'} />
             )}

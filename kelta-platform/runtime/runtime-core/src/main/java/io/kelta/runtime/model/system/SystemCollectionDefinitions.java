@@ -296,6 +296,8 @@ public final class SystemCollectionDefinitions {
                 .withDefault("ASC"))
             .addField(FieldDefinition.integer("defaultRowLimit").withColumnName("default_row_limit")
                 .withDefault(50))
+            .addField(FieldDefinition.json("headerConfig").withColumnName("header_config"))
+            .addField(FieldDefinition.json("railBlocks").withColumnName("rail_blocks"))
             .build();
     }
 

@@ -38,7 +38,13 @@ import { FieldRenderer } from '@/components/FieldRenderer'
 import { LayoutFieldSections } from '@/components/LayoutFieldSections'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { DetailTabBar } from '@/pages/ResourceDetailPage/DetailTabBar'
-import { RecordHeader, FieldSection, Crumb, MetadataCard } from '@/components/detail'
+import {
+  RecordHeader,
+  FieldSection,
+  Crumb,
+  MetadataCard,
+  RailRenderer,
+} from '@/components/detail'
 import type {
   RecordHeaderAction,
   RecordHeaderMetaField,
@@ -532,15 +538,33 @@ export function ObjectDetailPage(): React.ReactElement {
     return list
   }, [permissions.canEdit, handleEdit])
 
-  const headerMeta = useMemo<RecordHeaderMetaField[]>(
-    () => (record ? deriveMetaFields(fields, record) : []),
-    [fields, record]
-  )
+  // Prefer layout-driven header config; fall back to auto-derived meta row
+  // when admins haven't configured one. metaFields on the layout reference
+  // record fields by name, so we attach the same icon-derivation logic that
+  // powers the auto-derive path.
+  const headerMeta = useMemo<RecordHeaderMetaField[]>(() => {
+    if (!record) return []
+    const fromLayout = layout?.headerConfig?.metaFields
+    if (fromLayout && fromLayout.length > 0) {
+      return fromLayout
+        .filter((m) => {
+          const v = record[m.key]
+          return v !== null && v !== undefined && v !== ''
+        })
+        .map((m) => ({ key: m.key, prefix: m.prefix, icon: metaIconFor(m.key) }))
+    }
+    return deriveMetaFields(fields, record)
+  }, [fields, record, layout?.headerConfig])
+
+  const headerTitleFields = layout?.headerConfig?.titleFields
+  const headerAvatarFrom = layout?.headerConfig?.avatarFrom
 
   const systemRows = useMemo(
     () => (record ? deriveSystemRows(record, getUserDisplay) : []),
     [record, getUserDisplay]
   )
+
+  const railBlocks = layout?.railBlocks ?? null
 
   // Loading state
   if (isLoading) {
@@ -611,7 +635,11 @@ export function ObjectDetailPage(): React.ReactElement {
             recordId={recordId || ''}
             collectionLabel={collectionLabel}
             fallbackTitle={recordTitle}
-            config={{ metaFields: headerMeta }}
+            config={{
+              titleFields: headerTitleFields,
+              avatarFrom: headerAvatarFrom,
+              metaFields: headerMeta,
+            }}
             actions={headerActions}
             moreMenu={
               <>
@@ -721,13 +749,16 @@ export function ObjectDetailPage(): React.ReactElement {
           </div>
         )}
 
-        {/* Right rail — currently auto-derives a single MetadataCard from
-            system fields. StatStrip/ScoreCard/TagsCard/AICard/Timeline blocks
-            land here once the layout-config admin UI ships. */}
+        {/* Right rail — layout-configured blocks when present; otherwise a
+            single auto-derived system-info MetadataCard. */}
         <aside className="space-y-4">
-          <MetadataCard
-            config={{ title: 'System information', rows: systemRows }}
-          />
+          {railBlocks && railBlocks.length > 0 ? (
+            <RailRenderer blocks={railBlocks} />
+          ) : (
+            <MetadataCard
+              config={{ title: 'System information', rows: systemRows }}
+            />
+          )}
         </aside>
       </div>
 

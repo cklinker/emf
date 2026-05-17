@@ -76,6 +76,31 @@ export interface LayoutRuleDto {
   sortOrder: number
 }
 
+/**
+ * Record-detail header configuration (handoff). When NULL on the layout, the
+ * renderer auto-derives sensible defaults from the record's contact-ish
+ * fields. Shape matches `RecordHeaderConfig` in `@/components/detail`.
+ */
+export interface RecordHeaderConfigDto {
+  titleFields?: string[]
+  avatarFrom?: string[]
+  metaFields?: Array<{ key: string; icon?: string; prefix?: string }>
+}
+
+/**
+ * Side-rail block configuration. Each block carries a discriminating `kind`
+ * + a `config` payload matching the corresponding component's props. The
+ * renderer dispatches on `kind` and silently ignores unknown variants so
+ * adding a new block kind on the server doesn't crash older clients.
+ */
+export type RailBlockDto =
+  | { kind: 'metadataCard'; config: { title: string; rows: Array<{ label: string; value: string; mono?: boolean }> } }
+  | { kind: 'statStrip'; config: { tiles: Array<Record<string, unknown>> } }
+  | { kind: 'scoreCard'; config: Record<string, unknown> }
+  | { kind: 'tagsCard'; config: { title: string; tags: Array<{ label: string; tone?: string }> } }
+  | { kind: 'aiCard'; config: { title: string; summary: string; actions?: Array<{ label: string }> } }
+  | { kind: 'timeline'; config: { title: string; events: Array<Record<string, unknown>> } }
+
 export interface PageLayoutDto {
   id: string
   collectionId: string
@@ -86,6 +111,10 @@ export interface PageLayoutDto {
   sections: LayoutSectionDto[]
   relatedLists: LayoutRelatedListDto[]
   rules: LayoutRuleDto[]
+  /** When set, overrides the auto-derived RecordHeader meta row + actions */
+  headerConfig: RecordHeaderConfigDto | null
+  /** When non-empty, replaces the auto-derived rail (system-info MetadataCard) */
+  railBlocks: RailBlockDto[] | null
   createdAt: string
   updatedAt: string
 }

@@ -33,11 +33,17 @@ public class PasswordPolicyService {
 
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
+    private final WorkerClient workerClient;
+    private final io.kelta.auth.config.AuthProperties authProperties;
     private Set<String> commonPasswords = Set.of();
 
-    public PasswordPolicyService(JdbcTemplate jdbcTemplate, PasswordEncoder passwordEncoder) {
+    public PasswordPolicyService(JdbcTemplate jdbcTemplate, PasswordEncoder passwordEncoder,
+                                  WorkerClient workerClient,
+                                  io.kelta.auth.config.AuthProperties authProperties) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
+        this.workerClient = workerClient;
+        this.authProperties = authProperties;
     }
 
     @PostConstruct
@@ -275,7 +281,34 @@ public class PasswordPolicyService {
                 );
                 log.warn("Account locked for user {}: {} failed attempts, locked until {}",
                         userId, attempts, lockedUntil);
+                sendAccountLockedEmail(userId, lockedUntil);
             }
+        }
+    }
+
+    private void sendAccountLockedEmail(String userId, Instant lockedUntil) {
+        try {
+            var rows = jdbcTemplate.queryForList(
+                    "SELECT pu.email, pu.first_name, pu.tenant_id, t.name AS tenant_name "
+                            + "FROM platform_user pu JOIN tenant t ON t.id = pu.tenant_id "
+                            + "WHERE pu.id = ?",
+                    userId
+            );
+            if (rows.isEmpty()) return;
+            var row = rows.get(0);
+            String resetUrl = authProperties.getUiBaseUrl() + "/forgot-password";
+            workerClient.sendTemplateEmail(
+                    (String) row.get("tenant_id"),
+                    (String) row.get("email"),
+                    "user.account_locked",
+                    java.util.Map.of(
+                            "tenantName", row.getOrDefault("tenant_name", "Kelta"),
+                            "firstName",  row.getOrDefault("first_name", ""),
+                            "unlockAt",   lockedUntil.toString(),
+                            "actionUrl",  resetUrl),
+                    "ACCOUNT_LOCKED", userId);
+        } catch (Exception e) {
+            log.warn("Failed to send account-locked notification for {}: {}", userId, e.getMessage());
         }
     }
 

@@ -3,9 +3,11 @@ package io.kelta.worker.config;
 import io.kelta.runtime.context.TenantPropagatingExecutors;
 import io.kelta.runtime.module.integration.spi.EmailService;
 import io.kelta.worker.repository.EmailRepository;
+import io.kelta.worker.service.credential.CredentialResolver;
 import io.kelta.worker.service.email.DefaultEmailService;
 import io.kelta.worker.service.email.EmailProvider;
 import io.kelta.worker.service.email.SmtpEmailProvider;
+import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +18,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
@@ -34,7 +37,7 @@ public class EmailConfig {
 
     @Bean
     @ConditionalOnProperty(name = "kelta.email.enabled", havingValue = "true", matchIfMissing = true)
-    public EmailProvider emailProvider(
+    public SmtpEmailProvider smtpEmailProvider(
             JavaMailSender javaMailSender,
             @Value("${kelta.email.from-address:noreply@kelta.io}") String fromAddress,
             @Value("${kelta.email.from-name:Kelta Platform}") String fromName) {
@@ -43,13 +46,22 @@ public class EmailConfig {
 
     @Bean
     @ConditionalOnProperty(name = "kelta.email.enabled", havingValue = "true", matchIfMissing = true)
+    public EmailProvider emailProvider(SmtpEmailProvider smtpEmailProvider) {
+        return smtpEmailProvider;
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "kelta.email.enabled", havingValue = "true", matchIfMissing = true)
     public DefaultEmailService defaultEmailService(
             EmailProvider emailProvider,
             EmailRepository emailRepository,
+            ObjectProvider<CredentialResolver> credentialResolverProvider,
             @Value("${kelta.email.from-address:noreply@kelta.io}") String fromAddress,
             @Value("${kelta.email.from-name:Kelta Platform}") String fromName,
             @Value("${kelta.email.enabled:true}") boolean enabled) {
-        return new DefaultEmailService(emailProvider, emailRepository, fromAddress, fromName, enabled);
+        return new DefaultEmailService(emailProvider, emailRepository,
+                credentialResolverProvider.getIfAvailable(),
+                fromAddress, fromName, enabled);
     }
 
     /**
@@ -72,6 +84,13 @@ public class EmailConfig {
                                      String source, String sourceId) {
                 log.debug("Email disabled — dropping email to {} (subject: {})", to, subject);
                 return "disabled";
+            }
+
+            @Override
+            public Optional<String> sendByKey(String tenantId, String to, String templateKey,
+                                              Map<String, Object> vars, String source, String sourceId) {
+                log.debug("Email disabled — dropping templated email to {} (key: {})", to, templateKey);
+                return Optional.of("disabled");
             }
         };
     }

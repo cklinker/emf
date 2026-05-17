@@ -44,7 +44,7 @@ class SmtpEmailProviderTest {
     @DisplayName("Should resolve tenant SMTP host when tenant has overrides")
     void shouldResolveTenantSmtpHost() {
         TenantEmailSettings tenantSettings = new TenantEmailSettings(
-                "smtp.tenant.com", 587, "user", "pass", true, "noreply@tenant.com", "Tenant Co");
+                "tenant-1", "smtp.tenant.com", 587, "user", "pass", true, "noreply@tenant.com", "Tenant Co");
 
         assertThat(provider.resolveSmtpHost(tenantSettings)).isEqualTo("smtp.tenant.com");
     }
@@ -53,7 +53,7 @@ class SmtpEmailProviderTest {
     @DisplayName("Should fall back to platform host when tenant has no SMTP override")
     void shouldFallBackToPlatformHost() {
         TenantEmailSettings partial = new TenantEmailSettings(
-                null, 587, null, null, true, "custom@tenant.com", "Tenant");
+                "tenant-1", null, 587, null, null, true, "custom@tenant.com", "Tenant");
 
         assertThat(provider.resolveSmtpHost(partial)).isEqualTo("smtp.platform.io");
     }

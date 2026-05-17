@@ -4,6 +4,7 @@ import io.kelta.runtime.module.integration.spi.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,5 +31,14 @@ public class LoggingEmailService implements EmailService {
         log.info("[NOOP] EmailService.queueEmail: id={}, tenant={}, to={}, subject='{}', source={}",
             id, tenantId, to, subject, source);
         return id;
+    }
+
+    @Override
+    public Optional<String> sendByKey(String tenantId, String to, String templateKey,
+                                      Map<String, Object> vars, String source, String sourceId) {
+        String id = UUID.randomUUID().toString();
+        log.info("[NOOP] EmailService.sendByKey: id={}, tenant={}, to={}, key={}, source={}",
+            id, tenantId, to, templateKey, source);
+        return Optional.of(id);
     }
 }

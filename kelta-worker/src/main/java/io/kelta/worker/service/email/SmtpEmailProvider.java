@@ -78,9 +78,10 @@ public class SmtpEmailProvider implements EmailProvider {
 
         } catch (MailAuthenticationException e) {
             // Invalidate cached sender on auth failure — credentials may have changed
-            if (tenantSettings != null && tenantSettings.hasSmtpOverride()) {
-                tenantSenderCache.invalidate(tenantSettings.smtpHost() + ":" + tenantSettings.smtpPort());
-                log.warn("SMTP auth failed for tenant SMTP host {}, cache invalidated", tenantSettings.smtpHost());
+            if (tenantSettings != null && tenantSettings.hasSmtpOverride() && tenantSettings.tenantId() != null) {
+                tenantSenderCache.invalidate(tenantSettings.tenantId());
+                log.warn("SMTP auth failed for tenant {} (host {}), sender cache invalidated",
+                        tenantSettings.tenantId(), tenantSettings.smtpHost());
             }
             throw new EmailDeliveryException("SMTP authentication failed for host " + resolveSmtpHost(tenantSettings), e);
         } catch (MailException e) {
@@ -104,9 +105,28 @@ public class SmtpEmailProvider implements EmailProvider {
         if (tenantSettings == null || !tenantSettings.hasSmtpOverride()) {
             return platformMailSender;
         }
-
-        String cacheKey = tenantSettings.smtpHost() + ":" + tenantSettings.smtpPort();
+        // Key by tenantId so config-change events can evict per tenant without
+        // needing to know the previous host:port pair.
+        String cacheKey = tenantSettings.tenantId() != null
+                ? tenantSettings.tenantId()
+                : tenantSettings.smtpHost() + ":" + tenantSettings.smtpPort();
         return tenantSenderCache.get(cacheKey, key -> createTenantSender(tenantSettings));
+    }
+
+    /**
+     * Drops the cached tenant sender for {@code tenantId}. Invoked by the NATS
+     * listener when {@code tenant.email_*} columns or the SMTP credential change.
+     */
+    public void evictTenant(String tenantId) {
+        if (tenantId == null) return;
+        tenantSenderCache.invalidate(tenantId);
+        log.debug("Evicted SMTP sender cache for tenant {}", tenantId);
+    }
+
+    /** Drops all cached tenant senders. Intended for credential rotations. */
+    public void evictAll() {
+        tenantSenderCache.invalidateAll();
+        log.debug("Evicted all tenant SMTP sender caches");
     }
 
     private JavaMailSenderImpl createTenantSender(TenantEmailSettings settings) {

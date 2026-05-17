@@ -17,6 +17,10 @@ spring:
     enabled: false   # migrations run via K8s PreSync Job (application-migrate.yml re-enables)
     baseline-on-migrate: true
     baseline-version: 0
+    # Kelta migrations never use Flyway ${} placeholders; seed SQL for
+    # email_template intentionally stores ${variable} as data for runtime
+    # substitution, which would otherwise trip placeholder validation.
+    placeholder-replacement: false
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}

@@ -341,6 +341,16 @@ public class FlowConfig {
         return hook;
     }
 
+    @Bean
+    public io.kelta.worker.listener.TenantEmailConfigEventPublisher tenantEmailConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.TenantEmailConfigEventPublisher hook =
+                new io.kelta.worker.listener.TenantEmailConfigEventPublisher(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     // ---------------------------------------------------------------------------
     // OpenAPI spec library — parser bean + NATS broadcast on spec changes
     // ---------------------------------------------------------------------------

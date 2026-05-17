@@ -47,23 +47,22 @@ public class InternalEmailController {
             String sourceId
     ) {}
 
+    public record SendTemplateRequest(
+            @NotBlank String tenantId,
+            @NotBlank @Email String to,
+            @NotBlank String templateKey,
+            Map<String, Object> vars,
+            String source,
+            String sourceId
+    ) {}
+
     @PostMapping("/send")
     public ResponseEntity<Map<String, String>> sendEmail(
             @RequestHeader(value = "X-Internal-Token", required = false) String token,
             @Valid @RequestBody SendEmailRequest request) {
 
-        // Validate internal token
-        if (internalToken == null || internalToken.isBlank()) {
-            log.warn("Internal email endpoint called but kelta.internal.token is not configured");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Internal token not configured"));
-        }
-
-        if (!internalToken.equals(token)) {
-            log.warn("Internal email endpoint called with invalid token");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Invalid internal token"));
-        }
+        ResponseEntity<Map<String, String>> denial = checkInternalToken(token);
+        if (denial != null) return denial;
 
         String emailLogId = emailService.queueEmail(
                 request.tenantId(),
@@ -78,5 +77,35 @@ public class InternalEmailController {
                 "emailLogId", emailLogId,
                 "status", "QUEUED"
         ));
+    }
+
+    @PostMapping("/send-template")
+    public ResponseEntity<Map<String, String>> sendTemplate(
+            @RequestHeader(value = "X-Internal-Token", required = false) String token,
+            @Valid @RequestBody SendTemplateRequest request) {
+
+        ResponseEntity<Map<String, String>> denial = checkInternalToken(token);
+        if (denial != null) return denial;
+
+        return emailService.sendByKey(
+                request.tenantId(), request.to(), request.templateKey(),
+                request.vars(), request.source(), request.sourceId())
+                .map(id -> ResponseEntity.ok(Map.of("emailLogId", id, "status", "QUEUED")))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Template not found: " + request.templateKey())));
+    }
+
+    private ResponseEntity<Map<String, String>> checkInternalToken(String token) {
+        if (internalToken == null || internalToken.isBlank()) {
+            log.warn("Internal email endpoint called but kelta.internal.token is not configured");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Internal token not configured"));
+        }
+        if (!internalToken.equals(token)) {
+            log.warn("Internal email endpoint called with invalid token");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Invalid internal token"));
+        }
+        return null;
     }
 }

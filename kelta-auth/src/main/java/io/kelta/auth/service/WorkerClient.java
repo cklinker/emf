@@ -79,6 +79,38 @@ public class WorkerClient {
         }
     }
 
+    /**
+     * Sends an email using a stable {@code templateKey} resolved by the worker
+     * (tenant override or system default) with {@code ${var}} substitution.
+     *
+     * @return true when the worker accepted the request (template existed and was queued).
+     */
+    public boolean sendTemplateEmail(String tenantId, String to, String templateKey,
+                                     Map<String, Object> vars, String source, String sourceId) {
+        try {
+            Map<String, Object> requestBody = new java.util.LinkedHashMap<>();
+            requestBody.put("tenantId", tenantId);
+            requestBody.put("to", to);
+            requestBody.put("templateKey", templateKey);
+            requestBody.put("vars", vars == null ? Map.of() : vars);
+            if (source != null)   requestBody.put("source", source);
+            if (sourceId != null) requestBody.put("sourceId", sourceId);
+
+            restClient.post()
+                    .uri("/api/internal/email/send-template")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Internal-Token", internalToken)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(JsonNode.class);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to send template email via worker: to={}, key={}, error={}",
+                    to, templateKey, e.getMessage());
+            return false;
+        }
+    }
+
     public record OidcProviderInfo(
             String id, String name, String issuer, String jwksUri, String audience,
             String clientId, String clientSecretEnc,

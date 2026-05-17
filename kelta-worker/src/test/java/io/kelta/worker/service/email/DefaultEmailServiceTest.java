@@ -1,18 +1,24 @@
 package io.kelta.worker.service.email;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import io.kelta.runtime.credential.ResolvedCredential;
 import io.kelta.runtime.module.integration.spi.EmailService;
 import io.kelta.worker.repository.EmailRepository;
+import io.kelta.worker.repository.EmailRepository.TenantEmailConfigRow;
+import io.kelta.worker.service.credential.CredentialResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @DisplayName("DefaultEmailService")
@@ -20,14 +26,16 @@ class DefaultEmailServiceTest {
 
     private EmailProvider emailProvider;
     private EmailRepository emailRepository;
+    private CredentialResolver credentialResolver;
     private DefaultEmailService service;
 
     @BeforeEach
     void setUp() {
         emailProvider = mock(EmailProvider.class);
         emailRepository = mock(EmailRepository.class);
+        credentialResolver = mock(CredentialResolver.class);
         service = new DefaultEmailService(
-                emailProvider, emailRepository,
+                emailProvider, emailRepository, credentialResolver,
                 "noreply@kelta.io", "Kelta Platform", true);
     }
 
@@ -40,7 +48,7 @@ class DefaultEmailServiceTest {
         void shouldQueueWithPlatformDefaults() {
             when(emailRepository.createEmailLog("t1", "user@example.com", "Subject", "WORKFLOW", "flow-1"))
                     .thenReturn("log-123");
-            when(emailRepository.getTenantSettings("t1")).thenReturn(null);
+            when(emailRepository.findTenantEmailConfig("t1")).thenReturn(null);
 
             String logId = service.queueEmail("t1", "user@example.com", "Subject", "<p>Body</p>", "WORKFLOW", "flow-1");
 
@@ -49,19 +57,21 @@ class DefaultEmailServiceTest {
         }
 
         @Test
-        @DisplayName("Should resolve tenant settings when tenant has email overrides")
-        void shouldResolveTenantSettings() throws Exception {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode settings = mapper.readTree("""
-                    {"email": {"smtp": {"host": "smtp.tenant.com", "port": 587}, "fromAddress": "noreply@tenant.com"}}
-                    """);
-
-            when(emailRepository.createEmailLog(anyString(), anyString(), anyString(), anyString(), anyString()))
-                    .thenReturn("log-456");
-            when(emailRepository.getTenantSettings("t2")).thenReturn(settings);
+        @DisplayName("Should resolve credential-backed tenant SMTP settings")
+        void shouldResolveCredentialBackedSettings() {
+            when(emailRepository.createEmailLog(anyString(), anyString(), anyString(), anyString(), any()))
+                    .thenReturn("log-cred");
+            when(emailRepository.findTenantEmailConfig("t2"))
+                    .thenReturn(new TenantEmailConfigRow("cred-1", "no-reply@tenant.com", "Tenant", true, null));
+            when(credentialResolver.resolve(eq("t2"), eq("cred-1"), any()))
+                    .thenReturn(new ResolvedCredential("cred-1", "smtp", "smtp",
+                            Map.of("username", "u", "password", "p"),
+                            Map.of("host", "smtp.tenant.com", "port", 587, "useStartTls", true),
+                            Instant.now()));
 
             service.queueEmail("t2", "user@test.com", "Hello", "<p>Hi</p>", "SYSTEM", null);
 
+            verify(credentialResolver).resolve(eq("t2"), eq("cred-1"), any());
             verify(emailRepository).createEmailLog("t2", "user@test.com", "Hello", "SYSTEM", null);
         }
 
@@ -69,14 +79,59 @@ class DefaultEmailServiceTest {
         @DisplayName("Should return dummy ID and skip delivery when disabled")
         void shouldSkipWhenDisabled() {
             DefaultEmailService disabledService = new DefaultEmailService(
-                    emailProvider, emailRepository,
+                    emailProvider, emailRepository, credentialResolver,
                     "noreply@kelta.io", "Kelta Platform", false);
 
             String logId = disabledService.queueEmail("t1", "user@test.com", "Subject", "Body", "TEST", null);
 
             assertThat(logId).isNotNull();
             verify(emailProvider, never()).send(any(), any());
-            verify(emailRepository, never()).createEmailLog(anyString(), anyString(), anyString(), anyString(), anyString());
+            verify(emailRepository, never()).createEmailLog(anyString(), anyString(), anyString(), anyString(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("sendByKey")
+    class SendByKey {
+
+        @Test
+        @DisplayName("Should substitute variables and queue using the resolved template")
+        void shouldSubstituteAndQueue() {
+            when(emailRepository.findTemplateByKey("t1", "user.invite"))
+                    .thenReturn(Optional.of(Map.of(
+                            "subject", "Welcome ${firstName}",
+                            "body_html", "<p>Hi ${firstName}, click ${actionUrl}</p>"
+                    )));
+            when(emailRepository.createEmailLog(anyString(), anyString(), anyString(), anyString(), any()))
+                    .thenReturn("log-99");
+
+            Optional<String> logId = service.sendByKey("t1", "u@x.com", "user.invite",
+                    Map.of("firstName", "Ada", "actionUrl", "https://x.com/accept"),
+                    "USER_INVITE", "user-1");
+
+            assertThat(logId).contains("log-99");
+            verify(emailRepository).createEmailLog("t1", "u@x.com",
+                    "Welcome Ada", "USER_INVITE", "user-1");
+        }
+
+        @Test
+        @DisplayName("Should leave unknown variables intact so missing keys are obvious")
+        void shouldLeaveUnknownVarsIntact() {
+            assertThat(DefaultEmailService.substitute(
+                    "${a} ${b}", Map.of("a", "1")))
+                    .isEqualTo("1 ${b}");
+        }
+
+        @Test
+        @DisplayName("Should return empty when no template found")
+        void shouldReturnEmptyWhenMissing() {
+            when(emailRepository.findTemplateByKey("t1", "missing"))
+                    .thenReturn(Optional.empty());
+
+            Optional<String> logId = service.sendByKey("t1", "u@x.com", "missing",
+                    Map.of(), "X", null);
+
+            assertThat(logId).isEmpty();
         }
     }
 
@@ -128,22 +183,6 @@ class DefaultEmailServiceTest {
                 assertThat(result).isPresent();
                 assertThat(result.get().subject()).isEqualTo("Welcome");
                 assertThat(result.get().bodyHtml()).isEqualTo("<p>Hello</p>");
-            } finally {
-                io.kelta.runtime.context.TenantContext.clear();
-            }
-        }
-
-        @Test
-        @DisplayName("Should return empty when template not found")
-        void shouldReturnEmptyWhenNotFound() {
-            io.kelta.runtime.context.TenantContext.set("t1");
-            try {
-                when(emailRepository.findTemplateByTenantAndId("t1", "missing"))
-                        .thenReturn(Optional.empty());
-
-                Optional<EmailService.EmailTemplate> result = service.getTemplate("missing");
-
-                assertThat(result).isEmpty();
             } finally {
                 io.kelta.runtime.context.TenantContext.clear();
             }

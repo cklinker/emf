@@ -30,7 +30,7 @@ class TenantEmailSettingsTest {
                 }
                 """);
 
-        TenantEmailSettings settings = TenantEmailSettings.fromJsonNode(json);
+        TenantEmailSettings settings = TenantEmailSettings.fromJsonNode("tenant-1", json);
 
         assertThat(settings).isNotNull();
         assertThat(settings.smtpHost()).isEqualTo("smtp.tenant.com");
@@ -51,13 +51,13 @@ class TenantEmailSettingsTest {
                 {"theme": "dark", "locale": "en"}
                 """);
 
-        assertThat(TenantEmailSettings.fromJsonNode(json)).isNull();
+        assertThat(TenantEmailSettings.fromJsonNode("tenant-1", json)).isNull();
     }
 
     @Test
     @DisplayName("Should return null for null JSON")
     void shouldReturnNullForNullJson() {
-        assertThat(TenantEmailSettings.fromJsonNode(null)).isNull();
+        assertThat(TenantEmailSettings.fromJsonNode("tenant-1", null)).isNull();
     }
 
     @Test
@@ -72,7 +72,7 @@ class TenantEmailSettingsTest {
                 }
                 """);
 
-        TenantEmailSettings settings = TenantEmailSettings.fromJsonNode(json);
+        TenantEmailSettings settings = TenantEmailSettings.fromJsonNode("tenant-1", json);
 
         assertThat(settings).isNotNull();
         assertThat(settings.hasSmtpOverride()).isFalse();
@@ -92,7 +92,7 @@ class TenantEmailSettingsTest {
                 }
                 """);
 
-        TenantEmailSettings settings = TenantEmailSettings.fromJsonNode(json);
+        TenantEmailSettings settings = TenantEmailSettings.fromJsonNode("tenant-1", json);
 
         String str = settings.toString();
         assertThat(str).doesNotContain("supersecret");

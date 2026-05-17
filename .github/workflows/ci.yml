@@ -338,7 +338,7 @@ jobs:
             --set "*.cache-from=type=gha,scope=e2e-ci-jvm" \
             --set "*.cache-to=type=gha,mode=max,scope=e2e-ci-jvm" \
             --load \
-            kelta-auth kelta-worker kelta-gateway kelta-ui
+            kelta-auth kelta-worker kelta-gateway kelta-ui cerbos
 
       - name: Start stack
         run: |
@@ -350,13 +350,25 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.ci.yml \
             --profile seed run --rm kelta-bootstrap
 
+      - name: Build Playwright runner image (tests baked in)
+        # Bake e2e-tests + node_modules into a runner image. Bind-mounting the
+        # workspace doesn't work with the k8s-runner-integration remote Docker
+        # daemon (the daemon host can't see the runner's filesystem).
+        run: |
+          docker build -t kelta-e2e-runner:local -f - e2e-tests <<'DOCKERFILE'
+          FROM mcr.microsoft.com/playwright:v1.50.0-noble
+          WORKDIR /work
+          COPY package.json package-lock.json ./
+          RUN npm ci
+          COPY . .
+          DOCKERFILE
+
       - name: Run Playwright tests (sibling container on compose network)
+        id: playwright
         run: |
           NETWORK="${COMPOSE_PROJECT_NAME}_kelta-network"
-          docker run --rm \
+          docker run --name kelta-e2e-run \
             --network "$NETWORK" \
-            -v "$PWD/e2e-tests:/work" \
-            -w /work \
             -e CI=true \
             -e E2E_BASE_URL=http://kelta-ui:8080 \
             -e E2E_API_BASE_URL=http://kelta-gateway:8080 \
@@ -365,8 +377,16 @@ jobs:
             -e E2E_TENANT_SLUG=default \
             -e E2E_TEST_USERNAME=admin \
             -e E2E_TEST_PASSWORD=password \
-            mcr.microsoft.com/playwright:v1.50.0-noble \
-            bash -c "npm ci && npx playwright test"
+            kelta-e2e-runner:local \
+            npx playwright test
+
+      - name: Copy Playwright reports out of container
+        if: always() && steps.playwright.outcome != 'skipped'
+        run: |
+          mkdir -p e2e-tests/playwright-report e2e-tests/test-results
+          docker cp kelta-e2e-run:/work/playwright-report/. e2e-tests/playwright-report/ 2>/dev/null || true
+          docker cp kelta-e2e-run:/work/test-results/. e2e-tests/test-results/ 2>/dev/null || true
+          docker rm -f kelta-e2e-run || true
 
       - name: Dump compose logs on failure
         if: failure()

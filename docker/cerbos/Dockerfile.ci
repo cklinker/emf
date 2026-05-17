@@ -1,0 +1,7 @@
+# Bake the cerbos config + policies into the image so the CI compose stack
+# doesn't need bind mounts. Required because k8s-runner-integration uses a
+# remote Docker daemon and `./docker/cerbos/...` paths on the runner are
+# not visible to the daemon host.
+FROM ghcr.io/cerbos/cerbos:0.40.0
+COPY config.yaml /config/config.yaml
+COPY policies /policies

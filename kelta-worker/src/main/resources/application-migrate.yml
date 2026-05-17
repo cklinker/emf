@@ -6,6 +6,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
+    placeholder-replacement: false   # see comment in application.yml
   main:
     web-application-type: none   # no HTTP server — process exits after ApplicationRunners complete
   autoconfigure:

@@ -66,7 +66,7 @@ services:
     image: nats:2.10-alpine
     container_name: kelta-nats
     restart: unless-stopped
-    command: ["--jetstream", "--store_dir", "/data/nats-server/jetstream"]
+    command: ["--jetstream", "--store_dir", "/data/nats-server/jetstream", "-m", "8222"]
     ports:
       - "4222:4222"
       - "8222:8222"
@@ -92,7 +92,7 @@ services:
       - ./docker/cerbos/config.yaml:/config/config.yaml:ro
       - ./docker/cerbos/policies:/policies:ro
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3592/_cerbos/health"]
+      test: ["CMD", "/cerbos", "healthcheck", "--insecure"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -111,7 +111,12 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      # Database — same shared DB as kelta-worker
+      # Database — same shared DB as kelta-worker.
+      # Use SPRING_DATASOURCE_URL (Spring Boot relaxed binding) so runtime-core's
+      # default spring.datasource.url in application.properties doesn't win.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
+      SPRING_DATASOURCE_USERNAME: kelta
+      SPRING_DATASOURCE_PASSWORD: kelta
       DB_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
       DB_USERNAME: kelta
       DB_PASSWORD: kelta
@@ -137,6 +142,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kelta-worker:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
       interval: 15s
@@ -158,6 +165,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
       SPRING_DATASOURCE_USERNAME: kelta
       SPRING_DATASOURCE_PASSWORD: kelta
+      # In compose there is no K8s PreSync Job — let worker run its own Flyway
+      SPRING_FLYWAY_ENABLED: "true"
       # Redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
@@ -216,6 +225,8 @@ services:
       # Cerbos
       CERBOS_HOST: cerbos
       CERBOS_GRPC_PORT: "3593"
+      # CORS — gateway requires explicit origin pattern (no wildcard with credentials)
+      CORS_ALLOWED_ORIGIN_PATTERN: "http://localhost:5173"
       LOG_LEVEL: INFO
     ports:
       - "8080:8080"
@@ -226,9 +237,9 @@ services:
         condition: service_healthy
       cerbos:
         condition: service_healthy
-      kelta-auth:
-        condition: service_healthy
       kelta-worker:
+        condition: service_healthy
+      kelta-auth:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
@@ -248,12 +259,12 @@ services:
     container_name: kelta-ui
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "5173:8080"
     depends_on:
       kelta-gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80 >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080 >/dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

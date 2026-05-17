@@ -1,0 +1,29 @@
+# CI / e2e override — swaps native GraalVM Dockerfiles for JVM variants so PR
+# builds stay under ~5 min per service instead of the ~10 min native compile.
+# Production images continue to be built from each service's original Dockerfile
+# by build-and-publish-containers.yml on main.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.ci.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait
+
+services:
+  kelta-auth:
+    build:
+      context: .
+      dockerfile: kelta-auth/Dockerfile.jvm
+
+  kelta-worker:
+    build:
+      context: .
+      dockerfile: kelta-worker/Dockerfile.jvm
+
+  kelta-gateway:
+    build:
+      context: .
+      dockerfile: kelta-gateway/Dockerfile.jvm
+
+  kelta-ai:
+    build:
+      context: .
+      dockerfile: kelta-ai/Dockerfile.jvm

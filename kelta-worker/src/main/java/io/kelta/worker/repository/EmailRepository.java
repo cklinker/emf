@@ -47,6 +47,24 @@ public class EmailRepository {
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
+    /**
+     * Resolves a template by its stable {@code template_key} (e.g. "user.invite").
+     * Prefers the tenant's own override; falls back to the {@code 'system'} tenant's
+     * default. Returns empty when no template exists for the key in either scope.
+     */
+    public Optional<Map<String, Object>> findTemplateByKey(String tenantId, String templateKey) {
+        var rows = jdbcTemplate.queryForList(
+                "SELECT id, subject, body_html, body_text, tenant_id "
+                        + "FROM email_template "
+                        + "WHERE template_key = ? AND is_active = true "
+                        + "  AND tenant_id IN (?, 'system') "
+                        + "ORDER BY CASE WHEN tenant_id = ? THEN 0 ELSE 1 END "
+                        + "LIMIT 1",
+                templateKey, tenantId, tenantId
+        );
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
     // -----------------------------------------------------------------------
     // Email Log
     // -----------------------------------------------------------------------
@@ -127,4 +145,54 @@ public class EmailRepository {
             return null;
         }
     }
+
+    /**
+     * Loads the tenant's structured email config (vault FK + from overrides + legacy JSONB).
+     * The legacy JSONB blob is still returned so callers can fall back when no credential is set.
+     *
+     * @return the config row, or null if the tenant does not exist
+     */
+    public TenantEmailConfigRow findTenantEmailConfig(String tenantId) {
+        var rows = jdbcTemplate.queryForList(
+                "SELECT email_smtp_credential_id, email_from_address, email_from_name, "
+                        + "auto_invite_on_create, settings "
+                        + "FROM tenant WHERE id = ?",
+                tenantId
+        );
+        if (rows.isEmpty()) {
+            return null;
+        }
+        var row = rows.get(0);
+        JsonNode legacy = null;
+        Object settings = row.get("settings");
+        if (settings != null) {
+            try {
+                legacy = settings instanceof String s
+                        ? objectMapper.readTree(s)
+                        : objectMapper.valueToTree(settings);
+            } catch (Exception ignored) {
+                // legacy JSONB unreadable — treat as absent
+            }
+        }
+        Object autoInvite = row.get("auto_invite_on_create");
+        return new TenantEmailConfigRow(
+                (String) row.get("email_smtp_credential_id"),
+                (String) row.get("email_from_address"),
+                (String) row.get("email_from_name"),
+                autoInvite instanceof Boolean b ? b : true,
+                legacy
+        );
+    }
+
+    /**
+     * Tenant-level email configuration row. Decryption of the credential
+     * happens elsewhere via {@code CredentialResolver}.
+     */
+    public record TenantEmailConfigRow(
+            String smtpCredentialId,
+            String fromAddress,
+            String fromName,
+            boolean autoInviteOnCreate,
+            JsonNode legacySettings
+    ) {}
 }

@@ -12,6 +12,7 @@ import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SupersetCollectionSyncListener;
 import io.kelta.worker.listener.SvixWebhookPublisher;
 import io.kelta.worker.listener.SystemFeatureCacheInvalidationListener;
+import io.kelta.worker.listener.TenantEmailCacheInvalidationListener;
 import io.kelta.worker.module.ModuleEventListener;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -53,6 +54,9 @@ public class NatsSubscriptionConfig {
 
     @Autowired(required = false)
     private SvixWebhookPublisher svixWebhookPublisher;
+
+    @Autowired(required = false)
+    private TenantEmailCacheInvalidationListener tenantEmailCacheInvalidationListener;
 
     public NatsSubscriptionConfig(NatsSubscriptionManager subscriptionManager,
                                    FlowEventListener flowEventListener,
@@ -148,9 +152,23 @@ public class NatsSubscriptionConfig {
             log.info("Registered NATS subscription for Svix webhook publisher");
         }
 
+        // Tenant email config invalidation — every pod evicts its
+        // SmtpEmailProvider sender cache when tenant email columns change,
+        // and broadly when any credential rotates (small cache, cheap to refill).
+        if (tenantEmailCacheInvalidationListener != null) {
+            subscriptionManager.register(EventSubscription.broadcast(
+                    "worker-tenant-email", "kelta.config.tenant.email.changed.>",
+                    tenantEmailCacheInvalidationListener::handleTenantEmailChanged));
+            subscriptionManager.register(EventSubscription.broadcast(
+                    "worker-tenant-email-credential", "kelta.config.credential.changed.>",
+                    tenantEmailCacheInvalidationListener::handleCredentialChanged));
+            log.info("Registered NATS subscriptions for tenant email cache invalidation");
+        }
+
         log.info("Registered {} worker NATS subscriptions", 9
                 + (credentialCacheInvalidationListener != null ? 1 : 0)
                 + (supersetCollectionSyncListener != null ? 1 : 0)
-                + (svixWebhookPublisher != null ? 1 : 0));
+                + (svixWebhookPublisher != null ? 1 : 0)
+                + (tenantEmailCacheInvalidationListener != null ? 2 : 0));
     }
 }

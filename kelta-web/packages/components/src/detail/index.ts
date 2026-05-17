@@ -18,11 +18,7 @@ export type {
 } from './RecordHeader';
 
 export { FieldSection } from './FieldSection';
-export type {
-  FieldSectionProps,
-  FieldSectionRenderContext,
-  DetailField,
-} from './FieldSection';
+export type { FieldSectionProps, FieldSectionRenderContext, DetailField } from './FieldSection';
 
 export { AddressMap } from './AddressMap';
 export type { AddressMapProps } from './AddressMap';

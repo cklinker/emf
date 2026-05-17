@@ -10,48 +10,47 @@
  * package stays free of the consumer's FieldRenderer.
  */
 
-import React, { useState } from 'react'
-import { ChevronRight, MapPin } from 'lucide-react'
-import { Card } from '../ui/card'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
-import { cn } from './_utils'
-import type { DetailField, FieldSectionRenderContext } from './FieldSection'
+import React, { useState } from 'react';
+import { ChevronRight, MapPin } from 'lucide-react';
+import { Card } from '../ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { cn } from './_utils';
+import type { DetailField, FieldSectionRenderContext } from './FieldSection';
 
 export interface AddressMapProps<F extends DetailField = DetailField> {
-  title: string
-  fields: F[]
-  mapLabelFields?: string[]
+  title: string;
+  fields: F[];
+  mapLabelFields?: string[];
   /** Record field holding `{ latitude, longitude }` or `{ lat, lng }` */
-  geoField?: string
-  record: Record<string, unknown>
-  lookupDisplayMap?: Record<string, Record<string, string>>
-  defaultCollapsed?: boolean
-  renderField: (ctx: FieldSectionRenderContext<F>) => React.ReactNode
+  geoField?: string;
+  record: Record<string, unknown>;
+  lookupDisplayMap?: Record<string, Record<string, string>>;
+  defaultCollapsed?: boolean;
+  renderField: (ctx: FieldSectionRenderContext<F>) => React.ReactNode;
 }
 
 interface GeoPoint {
-  lat: number
-  lng: number
+  lat: number;
+  lng: number;
 }
 
-const REFERENCE_TYPES = new Set(['master_detail', 'lookup', 'reference'])
+const REFERENCE_TYPES = new Set(['master_detail', 'lookup', 'reference']);
 
 function extractGeoPoint<F extends DetailField>(
   record: Record<string, unknown>,
   fields: F[],
   geoField: string | undefined
 ): GeoPoint | null {
-  const fieldName =
-    geoField ?? fields.find((f) => f.type === 'geolocation')?.name ?? undefined
-  if (!fieldName) return null
-  const raw = record[fieldName]
-  if (!raw || typeof raw !== 'object') return null
-  const g = raw as Record<string, unknown>
-  const lat = Number(g.latitude ?? g.lat)
-  const lng = Number(g.longitude ?? g.lng ?? g.lon)
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
-  return { lat, lng }
+  const fieldName = geoField ?? fields.find((f) => f.type === 'geolocation')?.name ?? undefined;
+  if (!fieldName) return null;
+  const raw = record[fieldName];
+  if (!raw || typeof raw !== 'object') return null;
+  const g = raw as Record<string, unknown>;
+  const lat = Number(g.latitude ?? g.lat);
+  const lng = Number(g.longitude ?? g.lng ?? g.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng };
 }
 
 function staticMapUrl(point: GeoPoint, width: number, height: number): string {
@@ -59,21 +58,21 @@ function staticMapUrl(point: GeoPoint, width: number, height: number): string {
     typeof import.meta !== 'undefined' &&
     typeof (import.meta as { env?: Record<string, string | undefined> }).env !== 'undefined'
       ? (import.meta as { env: Record<string, string | undefined> }).env
-      : undefined
-  const mapboxToken = env?.VITE_MAPBOX_TOKEN
+      : undefined;
+  const mapboxToken = env?.VITE_MAPBOX_TOKEN;
   if (mapboxToken) {
-    const style = env?.VITE_MAPBOX_STYLE ?? 'mapbox/dark-v11'
+    const style = env?.VITE_MAPBOX_STYLE ?? 'mapbox/dark-v11';
     return (
       `https://api.mapbox.com/styles/v1/${style}/static/` +
       `pin-l+3b82f6(${point.lng},${point.lat})/` +
       `${point.lng},${point.lat},14,0/${width}x${height}@2x?access_token=${mapboxToken}`
-    )
+    );
   }
   return (
     `https://staticmap.openstreetmap.de/staticmap.php?` +
     `center=${point.lat},${point.lng}&zoom=14&size=${width}x${height}` +
     `&markers=${point.lat},${point.lng},lightblue1&maptype=mapnik`
-  )
+  );
 }
 
 export function AddressMap<F extends DetailField = DetailField>({
@@ -86,16 +85,16 @@ export function AddressMap<F extends DetailField = DetailField>({
   defaultCollapsed = false,
   renderField,
 }: AddressMapProps<F>): React.ReactElement | null {
-  const [isOpen, setIsOpen] = useState(!defaultCollapsed)
-  if (fields.length === 0) return null
+  const [isOpen, setIsOpen] = useState(!defaultCollapsed);
+  if (fields.length === 0) return null;
 
-  const [streetField, ...restFields] = fields
+  const [streetField, ...restFields] = fields;
   const mapLabel = mapLabelFields
     .map((f) => record[f])
     .filter((v) => v !== null && v !== undefined && v !== '')
     .map(String)
-    .join(', ')
-  const point = extractGeoPoint(record, fields, geoField)
+    .join(', ');
+  const point = extractGeoPoint(record, fields, geoField);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -134,12 +133,12 @@ export function AddressMap<F extends DetailField = DetailField>({
                 </div>
               )}
               {restFields.map((field) => {
-                const value = record[field.name]
-                const isLookup = REFERENCE_TYPES.has(field.type)
+                const value = record[field.name];
+                const isLookup = REFERENCE_TYPES.has(field.type);
                 const displayLabel =
                   isLookup && lookupDisplayMap?.[field.name]
                     ? lookupDisplayMap[field.name][String(value)] || undefined
-                    : undefined
+                    : undefined;
                 return (
                   <div key={field.name} className="min-w-0 space-y-1">
                     <dt className="kelta-field-label">{field.displayName || field.name}</dt>
@@ -147,7 +146,7 @@ export function AddressMap<F extends DetailField = DetailField>({
                       {renderField({ field, value, displayLabel })}
                     </dd>
                   </div>
-                )
+                );
               })}
             </div>
 
@@ -160,18 +159,12 @@ export function AddressMap<F extends DetailField = DetailField>({
         </CollapsibleContent>
       </Card>
     </Collapsible>
-  )
+  );
 }
 
-function StaticMap({
-  point,
-  label,
-}: {
-  point: GeoPoint
-  label: string
-}): React.ReactElement {
-  const [errored, setErrored] = useState(false)
-  if (errored) return <MapPlaceholder label={label} />
+function StaticMap({ point, label }: { point: GeoPoint; label: string }): React.ReactElement {
+  const [errored, setErrored] = useState(false);
+  if (errored) return <MapPlaceholder label={label} />;
   return (
     <div className="relative h-[220px] overflow-hidden rounded-[10px] bg-muted">
       <img
@@ -185,7 +178,7 @@ function StaticMap({
         {label}
       </div>
     </div>
-  )
+  );
 }
 
 function MapPlaceholder({ label }: { label: string }): React.ReactElement {
@@ -201,8 +194,7 @@ function MapPlaceholder({ label }: { label: string }): React.ReactElement {
       <div
         className="absolute inset-0 opacity-50"
         style={{
-          backgroundImage:
-            'radial-gradient(circle, rgba(148,163,184,0.18) 1px, transparent 1px)',
+          backgroundImage: 'radial-gradient(circle, rgba(148,163,184,0.18) 1px, transparent 1px)',
           backgroundSize: '28px 28px',
         }}
       />
@@ -215,5 +207,5 @@ function MapPlaceholder({ label }: { label: string }): React.ReactElement {
         {label}
       </div>
     </div>
-  )
+  );
 }

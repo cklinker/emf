@@ -5,13 +5,10 @@
  * detail components and stays in kelta-ui/app for now.
  */
 
-import * as React from 'react'
-import { cn } from '../detail/_utils'
+import * as React from 'react';
+import { cn } from '../detail/_utils';
 
-export function Card({
-  className,
-  ...props
-}: React.ComponentProps<'div'>): React.ReactElement {
+export function Card({ className, ...props }: React.ComponentProps<'div'>): React.ReactElement {
   return (
     <div
       data-slot="card"
@@ -21,7 +18,7 @@ export function Card({
       )}
       {...props}
     />
-  )
+  );
 }
 
 export function CardHeader({
@@ -37,12 +34,12 @@ export function CardHeader({
       )}
       {...props}
     />
-  )
+  );
 }
 
 export function CardContent({
   className,
   ...props
 }: React.ComponentProps<'div'>): React.ReactElement {
-  return <div data-slot="card-content" className={cn('px-6', className)} {...props} />
+  return <div data-slot="card-content" className={cn('px-6', className)} {...props} />;
 }

@@ -305,3 +305,45 @@ body {
   color: hsl(var(--foreground));
   background: hsl(var(--accent));
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Inspect mode — toggleable overlay for the runtime detail page.
+   When the root wrapper has `.kelta-inspect`, every descendant element with
+   a `data-component` attribute is outlined with a dashed cyan border and
+   labeled via a top-left badge that reads the component name. Useful for
+   designers/developers verifying which generic blocks are rendering where.
+   Matches the handoff "Show component labels" inspector overlay.
+   ────────────────────────────────────────────────────────────────────────── */
+.kelta-inspect [data-component] {
+  position: relative;
+  outline: 1px dashed rgba(96, 165, 250, 0.55);
+  outline-offset: 2px;
+  /* Reserve space so the badge doesn't collide with the first child */
+  padding-top: var(--kelta-inspect-pad, 0);
+}
+
+.kelta-inspect [data-component]::before {
+  content: attr(data-component);
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  z-index: 10;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #60a5fa;
+  font-family: var(--kelta-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kelta-inspect [data-component] {
+    transition: none;
+  }
+}

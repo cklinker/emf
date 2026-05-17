@@ -32,3 +32,6 @@ export type { TimelineConfig, TimelineEvent, TimelineTone } from './Timeline'
 
 export { AddressMap } from './AddressMap'
 export type { AddressMapProps } from './AddressMap'
+
+export { RailRenderer } from './RailRenderer'
+export type { RailRendererProps } from './RailRenderer'

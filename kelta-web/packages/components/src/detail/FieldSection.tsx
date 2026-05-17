@@ -3,51 +3,60 @@
  *
  * Collapsible card holding a CSS-grid of field name/value pairs.
  *
- * Layout:
- *   ┌─ header (cursor-pointer): chevron + title + "N fields" pill ─┐
- *   │                                                               │
- *   │ 1px top border                                                │
- *   │ grid (configurable columns, 22px row × 40px col gap)          │
- *   └───────────────────────────────────────────────────────────────┘
- *
- * Replaces the visual treatment of `<DetailSection>` while keeping
- * the same field-rendering responsibilities so it slots into
- * `LayoutFieldSections` cleanly.
+ * Migrated from kelta-ui/app. The consumer's FieldRenderer is no longer
+ * a direct dependency — callers pass a `renderField` callback that this
+ * component invokes per-field. That keeps the package free of the 21+
+ * field-type rendering logic + plugin registry while still letting the
+ * shared layout do the heavy lifting on labels, grid, and collapse state.
  */
 
 import React, { useCallback, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { Card } from '@/components/ui/card'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { FieldRenderer } from '@/components/FieldRenderer'
-import type { FieldDefinition } from '@/hooks/useCollectionSchema'
-import type { CollectionRecord } from '@/hooks/useCollectionRecords'
-import { cn } from '@/lib/utils'
+import { Card } from '../ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
+import { cn } from './_utils'
 
-export interface FieldSectionProps {
-  /** Section heading */
+/**
+ * Minimal field shape consumed by FieldSection's grid + label rendering.
+ * Mirrors the structural subset of the consumer's full FieldDefinition;
+ * consumers usually pass their full definition type via the generic.
+ */
+export interface DetailField {
+  name: string
+  displayName?: string
+  type: string
+  referenceTarget?: string
+}
+
+export interface FieldSectionRenderContext<F extends DetailField = DetailField> {
+  field: F
+  value: unknown
+  /** Resolved display label for lookup/reference fields, when available */
+  displayLabel?: string
+}
+
+export interface FieldSectionProps<F extends DetailField = DetailField> {
   title: string
-  /** Fields to render in this section */
-  fields: FieldDefinition[]
-  /** Record data */
-  record: CollectionRecord
-  /** Tenant slug for building lookup links */
-  tenantSlug?: string
+  fields: F[]
+  record: Record<string, unknown>
   /** Lookup display map: { fieldName: { recordId: displayLabel } } */
   lookupDisplayMap?: Record<string, Record<string, string>>
-  /** Whether the section starts collapsed */
   defaultCollapsed?: boolean
-  /** Number of grid columns (1-4). Default: 2 */
   columns?: 1 | 2 | 3 | 4
+  /**
+   * Callback that produces the rendered value for a single field. Consumers
+   * usually adapt their FieldRenderer here.
+   */
+  renderField: (ctx: FieldSectionRenderContext<F>) => React.ReactNode
   /**
    * When set, the open/collapsed state is persisted to localStorage under
    * `kelta_detail_section_${persistKey}`. Survives navigation and reloads.
-   * Defer to a real user-prefs API when one exists.
    */
   persistKey?: string
 }
 
 const STORAGE_PREFIX = 'kelta_detail_section_'
+const REFERENCE_TYPES = new Set(['master_detail', 'lookup', 'reference'])
 
 function readPersistedOpen(persistKey: string | undefined, fallback: boolean): boolean {
   if (!persistKey || typeof window === 'undefined') return fallback
@@ -56,7 +65,7 @@ function readPersistedOpen(persistKey: string | undefined, fallback: boolean): b
     if (raw === '1') return true
     if (raw === '0') return false
   } catch {
-    // localStorage may be disabled (private mode, quota) — fall back silently
+    // ignore
   }
   return fallback
 }
@@ -66,20 +75,20 @@ function writePersistedOpen(persistKey: string | undefined, open: boolean): void
   try {
     window.localStorage.setItem(STORAGE_PREFIX + persistKey, open ? '1' : '0')
   } catch {
-    // ignore — see readPersistedOpen
+    // ignore
   }
 }
 
-export function FieldSection({
+export function FieldSection<F extends DetailField = DetailField>({
   title,
   fields,
   record,
-  tenantSlug,
   lookupDisplayMap,
   defaultCollapsed = false,
   columns = 2,
+  renderField,
   persistKey,
-}: FieldSectionProps): React.ReactElement | null {
+}: FieldSectionProps<F>): React.ReactElement | null {
   const [isOpen, setIsOpenState] = useState(() =>
     readPersistedOpen(persistKey, !defaultCollapsed)
   )
@@ -120,14 +129,13 @@ export function FieldSection({
           <div className="border-t border-border px-5 py-5">
             <div
               className="kelta-field-grid"
-              style={{ ['--kelta-grid-cols' as string]: String(columns) } as React.CSSProperties}
+              style={
+                { ['--kelta-grid-cols' as string]: String(columns) } as React.CSSProperties
+              }
             >
               {fields.map((field) => {
                 const value = record[field.name]
-                const isLookup =
-                  field.type === 'master_detail' ||
-                  field.type === 'lookup' ||
-                  field.type === 'reference'
+                const isLookup = REFERENCE_TYPES.has(field.type)
                 const displayLabel =
                   isLookup && lookupDisplayMap?.[field.name]
                     ? lookupDisplayMap[field.name][String(value)] || undefined
@@ -135,20 +143,9 @@ export function FieldSection({
 
                 return (
                   <div key={field.name} className="min-w-0 space-y-1">
-                    <dt className="kelta-field-label">
-                      {field.displayName || field.name}
-                    </dt>
+                    <dt className="kelta-field-label">{field.displayName || field.name}</dt>
                     <dd className="text-sm text-foreground">
-                      <FieldRenderer
-                        type={field.type}
-                        value={value}
-                        fieldName={field.name}
-                        displayName={field.displayName || field.name}
-                        tenantSlug={tenantSlug}
-                        targetCollection={field.referenceTarget}
-                        displayLabel={displayLabel}
-                        truncate={false}
-                      />
+                      {renderField({ field, value, displayLabel })}
                     </dd>
                   </div>
                 )

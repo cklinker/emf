@@ -11,6 +11,7 @@
 
 import React, { useMemo } from 'react'
 import { FieldSection } from '@/components/detail'
+import { FieldRenderer } from '@/components/FieldRenderer'
 import type { LayoutSectionDto, LayoutFieldPlacementDto } from '@/hooks/usePageLayout'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
@@ -122,16 +123,27 @@ export function LayoutFieldSections({
         if (fields.length === 0) return null
 
         return (
-          <FieldSection
+          <FieldSection<FieldDefinition>
             key={section.id}
             title={section.heading || 'Details'}
             fields={fields}
             record={record}
-            tenantSlug={tenantSlug}
             lookupDisplayMap={lookupDisplayMap}
             defaultCollapsed={section.collapsed}
             columns={(section.columns as 1 | 2 | 3 | 4) || 2}
             persistKey={persistKeyPrefix ? `${persistKeyPrefix}.${section.id}` : undefined}
+            renderField={({ field, value, displayLabel }) => (
+              <FieldRenderer
+                type={field.type}
+                value={value}
+                fieldName={field.name}
+                displayName={field.displayName || field.name}
+                tenantSlug={tenantSlug}
+                targetCollection={field.referenceTarget}
+                displayLabel={displayLabel}
+                truncate={false}
+              />
+            )}
           />
         )
       })}

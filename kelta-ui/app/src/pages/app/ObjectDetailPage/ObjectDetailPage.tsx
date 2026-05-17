@@ -758,13 +758,24 @@ export function ObjectDetailPage(): React.ReactElement {
             )}
 
             {detailFields.length > 0 && (
-              <FieldSection
+              <FieldSection<FieldDefinition>
                 title="Details"
                 fields={detailFields}
                 record={record}
-                tenantSlug={tenantSlug}
                 lookupDisplayMap={lookupDisplayMap}
                 persistKey={collectionName ? `${collectionName}.details` : undefined}
+                renderField={({ field, value, displayLabel }) => (
+                  <FieldRenderer
+                    type={field.type}
+                    value={value}
+                    fieldName={field.name}
+                    displayName={field.displayName || field.name}
+                    tenantSlug={tenantSlug}
+                    targetCollection={field.referenceTarget}
+                    displayLabel={displayLabel}
+                    truncate={false}
+                  />
+                )}
               />
             )}
           </div>

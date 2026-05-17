@@ -1,55 +1,32 @@
 /**
  * AddressMap
  *
- * Composite field section: address fields on the left, map on the right.
+ * Composite field section: address fields on the left, static-map image on
+ * the right (Mapbox when `VITE_MAPBOX_TOKEN` is set, else OpenStreetMap
+ * staticmap). Falls back to a stylized placeholder when no coords are
+ * present or when the tile request errors.
  *
- * The map auto-promotes from a stylized placeholder to a real static map
- * tile when the record exposes lat/lng:
- *   1. If a geolocation field is identified on the record (either via the
- *      `geoField` prop or auto-detected from `fields`) and contains valid
- *      coordinates, render a static-image map.
- *   2. Static-image provider is picked at build time:
- *        - When `VITE_MAPBOX_TOKEN` is set, use Mapbox Static Images
- *          (better quality, requires the tenant's Mapbox account)
- *        - Otherwise, fall back to OpenStreetMap's free staticmap.de
- *          service (no API key required, lower quality)
- *   3. When no coordinates are present, fall back to the original stylized
- *      placeholder.
- *
- * Real interactive maps (pan, zoom, custom markers) are a separate
- * follow-up — static images are a deliberate intermediate that covers most
- * record-detail use cases without adding ~600KB of map-engine JS to the
- * bundle.
+ * Migrated from kelta-ui/app. Uses a `renderField` slot prop so the
+ * package stays free of the consumer's FieldRenderer.
  */
 
 import React, { useState } from 'react'
 import { ChevronRight, MapPin } from 'lucide-react'
-import { Card } from '@/components/ui/card'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { FieldRenderer } from '@/components/FieldRenderer'
-import type { FieldDefinition } from '@/hooks/useCollectionSchema'
-import type { CollectionRecord } from '@/hooks/useCollectionRecords'
-import { cn } from '@/lib/utils'
+import { Card } from '../ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
+import { cn } from './_utils'
+import type { DetailField, FieldSectionRenderContext } from './FieldSection'
 
-export interface AddressMapProps {
+export interface AddressMapProps<F extends DetailField = DetailField> {
   title: string
-  /**
-   * Address fields to display on the left side. The first field is rendered
-   * full-width (typically "Street"); the remainder flow into a 2-column grid.
-   */
-  fields: FieldDefinition[]
-  /** Record-name fields used to compose the map-pin chip label */
+  fields: F[]
   mapLabelFields?: string[]
-  /**
-   * Field name on the record holding geolocation coordinates. The value is
-   * expected to be either `{ latitude, longitude }` or `{ lat, lng }`.
-   * Falls back to auto-detecting any `geolocation`-typed field in `fields`.
-   */
+  /** Record field holding `{ latitude, longitude }` or `{ lat, lng }` */
   geoField?: string
-  record: CollectionRecord
-  tenantSlug?: string
+  record: Record<string, unknown>
   lookupDisplayMap?: Record<string, Record<string, string>>
   defaultCollapsed?: boolean
+  renderField: (ctx: FieldSectionRenderContext<F>) => React.ReactNode
 }
 
 interface GeoPoint {
@@ -57,9 +34,11 @@ interface GeoPoint {
   lng: number
 }
 
-function extractGeoPoint(
-  record: CollectionRecord,
-  fields: FieldDefinition[],
+const REFERENCE_TYPES = new Set(['master_detail', 'lookup', 'reference'])
+
+function extractGeoPoint<F extends DetailField>(
+  record: Record<string, unknown>,
+  fields: F[],
   geoField: string | undefined
 ): GeoPoint | null {
   const fieldName =
@@ -75,29 +54,21 @@ function extractGeoPoint(
   return { lat, lng }
 }
 
-/**
- * Static-map image URL. Mapbox when the build has a token, else
- * OpenStreetMap's free staticmap service.
- */
 function staticMapUrl(point: GeoPoint, width: number, height: number): string {
-  const mapboxToken =
+  const env =
     typeof import.meta !== 'undefined' &&
     typeof (import.meta as { env?: Record<string, string | undefined> }).env !== 'undefined'
-      ? (import.meta as { env: Record<string, string | undefined> }).env.VITE_MAPBOX_TOKEN
+      ? (import.meta as { env: Record<string, string | undefined> }).env
       : undefined
-
+  const mapboxToken = env?.VITE_MAPBOX_TOKEN
   if (mapboxToken) {
-    const style =
-      (import.meta as { env: Record<string, string | undefined> }).env
-        .VITE_MAPBOX_STYLE ?? 'mapbox/dark-v11'
+    const style = env?.VITE_MAPBOX_STYLE ?? 'mapbox/dark-v11'
     return (
       `https://api.mapbox.com/styles/v1/${style}/static/` +
       `pin-l+3b82f6(${point.lng},${point.lat})/` +
       `${point.lng},${point.lat},14,0/${width}x${height}@2x?access_token=${mapboxToken}`
     )
   }
-
-  // OSM staticmap fallback — free, no key required.
   return (
     `https://staticmap.openstreetmap.de/staticmap.php?` +
     `center=${point.lat},${point.lng}&zoom=14&size=${width}x${height}` +
@@ -105,28 +76,25 @@ function staticMapUrl(point: GeoPoint, width: number, height: number): string {
   )
 }
 
-export function AddressMap({
+export function AddressMap<F extends DetailField = DetailField>({
   title,
   fields,
   mapLabelFields = [],
   geoField,
   record,
-  tenantSlug,
   lookupDisplayMap,
   defaultCollapsed = false,
-}: AddressMapProps): React.ReactElement | null {
+  renderField,
+}: AddressMapProps<F>): React.ReactElement | null {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed)
-
   if (fields.length === 0) return null
 
   const [streetField, ...restFields] = fields
-
   const mapLabel = mapLabelFields
     .map((f) => record[f])
     .filter((v) => v !== null && v !== undefined && v !== '')
     .map(String)
     .join(', ')
-
   const point = extractGeoPoint(record, fields, geoField)
 
   return (
@@ -158,37 +126,29 @@ export function AddressMap({
                     {streetField.displayName || streetField.name}
                   </dt>
                   <dd className="text-sm text-foreground">
-                    <FieldRenderer
-                      type={streetField.type}
-                      value={record[streetField.name]}
-                      fieldName={streetField.name}
-                      displayName={streetField.displayName || streetField.name}
-                      tenantSlug={tenantSlug}
-                      targetCollection={streetField.referenceTarget}
-                      truncate={false}
-                    />
+                    {renderField({
+                      field: streetField,
+                      value: record[streetField.name],
+                    })}
                   </dd>
                 </div>
               )}
-              {restFields.map((field) => (
-                <div key={field.name} className="min-w-0 space-y-1">
-                  <dt className="kelta-field-label">{field.displayName || field.name}</dt>
-                  <dd className="text-sm text-foreground">
-                    <FieldRenderer
-                      type={field.type}
-                      value={record[field.name]}
-                      fieldName={field.name}
-                      displayName={field.displayName || field.name}
-                      tenantSlug={tenantSlug}
-                      targetCollection={field.referenceTarget}
-                      displayLabel={
-                        lookupDisplayMap?.[field.name]?.[String(record[field.name])] || undefined
-                      }
-                      truncate={false}
-                    />
-                  </dd>
-                </div>
-              ))}
+              {restFields.map((field) => {
+                const value = record[field.name]
+                const isLookup = REFERENCE_TYPES.has(field.type)
+                const displayLabel =
+                  isLookup && lookupDisplayMap?.[field.name]
+                    ? lookupDisplayMap[field.name][String(value)] || undefined
+                    : undefined
+                return (
+                  <div key={field.name} className="min-w-0 space-y-1">
+                    <dt className="kelta-field-label">{field.displayName || field.name}</dt>
+                    <dd className="text-sm text-foreground">
+                      {renderField({ field, value, displayLabel })}
+                    </dd>
+                  </div>
+                )
+              })}
             </div>
 
             {point ? (

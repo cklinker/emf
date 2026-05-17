@@ -1,22 +1,13 @@
 /**
- * Detail-page components.
- *
- * - RecordHeader / StatStrip / ScoreCard / TagsCard / MetadataCard / AICard /
- *   Timeline / Crumb / RailRenderer live in `@kelta/components` so admin
- *   and runtime shells share them. Re-exported here so existing imports
- *   through `@/components/detail` continue to work.
- * - FieldSection / AddressMap remain local because they depend on this
- *   app's FieldRenderer; they migrate next with a `renderField` slot prop.
+ * Detail-page components. All live in `@kelta/components` now — this
+ * barrel re-exports them so existing imports through `@/components/detail`
+ * keep working.
  */
-
-export { FieldSection } from './FieldSection'
-export type { FieldSectionProps } from './FieldSection'
-
-export { AddressMap } from './AddressMap'
-export type { AddressMapProps } from './AddressMap'
 
 export {
   RecordHeader,
+  FieldSection,
+  AddressMap,
   StatStrip,
   ScoreCard,
   TagsCard,
@@ -31,6 +22,10 @@ export type {
   RecordHeaderMetaField,
   RecordHeaderAction,
   RecordHeaderProps,
+  FieldSectionProps,
+  FieldSectionRenderContext,
+  DetailField,
+  AddressMapProps,
   StatStripProps,
   StatTileConfig,
   StatTileKind,

@@ -4,22 +4,22 @@
  * specific event-type schema.
  */
 
-import React from 'react'
-import { cn } from './_utils'
+import React from 'react';
+import { cn } from './_utils';
 
-export type TimelineTone = 'default' | 'brand' | 'success' | 'warning' | 'danger'
+export type TimelineTone = 'default' | 'brand' | 'success' | 'warning' | 'danger';
 
 export interface TimelineEvent {
-  at: string
-  icon?: React.ReactNode
-  tone?: TimelineTone
-  title: string
-  body?: string
+  at: string;
+  icon?: React.ReactNode;
+  tone?: TimelineTone;
+  title: string;
+  body?: string;
 }
 
 export interface TimelineConfig {
-  title: string
-  events: TimelineEvent[]
+  title: string;
+  events: TimelineEvent[];
 }
 
 const TONE_CLASS: Record<TimelineTone, string> = {
@@ -28,17 +28,17 @@ const TONE_CLASS: Record<TimelineTone, string> = {
   success: 'bg-emerald-500/10 text-emerald-400',
   warning: 'bg-amber-500/10 text-amber-400',
   danger: 'bg-red-500/10 text-red-400',
-}
+};
 
 export function Timeline({
   config,
   className,
 }: {
-  config: TimelineConfig
-  className?: string
+  config: TimelineConfig;
+  className?: string;
 }): React.ReactElement | null {
-  const { title, events } = config
-  if (events.length === 0) return null
+  const { title, events } = config;
+  if (events.length === 0) return null;
   return (
     <div
       data-component="Timeline"
@@ -50,7 +50,7 @@ export function Timeline({
       <div className="border-t border-border px-5 py-4">
         <ol className="relative">
           {events.map((event, idx) => {
-            const isLast = idx === events.length - 1
+            const isLast = idx === events.length - 1;
             return (
               <li
                 key={`${event.title}-${idx}`}
@@ -78,15 +78,13 @@ export function Timeline({
                       {event.at}
                     </span>
                   </div>
-                  {event.body && (
-                    <p className="text-[13px] text-muted-foreground">{event.body}</p>
-                  )}
+                  {event.body && <p className="text-[13px] text-muted-foreground">{event.body}</p>}
                 </div>
               </li>
-            )
+            );
           })}
         </ol>
       </div>
     </div>
-  )
+  );
 }

@@ -2,41 +2,41 @@
  * ScoreCard — 0–100 score card with gradient progress bar + sub-metric grid.
  */
 
-import React from 'react'
-import { cn } from './_utils'
+import React from 'react';
+import { cn } from './_utils';
 
-export type ScoreTone = 'success' | 'warning' | 'danger'
+export type ScoreTone = 'success' | 'warning' | 'danger';
 
 export interface ScoreMetric {
-  label: string
-  value: string
-  ok?: boolean
+  label: string;
+  value: string;
+  ok?: boolean;
 }
 
 export interface ScoreCardConfig {
-  title: string
-  score: number
-  statusLabel?: string
-  tone?: ScoreTone
-  delta?: string
-  metrics?: ScoreMetric[]
+  title: string;
+  score: number;
+  statusLabel?: string;
+  tone?: ScoreTone;
+  delta?: string;
+  metrics?: ScoreMetric[];
 }
 
 const TONE_PILL: Record<ScoreTone, string> = {
   success: 'bg-emerald-500/10 text-emerald-400',
   warning: 'bg-amber-500/10 text-amber-400',
   danger: 'bg-red-500/10 text-red-400',
-}
+};
 
 export function ScoreCard({
   config,
   className,
 }: {
-  config: ScoreCardConfig
-  className?: string
+  config: ScoreCardConfig;
+  className?: string;
 }): React.ReactElement {
-  const { title, score, statusLabel, tone = 'success', delta, metrics = [] } = config
-  const clamped = Math.max(0, Math.min(100, score))
+  const { title, score, statusLabel, tone = 'success', delta, metrics = [] } = config;
+  const clamped = Math.max(0, Math.min(100, score));
 
   return (
     <div
@@ -93,5 +93,5 @@ export function ScoreCard({
         )}
       </div>
     </div>
-  )
+  );
 }

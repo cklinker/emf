@@ -2,21 +2,21 @@
  * TagsCard — header with optional `+` action + flex row of tone-tinted pills.
  */
 
-import React from 'react'
-import { Plus } from 'lucide-react'
-import { cn } from './_utils'
+import React from 'react';
+import { Plus } from 'lucide-react';
+import { cn } from './_utils';
 
-export type TagTone = 'default' | 'brand' | 'success' | 'warning' | 'danger'
+export type TagTone = 'default' | 'brand' | 'success' | 'warning' | 'danger';
 
 export interface TagItem {
-  label: string
-  tone?: TagTone
+  label: string;
+  tone?: TagTone;
 }
 
 export interface TagsCardConfig {
-  title: string
-  tags: TagItem[]
-  onAdd?: () => void
+  title: string;
+  tags: TagItem[];
+  onAdd?: () => void;
 }
 
 const TONE_CLASS: Record<TagTone, string> = {
@@ -25,17 +25,17 @@ const TONE_CLASS: Record<TagTone, string> = {
   success: 'bg-emerald-500/10 text-emerald-400',
   warning: 'bg-amber-500/10 text-amber-400',
   danger: 'bg-red-500/10 text-red-400',
-}
+};
 
 export function TagsCard({
   config,
   className,
 }: {
-  config: TagsCardConfig
-  className?: string
+  config: TagsCardConfig;
+  className?: string;
 }): React.ReactElement | null {
-  const { title, tags, onAdd } = config
-  if (tags.length === 0 && !onAdd) return null
+  const { title, tags, onAdd } = config;
+  if (tags.length === 0 && !onAdd) return null;
 
   return (
     <div
@@ -75,5 +75,5 @@ export function TagsCard({
         )}
       </div>
     </div>
-  )
+  );
 }

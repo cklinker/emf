@@ -2,29 +2,29 @@
  * MetadataCard — label/value list separated by 1px dashed dividers.
  */
 
-import React from 'react'
-import { cn } from './_utils'
+import React from 'react';
+import { cn } from './_utils';
 
 export interface MetadataRow {
-  label: string
-  value: React.ReactNode
-  mono?: boolean
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
 }
 
 export interface MetadataCardConfig {
-  title: string
-  rows: MetadataRow[]
+  title: string;
+  rows: MetadataRow[];
 }
 
 export function MetadataCard({
   config,
   className,
 }: {
-  config: MetadataCardConfig
-  className?: string
+  config: MetadataCardConfig;
+  className?: string;
 }): React.ReactElement | null {
-  const { title, rows } = config
-  if (rows.length === 0) return null
+  const { title, rows } = config;
+  if (rows.length === 0) return null;
 
   return (
     <div
@@ -55,5 +55,5 @@ export function MetadataCard({
         </dl>
       </div>
     </div>
-  )
+  );
 }

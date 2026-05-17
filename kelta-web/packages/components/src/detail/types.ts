@@ -6,30 +6,30 @@
  */
 
 export interface RecordHeaderConfigDto {
-  titleFields?: string[]
-  avatarFrom?: string[]
-  metaFields?: Array<{ key: string; icon?: string; prefix?: string }>
+  titleFields?: string[];
+  avatarFrom?: string[];
+  metaFields?: Array<{ key: string; icon?: string; prefix?: string }>;
 }
 
 export type RailBlockDto =
   | {
-      kind: 'metadataCard'
+      kind: 'metadataCard';
       config: {
-        title: string
-        rows: Array<{ label: string; value: string; mono?: boolean }>
-      }
+        title: string;
+        rows: Array<{ label: string; value: string; mono?: boolean }>;
+      };
     }
   | { kind: 'statStrip'; config: { tiles: Array<Record<string, unknown>> } }
   | { kind: 'scoreCard'; config: Record<string, unknown> }
   | {
-      kind: 'tagsCard'
-      config: { title: string; tags: Array<{ label: string; tone?: string }> }
+      kind: 'tagsCard';
+      config: { title: string; tags: Array<{ label: string; tone?: string }> };
     }
   | {
-      kind: 'aiCard'
-      config: { title: string; summary: string; actions?: Array<{ label: string }> }
+      kind: 'aiCard';
+      config: { title: string; summary: string; actions?: Array<{ label: string }> };
     }
   | {
-      kind: 'timeline'
-      config: { title: string; events: Array<Record<string, unknown>> }
-    }
+      kind: 'timeline';
+      config: { title: string; events: Array<Record<string, unknown>> };
+    };

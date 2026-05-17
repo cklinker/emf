@@ -4,42 +4,34 @@
  * adding a new server-side kind doesn't crash older clients.
  */
 
-import React from 'react'
-import { MetadataCard } from './MetadataCard'
-import { StatStrip } from './StatStrip'
-import { ScoreCard, type ScoreCardConfig } from './ScoreCard'
-import { TagsCard, type TagTone } from './TagsCard'
-import { AICard } from './AICard'
-import { Timeline, type TimelineEvent, type TimelineTone } from './Timeline'
-import type { StatTileConfig } from './StatStrip'
-import type { RailBlockDto } from './types'
+import React from 'react';
+import { MetadataCard } from './MetadataCard';
+import { StatStrip } from './StatStrip';
+import { ScoreCard, type ScoreCardConfig } from './ScoreCard';
+import { TagsCard, type TagTone } from './TagsCard';
+import { AICard } from './AICard';
+import { Timeline, type TimelineEvent, type TimelineTone } from './Timeline';
+import type { StatTileConfig } from './StatStrip';
+import type { RailBlockDto } from './types';
 
 export interface RailRendererProps {
-  blocks: RailBlockDto[]
+  blocks: RailBlockDto[];
 }
 
 export function RailRenderer({ blocks }: RailRendererProps): React.ReactElement {
   return (
     <>
       {blocks.map((block, idx) => {
-        const key = `${block.kind}-${idx}`
+        const key = `${block.kind}-${idx}`;
         switch (block.kind) {
           case 'metadataCard':
-            return <MetadataCard key={key} config={block.config} />
+            return <MetadataCard key={key} config={block.config} />;
           case 'statStrip':
             return (
-              <StatStrip
-                key={key}
-                tiles={block.config.tiles as unknown as StatTileConfig[]}
-              />
-            )
+              <StatStrip key={key} tiles={block.config.tiles as unknown as StatTileConfig[]} />
+            );
           case 'scoreCard':
-            return (
-              <ScoreCard
-                key={key}
-                config={block.config as unknown as ScoreCardConfig}
-              />
-            )
+            return <ScoreCard key={key} config={block.config as unknown as ScoreCardConfig} />;
           case 'tagsCard':
             return (
               <TagsCard
@@ -52,7 +44,7 @@ export function RailRenderer({ blocks }: RailRendererProps): React.ReactElement 
                   })),
                 }}
               />
-            )
+            );
           case 'aiCard':
             return (
               <AICard
@@ -66,7 +58,7 @@ export function RailRenderer({ blocks }: RailRendererProps): React.ReactElement 
                   })),
                 }}
               />
-            )
+            );
           case 'timeline':
             return (
               <Timeline
@@ -74,21 +66,21 @@ export function RailRenderer({ blocks }: RailRendererProps): React.ReactElement 
                 config={{
                   title: block.config.title,
                   events: (block.config.events as unknown[]).map((e) => {
-                    const ev = e as Record<string, unknown>
+                    const ev = e as Record<string, unknown>;
                     return {
                       at: String(ev.at ?? ''),
                       title: String(ev.title ?? ''),
                       body: ev.body ? String(ev.body) : undefined,
                       tone: (ev.tone as TimelineTone | undefined) ?? 'default',
-                    } satisfies TimelineEvent
+                    } satisfies TimelineEvent;
                   }),
                 }}
               />
-            )
+            );
           default:
-            return null
+            return null;
         }
       })}
     </>
-  )
+  );
 }

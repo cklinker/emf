@@ -3,33 +3,33 @@
  * 12px outer radius. See the design handoff for the visual reference.
  */
 
-import React from 'react'
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
-import { cn } from './_utils'
+import React from 'react';
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { cn } from './_utils';
 
-export type StatTileKind = 'currency' | 'number' | 'text'
+export type StatTileKind = 'currency' | 'number' | 'text';
 
 export interface StatTileTrend {
-  dir: 'up' | 'down'
-  label: string
+  dir: 'up' | 'down';
+  label: string;
 }
 
 export interface StatTileConfig {
-  label: string
-  value: string
-  kind?: StatTileKind
-  icon?: React.ReactNode
-  trend?: StatTileTrend
-  sub?: string
+  label: string;
+  value: string;
+  kind?: StatTileKind;
+  icon?: React.ReactNode;
+  trend?: StatTileTrend;
+  sub?: string;
 }
 
 export interface StatStripProps {
-  tiles: StatTileConfig[]
-  className?: string
+  tiles: StatTileConfig[];
+  className?: string;
 }
 
 export function StatStrip({ tiles, className }: StatStripProps): React.ReactElement | null {
-  if (tiles.length === 0) return null
+  if (tiles.length === 0) return null;
   return (
     <div
       data-component="StatStrip"
@@ -43,7 +43,7 @@ export function StatStrip({ tiles, className }: StatStripProps): React.ReactElem
         <StatTile key={`${tile.label}-${idx}`} tile={tile} />
       ))}
     </div>
-  )
+  );
 }
 
 function StatTile({ tile }: { tile: StatTileConfig }): React.ReactElement {
@@ -83,5 +83,5 @@ function StatTile({ tile }: { tile: StatTileConfig }): React.ReactElement {
         </div>
       )}
     </div>
-  )
+  );
 }

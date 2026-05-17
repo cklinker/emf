@@ -9,33 +9,28 @@
  * pass.
  */
 
-export { StatStrip } from './StatStrip'
-export type {
-  StatStripProps,
-  StatTileConfig,
-  StatTileKind,
-  StatTileTrend,
-} from './StatStrip'
+export { StatStrip } from './StatStrip';
+export type { StatStripProps, StatTileConfig, StatTileKind, StatTileTrend } from './StatStrip';
 
-export { ScoreCard } from './ScoreCard'
-export type { ScoreCardConfig, ScoreMetric, ScoreTone } from './ScoreCard'
+export { ScoreCard } from './ScoreCard';
+export type { ScoreCardConfig, ScoreMetric, ScoreTone } from './ScoreCard';
 
-export { TagsCard } from './TagsCard'
-export type { TagsCardConfig, TagItem, TagTone } from './TagsCard'
+export { TagsCard } from './TagsCard';
+export type { TagsCardConfig, TagItem, TagTone } from './TagsCard';
 
-export { MetadataCard } from './MetadataCard'
-export type { MetadataCardConfig, MetadataRow } from './MetadataCard'
+export { MetadataCard } from './MetadataCard';
+export type { MetadataCardConfig, MetadataRow } from './MetadataCard';
 
-export { AICard } from './AICard'
-export type { AICardConfig, AIActionConfig } from './AICard'
+export { AICard } from './AICard';
+export type { AICardConfig, AIActionConfig } from './AICard';
 
-export { Timeline } from './Timeline'
-export type { TimelineConfig, TimelineEvent, TimelineTone } from './Timeline'
+export { Timeline } from './Timeline';
+export type { TimelineConfig, TimelineEvent, TimelineTone } from './Timeline';
 
-export { Crumb } from './Crumb'
-export type { CrumbItem, CrumbPosition, CrumbProps } from './Crumb'
+export { Crumb } from './Crumb';
+export type { CrumbItem, CrumbPosition, CrumbProps } from './Crumb';
 
-export { RailRenderer } from './RailRenderer'
-export type { RailRendererProps } from './RailRenderer'
+export { RailRenderer } from './RailRenderer';
+export type { RailRendererProps } from './RailRenderer';
 
-export type { RailBlockDto, RecordHeaderConfigDto } from './types'
+export type { RailBlockDto, RecordHeaderConfigDto } from './types';

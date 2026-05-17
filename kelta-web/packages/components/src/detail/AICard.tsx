@@ -2,30 +2,30 @@
  * AICard — cyan-tinted card with brand-gradient sparkles icon + summary.
  */
 
-import React from 'react'
-import { Sparkles } from 'lucide-react'
-import { cn } from './_utils'
+import React from 'react';
+import { Sparkles } from 'lucide-react';
+import { cn } from './_utils';
 
 export interface AIActionConfig {
-  label: string
-  icon?: React.ReactNode
-  onClick: () => void
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
 }
 
 export interface AICardConfig {
-  title: string
-  summary: string
-  actions?: AIActionConfig[]
+  title: string;
+  summary: string;
+  actions?: AIActionConfig[];
 }
 
 export function AICard({
   config,
   className,
 }: {
-  config: AICardConfig
-  className?: string
+  config: AICardConfig;
+  className?: string;
 }): React.ReactElement {
-  const { title, summary, actions = [] } = config
+  const { title, summary, actions = [] } = config;
   return (
     <div
       data-component="AICard"
@@ -64,5 +64,5 @@ export function AICard({
         )}
       </div>
     </div>
-  )
+  );
 }

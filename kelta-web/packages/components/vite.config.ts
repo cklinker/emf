@@ -36,6 +36,8 @@ export default defineConfig({
         '@tanstack/react-query',
         '@kelta/sdk',
         '@kelta/formula',
+        'clsx',
+        'lucide-react',
       ],
       output: {
         globals: {
@@ -47,6 +49,8 @@ export default defineConfig({
           '@tanstack/react-query': 'ReactQuery',
           '@kelta/sdk': 'KeltaSdk',
           '@kelta/formula': 'KeltaFormula',
+          clsx: 'clsx',
+          'lucide-react': 'LucideReact',
         },
       },
     },

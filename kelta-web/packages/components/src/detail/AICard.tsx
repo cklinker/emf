@@ -1,41 +1,33 @@
 /**
- * AICard
- *
- * Cyan-tinted card with a brand-gradient icon tile, summary paragraph, and a
- * row of small ghost-button AI actions. Matches the design handoff at
- * `design_handoff_kelta_detail_layout/`.
+ * AICard — cyan-tinted card with brand-gradient sparkles icon + summary.
  */
 
-import React from 'react'
-import { Sparkles } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import React from 'react';
+import { Sparkles } from 'lucide-react';
+import { cn } from './_utils';
 
 export interface AIActionConfig {
-  label: string
-  icon?: React.ReactNode
-  onClick: () => void
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
 }
 
 export interface AICardConfig {
-  title: string
-  /** Markdown-free summary text */
-  summary: string
-  actions?: AIActionConfig[]
+  title: string;
+  summary: string;
+  actions?: AIActionConfig[];
 }
 
 export function AICard({
   config,
   className,
 }: {
-  config: AICardConfig
-  className?: string
+  config: AICardConfig;
+  className?: string;
 }): React.ReactElement {
-  const { title, summary, actions = [] } = config
-
+  const { title, summary, actions = [] } = config;
   return (
-    <Card
+    <div
       data-component="AICard"
       className={cn(
         'relative overflow-hidden rounded-xl border border-border bg-card',
@@ -44,7 +36,7 @@ export function AICard({
         className
       )}
     >
-      <CardContent className="relative space-y-3 px-5 py-4">
+      <div className="relative space-y-3 px-5 py-4">
         <div className="flex items-center gap-2">
           <span
             className="inline-flex h-6 w-6 items-center justify-center rounded-md kelta-brand-gradient text-white shadow-[0_6px_14px_-4px_rgba(59,130,246,0.5)]"
@@ -58,20 +50,19 @@ export function AICard({
         {actions.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {actions.map((action, idx) => (
-              <Button
+              <button
                 key={`${action.label}-${idx}`}
-                size="sm"
-                variant="ghost"
+                type="button"
                 onClick={action.onClick}
-                className="h-7 px-2 text-[12px]"
+                className="inline-flex h-7 items-center rounded-md px-2 text-[12px] text-foreground hover:bg-accent"
               >
                 {action.icon && <span className="mr-1 inline-flex">{action.icon}</span>}
                 {action.label}
-              </Button>
+              </button>
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
-  )
+      </div>
+    </div>
+  );
 }

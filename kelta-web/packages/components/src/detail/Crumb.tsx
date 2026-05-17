@@ -1,33 +1,29 @@
 /**
- * Crumb
+ * Crumb — breadcrumb trail with optional N-of-M record stepper.
  *
- * Breadcrumb trail + optional prev/next stepper for record detail pages.
- * Matches the design handoff at `design_handoff_kelta_detail_layout/`.
- *
- * Renders a chevron-separated trail of links followed by an optional
- * "N of M" record stepper with 1px square nav buttons.
+ * Uses react-router-dom's Link when an internal route is provided; falls
+ * back to a plain anchor otherwise.
  */
 
-import React from 'react'
-import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import React from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export interface CrumbItem {
-  label: string
-  /** Internal route to navigate to. Omit for the current/last crumb. */
-  to?: string
+  label: string;
+  to?: string;
 }
 
 export interface CrumbPosition {
-  index: number
-  total: number
-  onPrev?: () => void
-  onNext?: () => void
+  index: number;
+  total: number;
+  onPrev?: () => void;
+  onNext?: () => void;
 }
 
 export interface CrumbProps {
-  trail: CrumbItem[]
-  position?: CrumbPosition
+  trail: CrumbItem[];
+  position?: CrumbPosition;
 }
 
 export function Crumb({ trail, position }: CrumbProps): React.ReactElement {
@@ -39,14 +35,11 @@ export function Crumb({ trail, position }: CrumbProps): React.ReactElement {
     >
       <ol className="flex min-w-0 items-center gap-1.5 text-[13px]">
         {trail.map((item, idx) => {
-          const isLast = idx === trail.length - 1
+          const isLast = idx === trail.length - 1;
           return (
             <li key={`${item.label}-${idx}`} className="flex items-center gap-1.5">
               {idx > 0 && (
-                <ChevronRight
-                  className="h-3.5 w-3.5 text-muted-foreground/60"
-                  aria-hidden="true"
-                />
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" aria-hidden="true" />
               )}
               {item.to && !isLast ? (
                 <Link
@@ -64,7 +57,7 @@ export function Crumb({ trail, position }: CrumbProps): React.ReactElement {
                 </span>
               )}
             </li>
-          )
+          );
         })}
       </ol>
 
@@ -94,5 +87,5 @@ export function Crumb({ trail, position }: CrumbProps): React.ReactElement {
         </div>
       )}
     </nav>
-  )
+  );
 }

@@ -1,45 +1,35 @@
 /**
- * StatStrip
- *
- * Horizontal strip of equal-width stat tiles separated by 1px borders (no
- * gaps), wrapped in a 12px-radius card. Each tile shows a label + optional
- * icon, a 24/600 value with tabular numerals, and an optional trend chip +
- * subtitle. Matches the design handoff at
- * `design_handoff_kelta_detail_layout/`.
+ * StatStrip — equal-width tile strip with 1px borders between, no gaps,
+ * 12px outer radius. See the design handoff for the visual reference.
  */
 
-import React from 'react'
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import React from 'react';
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { cn } from './_utils';
 
-export type StatTileKind = 'currency' | 'number' | 'text'
+export type StatTileKind = 'currency' | 'number' | 'text';
 
 export interface StatTileTrend {
-  /** `up` renders green, `down` renders red */
-  dir: 'up' | 'down'
-  /** e.g. `+12.4% YoY` */
-  label: string
+  dir: 'up' | 'down';
+  label: string;
 }
 
 export interface StatTileConfig {
-  label: string
-  /** Pre-formatted value to display (already locale-formatted) */
-  value: string
-  kind?: StatTileKind
-  icon?: React.ReactNode
-  trend?: StatTileTrend
-  /** Small muted line under the value/trend */
-  sub?: string
+  label: string;
+  value: string;
+  kind?: StatTileKind;
+  icon?: React.ReactNode;
+  trend?: StatTileTrend;
+  sub?: string;
 }
 
 export interface StatStripProps {
-  tiles: StatTileConfig[]
-  className?: string
+  tiles: StatTileConfig[];
+  className?: string;
 }
 
 export function StatStrip({ tiles, className }: StatStripProps): React.ReactElement | null {
-  if (tiles.length === 0) return null
-
+  if (tiles.length === 0) return null;
   return (
     <div
       data-component="StatStrip"
@@ -53,7 +43,7 @@ export function StatStrip({ tiles, className }: StatStripProps): React.ReactElem
         <StatTile key={`${tile.label}-${idx}`} tile={tile} />
       ))}
     </div>
-  )
+  );
 }
 
 function StatTile({ tile }: { tile: StatTileConfig }): React.ReactElement {
@@ -93,5 +83,5 @@ function StatTile({ tile }: { tile: StatTileConfig }): React.ReactElement {
         </div>
       )}
     </div>
-  )
+  );
 }

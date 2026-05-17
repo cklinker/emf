@@ -1,3 +1,16 @@
+/**
+ * Detail-page components.
+ *
+ * - StatStrip / ScoreCard / TagsCard / MetadataCard / AICard / Timeline /
+ *   Crumb / RailRenderer now live in `@kelta/components` so admin + runtime
+ *   shells share them. They're re-exported here so existing imports through
+ *   `@/components/detail` continue to work.
+ * - RecordHeader / FieldSection / AddressMap remain local because they
+ *   depend on this app's FieldRenderer and Radix-backed DropdownMenu /
+ *   Collapsible primitives; they migrate in a follow-up once the consumer
+ *   contract is stabilized.
+ */
+
 export { RecordHeader } from './RecordHeader'
 export type {
   RecordHeaderConfig,
@@ -9,29 +22,39 @@ export type {
 export { FieldSection } from './FieldSection'
 export type { FieldSectionProps } from './FieldSection'
 
-export { Crumb } from './Crumb'
-export type { CrumbItem, CrumbPosition, CrumbProps } from './Crumb'
-
-export { StatStrip } from './StatStrip'
-export type { StatStripProps, StatTileConfig, StatTileKind, StatTileTrend } from './StatStrip'
-
-export { ScoreCard } from './ScoreCard'
-export type { ScoreCardConfig, ScoreMetric, ScoreTone } from './ScoreCard'
-
-export { TagsCard } from './TagsCard'
-export type { TagsCardConfig, TagItem, TagTone } from './TagsCard'
-
-export { MetadataCard } from './MetadataCard'
-export type { MetadataCardConfig, MetadataRow } from './MetadataCard'
-
-export { AICard } from './AICard'
-export type { AICardConfig, AIActionConfig } from './AICard'
-
-export { Timeline } from './Timeline'
-export type { TimelineConfig, TimelineEvent, TimelineTone } from './Timeline'
-
 export { AddressMap } from './AddressMap'
 export type { AddressMapProps } from './AddressMap'
 
-export { RailRenderer } from './RailRenderer'
-export type { RailRendererProps } from './RailRenderer'
+export {
+  StatStrip,
+  ScoreCard,
+  TagsCard,
+  MetadataCard,
+  AICard,
+  Timeline,
+  Crumb,
+  RailRenderer,
+} from '@kelta/components'
+export type {
+  StatStripProps,
+  StatTileConfig,
+  StatTileKind,
+  StatTileTrend,
+  ScoreCardConfig,
+  ScoreMetric,
+  ScoreTone,
+  TagsCardConfig,
+  TagItem,
+  TagTone,
+  MetadataCardConfig,
+  MetadataRow,
+  AICardConfig,
+  AIActionConfig,
+  TimelineConfig,
+  TimelineEvent,
+  TimelineTone,
+  CrumbItem,
+  CrumbPosition,
+  CrumbProps,
+  RailRendererProps,
+} from '@kelta/components'

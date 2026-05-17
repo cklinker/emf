@@ -31,6 +31,13 @@ services:
   cerbos:
     container_name: !reset null
     ports: !reset []
+    # Bind mounts don't work with the remote k8s-runner Docker daemon —
+    # bake config + policies into a CI-only image instead.
+    build:
+      context: ./docker/cerbos
+      dockerfile: Dockerfile.ci
+    image: kelta-cerbos-ci:local
+    volumes: !reset []
 
   kelta-auth:
     build:

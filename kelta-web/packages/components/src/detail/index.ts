@@ -1,13 +1,22 @@
 /**
- * Detail-page rail block components. Mirror the design handoff at
+ * Detail-page components. Mirror the design handoff at
  * `design_handoff_kelta_detail_layout/` and are consumed by Kelta's
  * record-detail page (kelta-ui/app/src/pages/app/ObjectDetailPage).
  *
- * RecordHeader / FieldSection / AddressMap remain in kelta-ui/app for now
- * because they depend on the consumer's FieldRenderer + DropdownMenu /
- * Collapsible primitives; those land in @kelta/components in a separate
- * pass.
+ * RecordHeader now lives here too; it depends on the package-local UI
+ * primitives in `../ui/` (Button, Badge, DropdownMenu). FieldSection +
+ * AddressMap still live in kelta-ui/app because they depend on the
+ * consumer's FieldRenderer; they migrate in a separate pass that adds a
+ * `renderField` slot prop.
  */
+
+export { RecordHeader } from './RecordHeader';
+export type {
+  RecordHeaderConfig,
+  RecordHeaderMetaField,
+  RecordHeaderAction,
+  RecordHeaderProps,
+} from './RecordHeader';
 
 export { StatStrip } from './StatStrip';
 export type { StatStripProps, StatTileConfig, StatTileKind, StatTileTrend } from './StatStrip';

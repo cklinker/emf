@@ -5,65 +5,48 @@
  * detail page. Matches the design handoff at
  * `design_handoff_kelta_detail_layout/`.
  *
- * Configurable via `RecordHeaderConfig`. When no config is supplied, sensible
- * defaults are derived from the record + schema (title from display field,
- * initials from title, no meta row, generic actions).
+ * Migrated from kelta-ui/app so admin + runtime shells share the same
+ * implementation. Uses the local UI primitives in `../ui/` so no consumer
+ * primitive dependency.
  */
 
-import React, { useCallback, useMemo, useState } from 'react'
-import { Check, Copy, MoreHorizontal } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { cn } from '@/lib/utils'
+import React, { useCallback, useMemo, useState } from 'react';
+import { Check, Copy, MoreHorizontal } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { cn } from './_utils';
 
 export interface RecordHeaderMetaField {
-  /** Field name on the record to display */
-  key: string
-  /** Lucide icon name — already-imported icon element */
-  icon?: React.ReactNode
-  /** Optional prefix string (e.g. "Joined ") */
-  prefix?: string
+  key: string;
+  icon?: React.ReactNode;
+  prefix?: string;
 }
 
 export interface RecordHeaderAction {
-  label: string
-  icon?: React.ReactNode
-  onClick: () => void
-  variant?: 'primary' | 'ghost'
-  testId?: string
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  variant?: 'primary' | 'ghost';
+  testId?: string;
 }
 
 export interface RecordHeaderConfig {
-  /** Field names whose values are joined by space to form the title */
-  titleFields?: string[]
-  /** Field names whose first chars build the 2-char avatar initials */
-  avatarFrom?: string[]
-  /** Meta items shown beneath the title, separated by `·` */
-  metaFields?: RecordHeaderMetaField[]
+  titleFields?: string[];
+  avatarFrom?: string[];
+  metaFields?: RecordHeaderMetaField[];
 }
 
 export interface RecordHeaderProps {
-  /** Optional layout-driven config; when absent, defaults are derived */
-  config?: RecordHeaderConfig
-  /** Record data */
-  record: Record<string, unknown>
-  /** Record id (rendered as a monospaced pill with a copy button) */
-  recordId: string
-  /** Collection display label (e.g. "Customer") */
-  collectionLabel: string
-  /** Derived title fallback when config.titleFields not supplied */
-  fallbackTitle: string
-  /** Actions cluster on the right */
-  actions?: RecordHeaderAction[]
-  /** Menu items shown under the `…` trigger */
-  moreMenu?: React.ReactNode
-  /** Show online presence dot on the avatar (default false) */
-  showPresence?: boolean
+  config?: RecordHeaderConfig;
+  record: Record<string, unknown>;
+  recordId: string;
+  collectionLabel: string;
+  fallbackTitle: string;
+  actions?: RecordHeaderAction[];
+  /** Items rendered inside the `…` More-actions DropdownMenu */
+  moreMenu?: React.ReactNode;
+  showPresence?: boolean;
 }
 
 function computeInitials(
@@ -74,18 +57,18 @@ function computeInitials(
   if (avatarFrom && avatarFrom.length > 0) {
     const chars = avatarFrom
       .map((f) => {
-        const v = record[f]
-        return typeof v === 'string' && v.length > 0 ? v.charAt(0).toUpperCase() : ''
+        const v = record[f];
+        return typeof v === 'string' && v.length > 0 ? v.charAt(0).toUpperCase() : '';
       })
       .filter(Boolean)
-      .join('')
-    if (chars) return chars.slice(0, 2)
+      .join('');
+    if (chars) return chars.slice(0, 2);
   }
-  const parts = fallbackTitle.trim().split(/\s+/)
+  const parts = fallbackTitle.trim().split(/\s+/);
   if (parts.length >= 2) {
-    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
   }
-  return fallbackTitle.charAt(0).toUpperCase() || '?'
+  return fallbackTitle.charAt(0).toUpperCase() || '?';
 }
 
 function computeTitle(
@@ -99,10 +82,10 @@ function computeTitle(
       .filter((v) => v !== null && v !== undefined && v !== '')
       .map(String)
       .join(' ')
-      .trim()
-    if (joined) return joined
+      .trim();
+    if (joined) return joined;
   }
-  return fallbackTitle
+  return fallbackTitle;
 }
 
 export function RecordHeader({
@@ -115,24 +98,24 @@ export function RecordHeader({
   moreMenu,
   showPresence = false,
 }: RecordHeaderProps): React.ReactElement {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
 
   const initials = useMemo(
     () => computeInitials(record, config?.avatarFrom, fallbackTitle),
     [record, config?.avatarFrom, fallbackTitle]
-  )
+  );
 
   const title = useMemo(
     () => computeTitle(record, config?.titleFields, fallbackTitle),
     [record, config?.titleFields, fallbackTitle]
-  )
+  );
 
   const copyId = useCallback(() => {
     void navigator.clipboard.writeText(recordId).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1200)
-    })
-  }, [recordId])
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    });
+  }, [recordId]);
 
   return (
     <header
@@ -171,32 +154,33 @@ export function RecordHeader({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[13px] text-muted-foreground">
               {config.metaFields
                 .map((m, idx) => {
-                  const value = record[m.key]
-                  if (value === null || value === undefined || value === '') return null
+                  const value = record[m.key];
+                  if (value === null || value === undefined || value === '') return null;
                   return (
-                    <span
-                      key={`${m.key}-${idx}`}
-                      className="inline-flex items-center gap-1.5"
-                    >
+                    <span key={`${m.key}-${idx}`} className="inline-flex items-center gap-1.5">
                       {m.icon}
                       <span className="truncate">
                         {m.prefix}
                         {String(value)}
                       </span>
                     </span>
-                  )
+                  );
                 })
                 .filter(Boolean)
                 .reduce<React.ReactNode[]>((acc, node, idx) => {
                   if (idx > 0) {
                     acc.push(
-                      <span key={`sep-${idx}`} aria-hidden="true" className="text-muted-foreground/50">
+                      <span
+                        key={`sep-${idx}`}
+                        aria-hidden="true"
+                        className="text-muted-foreground/50"
+                      >
                         ·
                       </span>
-                    )
+                    );
                   }
-                  acc.push(node)
-                  return acc
+                  acc.push(node);
+                  return acc;
                 }, [])}
             </div>
           )}
@@ -231,5 +215,5 @@ export function RecordHeader({
         </div>
       )}
     </header>
-  )
+  );
 }

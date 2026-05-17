@@ -3,11 +3,10 @@
  * `design_handoff_kelta_detail_layout/` and are consumed by Kelta's
  * record-detail page (kelta-ui/app/src/pages/app/ObjectDetailPage).
  *
- * RecordHeader now lives here too; it depends on the package-local UI
- * primitives in `../ui/` (Button, Badge, DropdownMenu). FieldSection +
- * AddressMap still live in kelta-ui/app because they depend on the
- * consumer's FieldRenderer; they migrate in a separate pass that adds a
- * `renderField` slot prop.
+ * RecordHeader, FieldSection, and AddressMap also live here. They depend on
+ * the package-local UI primitives in `../ui/` (Button, Badge, DropdownMenu,
+ * Card, Collapsible). FieldSection + AddressMap take a `renderField` slot
+ * prop so the package never reaches back into the consumer's FieldRenderer.
  */
 
 export { RecordHeader } from './RecordHeader';
@@ -17,6 +16,12 @@ export type {
   RecordHeaderAction,
   RecordHeaderProps,
 } from './RecordHeader';
+
+export { FieldSection } from './FieldSection';
+export type { FieldSectionProps, FieldSectionRenderContext, DetailField } from './FieldSection';
+
+export { AddressMap } from './AddressMap';
+export type { AddressMapProps } from './AddressMap';
 
 export { StatStrip } from './StatStrip';
 export type { StatStripProps, StatTileConfig, StatTileKind, StatTileTrend } from './StatStrip';

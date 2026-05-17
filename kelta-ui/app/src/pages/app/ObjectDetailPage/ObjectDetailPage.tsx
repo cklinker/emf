@@ -51,6 +51,8 @@ import type {
   MetadataRow,
 } from '@/components/detail'
 import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
+import { useInspectMode } from '@/hooks/useInspectMode'
+import { cn } from '@/lib/utils'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
 import { useAppContext } from '@/context/AppContext'
@@ -524,6 +526,8 @@ export function ObjectDetailPage(): React.ReactElement {
 
   const isLoading = schemaLoading || recordLoading || permissionsLoading || layoutLoading
 
+  const inspect = useInspectMode()
+
   const headerActions = useMemo<RecordHeaderAction[]>(() => {
     const list: RecordHeaderAction[] = []
     if (permissions.canEdit) {
@@ -619,7 +623,7 @@ export function ObjectDetailPage(): React.ReactElement {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className={cn('space-y-6 p-6', inspect.enabled && 'kelta-inspect')}>
       <Crumb
         trail={[
           { label: 'Home', to: `${basePath}/home` },
@@ -627,6 +631,23 @@ export function ObjectDetailPage(): React.ReactElement {
           { label: recordTitle },
         ]}
       />
+      {inspect.enabled && (
+        <div
+          role="status"
+          className="-mt-2 inline-flex items-center gap-2 rounded-md border border-blue-400/30 bg-blue-400/10 px-2 py-1 text-[11px] font-mono text-blue-300"
+        >
+          <span>Inspect mode</span>
+          <button
+            type="button"
+            onClick={() => inspect.set(false)}
+            className="rounded px-1.5 text-blue-200 hover:bg-blue-400/20"
+            aria-label="Disable inspect mode"
+          >
+            ×
+          </button>
+          <span className="text-[10px] text-blue-300/60">Toggle: ⌘⇧L</span>
+        </div>
+      )}
 
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">

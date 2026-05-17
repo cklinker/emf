@@ -61,6 +61,7 @@ import {
 // Pages
 import {
   AiSettingsPage,
+  EmailSettingsPage,
   DashboardPage,
   CollectionsPage,
   CollectionDetailPage,
@@ -911,6 +912,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_TENANTS">
               <AiSettingsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Email Settings route — tenant admins configure SMTP + From + templates */}
+      <Route
+        path="email-settings"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_TENANTS">
+              <EmailSettingsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

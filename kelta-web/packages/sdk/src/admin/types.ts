@@ -2136,3 +2136,50 @@ export interface ApiSpecValidateResult {
   baseUrl?: string;
   error?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Tenant email settings
+// ---------------------------------------------------------------------------
+
+export interface EmailSettingsSmtp {
+  host?: string;
+  port?: number;
+  useStartTls?: boolean;
+  fromAddress?: string;
+}
+
+export interface EmailSettings {
+  hasOverride: boolean;
+  fromAddress?: string | null;
+  fromName?: string | null;
+  autoInviteOnCreate: boolean;
+  smtp?: EmailSettingsSmtp;
+}
+
+export interface EmailSettingsUpdate {
+  host?: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  useStartTls?: boolean;
+  fromAddress?: string | null;
+  fromName?: string | null;
+  autoInviteOnCreate?: boolean;
+  /** When true, drops the credential FK and reverts the tenant to platform default SMTP. */
+  clear?: boolean;
+}
+
+export interface EmailTemplateDetail {
+  id: string;
+  name: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText?: string | null;
+  variablesSchema?: unknown;
+}
+
+export interface EmailTemplateEntry {
+  templateKey: string;
+  systemDefault?: EmailTemplateDetail;
+  tenantOverride?: EmailTemplateDetail;
+}

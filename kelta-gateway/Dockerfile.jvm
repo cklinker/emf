@@ -1,0 +1,73 @@
+# JVM-mode build of Kelta API Gateway for CI/e2e — fast iteration, not for production.
+# Production builds use kelta-gateway/Dockerfile (GraalVM native-image).
+
+# =============================================================================
+# Stage 1: Build runtime-platform dependencies
+# =============================================================================
+FROM maven:3.9-eclipse-temurin-25 AS runtime-builder
+
+WORKDIR /kelta-platform
+
+COPY kelta-platform/pom.xml ./
+COPY kelta-platform/runtime/pom.xml ./runtime/
+COPY kelta-platform/runtime/runtime-core/pom.xml ./runtime/runtime-core/
+COPY kelta-platform/runtime/runtime-events/pom.xml ./runtime/runtime-events/
+COPY kelta-platform/runtime/runtime-jsonapi/pom.xml ./runtime/runtime-jsonapi/
+COPY kelta-platform/runtime/runtime-module-core/pom.xml ./runtime/runtime-module-core/
+COPY kelta-platform/runtime/runtime-module-integration/pom.xml ./runtime/runtime-module-integration/
+COPY kelta-platform/runtime/runtime-messaging-nats/pom.xml ./runtime/runtime-messaging-nats/
+COPY kelta-platform/runtime/runtime-module-schema/pom.xml ./runtime/runtime-module-schema/
+
+RUN mvn dependency:go-offline -B \
+    -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
+    -am || true
+
+COPY kelta-platform/runtime/runtime-core/src ./runtime/runtime-core/src
+COPY kelta-platform/runtime/runtime-events/src ./runtime/runtime-events/src
+COPY kelta-platform/runtime/runtime-messaging-nats/src ./runtime/runtime-messaging-nats/src
+COPY kelta-platform/runtime/runtime-jsonapi/src ./runtime/runtime-jsonapi/src
+COPY kelta-platform/runtime/runtime-module-core/src ./runtime/runtime-module-core/src
+COPY kelta-platform/runtime/runtime-module-integration/src ./runtime/runtime-module-integration/src
+COPY kelta-platform/runtime/runtime-module-schema/src ./runtime/runtime-module-schema/src
+
+RUN mvn clean install -DskipTests -B \
+    -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
+    -am
+
+# =============================================================================
+# Stage 2: Build the service jar
+# =============================================================================
+FROM maven:3.9-eclipse-temurin-25 AS builder
+
+WORKDIR /build
+
+COPY --from=runtime-builder /root/.m2/repository/io/kelta /root/.m2/repository/io/kelta
+
+COPY kelta-gateway/pom.xml .
+RUN mvn dependency:go-offline -B || true
+
+COPY kelta-gateway/src ./src
+RUN mvn clean package -DskipTests -B && \
+    mv target/kelta-gateway-*.jar target/app.jar
+
+# =============================================================================
+# Stage 3: Runtime
+# =============================================================================
+FROM eclipse-temurin:25-jre-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache curl && \
+    addgroup -S kelta && adduser -S -G kelta kelta
+
+COPY --from=builder /build/target/app.jar /app/app.jar
+
+RUN chown -R kelta:kelta /app
+
+USER kelta
+
+EXPOSE 8080
+
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

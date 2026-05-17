@@ -5,28 +5,21 @@
  * detail page. Matches the design handoff at
  * `design_handoff_kelta_detail_layout/`.
  *
- * Configurable via `RecordHeaderConfig`. When no config is supplied, sensible
- * defaults are derived from the record + schema (title from display field,
- * initials from title, no meta row, generic actions).
+ * Migrated from kelta-ui/app so admin + runtime shells share the same
+ * implementation. Uses the local UI primitives in `../ui/` so no consumer
+ * primitive dependency.
  */
 
 import React, { useCallback, useMemo, useState } from 'react'
 import { Check, Copy, MoreHorizontal } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { cn } from '@/lib/utils'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { cn } from './_utils'
 
 export interface RecordHeaderMetaField {
-  /** Field name on the record to display */
   key: string
-  /** Lucide icon name — already-imported icon element */
   icon?: React.ReactNode
-  /** Optional prefix string (e.g. "Joined ") */
   prefix?: string
 }
 
@@ -39,30 +32,20 @@ export interface RecordHeaderAction {
 }
 
 export interface RecordHeaderConfig {
-  /** Field names whose values are joined by space to form the title */
   titleFields?: string[]
-  /** Field names whose first chars build the 2-char avatar initials */
   avatarFrom?: string[]
-  /** Meta items shown beneath the title, separated by `·` */
   metaFields?: RecordHeaderMetaField[]
 }
 
 export interface RecordHeaderProps {
-  /** Optional layout-driven config; when absent, defaults are derived */
   config?: RecordHeaderConfig
-  /** Record data */
   record: Record<string, unknown>
-  /** Record id (rendered as a monospaced pill with a copy button) */
   recordId: string
-  /** Collection display label (e.g. "Customer") */
   collectionLabel: string
-  /** Derived title fallback when config.titleFields not supplied */
   fallbackTitle: string
-  /** Actions cluster on the right */
   actions?: RecordHeaderAction[]
-  /** Menu items shown under the `…` trigger */
+  /** Items rendered inside the `…` More-actions DropdownMenu */
   moreMenu?: React.ReactNode
-  /** Show online presence dot on the avatar (default false) */
   showPresence?: boolean
 }
 
@@ -190,7 +173,11 @@ export function RecordHeader({
                 .reduce<React.ReactNode[]>((acc, node, idx) => {
                   if (idx > 0) {
                     acc.push(
-                      <span key={`sep-${idx}`} aria-hidden="true" className="text-muted-foreground/50">
+                      <span
+                        key={`sep-${idx}`}
+                        aria-hidden="true"
+                        className="text-muted-foreground/50"
+                      >
                         ·
                       </span>
                     )

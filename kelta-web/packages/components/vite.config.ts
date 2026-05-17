@@ -38,6 +38,8 @@ export default defineConfig({
         '@kelta/formula',
         'clsx',
         'lucide-react',
+        'class-variance-authority',
+        'radix-ui',
       ],
       output: {
         globals: {
@@ -51,6 +53,8 @@ export default defineConfig({
           '@kelta/formula': 'KeltaFormula',
           clsx: 'clsx',
           'lucide-react': 'LucideReact',
+          'class-variance-authority': 'cva',
+          'radix-ui': 'RadixUI',
         },
       },
     },

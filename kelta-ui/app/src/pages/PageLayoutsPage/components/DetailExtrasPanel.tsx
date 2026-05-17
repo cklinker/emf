@@ -12,11 +12,9 @@
  *     ObjectDetailPage falls back to a single auto-derived system-info
  *     MetadataCard.
  *
- * Header config is presented as a structured form (multi-select field
- * pickers + meta-row editor). Rail blocks are edited as JSON because
- * authoring structured editors for six discriminated kinds is a much larger
- * scope — the JSON view ships configurability today, structured editors
- * can land per-kind later without changing the persisted shape.
+ * Header config is a structured form (multi-select pickers + meta-row
+ * editor). Rail blocks use the dedicated RailBlocksEditor component which
+ * provides per-kind structured forms plus a raw-JSON escape hatch.
  */
 
 import React, { useCallback, useMemo, useState } from 'react'
@@ -25,9 +23,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import type { RailBlockDto, RecordHeaderConfigDto } from '@/hooks/usePageLayout'
+import type { RecordHeaderConfigDto } from '@/hooks/usePageLayout'
 import { useLayoutEditor } from './LayoutEditorContext'
+import { RailBlocksEditor } from './RailBlocksEditor'
 
 interface MultiSelectFieldPickerProps {
   label: string
@@ -189,14 +187,6 @@ function MetaFieldsEditor({
   )
 }
 
-const RAIL_BLOCKS_SCHEMA_HINT = `Array of { kind, config }. Supported kinds:
-  metadataCard  { title, rows: [{ label, value, mono? }] }
-  statStrip     { tiles: [{ label, value, kind?, icon?, trend?, sub? }] }
-  scoreCard     { title, score, statusLabel?, tone?, delta?, metrics? }
-  tagsCard      { title, tags: [{ label, tone? }] }
-  aiCard        { title, summary, actions? }
-  timeline      { title, events: [{ at, title, body?, tone? }] }`
-
 export function DetailExtrasPanel(): React.ReactElement | null {
   const { state, setHeaderConfig, setRailBlocks } = useLayoutEditor()
 
@@ -225,36 +215,6 @@ export function DetailExtrasPanel(): React.ReactElement | null {
     },
     [headerConfig, setHeaderConfig]
   )
-
-  // Initial textarea content reflects the loaded rail-blocks snapshot. We don't
-  // re-sync mid-edit: railBlocks isn't part of the undo stack, and the editor
-  // remounts (along with this panel) whenever a different layout is loaded —
-  // so the only way state.railBlocks changes is through this textarea's own
-  // commit-on-blur, at which point the textarea already holds the new value.
-  const [railJson, setRailJson] = useState<string>(() =>
-    state.railBlocks ? JSON.stringify(state.railBlocks, null, 2) : ''
-  )
-  const [railError, setRailError] = useState<string | null>(null)
-
-  const commitRailJson = (): void => {
-    const trimmed = railJson.trim()
-    if (trimmed === '') {
-      setRailBlocks(null)
-      setRailError(null)
-      return
-    }
-    try {
-      const parsed = JSON.parse(trimmed) as unknown
-      if (!Array.isArray(parsed)) {
-        setRailError('Must be a JSON array of { kind, config } blocks.')
-        return
-      }
-      setRailBlocks(parsed as RailBlockDto[])
-      setRailError(null)
-    } catch (err) {
-      setRailError(err instanceof Error ? err.message : 'Invalid JSON')
-    }
-  }
 
   return (
     <div className="space-y-4 border-t border-border p-4">
@@ -295,26 +255,7 @@ export function DetailExtrasPanel(): React.ReactElement | null {
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Right rail blocks
         </h4>
-        <p className="text-xs text-muted-foreground whitespace-pre-line">
-          {RAIL_BLOCKS_SCHEMA_HINT}
-        </p>
-        <Textarea
-          value={railJson}
-          onChange={(e) => setRailJson(e.target.value)}
-          onBlur={commitRailJson}
-          rows={10}
-          className="font-mono text-[11px] leading-relaxed"
-          placeholder='[ { "kind": "metadataCard", "config": { "title": "System", "rows": [] } } ]'
-          aria-label="Rail blocks JSON"
-        />
-        {railError && (
-          <p className="text-xs text-destructive" role="alert">
-            {railError}
-          </p>
-        )}
-        <p className="text-[11px] text-muted-foreground">
-          Tip: leave empty to auto-derive a System-information card. Changes commit on blur.
-        </p>
+        <RailBlocksEditor blocks={state.railBlocks} onChange={setRailBlocks} />
       </section>
     </div>
   )

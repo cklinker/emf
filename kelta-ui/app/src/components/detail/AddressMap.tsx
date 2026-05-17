@@ -1,10 +1,25 @@
 /**
  * AddressMap
  *
- * Composite field section: address fields on the left, stylized map
- * placeholder on the right (radial gradient on slate + 28px dotted grid +
- * teardrop pin). Real map provider integration (Mapbox / Google Maps) is
- * a deliberate follow-up — see the handoff README.
+ * Composite field section: address fields on the left, map on the right.
+ *
+ * The map auto-promotes from a stylized placeholder to a real static map
+ * tile when the record exposes lat/lng:
+ *   1. If a geolocation field is identified on the record (either via the
+ *      `geoField` prop or auto-detected from `fields`) and contains valid
+ *      coordinates, render a static-image map.
+ *   2. Static-image provider is picked at build time:
+ *        - When `VITE_MAPBOX_TOKEN` is set, use Mapbox Static Images
+ *          (better quality, requires the tenant's Mapbox account)
+ *        - Otherwise, fall back to OpenStreetMap's free staticmap.de
+ *          service (no API key required, lower quality)
+ *   3. When no coordinates are present, fall back to the original stylized
+ *      placeholder.
+ *
+ * Real interactive maps (pan, zoom, custom markers) are a separate
+ * follow-up — static images are a deliberate intermediate that covers most
+ * record-detail use cases without adding ~600KB of map-engine JS to the
+ * bundle.
  */
 
 import React, { useState } from 'react'
@@ -25,16 +40,76 @@ export interface AddressMapProps {
   fields: FieldDefinition[]
   /** Record-name fields used to compose the map-pin chip label */
   mapLabelFields?: string[]
+  /**
+   * Field name on the record holding geolocation coordinates. The value is
+   * expected to be either `{ latitude, longitude }` or `{ lat, lng }`.
+   * Falls back to auto-detecting any `geolocation`-typed field in `fields`.
+   */
+  geoField?: string
   record: CollectionRecord
   tenantSlug?: string
   lookupDisplayMap?: Record<string, Record<string, string>>
   defaultCollapsed?: boolean
 }
 
+interface GeoPoint {
+  lat: number
+  lng: number
+}
+
+function extractGeoPoint(
+  record: CollectionRecord,
+  fields: FieldDefinition[],
+  geoField: string | undefined
+): GeoPoint | null {
+  const fieldName =
+    geoField ?? fields.find((f) => f.type === 'geolocation')?.name ?? undefined
+  if (!fieldName) return null
+  const raw = record[fieldName]
+  if (!raw || typeof raw !== 'object') return null
+  const g = raw as Record<string, unknown>
+  const lat = Number(g.latitude ?? g.lat)
+  const lng = Number(g.longitude ?? g.lng ?? g.lon)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+  return { lat, lng }
+}
+
+/**
+ * Static-map image URL. Mapbox when the build has a token, else
+ * OpenStreetMap's free staticmap service.
+ */
+function staticMapUrl(point: GeoPoint, width: number, height: number): string {
+  const mapboxToken =
+    typeof import.meta !== 'undefined' &&
+    typeof (import.meta as { env?: Record<string, string | undefined> }).env !== 'undefined'
+      ? (import.meta as { env: Record<string, string | undefined> }).env.VITE_MAPBOX_TOKEN
+      : undefined
+
+  if (mapboxToken) {
+    const style =
+      (import.meta as { env: Record<string, string | undefined> }).env
+        .VITE_MAPBOX_STYLE ?? 'mapbox/dark-v11'
+    return (
+      `https://api.mapbox.com/styles/v1/${style}/static/` +
+      `pin-l+3b82f6(${point.lng},${point.lat})/` +
+      `${point.lng},${point.lat},14,0/${width}x${height}@2x?access_token=${mapboxToken}`
+    )
+  }
+
+  // OSM staticmap fallback — free, no key required.
+  return (
+    `https://staticmap.openstreetmap.de/staticmap.php?` +
+    `center=${point.lat},${point.lng}&zoom=14&size=${width}x${height}` +
+    `&markers=${point.lat},${point.lng},lightblue1&maptype=mapnik`
+  )
+}
+
 export function AddressMap({
   title,
   fields,
   mapLabelFields = [],
+  geoField,
   record,
   tenantSlug,
   lookupDisplayMap,
@@ -51,6 +126,8 @@ export function AddressMap({
     .filter((v) => v !== null && v !== undefined && v !== '')
     .map(String)
     .join(', ')
+
+  const point = extractGeoPoint(record, fields, geoField)
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -114,11 +191,40 @@ export function AddressMap({
               ))}
             </div>
 
-            <MapPlaceholder label={mapLabel || 'Address'} />
+            {point ? (
+              <StaticMap point={point} label={mapLabel || 'Address'} />
+            ) : (
+              <MapPlaceholder label={mapLabel || 'Address'} />
+            )}
           </div>
         </CollapsibleContent>
       </Card>
     </Collapsible>
+  )
+}
+
+function StaticMap({
+  point,
+  label,
+}: {
+  point: GeoPoint
+  label: string
+}): React.ReactElement {
+  const [errored, setErrored] = useState(false)
+  if (errored) return <MapPlaceholder label={label} />
+  return (
+    <div className="relative h-[220px] overflow-hidden rounded-[10px] bg-muted">
+      <img
+        src={staticMapUrl(point, 600, 220)}
+        alt={`Map showing ${label}`}
+        loading="lazy"
+        onError={() => setErrored(true)}
+        className="h-full w-full object-cover"
+      />
+      <div className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] text-white/90 backdrop-blur-sm">
+        {label}
+      </div>
+    </div>
   )
 }
 

@@ -15,7 +15,7 @@
  * `LayoutFieldSections` cleanly.
  */
 
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -39,6 +39,35 @@ export interface FieldSectionProps {
   defaultCollapsed?: boolean
   /** Number of grid columns (1-4). Default: 2 */
   columns?: 1 | 2 | 3 | 4
+  /**
+   * When set, the open/collapsed state is persisted to localStorage under
+   * `kelta_detail_section_${persistKey}`. Survives navigation and reloads.
+   * Defer to a real user-prefs API when one exists.
+   */
+  persistKey?: string
+}
+
+const STORAGE_PREFIX = 'kelta_detail_section_'
+
+function readPersistedOpen(persistKey: string | undefined, fallback: boolean): boolean {
+  if (!persistKey || typeof window === 'undefined') return fallback
+  try {
+    const raw = window.localStorage.getItem(STORAGE_PREFIX + persistKey)
+    if (raw === '1') return true
+    if (raw === '0') return false
+  } catch {
+    // localStorage may be disabled (private mode, quota) — fall back silently
+  }
+  return fallback
+}
+
+function writePersistedOpen(persistKey: string | undefined, open: boolean): void {
+  if (!persistKey || typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(STORAGE_PREFIX + persistKey, open ? '1' : '0')
+  } catch {
+    // ignore — see readPersistedOpen
+  }
 }
 
 export function FieldSection({
@@ -49,8 +78,18 @@ export function FieldSection({
   lookupDisplayMap,
   defaultCollapsed = false,
   columns = 2,
+  persistKey,
 }: FieldSectionProps): React.ReactElement | null {
-  const [isOpen, setIsOpen] = useState(!defaultCollapsed)
+  const [isOpen, setIsOpenState] = useState(() =>
+    readPersistedOpen(persistKey, !defaultCollapsed)
+  )
+  const setIsOpen = useCallback(
+    (open: boolean) => {
+      setIsOpenState(open)
+      writePersistedOpen(persistKey, open)
+    },
+    [persistKey]
+  )
 
   if (fields.length === 0) return null
 

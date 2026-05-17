@@ -13,7 +13,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Loader2, AlertCircle, Pencil, Copy, Trash2 } from 'lucide-react'
+import { Loader2, AlertCircle, Pencil, Copy, Trash2, Mail, Phone, MapPin } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -38,8 +38,12 @@ import { FieldRenderer } from '@/components/FieldRenderer'
 import { LayoutFieldSections } from '@/components/LayoutFieldSections'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { DetailTabBar } from '@/pages/ResourceDetailPage/DetailTabBar'
-import { RecordHeader, FieldSection, Crumb } from '@/components/detail'
-import type { RecordHeaderAction } from '@/components/detail'
+import { RecordHeader, FieldSection, Crumb, MetadataCard } from '@/components/detail'
+import type {
+  RecordHeaderAction,
+  RecordHeaderMetaField,
+  MetadataRow,
+} from '@/components/detail'
 import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
@@ -104,6 +108,110 @@ function getRecordDisplayName(
   }
   // Fall back to ID
   return String(record.id || 'Untitled')
+}
+
+/**
+ * Map a field name (case-insensitive substring) to a Lucide icon for the
+ * record header meta row. Returns null when no icon should be shown.
+ */
+function metaIconFor(fieldName: string): React.ReactNode {
+  const n = fieldName.toLowerCase()
+  if (n.includes('email')) return <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+  if (n.includes('phone') || n === 'mobile') {
+    return <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+  }
+  if (n.includes('city') || n.includes('country') || n.includes('region')) {
+    return <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+  }
+  return null
+}
+
+/**
+ * Auto-derive a small RecordHeader meta row from common contact-ish fields.
+ * Used when no layout-driven `RecordHeaderConfig.metaFields` is supplied.
+ * Cap at 4 items so the row doesn't wrap on common viewports.
+ */
+function deriveMetaFields(
+  fields: FieldDefinition[],
+  record: Record<string, unknown>
+): RecordHeaderMetaField[] {
+  const candidates: Array<{ key: string; prefix?: string; rank: number }> = []
+  const seen = new Set<string>()
+  const push = (key: string, prefix: string | undefined, rank: number): void => {
+    if (seen.has(key)) return
+    if (record[key] === null || record[key] === undefined || record[key] === '') return
+    seen.add(key)
+    candidates.push({ key, prefix, rank })
+  }
+
+  for (const f of fields) {
+    const n = f.name.toLowerCase()
+    if (f.type === 'email') push(f.name, undefined, 1)
+    else if (f.type === 'phone') push(f.name, undefined, 2)
+    else if (n.includes('city')) push(f.name, undefined, 3)
+    else if (n.includes('country')) push(f.name, undefined, 4)
+  }
+
+  // Joined-at: prefer a domain field like joinedAt/signedUpAt, else fall back to createdAt.
+  const joinedField = fields.find((f) =>
+    /(^|_)joined|signedup|registered|memberSince/i.test(f.name)
+  )
+  if (joinedField && record[joinedField.name]) {
+    push(joinedField.name, 'Joined ', 5)
+  } else if (record.createdAt || record.created_at) {
+    const createdKey = record.createdAt ? 'createdAt' : 'created_at'
+    push(createdKey, 'Joined ', 5)
+  }
+
+  return candidates
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, 4)
+    .map(({ key, prefix }) => ({ key, prefix, icon: metaIconFor(key) }))
+}
+
+/**
+ * Auto-derive a system-metadata MetadataCard for the right rail. Shows the
+ * record id (monospaced), created/updated timestamps, and resolved author
+ * names when the include map has them.
+ */
+function deriveSystemRows(
+  record: Record<string, unknown>,
+  getUserDisplay: (userId: string) => { name: string; linkTo: string } | null
+): MetadataRow[] {
+  const rows: MetadataRow[] = []
+  rows.push({ label: 'ID', value: String(record.id), mono: true })
+
+  const formatStamp = (raw: unknown): string => {
+    if (!raw) return ''
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(String(raw)))
+    } catch {
+      return String(raw)
+    }
+  }
+
+  const createdAt = record.createdAt ?? record.created_at
+  const updatedAt = record.updatedAt ?? record.updated_at
+  const createdBy = record.createdBy ?? record.created_by
+  const updatedBy = record.updatedBy ?? record.updated_by
+
+  if (createdAt) rows.push({ label: 'Created', value: formatStamp(createdAt) })
+  if (createdBy != null) {
+    const display = getUserDisplay(String(createdBy))
+    rows.push({ label: 'Created by', value: display?.name ?? String(createdBy) })
+  }
+  if (updatedAt) rows.push({ label: 'Updated', value: formatStamp(updatedAt) })
+  if (updatedBy != null) {
+    const display = getUserDisplay(String(updatedBy))
+    rows.push({ label: 'Updated by', value: display?.name ?? String(updatedBy) })
+  }
+  return rows
 }
 
 export function ObjectDetailPage(): React.ReactElement {
@@ -424,6 +532,16 @@ export function ObjectDetailPage(): React.ReactElement {
     return list
   }, [permissions.canEdit, handleEdit])
 
+  const headerMeta = useMemo<RecordHeaderMetaField[]>(
+    () => (record ? deriveMetaFields(fields, record) : []),
+    [fields, record]
+  )
+
+  const systemRows = useMemo(
+    () => (record ? deriveSystemRows(record, getUserDisplay) : []),
+    [record, getUserDisplay]
+  )
+
   // Loading state
   if (isLoading) {
     return (
@@ -493,6 +611,7 @@ export function ObjectDetailPage(): React.ReactElement {
             recordId={recordId || ''}
             collectionLabel={collectionLabel}
             fallbackTitle={recordTitle}
+            config={{ metaFields: headerMeta }}
             actions={headerActions}
             moreMenu={
               <>
@@ -532,72 +651,85 @@ export function ObjectDetailPage(): React.ReactElement {
         </div>
       </div>
 
-      {/* Field Sections — use page layout sections when available, otherwise fall back to generic highlights + details */}
-      {hasLayoutSections ? (
-        <div data-testid="field-values" className="space-y-4">
-          <LayoutFieldSections
-            sections={layout!.sections}
-            schemaFields={fields}
-            record={record}
-            tenantSlug={tenantSlug}
-            lookupDisplayMap={lookupDisplayMap}
-          />
-        </div>
-      ) : (
-        <div data-testid="field-values" className="space-y-4">
-          {/* Highlights Panel (fallback) */}
-          {highlightFields.length > 0 && record && (
-            <Card className="overflow-hidden rounded-xl border border-border bg-card">
-              <CardContent className="py-5">
-                <div className="grid grid-cols-2 gap-x-10 gap-y-5 md:grid-cols-4">
-                  {highlightFields.map((field) => {
-                    const value = record[field.name]
-                    const isRef =
-                      field.type === 'master_detail' ||
-                      field.type === 'lookup' ||
-                      field.type === 'reference'
-                    const displayLabel =
-                      isRef && lookupDisplayMap?.[field.name]
-                        ? lookupDisplayMap[field.name][String(value)] || undefined
-                        : undefined
-
-                    return (
-                      <div key={field.name} className="min-w-0 space-y-1">
-                        <dt className="kelta-field-label">
-                          {field.displayName || field.name}
-                        </dt>
-                        <dd className="text-sm font-medium">
-                          <FieldRenderer
-                            type={field.type}
-                            value={value}
-                            fieldName={field.name}
-                            displayName={field.displayName || field.name}
-                            tenantSlug={tenantSlug}
-                            targetCollection={field.referenceTarget}
-                            displayLabel={displayLabel}
-                            truncate
-                          />
-                        </dd>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Detail fields section (fallback) */}
-          {detailFields.length > 0 && (
-            <FieldSection
-              title="Details"
-              fields={detailFields}
+      {/* Main + right rail (rail collapses below on narrow screens) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* Main column: layout sections OR generic highlights + details fallback */}
+        {hasLayoutSections ? (
+          <div data-testid="field-values" className="space-y-4">
+            <LayoutFieldSections
+              sections={layout!.sections}
+              schemaFields={fields}
               record={record}
               tenantSlug={tenantSlug}
               lookupDisplayMap={lookupDisplayMap}
+              persistKeyPrefix={collectionName}
             />
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div data-testid="field-values" className="space-y-4">
+            {/* Highlights Panel (fallback) */}
+            {highlightFields.length > 0 && record && (
+              <Card className="overflow-hidden rounded-xl border border-border bg-card">
+                <CardContent className="py-5">
+                  <div className="grid grid-cols-2 gap-x-10 gap-y-5 md:grid-cols-4">
+                    {highlightFields.map((field) => {
+                      const value = record[field.name]
+                      const isRef =
+                        field.type === 'master_detail' ||
+                        field.type === 'lookup' ||
+                        field.type === 'reference'
+                      const displayLabel =
+                        isRef && lookupDisplayMap?.[field.name]
+                          ? lookupDisplayMap[field.name][String(value)] || undefined
+                          : undefined
+
+                      return (
+                        <div key={field.name} className="min-w-0 space-y-1">
+                          <dt className="kelta-field-label">
+                            {field.displayName || field.name}
+                          </dt>
+                          <dd className="text-sm font-medium">
+                            <FieldRenderer
+                              type={field.type}
+                              value={value}
+                              fieldName={field.name}
+                              displayName={field.displayName || field.name}
+                              tenantSlug={tenantSlug}
+                              targetCollection={field.referenceTarget}
+                              displayLabel={displayLabel}
+                              truncate
+                            />
+                          </dd>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {detailFields.length > 0 && (
+              <FieldSection
+                title="Details"
+                fields={detailFields}
+                record={record}
+                tenantSlug={tenantSlug}
+                lookupDisplayMap={lookupDisplayMap}
+                persistKey={collectionName ? `${collectionName}.details` : undefined}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Right rail — currently auto-derives a single MetadataCard from
+            system fields. StatStrip/ScoreCard/TagsCard/AICard/Timeline blocks
+            land here once the layout-config admin UI ships. */}
+        <aside className="space-y-4">
+          <MetadataCard
+            config={{ title: 'System information', rows: systemRows }}
+          />
+        </aside>
+      </div>
 
       {/* Bottom tab bar: related lists + Notes + Attachments + System Information */}
       {schema && recordId && (

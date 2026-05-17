@@ -26,6 +26,12 @@ export interface LayoutFieldSectionsProps {
   tenantSlug?: string
   /** Lookup display map: { fieldName: { recordId: displayLabel } } */
   lookupDisplayMap?: Record<string, Record<string, string>>
+  /**
+   * Prefix for persisting per-section open state. When set, each section's
+   * collapsed state survives navigation/reload via localStorage. Usually
+   * the collection name.
+   */
+  persistKeyPrefix?: string
 }
 
 /**
@@ -84,6 +90,7 @@ export function LayoutFieldSections({
   record,
   tenantSlug,
   lookupDisplayMap,
+  persistKeyPrefix,
 }: LayoutFieldSectionsProps): React.ReactElement {
   // Build lookup maps once for efficient field resolution
   const { schemaFieldsByName, schemaFieldsById } = useMemo(() => {
@@ -124,6 +131,7 @@ export function LayoutFieldSections({
             lookupDisplayMap={lookupDisplayMap}
             defaultCollapsed={section.collapsed}
             columns={(section.columns as 1 | 2 | 3 | 4) || 2}
+            persistKey={persistKeyPrefix ? `${persistKeyPrefix}.${section.id}` : undefined}
           />
         )
       })}

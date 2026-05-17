@@ -8,20 +8,20 @@
  * shared component needs them.
  */
 
-import * as React from 'react'
-import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
-import { cn } from '../detail/_utils'
+import * as React from 'react';
+import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
+import { cn } from '../detail/_utils';
 
 export function DropdownMenu(
   props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>
 ): React.ReactElement {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
 }
 
 export function DropdownMenuTrigger(
   props: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>
 ): React.ReactElement {
-  return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+  return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />;
 }
 
 export function DropdownMenuContent({
@@ -41,7 +41,7 @@ export function DropdownMenuContent({
         {...props}
       />
     </DropdownMenuPrimitive.Portal>
-  )
+  );
 }
 
 export function DropdownMenuItem({
@@ -49,7 +49,7 @@ export function DropdownMenuItem({
   variant = 'default',
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
-  variant?: 'default' | 'destructive'
+  variant?: 'default' | 'destructive';
 }): React.ReactElement {
   return (
     <DropdownMenuPrimitive.Item
@@ -61,7 +61,7 @@ export function DropdownMenuItem({
       )}
       {...props}
     />
-  )
+  );
 }
 
 export function DropdownMenuSeparator({
@@ -74,5 +74,5 @@ export function DropdownMenuSeparator({
       className={cn('bg-border -mx-1 my-1 h-px', className)}
       {...props}
     />
-  )
+  );
 }

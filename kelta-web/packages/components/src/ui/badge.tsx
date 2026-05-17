@@ -2,10 +2,10 @@
  * Badge — shadcn-style pill primitive, ported into @kelta/components.
  */
 
-import * as React from 'react'
-import { cva, type VariantProps } from 'class-variance-authority'
-import { Slot } from 'radix-ui'
-import { cn } from '../detail/_utils'
+import * as React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { Slot } from 'radix-ui';
+import { cn } from '../detail/_utils';
 
 const badgeVariants = cva(
   'inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none transition-[color,box-shadow] overflow-hidden',
@@ -23,7 +23,7 @@ const badgeVariants = cva(
       variant: 'default',
     },
   }
-)
+);
 
 export function Badge({
   className,
@@ -32,7 +32,7 @@ export function Badge({
   ...props
 }: React.ComponentProps<'span'> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }): React.ReactElement {
-  const Comp = asChild ? Slot.Root : 'span'
+  const Comp = asChild ? Slot.Root : 'span';
   return (
     <Comp
       data-slot="badge"
@@ -40,7 +40,7 @@ export function Badge({
       className={cn(badgeVariants({ variant }), className)}
       {...props}
     />
-  )
+  );
 }
 
-export { badgeVariants }
+export { badgeVariants };

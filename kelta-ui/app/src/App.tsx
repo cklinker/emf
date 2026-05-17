@@ -62,6 +62,7 @@ import {
 import {
   AiSettingsPage,
   EmailSettingsPage,
+  MapSettingsPage,
   DashboardPage,
   CollectionsPage,
   CollectionDetailPage,
@@ -924,6 +925,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_TENANTS">
               <EmailSettingsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Map Settings route — tenant admins configure Mapbox token + style */}
+      <Route
+        path="map-settings"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_TENANTS">
+              <MapSettingsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

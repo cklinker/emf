@@ -35,6 +35,16 @@ export interface AddressMapProps<F extends DetailField = DetailField> {
    * consumer to install `maplibre-gl` and import its CSS.
    */
   interactive?: boolean;
+  /**
+   * Mapbox public token. Overrides the build-time `VITE_MAPBOX_TOKEN` env
+   * var. Pass the per-tenant value here when an admin has configured one.
+   */
+  mapboxToken?: string;
+  /**
+   * Mapbox style id (e.g. `mapbox/dark-v11`) or a full maplibre style URL.
+   * Overrides the build-time `VITE_MAPBOX_STYLE` env var.
+   */
+  mapStyle?: string;
 }
 
 interface GeoPoint {
@@ -61,15 +71,21 @@ function extractGeoPoint<F extends DetailField>(
   return { lat, lng };
 }
 
-function staticMapUrl(point: GeoPoint, width: number, height: number): string {
+function staticMapUrl(
+  point: GeoPoint,
+  width: number,
+  height: number,
+  tokenOverride?: string,
+  styleOverride?: string
+): string {
   const env =
     typeof import.meta !== 'undefined' &&
     typeof (import.meta as { env?: Record<string, string | undefined> }).env !== 'undefined'
       ? (import.meta as { env: Record<string, string | undefined> }).env
       : undefined;
-  const mapboxToken = env?.VITE_MAPBOX_TOKEN;
+  const mapboxToken = tokenOverride ?? env?.VITE_MAPBOX_TOKEN;
   if (mapboxToken) {
-    const style = env?.VITE_MAPBOX_STYLE ?? 'mapbox/dark-v11';
+    const style = styleOverride ?? env?.VITE_MAPBOX_STYLE ?? 'mapbox/dark-v11';
     return (
       `https://api.mapbox.com/styles/v1/${style}/static/` +
       `pin-l+3b82f6(${point.lng},${point.lat})/` +
@@ -93,6 +109,8 @@ export function AddressMap<F extends DetailField = DetailField>({
   defaultCollapsed = false,
   renderField,
   interactive = false,
+  mapboxToken,
+  mapStyle,
 }: AddressMapProps<F>): React.ReactElement | null {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
   if (fields.length === 0) return null;
@@ -170,7 +188,12 @@ export function AddressMap<F extends DetailField = DetailField>({
                   />
                 </div>
               ) : (
-                <StaticMap point={point} label={mapLabel || 'Address'} />
+                <StaticMap
+                  point={point}
+                  label={mapLabel || 'Address'}
+                  mapboxToken={mapboxToken}
+                  mapStyle={mapStyle}
+                />
               )
             ) : (
               <MapPlaceholder label={mapLabel || 'Address'} />
@@ -182,13 +205,23 @@ export function AddressMap<F extends DetailField = DetailField>({
   );
 }
 
-function StaticMap({ point, label }: { point: GeoPoint; label: string }): React.ReactElement {
+function StaticMap({
+  point,
+  label,
+  mapboxToken,
+  mapStyle,
+}: {
+  point: GeoPoint;
+  label: string;
+  mapboxToken?: string;
+  mapStyle?: string;
+}): React.ReactElement {
   const [errored, setErrored] = useState(false);
   if (errored) return <MapPlaceholder label={label} />;
   return (
     <div className="relative h-[220px] overflow-hidden rounded-[10px] bg-muted">
       <img
-        src={staticMapUrl(point, 600, 220)}
+        src={staticMapUrl(point, 600, 220, mapboxToken, mapStyle)}
         alt={`Map showing ${label}`}
         loading="lazy"
         onError={() => setErrored(true)}

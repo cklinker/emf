@@ -1,34 +1,74 @@
-# CI / e2e override — swaps native GraalVM Dockerfiles for JVM variants so PR
-# builds stay under ~5 min per service instead of the ~10 min native compile.
-# Production images continue to be built from each service's original Dockerfile
-# by build-and-publish-containers.yml on main.
+# CI / e2e override:
+#   1. Swap native GraalVM Dockerfiles for JVM variants so PR builds stay
+#      under ~5 min per service instead of the ~10 min native compile.
+#   2. Drop fixed host port bindings — the k8s-runner shares a Docker daemon
+#      and ports 5432/6379/4222/8080/8081/8083/5173 collide with concurrent
+#      jobs (and leaked containers from prior runs). Playwright runs inside
+#      a container joined to the same compose network and reaches services
+#      by their container DNS names (kelta-ui, kelta-gateway, kelta-auth).
+#   3. Drop `container_name:` so unique COMPOSE_PROJECT_NAME-prefixed names
+#      take over, preventing container-name collisions too.
+#   4. Rebuild UI with VITE_API_BASE_URL=http://kelta-gateway:8080 so the
+#      SPA's API calls resolve via container DNS, not localhost.
+#   5. Allow kelta-ui origin in auth + gateway CORS.
 #
-# Concurrency note: the e2e job in ci.yml uses a global `e2e-shared-runner`
-# concurrency group with cancel-in-progress: false so only one PR runs the
-# stack at a time on the shared k8s-runner Docker daemon. This avoids host
-# port collisions on 5432/6379/4222/8080/etc.
-#
-# Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.ci.yml build
-#   docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait
+# Production images continue to be built from each service's original
+# Dockerfile by build-and-publish-containers.yml on main.
 
 services:
+  postgres:
+    container_name: null
+    ports: !reset []
+
+  redis:
+    container_name: null
+    ports: !reset []
+
+  nats:
+    container_name: null
+    ports: !reset []
+
+  cerbos:
+    container_name: null
+    ports: !reset []
+
   kelta-auth:
     build:
       context: .
       dockerfile: kelta-auth/Dockerfile.jvm
+    container_name: null
+    ports: !reset []
+    environment:
+      UI_BASE_URL: http://kelta-ui:8080
+      CORS_ALLOWED_ORIGINS: http://kelta-ui:8080
+      COOKIE_DOMAIN: kelta-ui
 
   kelta-worker:
     build:
       context: .
       dockerfile: kelta-worker/Dockerfile.jvm
+    container_name: null
+    ports: !reset []
 
   kelta-gateway:
     build:
       context: .
       dockerfile: kelta-gateway/Dockerfile.jvm
+    container_name: null
+    ports: !reset []
+    environment:
+      CORS_ALLOWED_ORIGIN_PATTERN: http://kelta-ui:8080
 
   kelta-ai:
     build:
       context: .
       dockerfile: kelta-ai/Dockerfile.jvm
+    container_name: null
+    ports: !reset []
+
+  kelta-ui:
+    build:
+      args:
+        VITE_API_BASE_URL: http://kelta-gateway:8080
+    container_name: null
+    ports: !reset []

@@ -312,14 +312,13 @@ jobs:
     if: needs.changes.outputs.e2e == 'true' || needs.changes.outputs.workflows == 'true'
     runs-on: k8s-runner-integration
     timeout-minutes: 45
-    # Global concurrency: only one e2e run at a time across all PRs.
-    # The stack binds fixed host ports (5432/6379/4222/8080/...) and the
-    # k8s-runner shares a Docker daemon, so parallel runs would collide.
-    # cancel-in-progress: false so a queued PR run still gets a turn after
-    # the current one finishes.
+    # Per-branch concurrency: cancel an in-flight run when the PR is updated.
+    # Cross-PR isolation comes from docker-compose.ci.yml dropping host port
+    # bindings and COMPOSE_PROJECT_NAME namespacing container names; Playwright
+    # runs inside a container on the compose network so no host ports are needed.
     concurrency:
-      group: e2e-shared-runner
-      cancel-in-progress: false
+      group: e2e-${{ github.head_ref || github.ref }}
+      cancel-in-progress: true
     env:
       COMPOSE_PROJECT_NAME: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
@@ -351,31 +350,23 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.ci.yml \
             --profile seed run --rm kelta-bootstrap
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'e2e-tests/package-lock.json'
-
-      - name: Install Playwright + browsers
-        working-directory: e2e-tests
+      - name: Run Playwright tests (sibling container on compose network)
         run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Run Playwright tests
-        working-directory: e2e-tests
-        env:
-          CI: 'true'
-          E2E_BASE_URL: http://localhost:5173
-          E2E_API_BASE_URL: http://localhost:8080
-          E2E_AUTH_BASE_URL: http://localhost:8081
-          E2E_AUTH_DIRECT_LOGIN_URL: http://localhost:8081
-          E2E_TENANT_SLUG: default
-          E2E_TEST_USERNAME: admin
-          E2E_TEST_PASSWORD: password
-        run: npx playwright test
+          NETWORK="${COMPOSE_PROJECT_NAME}_kelta-network"
+          docker run --rm \
+            --network "$NETWORK" \
+            -v "$PWD/e2e-tests:/work" \
+            -w /work \
+            -e CI=true \
+            -e E2E_BASE_URL=http://kelta-ui:8080 \
+            -e E2E_API_BASE_URL=http://kelta-gateway:8080 \
+            -e E2E_AUTH_BASE_URL=http://kelta-auth:8080 \
+            -e E2E_AUTH_DIRECT_LOGIN_URL=http://kelta-auth:8080 \
+            -e E2E_TENANT_SLUG=default \
+            -e E2E_TEST_USERNAME=admin \
+            -e E2E_TEST_PASSWORD=password \
+            mcr.microsoft.com/playwright:v1.50.0-noble \
+            bash -c "npm ci && npx playwright test"
 
       - name: Dump compose logs on failure
         if: failure()

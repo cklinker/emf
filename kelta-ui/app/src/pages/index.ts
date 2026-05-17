@@ -272,6 +272,10 @@ export type { SearchSettingsPageProps } from './SearchSettingsPage'
 export { AiSettingsPage } from './AiSettingsPage'
 export type { AiSettingsPageProps } from './AiSettingsPage'
 
+// EmailSettingsPage - tenant SMTP + From + invite configuration (admin only)
+export { EmailSettingsPage } from './EmailSettingsPage'
+export type { EmailSettingsPageProps } from './EmailSettingsPage'
+
 // PasswordPolicyPage - Password policy configuration page
 export { PasswordPolicyPanel as PasswordPolicyPage } from './SecuritySettingsPage/PasswordPolicyPanel'
 

@@ -138,6 +138,9 @@ import type {
   AiTokenUsage,
   AiConfig,
   AiApplyResult,
+  EmailSettings,
+  EmailSettingsUpdate,
+  EmailTemplateEntry,
 } from './types';
 import {
   toJsonApiBody,
@@ -2045,6 +2048,44 @@ export class AdminClient {
 
     unlockUser: async (userId: string): Promise<void> => {
       await this.axios.post(`/api/admin/password-policy/users/${userId}/unlock`);
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Tenant email settings (admin API)
+  // ---------------------------------------------------------------------------
+
+  readonly emailSettings = {
+    get: async (): Promise<EmailSettings> => {
+      const response = await this.axios.get('/api/admin/tenant/email-settings');
+      return (response.data as { data: EmailSettings }).data;
+    },
+
+    update: async (update: EmailSettingsUpdate): Promise<void> => {
+      await this.axios.put('/api/admin/tenant/email-settings', update);
+    },
+
+    testSend: async (to: string): Promise<void> => {
+      await this.axios.post('/api/admin/tenant/email-settings/test', { to });
+    },
+  };
+
+  readonly emailTemplateOverrides = {
+    list: async (): Promise<EmailTemplateEntry[]> => {
+      const response = await this.axios.get('/api/admin/email-templates');
+      return (response.data as { data: EmailTemplateEntry[] }).data;
+    },
+
+    override: async (templateKey: string): Promise<void> => {
+      await this.axios.post(`/api/admin/email-templates/${templateKey}/override`);
+    },
+
+    revert: async (templateKey: string): Promise<void> => {
+      await this.axios.delete(`/api/admin/email-templates/${templateKey}/override`);
+    },
+
+    inviteUser: async (userId: string): Promise<void> => {
+      await this.axios.post(`/api/admin/users/${userId}/invite`);
     },
   };
 

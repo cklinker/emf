@@ -1,23 +1,15 @@
 /**
- * Timeline
- *
- * Generic vertical event feed: each row has a 28×28 round icon dot, a 1px
- * vertical connector to the next row, a 13/500 title with right-aligned
- * tabular timestamp, and a 13px muted body. Matches the design handoff at
- * `design_handoff_kelta_detail_layout/`.
- *
- * For the activity-feed specific case (CREATED/UPDATED/APPROVAL_* events),
- * see [ActivityTimeline](../ActivityTimeline/ActivityTimeline.tsx).
+ * Timeline — generic vertical event feed: 28×28 dot + 1px connector + body.
+ * Distinct from kelta-ui/app's `ActivityTimeline`, which is bound to a
+ * specific event-type schema.
  */
 
 import React from 'react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn } from './_utils'
 
 export type TimelineTone = 'default' | 'brand' | 'success' | 'warning' | 'danger'
 
 export interface TimelineEvent {
-  /** Pre-formatted timestamp text (e.g. "2h ago" or "Mar 28") */
   at: string
   icon?: React.ReactNode
   tone?: TimelineTone
@@ -47,16 +39,15 @@ export function Timeline({
 }): React.ReactElement | null {
   const { title, events } = config
   if (events.length === 0) return null
-
   return (
-    <Card
+    <div
       data-component="Timeline"
       className={cn('overflow-hidden rounded-xl border border-border bg-card', className)}
     >
-      <CardHeader className="px-5 py-4">
+      <div className="px-5 py-4">
         <span className="text-sm font-semibold text-foreground">{title}</span>
-      </CardHeader>
-      <CardContent className="border-t border-border px-5 py-4">
+      </div>
+      <div className="border-t border-border px-5 py-4">
         <ol className="relative">
           {events.map((event, idx) => {
             const isLast = idx === events.length - 1
@@ -95,7 +86,7 @@ export function Timeline({
             )
           })}
         </ol>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

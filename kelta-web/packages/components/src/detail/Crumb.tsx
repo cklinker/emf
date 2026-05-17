@@ -1,20 +1,16 @@
 /**
- * Crumb
+ * Crumb — breadcrumb trail with optional N-of-M record stepper.
  *
- * Breadcrumb trail + optional prev/next stepper for record detail pages.
- * Matches the design handoff at `design_handoff_kelta_detail_layout/`.
- *
- * Renders a chevron-separated trail of links followed by an optional
- * "N of M" record stepper with 1px square nav buttons.
+ * Uses react-router-dom's Link when an internal route is provided; falls
+ * back to a plain anchor otherwise.
  */
 
 import React from 'react'
-import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export interface CrumbItem {
   label: string
-  /** Internal route to navigate to. Omit for the current/last crumb. */
   to?: string
 }
 

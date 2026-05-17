@@ -1,16 +1,10 @@
 /**
- * TagsCard
- *
- * Card holding a chip row of pills with optional tone variants. Matches the
- * design handoff at `design_handoff_kelta_detail_layout/`.
+ * TagsCard — header with optional `+` action + flex row of tone-tinted pills.
  */
 
 import React from 'react'
 import { Plus } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn } from './_utils'
 
 export type TagTone = 'default' | 'brand' | 'success' | 'warning' | 'danger'
 
@@ -22,7 +16,6 @@ export interface TagItem {
 export interface TagsCardConfig {
   title: string
   tags: TagItem[]
-  /** When provided, header renders a small `+` button */
   onAdd?: () => void
 }
 
@@ -45,41 +38,42 @@ export function TagsCard({
   if (tags.length === 0 && !onAdd) return null
 
   return (
-    <Card
+    <div
       data-component="TagsCard"
       className={cn('overflow-hidden rounded-xl border border-border bg-card', className)}
     >
-      <CardHeader className="flex flex-row items-center justify-between gap-2 px-5 py-4">
+      <div className="flex flex-row items-center justify-between gap-2 px-5 py-4">
         <span className="text-sm font-semibold text-foreground">{title}</span>
         {onAdd && (
-          <Button
-            size="icon"
-            variant="ghost"
+          <button
+            type="button"
             onClick={onAdd}
             aria-label={`Add ${title.toLowerCase()}`}
-            className="h-6 w-6"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          </Button>
+          </button>
         )}
-      </CardHeader>
-      <CardContent className="border-t border-border px-5 py-4">
+      </div>
+      <div className="border-t border-border px-5 py-4">
         {tags.length === 0 ? (
           <span className="text-[13px] text-muted-foreground">—</span>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag, idx) => (
-              <Badge
+              <span
                 key={`${tag.label}-${idx}`}
-                className={cn('font-medium', TONE_CLASS[tag.tone || 'default'])}
-                variant="secondary"
+                className={cn(
+                  'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                  TONE_CLASS[tag.tone || 'default']
+                )}
               >
                 {tag.label}
-              </Badge>
+              </span>
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

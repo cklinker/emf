@@ -1,31 +1,23 @@
 /**
- * ScoreCard
- *
- * 0–100 score card with a 6px gradient progress bar, optional delta chip,
- * and a 2×2 grid of sub-metric rows. Matches the design handoff at
- * `design_handoff_kelta_detail_layout/`.
+ * ScoreCard — 0–100 score card with gradient progress bar + sub-metric grid.
  */
 
 import React from 'react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn } from './_utils'
 
 export type ScoreTone = 'success' | 'warning' | 'danger'
 
 export interface ScoreMetric {
   label: string
   value: string
-  /** Tints the value foreground in success-fg when true */
   ok?: boolean
 }
 
 export interface ScoreCardConfig {
   title: string
-  /** 0..100 */
   score: number
   statusLabel?: string
   tone?: ScoreTone
-  /** e.g. `+4 this month` */
   delta?: string
   metrics?: ScoreMetric[]
 }
@@ -47,11 +39,11 @@ export function ScoreCard({
   const clamped = Math.max(0, Math.min(100, score))
 
   return (
-    <Card
+    <div
       data-component="ScoreCard"
       className={cn('overflow-hidden rounded-xl border border-border bg-card', className)}
     >
-      <CardHeader className="flex flex-row items-center justify-between gap-2 px-5 py-4">
+      <div className="flex flex-row items-center justify-between gap-2 px-5 py-4">
         <span className="text-sm font-semibold text-foreground">{title}</span>
         {statusLabel && (
           <span
@@ -63,8 +55,8 @@ export function ScoreCard({
             {statusLabel}
           </span>
         )}
-      </CardHeader>
-      <CardContent className="space-y-3 border-t border-border px-5 py-4">
+      </div>
+      <div className="space-y-3 border-t border-border px-5 py-4">
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300"
@@ -99,7 +91,7 @@ export function ScoreCard({
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

@@ -9,6 +9,9 @@
 export { KeltaProvider, useKeltaClient, useCurrentUser } from './context/KeltaContext';
 export type { KeltaProviderProps } from './context/KeltaContext';
 
+// Detail-page rail block components (see ./detail)
+export * from './detail';
+
 // DataTable
 export { DataTable } from './DataTable/DataTable';
 export type { DataTableProps, ColumnDefinition } from './DataTable/types';

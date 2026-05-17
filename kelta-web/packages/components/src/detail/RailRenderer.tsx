@@ -1,24 +1,18 @@
 /**
- * RailRenderer
- *
- * Renders an ordered list of side-rail blocks from a layout config. Each
- * `RailBlockDto` carries a discriminating `kind` and a `config` payload; we
- * dispatch on `kind` and silently skip unknown variants so adding a new
- * server-side kind doesn't crash older clients.
+ * RailRenderer — dispatches an ordered list of `RailBlockDto` items to the
+ * appropriate per-kind component. Unknown kinds are silently skipped so
+ * adding a new server-side kind doesn't crash older clients.
  */
 
 import React from 'react'
-import type { RailBlockDto } from '@/hooks/usePageLayout'
 import { MetadataCard } from './MetadataCard'
 import { StatStrip } from './StatStrip'
-import { ScoreCard } from './ScoreCard'
-import { TagsCard } from './TagsCard'
+import { ScoreCard, type ScoreCardConfig } from './ScoreCard'
+import { TagsCard, type TagTone } from './TagsCard'
 import { AICard } from './AICard'
-import { Timeline } from './Timeline'
-import type { ScoreCardConfig } from './ScoreCard'
+import { Timeline, type TimelineEvent, type TimelineTone } from './Timeline'
 import type { StatTileConfig } from './StatStrip'
-import type { TagTone } from './TagsCard'
-import type { TimelineEvent, TimelineTone } from './Timeline'
+import type { RailBlockDto } from './types'
 
 export interface RailRendererProps {
   blocks: RailBlockDto[]
@@ -66,8 +60,6 @@ export function RailRenderer({ blocks }: RailRendererProps): React.ReactElement 
                 config={{
                   title: block.config.title,
                   summary: block.config.summary,
-                  // Server-defined actions are visual-only at this point;
-                  // wire to real handlers when the AI action endpoints land.
                   actions: (block.config.actions ?? []).map((a) => ({
                     label: a.label,
                     onClick: () => undefined,

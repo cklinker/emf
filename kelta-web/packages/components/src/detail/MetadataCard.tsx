@@ -1,20 +1,13 @@
 /**
- * MetadataCard
- *
- * Compact list of label / value rows separated by 1px dashed dividers.
- * Optionally renders values in monospace (useful for IDs). Matches the
- * design handoff at `design_handoff_kelta_detail_layout/`.
+ * MetadataCard — label/value list separated by 1px dashed dividers.
  */
 
 import React from 'react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn } from './_utils'
 
 export interface MetadataRow {
   label: string
-  /** Pre-formatted display value */
   value: React.ReactNode
-  /** Render the value in monospace */
   mono?: boolean
 }
 
@@ -34,14 +27,14 @@ export function MetadataCard({
   if (rows.length === 0) return null
 
   return (
-    <Card
+    <div
       data-component="MetadataCard"
       className={cn('overflow-hidden rounded-xl border border-border bg-card', className)}
     >
-      <CardHeader className="px-5 py-4">
+      <div className="px-5 py-4">
         <span className="text-sm font-semibold text-foreground">{title}</span>
-      </CardHeader>
-      <CardContent className="border-t border-border px-5 py-2">
+      </div>
+      <div className="border-t border-border px-5 py-2">
         <dl className="divide-y divide-dashed divide-border">
           {rows.map((row, idx) => (
             <div
@@ -60,7 +53,7 @@ export function MetadataCard({
             </div>
           ))}
         </dl>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

@@ -40,6 +40,7 @@ export default defineConfig({
         'lucide-react',
         'class-variance-authority',
         'radix-ui',
+        'maplibre-gl',
       ],
       output: {
         globals: {
@@ -55,6 +56,7 @@ export default defineConfig({
           'lucide-react': 'LucideReact',
           'class-variance-authority': 'cva',
           'radix-ui': 'RadixUI',
+          'maplibre-gl': 'maplibregl',
         },
       },
     },

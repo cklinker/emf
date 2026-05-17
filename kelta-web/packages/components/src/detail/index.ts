@@ -23,6 +23,9 @@ export type { FieldSectionProps, FieldSectionRenderContext, DetailField } from '
 export { AddressMap } from './AddressMap';
 export type { AddressMapProps } from './AddressMap';
 
+export { InteractiveMap } from './InteractiveMap';
+export type { InteractiveMapProps } from './InteractiveMap';
+
 export { StatStrip } from './StatStrip';
 export type { StatStripProps, StatTileConfig, StatTileKind, StatTileTrend } from './StatStrip';
 

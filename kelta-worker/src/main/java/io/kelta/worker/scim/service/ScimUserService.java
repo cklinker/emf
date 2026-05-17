@@ -36,9 +36,13 @@ public class ScimUserService {
 
     private final JdbcTemplate jdbcTemplate;
     private final ScimFilterParser filterParser;
+    private final io.kelta.worker.service.UserInviteService userInviteService;
 
-    public ScimUserService(JdbcTemplate jdbcTemplate) {
+    public ScimUserService(JdbcTemplate jdbcTemplate,
+                            @org.springframework.beans.factory.annotation.Autowired(required = false)
+                            io.kelta.worker.service.UserInviteService userInviteService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.userInviteService = userInviteService;
         this.filterParser = new ScimFilterParser(USER_ATTR_MAP);
     }
 
@@ -115,6 +119,16 @@ public class ScimUserService {
                 id, tenantId, email, username, firstName, lastName, status, locale, timezone);
 
         log.info("SCIM: Created user {} ({}) in tenant {}", id, email, tenantId);
+
+        // Send invite (tenant can opt out via tenant.auto_invite_on_create=false).
+        if (userInviteService != null && "ACTIVE".equals(status)
+                && userInviteService.isAutoInviteEnabled(tenantId)) {
+            try {
+                userInviteService.inviteUser(tenantId, id);
+            } catch (Exception e) {
+                log.warn("SCIM: invite for newly-created user {} failed: {}", id, e.getMessage());
+            }
+        }
         return getUser(tenantId, id, baseUrl);
     }
 

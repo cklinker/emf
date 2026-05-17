@@ -24,7 +24,9 @@ class PasswordPolicyServiceTest {
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
         passwordEncoder = new BCryptPasswordEncoder();
-        service = new PasswordPolicyService(jdbcTemplate, passwordEncoder);
+        service = new PasswordPolicyService(jdbcTemplate, passwordEncoder,
+                mock(io.kelta.auth.service.WorkerClient.class),
+                mock(io.kelta.auth.config.AuthProperties.class));
     }
 
     @Nested

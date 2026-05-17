@@ -28,7 +28,7 @@ class ScimUserServiceTest {
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
-        service = new ScimUserService(jdbcTemplate);
+        service = new ScimUserService(jdbcTemplate, null);
     }
 
     @Test

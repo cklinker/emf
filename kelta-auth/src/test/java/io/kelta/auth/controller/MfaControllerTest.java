@@ -37,7 +37,8 @@ class MfaControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new MfaController(totpService);
+        controller = new MfaController(totpService, mock(io.kelta.auth.service.WorkerClient.class),
+                mock(org.springframework.jdbc.core.JdbcTemplate.class));
         lenient().when(request.getSession(false)).thenReturn(session);
     }
 
@@ -71,7 +72,8 @@ class MfaControllerTest {
         @Test
         @DisplayName("redirects to login when TOTP service is null")
         void redirectsWhenTotpServiceNull() {
-            MfaController controllerNoTotp = new MfaController(null);
+            MfaController controllerNoTotp = new MfaController(null, mock(io.kelta.auth.service.WorkerClient.class),
+                    mock(org.springframework.jdbc.core.JdbcTemplate.class));
 
             String result = controllerNoTotp.showMfaChallenge(session, new ConcurrentModel());
 

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.kelta.runtime.module.integration.spi.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -69,18 +70,29 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final JdbcTemplate jdbcTemplate;
+    private final EmailService emailService;
+    private final String uiBaseUrl;
 
     /** Maps "tenantId:email" to the epoch-second of the last tracking write. */
     private final Map<String, Long> lastTrackedAt;
 
     @Autowired
-    public LoginTrackingFilter(JdbcTemplate jdbcTemplate) {
-        this(jdbcTemplate, new ConcurrentHashMap<>());
+    public LoginTrackingFilter(JdbcTemplate jdbcTemplate,
+                                EmailService emailService,
+                                @org.springframework.beans.factory.annotation.Value("${kelta.external-base-url:}") String uiBaseUrl) {
+        this(jdbcTemplate, emailService, uiBaseUrl, new ConcurrentHashMap<>());
     }
 
     /** Constructor for testing — allows injecting the throttle cache. */
     LoginTrackingFilter(JdbcTemplate jdbcTemplate, Map<String, Long> lastTrackedAt) {
+        this(jdbcTemplate, null, null, lastTrackedAt);
+    }
+
+    LoginTrackingFilter(JdbcTemplate jdbcTemplate, EmailService emailService,
+                         String uiBaseUrl, Map<String, Long> lastTrackedAt) {
         this.jdbcTemplate = jdbcTemplate;
+        this.emailService = emailService;
+        this.uiBaseUrl = uiBaseUrl;
         this.lastTrackedAt = lastTrackedAt;
     }
 
@@ -319,9 +331,43 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
     }
 
     private void updateUserLoginInfo(String userId, Timestamp ts) {
+        boolean firstLogin = false;
+        try {
+            Object last = jdbcTemplate.queryForObject(
+                    "SELECT welcomed_at FROM platform_user WHERE id = ?",
+                    Object.class, userId);
+            firstLogin = (last == null);
+        } catch (Exception ignored) {
+            // Older schemas may not have welcomed_at — skip the welcome path.
+        }
         jdbcTemplate.update(
                 "UPDATE platform_user SET last_login_at = ?, login_count = COALESCE(login_count, 0) + 1, updated_at = ? WHERE id = ?",
                 ts, ts, userId);
+
+        if (firstLogin && emailService != null) {
+            try {
+                var rows = jdbcTemplate.queryForList(
+                        "SELECT pu.email, pu.first_name, pu.tenant_id, t.name AS tenant_name "
+                                + "FROM platform_user pu JOIN tenant t ON t.id = pu.tenant_id "
+                                + "WHERE pu.id = ?", userId);
+                if (!rows.isEmpty()) {
+                    var row = rows.get(0);
+                    emailService.sendByKey(
+                            (String) row.get("tenant_id"),
+                            (String) row.get("email"),
+                            "user.welcome",
+                            Map.of(
+                                    "tenantName", row.getOrDefault("tenant_name", "Kelta"),
+                                    "firstName",  row.getOrDefault("first_name", ""),
+                                    "actionUrl",  uiBaseUrl == null ? "" : uiBaseUrl),
+                            "WELCOME", userId);
+                    jdbcTemplate.update(
+                            "UPDATE platform_user SET welcomed_at = ? WHERE id = ?", ts, userId);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to send welcome email for {}: {}", userId, e.getMessage());
+            }
+        }
     }
 
     private void insertLoginHistory(String userId, String tenantId, Timestamp ts,

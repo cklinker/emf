@@ -1,10 +1,12 @@
 package io.kelta.auth.controller;
 
 import io.kelta.auth.service.TotpService;
+import io.kelta.auth.service.WorkerClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +14,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller for MFA challenge and setup pages.
@@ -36,9 +40,15 @@ public class MfaController {
     public static final String SESSION_MFA_SETUP_SECRET = "MFA_SETUP_SECRET";
 
     private final TotpService totpService;
+    private final WorkerClient workerClient;
+    private final JdbcTemplate jdbcTemplate;
 
-    public MfaController(@org.springframework.beans.factory.annotation.Autowired(required = false) TotpService totpService) {
+    public MfaController(@org.springframework.beans.factory.annotation.Autowired(required = false) TotpService totpService,
+                          WorkerClient workerClient,
+                          JdbcTemplate jdbcTemplate) {
         this.totpService = totpService;
+        this.workerClient = workerClient;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     // -----------------------------------------------------------------------
@@ -154,6 +164,7 @@ public class MfaController {
         try {
             List<String> recoveryCodes = totpService.enrollUser(userId, secret, code);
             securityLog.info("security_event=MFA_ENROLLED actor={} tenant={}", userId, tenantId);
+            sendMfaChangedEmail(userId, "user.mfa_enrolled");
 
             session.removeAttribute(SESSION_MFA_SETUP_SECRET);
             session.removeAttribute(SESSION_MFA_SETUP_REQUIRED);
@@ -165,6 +176,29 @@ public class MfaController {
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error", "Invalid verification code. Please try again.");
             return "redirect:/mfa-setup";
+        }
+    }
+
+    private void sendMfaChangedEmail(String userId, String templateKey) {
+        try {
+            var rows = jdbcTemplate.queryForList(
+                    "SELECT pu.email, pu.first_name, pu.tenant_id, t.name AS tenant_name "
+                            + "FROM platform_user pu JOIN tenant t ON t.id = pu.tenant_id "
+                            + "WHERE pu.id = ?",
+                    userId);
+            if (rows.isEmpty()) return;
+            var row = rows.get(0);
+            workerClient.sendTemplateEmail(
+                    (String) row.get("tenant_id"),
+                    (String) row.get("email"),
+                    templateKey,
+                    Map.of(
+                            "tenantName", row.getOrDefault("tenant_name", "Kelta"),
+                            "firstName",  row.getOrDefault("first_name", ""),
+                            "changedAt",  Instant.now().toString()),
+                    "MFA_CHANGED", userId);
+        } catch (Exception e) {
+            log.warn("Failed to send MFA-change notification for {}: {}", userId, e.getMessage());
         }
     }
 

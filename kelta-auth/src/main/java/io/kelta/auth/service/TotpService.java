@@ -50,11 +50,15 @@ public class TotpService {
     private final CodeVerifier codeVerifier;
     private final SecureRandom secureRandom;
 
+    private final WorkerClient workerClient;
+
     public TotpService(JdbcTemplate jdbcTemplate, PasswordEncoder passwordEncoder,
-                       @org.springframework.beans.factory.annotation.Autowired(required = false) EncryptionService encryptionService) {
+                       @org.springframework.beans.factory.annotation.Autowired(required = false) EncryptionService encryptionService,
+                       WorkerClient workerClient) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
         this.encryptionService = encryptionService;
+        this.workerClient = workerClient;
         this.secretGenerator = new DefaultSecretGenerator();
         this.codeVerifier = new DefaultCodeVerifier(
                 new DefaultCodeGenerator(HashingAlgorithm.SHA1),
@@ -200,11 +204,36 @@ public class TotpService {
             throw new IllegalArgumentException("Invalid TOTP code");
         }
         deleteMfaData(userId);
+        sendMfaDisabledEmail(userId);
     }
 
     public void resetMfa(String userId) {
         deleteMfaData(userId);
+        sendMfaDisabledEmail(userId);
         log.info("MFA reset by admin for user {}", userId);
+    }
+
+    private void sendMfaDisabledEmail(String userId) {
+        try {
+            var rows = jdbcTemplate.queryForList(
+                    "SELECT pu.email, pu.first_name, pu.tenant_id, t.name AS tenant_name "
+                            + "FROM platform_user pu JOIN tenant t ON t.id = pu.tenant_id "
+                            + "WHERE pu.id = ?",
+                    userId);
+            if (rows.isEmpty()) return;
+            var row = rows.get(0);
+            workerClient.sendTemplateEmail(
+                    (String) row.get("tenant_id"),
+                    (String) row.get("email"),
+                    "user.mfa_disabled",
+                    java.util.Map.of(
+                            "tenantName", row.getOrDefault("tenant_name", "Kelta"),
+                            "firstName",  row.getOrDefault("first_name", ""),
+                            "changedAt",  java.time.Instant.now().toString()),
+                    "MFA_DISABLED", userId);
+        } catch (Exception e) {
+            log.warn("Failed to send MFA-disabled notification for {}: {}", userId, e.getMessage());
+        }
     }
 
     private void deleteMfaData(String userId) {

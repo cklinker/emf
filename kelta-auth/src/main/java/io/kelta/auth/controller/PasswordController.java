@@ -128,6 +128,7 @@ public class PasswordController {
         }
 
         log.info("Password changed for user {}", email);
+        if (userId != null) sendPasswordChangedEmail(userId);
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
 
@@ -204,34 +205,59 @@ public class PasswordController {
         );
 
         log.info("Password reset completed for user_id {}", userId);
+        sendPasswordChangedEmail(userId);
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
 
     private void sendPasswordResetEmail(String email, String resetToken) {
         try {
-            // Resolve tenant ID from the user's record
-            var tenantResults = jdbcTemplate.queryForList(
-                    "SELECT pu.tenant_id FROM platform_user pu WHERE pu.email = ? AND pu.status = 'ACTIVE'",
+            var rows = jdbcTemplate.queryForList(
+                    "SELECT pu.tenant_id, pu.first_name, t.name AS tenant_name "
+                            + "FROM platform_user pu JOIN tenant t ON t.id = pu.tenant_id "
+                            + "WHERE pu.email = ? AND pu.status = 'ACTIVE'",
                     email
             );
-            String tenantId = tenantResults.isEmpty() ? "system" : (String) tenantResults.get(0).get("tenant_id");
+            if (rows.isEmpty()) return;
+            String tenantId   = (String) rows.get(0).get("tenant_id");
+            String firstName  = (String) rows.getFirst().getOrDefault("first_name", "");
+            String tenantName = (String) rows.getFirst().getOrDefault("tenant_name", "Kelta");
 
-            String resetLink = uiBaseUrl + "/reset-password?token=" + resetToken + "&email=" + email;
-            String subject = "Reset your password";
-            String body = """
-                    <html><body>
-                    <h2>Password Reset</h2>
-                    <p>You requested a password reset. Click the link below to set a new password:</p>
-                    <p><a href="%s">Reset Password</a></p>
-                    <p>This link expires in 1 hour. If you did not request this, ignore this email.</p>
-                    </body></html>
-                    """.formatted(resetLink);
-
-            workerClient.sendEmail(tenantId, email, subject, body, "PASSWORD_RESET");
+            String actionUrl = uiBaseUrl + "/reset-password?token=" + resetToken + "&email=" + email;
+            workerClient.sendTemplateEmail(tenantId, email, "user.password_reset",
+                    Map.of(
+                            "tenantName", tenantName,
+                            "firstName", firstName == null ? "" : firstName,
+                            "actionUrl", actionUrl,
+                            "expiresIn", "1 hour"),
+                    "PASSWORD_RESET", null);
             log.info("Password reset email queued for {}", email);
         } catch (Exception e) {
-            // Log but don't fail the reset request — prevent email enumeration
             log.error("Failed to send password reset email to {}: {}", email, e.getMessage());
+        }
+    }
+
+    private void sendPasswordChangedEmail(String userId) {
+        try {
+            var rows = jdbcTemplate.queryForList(
+                    "SELECT pu.email, pu.first_name, pu.tenant_id, t.name AS tenant_name "
+                            + "FROM platform_user pu JOIN tenant t ON t.id = pu.tenant_id "
+                            + "WHERE pu.id = ?",
+                    userId
+            );
+            if (rows.isEmpty()) return;
+            var row = rows.get(0);
+            workerClient.sendTemplateEmail(
+                    (String) row.get("tenant_id"),
+                    (String) row.get("email"),
+                    "user.password_changed",
+                    Map.of(
+                            "tenantName", row.getOrDefault("tenant_name", "Kelta"),
+                            "firstName",  row.getOrDefault("first_name", ""),
+                            "changedAt",  Instant.now().toString(),
+                            "ipAddress",  "unknown"),
+                    "PASSWORD_CHANGED", userId);
+        } catch (Exception e) {
+            log.warn("Failed to send password-changed notification: {}", e.getMessage());
         }
     }
 }

@@ -35,7 +35,8 @@ class TotpServiceTest {
 
     @BeforeEach
     void setUp() {
-        totpService = new TotpService(jdbcTemplate, passwordEncoder, encryptionService);
+        totpService = new TotpService(jdbcTemplate, passwordEncoder, encryptionService,
+                mock(io.kelta.auth.service.WorkerClient.class));
     }
 
     @Nested

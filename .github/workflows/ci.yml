@@ -367,16 +367,6 @@ jobs:
 
       - name: Run Playwright tests (sibling container on compose network)
         id: playwright
-        # NOTE: report-only until the gateway dynamic-route bug is fixed.
-        # In compose, gateway logs show /api/{collection}/** routes registered
-        # via RouteRegistry but Spring still returns 404 "No static resource"
-        # — falling through to the WebFlux static-resource handler instead of
-        # the DynamicRouteLocator. Reproducible locally with:
-        #   make up && curl -H "Authorization: Bearer <token>" \
-        #     http://localhost:8080/api/collections
-        # Works against prod (k8s ingress) so it's a compose-stack regression.
-        # Tracking: see PR #908 description.
-        continue-on-error: true
         run: |
           NETWORK="${COMPOSE_PROJECT_NAME}_kelta-network"
           docker run --name kelta-e2e-run \

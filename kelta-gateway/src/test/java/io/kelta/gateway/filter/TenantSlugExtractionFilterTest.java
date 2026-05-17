@@ -325,6 +325,63 @@ class TenantSlugExtractionFilterTest {
                 .isNull();
     }
 
+    // --- Reserved segments (slug-shaped but reserved as API/platform path prefixes) ---
+
+    @Test
+    void shouldPassThroughApiPathWhenRequirePrefixFalse() {
+        // "api" matches the slug regex (3 chars) but must not be treated as a slug;
+        // otherwise /api/collections gets stripped to /collections and route
+        // matching against /api/** fails.
+        TenantSlugExtractionFilter filter = createFilter(true, false);
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/collections").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        // Original exchange — path unchanged, no tenant attributes set
+        verify(chain).filter(exchange);
+        assertThat(exchange.getAttributes().get(TenantResolutionFilter.TENANT_SLUG_ATTR)).isNull();
+        assertThat(exchange.getAttributes().get(TenantResolutionFilter.TENANT_ID_ATTR)).isNull();
+    }
+
+    @Test
+    void shouldPassThroughApiPathWhenRequirePrefixTrue() {
+        // Even in strict mode, /api/** is a reserved API prefix — downstream filters
+        // (TenantResolutionFilter, JWT) resolve tenant from headers/token.
+        TenantSlugExtractionFilter filter = createFilter(true, true);
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/collections").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        verify(chain).filter(exchange);
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
+    @Test
+    void shouldPassThroughReservedSegments() {
+        // Slug-shaped reserved names (api/auth/otel/scim) must never be stripped.
+        TenantSlugExtractionFilter filter = createFilter(true, false);
+        String[] reserved = {"/api/users", "/auth/login", "/otel/v1/traces", "/scim/v2/Users"};
+
+        for (String path : reserved) {
+            MockServerHttpRequest request = MockServerHttpRequest.get(path).build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete();
+
+            verify(chain, atLeastOnce()).filter(exchange);
+            assertThat(exchange.getAttributes().get(TenantResolutionFilter.TENANT_SLUG_ATTR))
+                    .as("Path '%s' must not set a slug attribute", path)
+                    .isNull();
+        }
+    }
+
     // --- Slug pattern validation ---
 
     @Test

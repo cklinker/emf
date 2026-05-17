@@ -6,6 +6,14 @@ spring:
   application:
     name: kelta-gateway
 
+  # Gateway has no static assets to serve. Disabling the static-resource handler
+  # prevents the misleading "No static resource X" 404 when a request fails to
+  # match a Gateway route — the GlobalErrorHandler / Gateway not-found path now
+  # surfaces the actual routing miss instead.
+  webflux:
+    resources:
+      add-mappings: false
+
   # Request size limits for in-memory buffering
   codec:
     max-in-memory-size: 10MB

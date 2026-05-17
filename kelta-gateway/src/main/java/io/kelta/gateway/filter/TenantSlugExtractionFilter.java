@@ -19,6 +19,7 @@ import reactor.core.publisher.Mono;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -44,6 +45,17 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
 
     /** Tenant slug pattern matching the Tenant entity validation. */
     private static final Pattern SLUG_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{1,61}[a-z0-9]$");
+
+    /**
+     * First-segment names that are slug-shaped but reserved as platform/API path
+     * prefixes. The slug regex (3-63 lowercase chars) accepts short words like
+     * {@code api}, so without this guard the filter would treat {@code /api/foo}
+     * as an unresolved slug and strip {@code /api/}, breaking downstream route
+     * matching against {@code /api/**}. Keep this aligned with platformPaths.
+     */
+    private static final Set<String> RESERVED_SEGMENTS = Set.of(
+            "api", "actuator", "platform", "internal", "otel", "scim", "auth", "ws"
+    );
 
     private final GatewayCacheManager cacheManager;
     private final GatewayMetrics metrics;
@@ -100,6 +112,12 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
                 return chain.filter(exchange);
             }
             return notFound(exchange, "Invalid tenant identifier: " + firstSegment);
+        }
+
+        // Slug-shaped but reserved as an API/platform path prefix (e.g. /api/**).
+        // Pass through unchanged so downstream route matching works.
+        if (RESERVED_SEGMENTS.contains(firstSegment)) {
+            return chain.filter(exchange);
         }
 
         // Strip the slug segment from the path (must happen regardless of cache hit

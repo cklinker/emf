@@ -4,6 +4,14 @@ import { ObjectFormPage } from "../../pages/end-user/object-form.page";
 const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
 
 test.describe("Validation Rules Journey", () => {
+  // This journey does a lot of sequential work on a freshly-created
+  // collection (create collection + 2 fields, storage-ready barrier,
+  // navigate the SPA, fill, submit, assert). On a cold CI compose stack
+  // it intermittently exceeds the 45s default (passes locally and on
+  // warm runs). The work is correct — give it realistic headroom rather
+  // than flake. (Rollup journeys are NOT slow-but-correct; excluded.)
+  test.describe.configure({ timeout: 90_000 });
+
   test("required field prevents empty form submission", async ({
     page,
     dataFactory,

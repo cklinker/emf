@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { uuid } from '@/utils/uuid'
 import { useAuth } from '../../context/AuthContext'
 import { useAiChat } from './AiChatContext'
 import type { AiProposal, ChatMessage } from './types'
@@ -32,7 +33,7 @@ export function useAiStream() {
 
       // Add user message immediately
       const userMsg: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         role: 'user',
         content: message,
         createdAt: new Date().toISOString(),
@@ -75,7 +76,7 @@ export function useAiStream() {
 
           // Add error as assistant message so it's visible in the chat
           const errorChatMsg: ChatMessage = {
-            id: crypto.randomUUID(),
+            id: uuid(),
             role: 'assistant',
             content: `Sorry, I encountered an error: ${errorMsg}`,
             createdAt: new Date().toISOString(),
@@ -122,7 +123,7 @@ export function useAiStream() {
                     // When tool use starts, finalize any accumulated text as a message
                     if (fullText.trim()) {
                       const textMsg: ChatMessage = {
-                        id: crypto.randomUUID(),
+                        id: uuid(),
                         role: 'assistant',
                         content: fullText,
                         createdAt: new Date().toISOString(),
@@ -178,7 +179,7 @@ export function useAiStream() {
         // Finalize: add the complete assistant message
         if (fullText) {
           const assistantMsg: ChatMessage = {
-            id: crypto.randomUUID(),
+            id: uuid(),
             role: 'assistant',
             content: fullText,
             createdAt: new Date().toISOString(),
@@ -190,7 +191,7 @@ export function useAiStream() {
           const errorMsg = (err as Error).message
           // Show error in the chat UI
           const errorChatMsg: ChatMessage = {
-            id: crypto.randomUUID(),
+            id: uuid(),
             role: 'assistant',
             content: `Sorry, I encountered an error: ${errorMsg}`,
             createdAt: new Date().toISOString(),

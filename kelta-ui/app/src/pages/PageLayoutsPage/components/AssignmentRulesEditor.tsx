@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { uuid } from '@/utils/uuid'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -133,7 +134,7 @@ export function AssignmentRulesEditor({
     /* eslint-disable react-hooks/set-state-in-effect */
     setRows(
       sorted.map((a) => ({
-        id: crypto.randomUUID(),
+        id: uuid(),
         serverId: a.id,
         profileId: a.profileId ?? '',
         recordTypeId: a.recordTypeId ?? '',
@@ -188,7 +189,7 @@ export function AssignmentRulesEditor({
     setRows((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: uuid(),
         profileId: '',
         recordTypeId: '',
         condition: null,

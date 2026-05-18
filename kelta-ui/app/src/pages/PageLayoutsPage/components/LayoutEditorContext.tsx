@@ -8,6 +8,7 @@
  */
 
 import React, { createContext, useContext, useReducer, useCallback, useMemo } from 'react'
+import { uuid } from '@/utils/uuid'
 import type { RailBlockDto, RecordHeaderConfigDto } from '@/hooks/usePageLayout'
 
 // ---------------------------------------------------------------------------
@@ -275,7 +276,7 @@ function layoutEditorReducer(
       const undo = pushUndo(state)
       const maxSortOrder = state.sections.reduce((max, s) => Math.max(max, s.sortOrder), -1)
       const newSection: EditorSection = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         heading: 'New Section',
         columns: 2,
         sortOrder: maxSortOrder + 1,
@@ -368,7 +369,7 @@ function layoutEditorReducer(
       } = action.payload
       const undo = pushUndo(state)
       const newPlacement: EditorFieldPlacement = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         fieldId,
         fieldName,
         fieldType,
@@ -485,7 +486,7 @@ function layoutEditorReducer(
     case 'ADD_RELATED_LIST': {
       const undo = pushUndo(state)
       const newRelatedList: EditorRelatedList = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         ...action.payload.relatedList,
       }
       return {

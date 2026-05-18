@@ -7,6 +7,7 @@ import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
+import io.kelta.worker.service.CollectionLifecycleManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,11 +37,14 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
 
     private final PlatformEventPublisher eventPublisher;
     private final JdbcTemplate jdbcTemplate;
+    private final CollectionLifecycleManager lifecycleManager;
 
     public FieldConfigEventPublisher(PlatformEventPublisher eventPublisher,
-                                      JdbcTemplate jdbcTemplate) {
+                                      JdbcTemplate jdbcTemplate,
+                                      CollectionLifecycleManager lifecycleManager) {
         this.eventPublisher = eventPublisher;
         this.jdbcTemplate = jdbcTemplate;
+        this.lifecycleManager = lifecycleManager;
     }
 
     @Override
@@ -97,6 +101,13 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         log.info("Publishing collection UPDATED event (triggered by field change) for collectionId={}, collectionName={}",
                 collectionId, collectionName);
         eventPublisher.publish(subject, event);
+
+        // Read-after-write (issue #910): the NATS broadcast above keeps OTHER
+        // pods consistent, but the originating pod consumes its own event
+        // asynchronously and can serve a stale CollectionDefinition (e.g. a
+        // just-added rollup_summary field missing from getById) until the
+        // self-consume lands. Refresh this pod synchronously as well.
+        lifecycleManager.refreshOrInitializeLocally(collectionId);
     }
 
     private String resolveCollectionName(String collectionId) {

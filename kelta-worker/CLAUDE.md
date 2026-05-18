@@ -53,7 +53,9 @@ When a system collection config changes, broadcast via NATS JetStream so all pod
 **Reference**: `listener/CollectionConfigEventPublisher.java` (subject prefix: `kelta.config.collection.changed.`)
 **Reference**: `listener/FieldConfigEventPublisher.java`
 
-> Never call `lifecycleManager.refreshX()` directly from a hook — that only updates the local pod. Publishing the event is what keeps all pods consistent.
+> Never call `lifecycleManager.refreshX()` directly from a hook **as a substitute for** the NATS broadcast — that only updates the local pod and leaves every other pod stale. Publishing the event is what keeps all pods consistent.
+>
+> **Read-after-write exception (issue #910):** a hook MAY *additionally* trigger a synchronous local refresh so the originating pod is consistent for an immediate read-after-write (e.g. `addField` → `getById` on the same pod), **provided it still publishes the NATS config event** for all other pods. Use `CollectionLifecycleManager.refreshOrInitializeLocally(collectionId)` for this — see `FieldConfigEventPublisher`. Local-refresh-*only* (skipping the broadcast) remains forbidden.
 
 ### NATS Subscriptions
 Listeners are plain classes registered in `config/NatsSubscriptionConfig` at `@PostConstruct` time via `NatsSubscriptionManager`. There are no `@KafkaListener`-style annotations. A listener method typically takes the raw JSON message and extracts the `PlatformEvent` envelope.

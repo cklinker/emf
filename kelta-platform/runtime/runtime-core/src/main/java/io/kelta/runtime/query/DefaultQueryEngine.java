@@ -13,6 +13,7 @@ import io.kelta.runtime.service.FieldEncryptionService;
 import io.kelta.runtime.service.RollupSummaryService;
 import io.kelta.runtime.formula.FormulaEvaluator;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.runtime.registry.CollectionOnDemandLoader;
 import io.kelta.runtime.storage.PhysicalTableStorageAdapter;
 import io.kelta.runtime.storage.StorageAdapter;
 import io.kelta.runtime.storage.TableRef;
@@ -69,6 +70,8 @@ public class DefaultQueryEngine implements QueryEngine {
     private final RecordEventPublisher recordEventPublisher;
     private final BeforeSaveHookRegistry beforeSaveHookRegistry;
     private final CollectionRegistry collectionRegistry;
+    /** Optional fallback to resolve a collection not yet in the in-memory registry. */
+    private CollectionOnDemandLoader onDemandLoader;
 
     /**
      * Creates a new DefaultQueryEngine with all services including workflow engine.
@@ -115,6 +118,17 @@ public class DefaultQueryEngine implements QueryEngine {
         this.recordEventPublisher = recordEventPublisher;
         this.beforeSaveHookRegistry = beforeSaveHookRegistry;
         this.collectionRegistry = collectionRegistry;
+    }
+
+    /**
+     * Optionally wires an on-demand collection loader used to resolve a
+     * ROLLUP_SUMMARY child collection that has not yet propagated into this
+     * pod's in-memory registry. Mirrors {@code DynamicCollectionRouter}'s
+     * fallback so rollup reads are correct immediately after the child
+     * collection is created rather than only after the NATS config event.
+     */
+    public void setOnDemandLoader(CollectionOnDemandLoader onDemandLoader) {
+        this.onDemandLoader = onDemandLoader;
     }
 
     /**
@@ -792,9 +806,27 @@ public class DefaultQueryEngine implements QueryEngine {
         }
 
         CollectionDefinition childDef = collectionRegistry.get(childCollection);
+        if (childDef == null && onDemandLoader != null) {
+            // The child collection may not have propagated into this pod's
+            // in-memory registry yet (NATS config event lag) even though its
+            // physical table is migrated. Mirror DynamicCollectionRouter's
+            // on-demand fallback so the rollup resolves on the first read
+            // instead of silently returning null until the registry refreshes.
+            String tenantId = TenantContext.get();
+            try {
+                childDef = onDemandLoader.load(childCollection, tenantId);
+                if (childDef != null) {
+                    logger.info("Rollup field '{}': loaded child collection '{}' on demand (tenantId={})",
+                            field.name(), childCollection, tenantId);
+                }
+            } catch (Exception e) {
+                logger.warn("Rollup field '{}': on-demand load of child collection '{}' failed: {}",
+                        field.name(), childCollection, e.getMessage());
+            }
+        }
         if (childDef == null) {
-            logger.debug("Rollup field '{}' references unknown child collection '{}'",
-                    field.name(), childCollection);
+            logger.warn("Rollup field '{}' references child collection '{}' not present in registry "
+                    + "and not loadable on demand; returning null", field.name(), childCollection);
             return null;
         }
 

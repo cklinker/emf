@@ -8,6 +8,7 @@ import io.kelta.runtime.query.DefaultQueryEngine;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.service.RollupSummaryService;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.runtime.registry.CollectionOnDemandLoader;
 import io.kelta.runtime.registry.ConcurrentCollectionRegistry;
 import io.kelta.runtime.router.DynamicCollectionRouter;
 import io.kelta.runtime.router.GlobalExceptionHandler;
@@ -133,10 +134,15 @@ public class KeltaRuntimeAutoConfiguration {
                                     @Autowired(required = false) RecordEventPublisher recordEventPublisher,
                                     @Autowired(required = false) BeforeSaveHookRegistry beforeSaveHookRegistry,
                                     @Autowired(required = false) RollupSummaryService rollupSummaryService,
+                                    @Autowired(required = false) CollectionOnDemandLoader onDemandLoader,
                                     CollectionRegistry collectionRegistry) {
-        return new DefaultQueryEngine(storageAdapter, validationEngine,
+        DefaultQueryEngine engine = new DefaultQueryEngine(storageAdapter, validationEngine,
                 null, null, null, rollupSummaryService, customValidationRuleEngine, recordEventPublisher,
                 beforeSaveHookRegistry, collectionRegistry);
+        if (onDemandLoader != null) {
+            engine.setOnDemandLoader(onDemandLoader);
+        }
+        return engine;
     }
 
     /**

@@ -4,6 +4,11 @@ import { ObjectFormPage } from "../../pages/end-user/object-form.page";
 const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
 
 test.describe("Validation Rules Journey", () => {
+  // Multi-step journey (create collection + fields, storage-ready wait,
+  // navigate, fill, submit). The default 45s per-test budget is too
+  // tight on cold CI compose.
+  test.describe.configure({ timeout: 150_000 });
+
   test("required field prevents empty form submission", async ({
     page,
     dataFactory,

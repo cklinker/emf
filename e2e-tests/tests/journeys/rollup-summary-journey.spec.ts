@@ -11,7 +11,11 @@ import { test, expect } from "../../fixtures";
 async function waitForRollupAttribute<T>(
   fetcher: () => Promise<{ attributes: Record<string, unknown> }>,
   attributeName: string,
-  timeoutMs = 20_000,
+  // Cold CI compose runs a single worker pod; the rollup field's
+  // CollectionDefinition refresh + child physical-column migration
+  // propagate via NATS and are materially slower than a warm prod
+  // cluster. 20s is enough locally but flakes in CI.
+  timeoutMs = 60_000,
   pollMs = 500,
 ): Promise<T> {
   const deadline = Date.now() + timeoutMs;
@@ -41,6 +45,11 @@ async function waitForRollupAttribute<T>(
  * reads them and invokes the SQL aggregate.
  */
 test.describe("Rollup Summary Journey", () => {
+  // Multi-step journey (create 2 collections, 4 fields, storage-ready
+  // waits, records, then poll for async rollup). The default 45s
+  // per-test budget is too tight on cold CI compose.
+  test.describe.configure({ timeout: 150_000 });
+
   test("computes SUM rollup over child records", async ({ dataFactory }) => {
     const parent = await dataFactory.createCollection({
       displayName: `Rollup Parent ${Date.now()}`,

@@ -7,7 +7,7 @@ import io.kelta.worker.repository.EmailRepository;
 import io.kelta.worker.repository.EmailRepository.TenantEmailConfigRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -32,7 +32,16 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/admin/tenant/email-settings")
-@ConditionalOnBean(EncryptionService.class)
+// Gate on the SAME property that creates the EncryptionService bean
+// (EncryptionAutoConfiguration @ConditionalOnProperty "kelta.encryption.key").
+// @ConditionalOnBean on a @RestController is order-sensitive — the
+// component scan can evaluate it before the runtime-core auto-config
+// registers EncryptionService, dropping the controller even though the
+// bean is later created. The request then falls through to the dynamic
+// collection router and 404s ("collection 'admin' not in registry").
+// A property condition is evaluated deterministically regardless of
+// bean-definition order and mirrors exactly when EncryptionService exists.
+@ConditionalOnProperty(name = "kelta.encryption.key")
 public class TenantEmailSettingsController {
 
     private static final Logger log = LoggerFactory.getLogger(TenantEmailSettingsController.class);

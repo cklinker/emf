@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import { uuid } from '@/utils/uuid'
 
 /**
  * A single filter condition within a saved view.
@@ -103,7 +104,7 @@ export function useSavedViews(collectionName: string): UseSavedViewsReturn {
         const existingIndex = prev.findIndex((v) => v.name === name)
 
         const newView: SavedView = {
-          id: existingIndex >= 0 ? prev[existingIndex].id : crypto.randomUUID(),
+          id: existingIndex >= 0 ? prev[existingIndex].id : uuid(),
           name,
           collectionName,
           filters: config.filters,

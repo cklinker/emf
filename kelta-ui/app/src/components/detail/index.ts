@@ -16,6 +16,15 @@ export {
   Timeline,
   Crumb,
   RailRenderer,
+  // DropdownMenu primitives re-exported so RecordHeader's `moreMenu`
+  // slot is composed from the SAME instance RecordHeader renders
+  // (mixing the app's local radix primitives splits the radix context
+  // and the menu items never become interactive).
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
 } from '@kelta/components'
 export type {
   RecordHeaderConfig,

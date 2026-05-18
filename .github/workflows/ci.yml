@@ -301,24 +301,142 @@ jobs:
         run: scripts/ci/release-db.sh
 
   # ===========================================================================
+  # E2E tests (Playwright) — spins up the full docker-compose stack using the
+  # JVM-mode service Dockerfiles from docker-compose.ci.yml so PR feedback stays
+  # under ~25 min instead of the ~50 min a native GraalVM build would cost.
+  # Native images are still validated post-merge by build-and-publish-containers.yml.
+  # ===========================================================================
+  e2e:
+    name: E2E Tests
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: k8s-runner-integration
+    timeout-minutes: 45
+    # Per-branch concurrency: cancel an in-flight run when the PR is updated.
+    # Cross-PR isolation comes from docker-compose.ci.yml dropping host port
+    # bindings and COMPOSE_PROJECT_NAME namespacing container names; Playwright
+    # runs inside a container on the compose network so no host ports are needed.
+    concurrency:
+      group: e2e-${{ github.head_ref || github.ref }}
+      cancel-in-progress: true
+    env:
+      COMPOSE_PROJECT_NAME: ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate .env (JWK_SET + encryption key)
+        run: make setup
+
+      - name: Build service images (JVM, GHA cache)
+        run: |
+          docker buildx bake \
+            -f docker-compose.yml -f docker-compose.ci.yml \
+            --set "*.cache-from=type=gha,scope=e2e-ci-jvm" \
+            --set "*.cache-to=type=gha,mode=max,scope=e2e-ci-jvm" \
+            --load \
+            kelta-auth kelta-worker kelta-gateway kelta-ui cerbos
+
+      - name: Start stack
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            up -d --wait --wait-timeout 300
+
+      - name: Seed admin + verify health
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            --profile seed run --rm kelta-bootstrap
+
+      - name: Build Playwright runner image (tests baked in)
+        # Bake e2e-tests + node_modules into a runner image. Bind-mounting the
+        # workspace doesn't work with the k8s-runner-integration remote Docker
+        # daemon (the daemon host can't see the runner's filesystem).
+        run: |
+          # Image tag must match the @playwright/test version in package-lock.json
+          # (resolved from ^1.50.0 → currently 1.58.2). Update both together.
+          docker build -t kelta-e2e-runner:local -f - e2e-tests <<'DOCKERFILE'
+          FROM mcr.microsoft.com/playwright:v1.58.2-noble
+          WORKDIR /work
+          COPY package.json package-lock.json ./
+          RUN npm ci
+          COPY . .
+          DOCKERFILE
+
+      - name: Run Playwright tests (sibling container on compose network)
+        id: playwright
+        run: |
+          NETWORK="${COMPOSE_PROJECT_NAME}_kelta-network"
+          docker run --name kelta-e2e-run \
+            --network "$NETWORK" \
+            -e CI=true \
+            -e E2E_BASE_URL=http://kelta-ui:8080 \
+            -e E2E_API_BASE_URL=http://kelta-gateway:8080 \
+            -e E2E_AUTH_BASE_URL=http://kelta-auth:8080 \
+            -e E2E_AUTH_DIRECT_LOGIN_URL=http://kelta-auth:8080 \
+            -e E2E_TENANT_SLUG=default \
+            -e E2E_TEST_USERNAME=admin \
+            -e E2E_TEST_PASSWORD=password \
+            kelta-e2e-runner:local \
+            npx playwright test
+
+      - name: Copy Playwright reports out of container
+        if: always() && steps.playwright.outcome != 'skipped'
+        run: |
+          mkdir -p e2e-tests/playwright-report e2e-tests/test-results
+          docker cp kelta-e2e-run:/work/playwright-report/. e2e-tests/playwright-report/ 2>/dev/null || true
+          docker cp kelta-e2e-run:/work/test-results/. e2e-tests/test-results/ 2>/dev/null || true
+          docker rm -f kelta-e2e-run || true
+
+      - name: Dump compose logs on failure
+        if: failure()
+        run: |
+          mkdir -p _logs
+          for s in kelta-auth kelta-worker kelta-gateway kelta-ui postgres redis nats cerbos; do
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+              logs --no-color "$s" > "_logs/${s}.log" 2>&1 || true
+          done
+
+      - name: Upload e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e-tests/playwright-report/
+            e2e-tests/test-results/
+            _logs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop stack + remove volumes
+        if: always()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            --profile ai --profile tools --profile seed down -v || true
+
+  # ===========================================================================
   # Quality gate — succeeds when every triggered job succeeded.
   # Jobs that skipped (because their paths didn't change) report `skipped`
   # which is not a failure. Only `failure` and `cancelled` block the gate.
   # ===========================================================================
   quality-gate:
     name: Quality Gate
-    needs: [changes, test-java, test-frontend, integration-tests]
+    needs: [changes, test-java, test-frontend, integration-tests, e2e]
     if: always()
     runs-on: k8s-runner
     steps:
       - name: Check job results
         run: |
-          for job in test-java test-frontend integration-tests; do
+          for job in test-java test-frontend integration-tests e2e; do
             result_var="${job//-/_}_result"
             case "${job}" in
-              test-java)        result="${{ needs.test-java.result }}" ;;
-              test-frontend)    result="${{ needs.test-frontend.result }}" ;;
+              test-java)         result="${{ needs.test-java.result }}" ;;
+              test-frontend)     result="${{ needs.test-frontend.result }}" ;;
               integration-tests) result="${{ needs.integration-tests.result }}" ;;
+              e2e)               result="${{ needs.e2e.result }}" ;;
             esac
             echo "${job}: ${result}"
             if [[ "${result}" == "failure" || "${result}" == "cancelled" ]]; then

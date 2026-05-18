@@ -13,7 +13,9 @@ test.describe("Page Builder", () => {
 
   test("shows pages table or empty state", async ({ page }) => {
     const grid = page.locator("table, [role='grid']");
-    const emptyState = page.getByText(/no.*page|no.*data/i);
+    // The page builder renders a generic "No results found" empty state
+    // (not "no pages"/"no data"), so match common empty-state phrasings.
+    const emptyState = page.getByText(/no.*(page|data|result)/i);
     const gridOrEmpty = grid.or(emptyState);
     await expect(gridOrEmpty).toBeVisible();
   });

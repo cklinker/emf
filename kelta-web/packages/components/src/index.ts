@@ -40,6 +40,19 @@ export type { ResourceDetailProps, FieldRenderer } from './ResourceDetail/types'
 export { FilterBuilder } from './FilterBuilder/FilterBuilder';
 export type { FilterBuilderProps } from './FilterBuilder/types';
 
+// UI primitives — exported so consumers can compose slots (e.g.
+// RecordHeader's `moreMenu`) using the SAME DropdownMenu instance the
+// shared components render. Mixing the consumer's own radix-based
+// primitives into @kelta/components' DropdownMenu splits the radix
+// context and the menu items never become interactive.
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from './ui/dropdown-menu';
+
 // Navigation
 export { Navigation } from './Navigation/Navigation';
 export type { NavigationProps, MenuItem } from './Navigation/types';

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { uuid } from '@/utils/uuid'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Bot, MessageSquarePlus, History } from 'lucide-react'
@@ -72,7 +73,7 @@ export function AiChatPanel({
             const warnings = body.warnings as string[] | undefined
             if (warnings && warnings.length > 0) {
               const warningMsg = {
-                id: crypto.randomUUID(),
+                id: uuid(),
                 role: 'assistant' as const,
                 content: `Collection created with ${warnings.length} warning(s):\n${warnings.map((w: string) => `- ${w}`).join('\n')}`,
                 createdAt: new Date().toISOString(),
@@ -95,7 +96,7 @@ export function AiChatPanel({
             /* ignore */
           }
           const errorChatMsg = {
-            id: crypto.randomUUID(),
+            id: uuid(),
             role: 'assistant' as const,
             content: `Failed to apply: ${errorMsg}`,
             createdAt: new Date().toISOString(),

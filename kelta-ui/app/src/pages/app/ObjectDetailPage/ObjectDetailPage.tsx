@@ -27,7 +27,9 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+// DropdownMenuItem/Separator come from @kelta/components (via the detail
+// barrel) so the moreMenu slot shares RecordHeader's DropdownMenu radix
+// context — see kelta-ui/app/src/components/detail/index.ts.
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
 import { useRecord } from '@/hooks/useRecord'
@@ -44,6 +46,8 @@ import {
   Crumb,
   MetadataCard,
   RailRenderer,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
 } from '@/components/detail'
 import type {
   RecordHeaderAction,

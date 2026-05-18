@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, GripVertical, Plus, Save, Trash2 } from 'lucide-react'
+import { uuid } from '@/utils/uuid'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -128,7 +129,7 @@ export function LayoutEditorList({
       setColumns((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: uuid(),
           fieldId,
           fieldName: field.name,
           fieldDisplayName: field.displayName,

@@ -1,5 +1,5 @@
 import { test as setup, expect } from "@playwright/test";
-import { loginViaAuthentik } from "../helpers/authentik-helper";
+import { loginViaInternalForm } from "../helpers/internal-login";
 import { attemptDirectLogin, toSessionTokens } from "../helpers/direct-login";
 import fs from "fs";
 
@@ -61,43 +61,14 @@ setup("authenticate via Authentik", async ({ page }) => {
     }
   }
 
-  // --- Strategy 2: Browser-based OIDC login (original flow) ---
-  // Navigate to the app login page — the SPA will load, check auth, then either
-  // show provider buttons or auto-redirect to Authentik (single provider).
+  // --- Strategy 2: Browser login via kelta-auth's internal form ---
+  // The SPA redirects (single internal OIDC provider) to kelta-auth's
+  // server-rendered login form. This path is also the one exercised when
+  // Strategy 1 (direct login) is disabled — e.g. on the deployed environment,
+  // where /auth/direct-login is intentionally off for security.
   await page.goto(`/${TENANT_SLUG}/login`, { waitUntil: "load" });
 
-  // The SPA may auto-redirect to Authentik if there's only one OIDC provider.
-  // Wait until we're either on Authentik or see provider buttons on the login page.
-  await page.waitForFunction(
-    () => {
-      const url = window.location.href;
-      // Already redirected to Authentik
-      if (url.includes("auth")) return true;
-      // Still on app login page — check if provider buttons are rendered
-      const buttons = document.querySelectorAll("button");
-      return buttons.length > 0;
-    },
-    { timeout: 30_000 },
-  );
-
-  // If we're still on the app's login page, click a provider button to trigger OIDC redirect
-  if (!page.url().includes("Internal")) {
-    // Wait for the login page to fully render with provider buttons
-    await page.waitForSelector('[data-testid="login-page"]', {
-      timeout: 10_000,
-    });
-    // Click the first provider button (contains a KeyRound icon and provider name)
-    const providerButton = page
-      .locator('[class="btn-primary"] button')
-      .first();
-    await providerButton.click({ timeout: 10_000 });
-  }
-
-  // Wait until we're on the Authentik login page
-  await page.waitForURL("**/auth**", { timeout: 30_000 });
-
-  // Now we're on Authentik's login form — fill in credentials
-  await loginViaAuthentik(page, {
+  await loginViaInternalForm(page, {
     username: process.env.E2E_TEST_USERNAME || "e2e-admin@kelta.local",
     password: process.env.E2E_TEST_PASSWORD || "",
   });

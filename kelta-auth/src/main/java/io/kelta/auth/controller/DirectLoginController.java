@@ -5,7 +5,6 @@ import io.kelta.auth.model.KeltaUserDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -33,11 +32,14 @@ import java.util.UUID;
  * browser-based OIDC authorization code flow. This enables automated testing
  * (e.g. headless Chrome e2e tests) to authenticate without browser redirects.
  * <p>
- * Enabled only when {@code kelta.auth.direct-login.enabled=true}.
+ * Enabled only when {@code kelta.auth.direct-login.enabled=true}. The toggle
+ * is evaluated per-request rather than via {@code @ConditionalOnProperty}
+ * because Spring AOT (GraalVM native image) resolves bean conditions at build
+ * time, where the runtime env var {@code DIRECT_LOGIN_ENABLED} is unset and
+ * the bean would otherwise be pruned from the binary.
  */
 @RestController
 @RequestMapping("/auth/direct-login")
-@ConditionalOnProperty(name = "kelta.auth.direct-login.enabled", havingValue = "true")
 public class DirectLoginController {
 
     private static final Logger log = LoggerFactory.getLogger(DirectLoginController.class);
@@ -59,6 +61,10 @@ public class DirectLoginController {
 
     @PostMapping
     public ResponseEntity<?> login(@RequestBody DirectLoginRequest request, HttpSession session) {
+        if (!authProperties.getDirectLogin().isEnabled()) {
+            return ResponseEntity.notFound().build();
+        }
+
         if (request.username() == null || request.password() == null) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "username and password are required"));

@@ -2,11 +2,15 @@ import { useCallback, useRef } from 'react'
 import { uuid } from '@/utils/uuid'
 import { useAuth } from '../../context/AuthContext'
 import { useAiChat } from './AiChatContext'
-import type { AiProposal, ChatMessage } from './types'
+import type { AiProposal, ChatMessage, ToolCallStatus } from './types'
 
 interface StreamCallbacks {
   onDone?: (conversationId: string) => void
   onError?: (error: string) => void
+}
+
+function toolCallMessageId(toolUseId: string): string {
+  return `toolcall-${toolUseId}`
 }
 
 export function useAiStream() {
@@ -23,7 +27,6 @@ export function useAiStream() {
       contextId?: string,
       callbacks?: StreamCallbacks
     ) => {
-      // Abort any existing stream
       abortControllerRef.current?.abort()
       const abortController = new AbortController()
       abortControllerRef.current = abortController
@@ -31,7 +34,6 @@ export function useAiStream() {
       dispatch({ type: 'SET_STREAMING', isStreaming: true })
       dispatch({ type: 'CLEAR_STREAMING_TEXT' })
 
-      // Add user message immediately
       const userMsg: ChatMessage = {
         id: uuid(),
         role: 'user',
@@ -41,9 +43,7 @@ export function useAiStream() {
       dispatch({ type: 'ADD_MESSAGE', message: userMsg })
 
       try {
-        // Get auth token
         const token = await getAccessToken()
-
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
         }
@@ -73,8 +73,6 @@ export function useAiStream() {
           } catch {
             // ignore parse error
           }
-
-          // Add error as assistant message so it's visible in the chat
           const errorChatMsg: ChatMessage = {
             id: uuid(),
             role: 'assistant',
@@ -95,6 +93,20 @@ export function useAiStream() {
         let buffer = ''
         let fullText = ''
         let currentEvent = ''
+
+        const flushStreamingText = () => {
+          if (fullText.trim()) {
+            const textMsg: ChatMessage = {
+              id: uuid(),
+              role: 'assistant',
+              content: fullText,
+              createdAt: new Date().toISOString(),
+            }
+            dispatch({ type: 'ADD_MESSAGE', message: textMsg })
+            dispatch({ type: 'CLEAR_STREAMING_TEXT' })
+            fullText = ''
+          }
+        }
 
         let done = false
         while (!done) {
@@ -120,23 +132,42 @@ export function useAiStream() {
                     dispatch({ type: 'APPEND_STREAMING_TEXT', text: parsed.text as string })
                     break
                   case 'tool_use':
-                    // When tool use starts, finalize any accumulated text as a message
-                    if (fullText.trim()) {
-                      const textMsg: ChatMessage = {
-                        id: uuid(),
-                        role: 'assistant',
-                        content: fullText,
-                        createdAt: new Date().toISOString(),
-                      }
-                      dispatch({ type: 'ADD_MESSAGE', message: textMsg })
-                      dispatch({ type: 'CLEAR_STREAMING_TEXT' })
-                      fullText = ''
-                    }
+                    // Propose tools — finalize streaming text; the proposal event will follow.
+                    flushStreamingText()
                     break
+                  case 'tool_call': {
+                    // Read tool — render a transient pill.
+                    flushStreamingText()
+                    const toolUseId = parsed.toolUseId as string
+                    const callMsg: ChatMessage = {
+                      id: toolCallMessageId(toolUseId),
+                      role: 'assistant',
+                      content: '',
+                      toolCall: {
+                        id: toolUseId,
+                        name: parsed.name as string,
+                        status: 'pending',
+                      },
+                      createdAt: new Date().toISOString(),
+                    }
+                    dispatch({ type: 'ADD_MESSAGE', message: callMsg })
+                    break
+                  }
+                  case 'tool_result': {
+                    const status = (parsed.status as ToolCallStatus | undefined) ??
+                      (parsed.isError ? 'error' : 'done')
+                    dispatch({
+                      type: 'UPDATE_TOOL_CALL_STATUS',
+                      toolUseId: parsed.toolUseId as string,
+                      status,
+                      summary: parsed.summary as string | undefined,
+                    })
+                    break
+                  }
                   case 'proposal': {
+                    flushStreamingText()
                     const proposal = parsed as AiProposal
                     dispatch({ type: 'ADD_PROPOSAL', proposal })
-                    // Add as a message so it appears inline in the chat flow
                     const proposalMsg: ChatMessage = {
                       id: `proposal-${proposal.id}`,
                       role: 'assistant',
@@ -176,7 +207,6 @@ export function useAiStream() {
           }
         }
 
-        // Finalize: add the complete assistant message
         if (fullText) {
           const assistantMsg: ChatMessage = {
             id: uuid(),
@@ -189,7 +219,6 @@ export function useAiStream() {
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
           const errorMsg = (err as Error).message
-          // Show error in the chat UI
           const errorChatMsg: ChatMessage = {
             id: uuid(),
             role: 'assistant',

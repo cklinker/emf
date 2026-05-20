@@ -5,6 +5,8 @@ import io.kelta.ai.model.AiProposal;
 import io.kelta.ai.model.ChatMessage;
 import io.kelta.ai.model.Conversation;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -37,15 +39,23 @@ public final class TestFixtures {
 
     public static ChatMessage assistantMessage() {
         return ChatMessage.assistant(TENANT_ID, UUID.randomUUID(),
-                "I'll help you with that.", null, 100, 50);
+                List.of(textBlock("I'll help you with that.")), 100, 50);
     }
 
     public static ChatMessage assistantMessage(UUID conversationId, String content) {
-        return ChatMessage.assistant(TENANT_ID, conversationId, content, null, 100, 50);
+        return ChatMessage.assistant(TENANT_ID, conversationId,
+                List.of(textBlock(content)), 100, 50);
+    }
+
+    public static Map<String, Object> textBlock(String text) {
+        Map<String, Object> block = new LinkedHashMap<>();
+        block.put("type", "text");
+        block.put("text", text);
+        return block;
     }
 
     public static AiProposal proposal() {
-        return AiProposal.pending("create_collection", Map.of(
+        return AiProposal.pending("collection", Map.of(
                 "name", "customers",
                 "fields", Map.of("name", "string", "email", "string")
         ));

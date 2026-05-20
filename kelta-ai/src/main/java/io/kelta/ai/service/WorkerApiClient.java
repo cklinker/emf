@@ -7,8 +7,10 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * HTTP client for calling the kelta-worker APIs.
@@ -347,6 +349,169 @@ public class WorkerApiClient {
                 .bodyValue(jsonApiBody)
                 .retrieve()
                 .bodyToMono(Map.class)
+                .block();
+    }
+
+    // =========================================================================
+    // Read helpers (used by AI read tools)
+    // =========================================================================
+
+    @SuppressWarnings("unchecked")
+    public Optional<Map<String, Object>> getCollectionByName(String tenantId, String name) {
+        if (name == null || name.isBlank()) return Optional.empty();
+        String needle = name.toLowerCase();
+        return listCollections(tenantId).stream()
+                .filter(c -> {
+                    Map<String, Object> attrs = (Map<String, Object>) c.get("attributes");
+                    if (attrs == null) return false;
+                    Object n = attrs.get("name");
+                    return n != null && needle.equals(String.valueOf(n).toLowerCase());
+                })
+                .findFirst();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listPicklists(String tenantId) {
+        Map<String, Object> response = webClient.get()
+                .uri("/api/global-picklists?page[size]=200")
+                .header("X-Tenant-ID", tenantId)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+        if (response != null && response.containsKey("data")) {
+            return (List<Map<String, Object>>) response.get("data");
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    public Optional<Map<String, Object>> getPicklist(String tenantId, String idOrName) {
+        if (idOrName == null || idOrName.isBlank()) return Optional.empty();
+        Map<String, Object> response = webClient.get()
+                .uri(uri -> uri.path("/api/global-picklists")
+                        .queryParam("include", "picklist-values")
+                        .queryParam("filter[name][EQ]", idOrName)
+                        .queryParam("page[size]", 1)
+                        .build())
+                .header("X-Tenant-ID", tenantId)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+        if (response == null) return Optional.empty();
+        List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+        if (data == null || data.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<String, Object> picklist = data.getFirst();
+        Object included = response.get("included");
+        if (included instanceof List<?> incList) {
+            List<Map<String, Object>> values = incList.stream()
+                    .filter(o -> o instanceof Map)
+                    .map(o -> (Map<String, Object>) o)
+                    .filter(o -> "picklist-values".equals(o.get("type")))
+                    .toList();
+            Map<String, Object> withValues = new LinkedHashMap<>(picklist);
+            withValues.put("values", values);
+            return Optional.of(withValues);
+        }
+        return Optional.of(picklist);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listValidationRules(String tenantId, String collectionId) {
+        Map<String, Object> response = webClient.get()
+                .uri(uri -> uri.path("/api/validation-rules")
+                        .queryParam("filter[collectionId][EQ]", collectionId)
+                        .queryParam("page[size]", 200)
+                        .build())
+                .header("X-Tenant-ID", tenantId)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+        if (response != null && response.containsKey("data")) {
+            return (List<Map<String, Object>>) response.get("data");
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listPageLayouts(String tenantId, String collectionId) {
+        Map<String, Object> response = webClient.get()
+                .uri(uri -> uri.path("/api/page-layouts")
+                        .queryParam("filter[collectionId][EQ]", collectionId)
+                        .queryParam("page[size]", 50)
+                        .build())
+                .header("X-Tenant-ID", tenantId)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+        if (response != null && response.containsKey("data")) {
+            return (List<Map<String, Object>>) response.get("data");
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> sampleRecords(String tenantId, String collectionName,
+                                              int limit, List<String> fields,
+                                              Map<String, Object> filter) {
+        int safeLimit = Math.max(1, Math.min(20, limit));
+        Map<String, Object> response = webClient.get()
+                .uri(uri -> {
+                    var b = uri.path("/api/" + collectionName)
+                            .queryParam("page[size]", safeLimit);
+                    if (fields != null && !fields.isEmpty()) {
+                        b.queryParam("fields[" + collectionName + "]", String.join(",", fields));
+                    }
+                    if (filter != null) {
+                        for (Map.Entry<String, Object> e : filter.entrySet()) {
+                            if (e.getValue() != null) {
+                                b.queryParam("filter[" + e.getKey() + "][EQ]", String.valueOf(e.getValue()));
+                            }
+                        }
+                    }
+                    return b.build();
+                })
+                .header("X-Tenant-ID", tenantId)
+                .retrieve()
+                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                        resp -> resp.bodyToMono(String.class)
+                                .map(body -> new RuntimeException(parseWorkerError(body))))
+                .bodyToMono(Map.class)
+                .block();
+        if (response == null) return Map.of("data", List.of());
+        return response;
+    }
+
+    public Map<String, Object> updateField(String tenantId, String userId, String fieldId,
+                                            Map<String, Object> attrs) {
+        Map<String, Object> jsonApiBody = Map.of(
+                "data", Map.of("type", "fields", "id", fieldId, "attributes", attrs));
+
+        return webClient.patch()
+                .uri("/api/fields/{fieldId}", fieldId)
+                .header("X-Tenant-ID", tenantId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(jsonApiBody)
+                .retrieve()
+                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                        resp -> resp.bodyToMono(String.class)
+                                .map(body -> new RuntimeException(parseWorkerError(body))))
+                .bodyToMono(Map.class)
+                .block();
+    }
+
+    public void deleteField(String tenantId, String userId, String fieldId) {
+        webClient.delete()
+                .uri("/api/fields/{fieldId}", fieldId)
+                .header("X-Tenant-ID", tenantId)
+                .header("X-User-Id", userId)
+                .retrieve()
+                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                        resp -> resp.bodyToMono(String.class)
+                                .map(body -> new RuntimeException(parseWorkerError(body))))
+                .bodyToMono(Void.class)
                 .block();
     }
 }

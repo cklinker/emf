@@ -29,6 +29,8 @@ public class AuthProperties {
      */
     private Map<String, InternalClient> internalClients = new LinkedHashMap<>();
 
+    private DirectLogin directLogin = new DirectLogin();
+
     public String getIssuerUri() { return issuerUri; }
     public void setIssuerUri(String issuerUri) { this.issuerUri = issuerUri; }
 
@@ -61,6 +63,11 @@ public class AuthProperties {
         this.internalClients = (internalClients != null) ? internalClients : new LinkedHashMap<>();
     }
 
+    public DirectLogin getDirectLogin() { return directLogin; }
+    public void setDirectLogin(DirectLogin directLogin) {
+        this.directLogin = (directLogin != null) ? directLogin : new DirectLogin();
+    }
+
     /**
      * Credential-carrying record for a single internal service caller. A blank
      * secret disables registration for that client, so the default (empty map)
@@ -70,5 +77,16 @@ public class AuthProperties {
         private String secret;
         public String getSecret() { return secret; }
         public void setSecret(String secret) { this.secret = secret; }
+    }
+
+    /**
+     * Direct-login endpoint toggle. Evaluated at request time so the controller
+     * stays registered in GraalVM native images (Spring AOT prunes beans whose
+     * {@code @ConditionalOnProperty} is unset at build time).
+     */
+    public static class DirectLogin {
+        private boolean enabled;
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
 }

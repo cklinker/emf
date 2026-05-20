@@ -40,6 +40,50 @@ public class ProposalService {
         return AiProposal.pending(type, data);
     }
 
+    /**
+     * Reconstruct an AiProposal from a persisted message. New messages store
+     * the proposal info inside a {@code tool_use} content block (with
+     * {@code proposalId}); legacy messages store it in the {@code proposalJson}
+     * column.
+     */
+    @SuppressWarnings("unchecked")
+    private AiProposal extractProposal(ChatMessage message, UUID proposalId) {
+        if (message.contentBlocks() != null) {
+            for (Map<String, Object> block : message.contentBlocks()) {
+                if (!"tool_use".equals(block.get("type"))) continue;
+                Object pid = block.get("proposalId");
+                if (pid == null || !proposalId.toString().equals(String.valueOf(pid))) continue;
+                String toolName = String.valueOf(block.get("name"));
+                String type = proposalTypeFromToolName(toolName);
+                Map<String, Object> data = block.get("input") instanceof Map<?, ?> m
+                        ? new java.util.LinkedHashMap<>((Map<String, Object>) m)
+                        : Map.of();
+                return new AiProposal(proposalId, type, "pending", data, message.createdAt());
+            }
+        }
+
+        if (message.legacyProposalJson() != null) {
+            try {
+                return objectMapper.readValue(message.legacyProposalJson(), AiProposal.class);
+            } catch (JacksonException e) {
+                throw new RuntimeException("Failed to deserialize proposal", e);
+            }
+        }
+        throw new IllegalArgumentException("Proposal not found in message: " + proposalId);
+    }
+
+    private static String proposalTypeFromToolName(String toolName) {
+        return switch (toolName) {
+            case "propose_collection" -> "collection";
+            case "propose_layout" -> "layout";
+            case "propose_add_fields" -> "add_fields";
+            case "propose_update_field" -> "update_field";
+            case "propose_remove_field" -> "remove_field";
+            case "propose_picklist" -> "picklist";
+            default -> "unknown";
+        };
+    }
+
     public String serializeProposal(AiProposal proposal) {
         try {
             return objectMapper.writeValueAsString(proposal);
@@ -57,12 +101,7 @@ public class ProposalService {
         ChatMessage message = messageRepository.findByProposalId(proposalId, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Proposal not found: " + proposalId));
 
-        AiProposal proposal;
-        try {
-            proposal = objectMapper.readValue(message.proposalJson(), AiProposal.class);
-        } catch (JacksonException e) {
-            throw new RuntimeException("Failed to deserialize proposal", e);
-        }
+        AiProposal proposal = extractProposal(message, proposalId);
 
         if (!"pending".equals(proposal.status())) {
             throw new IllegalStateException("Proposal has already been " + proposal.status());
@@ -71,8 +110,120 @@ public class ProposalService {
         return switch (proposal.type()) {
             case "collection" -> applyCollectionProposal(tenantId, userId, proposal.data());
             case "layout" -> applyLayoutProposal(tenantId, userId, proposal.data());
+            case "add_fields" -> applyAddFieldsProposal(tenantId, userId, proposal.data());
+            case "update_field" -> applyUpdateFieldProposal(tenantId, userId, proposal.data());
+            case "remove_field" -> applyRemoveFieldProposal(tenantId, userId, proposal.data());
+            case "picklist" -> applyPicklistProposal(tenantId, userId, proposal.data());
             default -> throw new IllegalArgumentException("Unknown proposal type: " + proposal.type());
         };
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> applyAddFieldsProposal(String tenantId, String userId, Map<String, Object> data) {
+        String collectionName = String.valueOf(data.get("collectionName"));
+        Map<String, Object> collection = workerApiClient.getCollectionByName(tenantId, collectionName)
+                .orElseThrow(() -> new IllegalArgumentException("Collection not found: " + collectionName));
+        String collectionId = String.valueOf(collection.get("id"));
+
+        List<Map<String, Object>> fields = (List<Map<String, Object>>) data.getOrDefault("fields", List.of());
+        if (fields.isEmpty()) {
+            throw new IllegalArgumentException("No fields specified to add");
+        }
+
+        List<String> warnings = new java.util.ArrayList<>();
+        warnings.addAll(createPicklistsForFields(tenantId, userId, fields));
+        warnings.addAll(workerApiClient.createFields(tenantId, userId, collectionId, fields));
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("collectionId", collectionId);
+        result.put("collectionName", collectionName);
+        result.put("fieldsAdded", fields.size() - warnings.size());
+        if (!warnings.isEmpty()) result.put("_warnings", warnings);
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> applyUpdateFieldProposal(String tenantId, String userId, Map<String, Object> data) {
+        String collectionName = String.valueOf(data.get("collectionName"));
+        String fieldName = String.valueOf(data.get("fieldName"));
+        Map<String, Object> changes = (Map<String, Object>) data.getOrDefault("changes", Map.of());
+
+        if (changes.containsKey("type")) {
+            throw new IllegalArgumentException("Type changes are not supported via propose_update_field. " +
+                    "Use propose_remove_field then propose_add_fields.");
+        }
+
+        String fieldId = findFieldId(tenantId, collectionName, fieldName);
+        return workerApiClient.updateField(tenantId, userId, fieldId, changes);
+    }
+
+    private Map<String, Object> applyRemoveFieldProposal(String tenantId, String userId, Map<String, Object> data) {
+        String collectionName = String.valueOf(data.get("collectionName"));
+        String fieldName = String.valueOf(data.get("fieldName"));
+        String fieldId = findFieldId(tenantId, collectionName, fieldName);
+
+        workerApiClient.deleteField(tenantId, userId, fieldId);
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("status", "deleted");
+        result.put("collectionName", collectionName);
+        result.put("fieldName", fieldName);
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> applyPicklistProposal(String tenantId, String userId, Map<String, Object> data) {
+        Map<String, Object> picklistData = new java.util.LinkedHashMap<>();
+        picklistData.put("name", data.get("name"));
+        picklistData.put("description", data.get("description"));
+        picklistData.put("restricted", data.getOrDefault("restricted", false));
+        picklistData.put("sorted", false);
+        picklistData.entrySet().removeIf(e -> e.getValue() == null);
+
+        Map<String, Object> created = workerApiClient.createGlobalPicklist(tenantId, userId, picklistData);
+        Object plData = created.get("data");
+        String picklistId = (plData instanceof Map)
+                ? String.valueOf(((Map<String, Object>) plData).get("id"))
+                : null;
+
+        if (picklistId == null) {
+            throw new IllegalStateException("Could not extract picklist ID from worker response");
+        }
+
+        List<Map<String, Object>> values = (List<Map<String, Object>>) data.getOrDefault("values", List.of());
+        List<Map<String, Object>> formatted = new java.util.ArrayList<>();
+        for (int i = 0; i < values.size(); i++) {
+            Map<String, Object> raw = values.get(i);
+            Map<String, Object> v = new java.util.LinkedHashMap<>();
+            v.put("value", raw.get("value"));
+            v.put("label", raw.getOrDefault("label", raw.get("value")));
+            v.put("sortOrder", raw.getOrDefault("sortOrder", i));
+            v.put("isActive", true);
+            v.put("isDefault", i == 0);
+            formatted.add(v);
+        }
+        workerApiClient.createPicklistValues(tenantId, userId, picklistId, formatted);
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("picklistId", picklistId);
+        result.put("name", data.get("name"));
+        result.put("valuesCreated", formatted.size());
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String findFieldId(String tenantId, String collectionName, String fieldName) {
+        Map<String, Object> collection = workerApiClient.getCollectionByName(tenantId, collectionName)
+                .orElseThrow(() -> new IllegalArgumentException("Collection not found: " + collectionName));
+        String collectionId = String.valueOf(collection.get("id"));
+
+        for (Map<String, Object> field : workerApiClient.listFields(tenantId, collectionId)) {
+            Map<String, Object> attrs = (Map<String, Object>) field.getOrDefault("attributes", field);
+            if (fieldName.equals(attrs.get("name"))) {
+                return String.valueOf(field.get("id"));
+            }
+        }
+        throw new IllegalArgumentException("Field '" + fieldName + "' not found on collection " + collectionName);
     }
 
     @SuppressWarnings("unchecked")

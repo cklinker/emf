@@ -10,14 +10,116 @@ import { ChatMessage, StreamingMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { CollectionProposalCard } from './CollectionProposalCard'
 import { LayoutProposalCard } from './LayoutProposalCard'
+import { AddFieldsProposalCard } from './AddFieldsProposalCard'
+import { UpdateFieldProposalCard } from './UpdateFieldProposalCard'
+import { RemoveFieldProposalCard } from './RemoveFieldProposalCard'
+import { PicklistProposalCard } from './PicklistProposalCard'
+import { ToolCallIndicator } from './ToolCallIndicator'
 import { TokenUsageBadge } from './TokenUsageBadge'
-import type { AiProposal } from './types'
+import type { AiProposal, ChatMessage as ChatMessageType, ToolCallState } from './types'
 
 interface AiChatPanelProps {
   baseUrl?: string
   contextType?: string
   contextId?: string
   contextLabel?: string
+}
+
+interface RawHistoryMessage {
+  id: string
+  role: 'user' | 'assistant'
+  contentBlocks?: Array<Record<string, unknown>>
+  content?: string
+  tokensInput?: number
+  tokensOutput?: number
+  createdAt: string
+}
+
+function rehydrateMessages(raw: RawHistoryMessage[]): { messages: ChatMessageType[]; proposals: AiProposal[] } {
+  const messages: ChatMessageType[] = []
+  const proposals: AiProposal[] = []
+
+  for (const m of raw) {
+    const blocks = m.contentBlocks ?? []
+    let textBuffer = ''
+
+    for (const block of blocks) {
+      const type = block.type as string | undefined
+
+      if (type === 'text') {
+        textBuffer += (block.text as string) ?? ''
+        continue
+      }
+
+      if (type === 'tool_use') {
+        if (textBuffer.trim()) {
+          messages.push({
+            id: uuid(),
+            role: m.role,
+            content: textBuffer,
+            createdAt: m.createdAt,
+          })
+          textBuffer = ''
+        }
+        const name = block.name as string
+        const toolUseId = block.id as string
+        const proposalId = block.proposalId as string | undefined
+        const input = block.input as Record<string, unknown> | undefined
+
+        if (proposalId && name?.startsWith('propose_')) {
+          const proposal: AiProposal = {
+            id: proposalId,
+            type: name.replace(/^propose_/, '') as AiProposal['type'],
+            status: 'applied',
+            data: input ?? {},
+            createdAt: m.createdAt,
+          }
+          proposals.push(proposal)
+          messages.push({
+            id: `proposal-${proposalId}`,
+            role: 'assistant',
+            content: '',
+            proposals: [proposal],
+            createdAt: m.createdAt,
+          })
+        } else {
+          const toolCall: ToolCallState = {
+            id: toolUseId,
+            name,
+            status: 'done',
+          }
+          messages.push({
+            id: `toolcall-${toolUseId}`,
+            role: 'assistant',
+            content: '',
+            toolCall,
+            createdAt: m.createdAt,
+          })
+        }
+      }
+    }
+
+    if (textBuffer.trim()) {
+      messages.push({
+        id: uuid(),
+        role: m.role,
+        content: textBuffer,
+        createdAt: m.createdAt,
+      })
+    }
+
+    // Fallback for legacy rows where contentBlocks is empty
+    if (blocks.length === 0 && m.content) {
+      messages.push({
+        id: uuid(),
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt,
+      })
+    }
+  }
+
+  return { messages, proposals }
 }
 
 export function AiChatPanel({
@@ -31,17 +133,52 @@ export function AiChatPanel({
   const { sendStreamMessage, cancelStream } = useAiStream()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [applyingId, setApplyingId] = useState<string | null>(null)
+  const hydratedConvIdRef = useRef<string | null>(null)
 
-  // Auto-scroll to bottom on new messages or streaming text
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [state.messages, state.streamingText, state.proposals])
+
+  // Rehydrate conversation history on mount when an activeConversationId is set
+  // (e.g. user reopens a saved conversation or refreshes the page).
+  useEffect(() => {
+    const convId = state.activeConversationId
+    if (!convId || hydratedConvIdRef.current === convId) return
+    if (state.messages.length > 0) {
+      hydratedConvIdRef.current = convId
+      return
+    }
+
+    let cancelled = false
+    const load = async () => {
+      try {
+        const token = await getAccessToken()
+        const headers: Record<string, string> = {}
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        const response = await fetch(`${baseUrl}/api/ai/conversations/${convId}/messages`, { headers })
+        if (!response.ok) return
+        const body = await response.json()
+        const raw = (body.messages ?? []) as RawHistoryMessage[]
+        if (cancelled) return
+        const { messages, proposals } = rehydrateMessages(raw)
+        dispatch({ type: 'LOAD_CONVERSATION_HISTORY', messages, proposals })
+        hydratedConvIdRef.current = convId
+      } catch (err) {
+        console.error('Failed to rehydrate conversation:', err)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [state.activeConversationId, state.messages.length, baseUrl, dispatch, getAccessToken])
 
   const handleSend = useCallback(
     (message: string) => {
       sendStreamMessage(baseUrl, message, state.activeConversationId, contextType, contextId, {
         onDone: (conversationId) => {
           dispatch({ type: 'SET_CONVERSATION_ID', id: conversationId })
+          hydratedConvIdRef.current = conversationId
         },
       })
     },
@@ -51,6 +188,7 @@ export function AiChatPanel({
   const handleNewChat = useCallback(() => {
     dispatch({ type: 'SET_ACTIVE_CONVERSATION', id: null })
     dispatch({ type: 'SET_MESSAGES', messages: [] })
+    hydratedConvIdRef.current = null
   }, [dispatch])
 
   const handleApply = useCallback(
@@ -67,7 +205,6 @@ export function AiChatPanel({
         })
         if (response.ok) {
           dispatch({ type: 'UPDATE_PROPOSAL_STATUS', id: proposalId, status: 'applied' })
-          // Check for warnings (partial failures)
           try {
             const body = await response.json()
             const warnings = body.warnings as string[] | undefined
@@ -75,13 +212,13 @@ export function AiChatPanel({
               const warningMsg = {
                 id: uuid(),
                 role: 'assistant' as const,
-                content: `Collection created with ${warnings.length} warning(s):\n${warnings.map((w: string) => `- ${w}`).join('\n')}`,
+                content: `Applied with ${warnings.length} warning(s):\n${warnings.map((w: string) => `- ${w}`).join('\n')}`,
                 createdAt: new Date().toISOString(),
               }
               dispatch({ type: 'ADD_MESSAGE', message: warningMsg })
             }
           } catch {
-            /* ignore parse error */
+            /* ignore */
           }
         } else {
           let errorMsg = `Apply failed (${response.status})`
@@ -120,26 +257,28 @@ export function AiChatPanel({
   )
 
   const renderProposal = (proposal: AiProposal) => {
-    if (proposal.type === 'collection') {
-      return (
-        <CollectionProposalCard
-          key={proposal.id}
-          proposal={proposal}
-          onApply={handleApply}
-          onDismiss={handleDismiss}
-          isApplying={applyingId === proposal.id}
-        />
-      )
+    const props = {
+      proposal,
+      onApply: handleApply,
+      onDismiss: handleDismiss,
+      isApplying: applyingId === proposal.id,
     }
-    return (
-      <LayoutProposalCard
-        key={proposal.id}
-        proposal={proposal}
-        onApply={handleApply}
-        onDismiss={handleDismiss}
-        isApplying={applyingId === proposal.id}
-      />
-    )
+    switch (proposal.type) {
+      case 'collection':
+        return <CollectionProposalCard key={proposal.id} {...props} />
+      case 'layout':
+        return <LayoutProposalCard key={proposal.id} {...props} />
+      case 'add_fields':
+        return <AddFieldsProposalCard key={proposal.id} {...props} />
+      case 'update_field':
+        return <UpdateFieldProposalCard key={proposal.id} {...props} />
+      case 'remove_field':
+        return <RemoveFieldProposalCard key={proposal.id} {...props} />
+      case 'picklist':
+        return <PicklistProposalCard key={proposal.id} {...props} />
+      default:
+        return null
+    }
   }
 
   return (
@@ -165,7 +304,6 @@ export function AiChatPanel({
           </div>
         </SheetHeader>
 
-        {/* Messages & Proposals — rendered inline */}
         <div className="flex-1 overflow-y-auto">
           {state.messages.length === 0 && !state.isStreaming && state.proposals.length === 0 && (
             <div className="flex h-full items-center justify-center p-8">
@@ -173,16 +311,18 @@ export function AiChatPanel({
                 <Bot className="mx-auto mb-3 h-12 w-12 text-muted-foreground/30" />
                 <h3 className="text-sm font-medium text-muted-foreground">How can I help?</h3>
                 <p className="mt-1 text-xs text-muted-foreground/60">
-                  I can create collections and layouts for you.
+                  Ask me to review or extend your collections.
                   <br />
-                  Try: &quot;Create a customer collection&quot;
+                  Try: &quot;Review the fields in products&quot;
                 </p>
               </div>
             </div>
           )}
 
           {state.messages.map((msg) => {
-            // If message has proposals, render them instead of the text
+            if (msg.toolCall) {
+              return <ToolCallIndicator key={msg.id} call={msg.toolCall} />
+            }
             if (msg.proposals && msg.proposals.length > 0) {
               return msg.proposals.map(renderProposal)
             }
@@ -194,7 +334,6 @@ export function AiChatPanel({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
         <ChatInput
           onSend={handleSend}
           onCancel={cancelStream}

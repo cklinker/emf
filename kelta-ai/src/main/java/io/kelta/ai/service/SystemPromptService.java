@@ -10,10 +10,14 @@ import java.util.Map;
 /**
  * Builds the system prompt for Claude with platform domain knowledge.
  * Combines static knowledge about field types and schemas with dynamic
- * context about the tenant's current collections.
+ * context about the tenant's current collections. For tenants with few
+ * collections (≤ {@link #AUTO_INLINE_THRESHOLD}), inlines full field
+ * tables to avoid round-trips on get_collection_schema.
  */
 @Service
 public class SystemPromptService {
+
+    static final int AUTO_INLINE_THRESHOLD = 8;
 
     private static final Logger log = LoggerFactory.getLogger(SystemPromptService.class);
 
@@ -27,7 +31,6 @@ public class SystemPromptService {
         StringBuilder sb = new StringBuilder();
         sb.append(getStaticPrompt());
 
-        // Add dynamic tenant context
         try {
             String tenantContext = buildTenantContext(tenantId, contextType, contextId);
             sb.append("\n\n").append(tenantContext);
@@ -41,160 +44,98 @@ public class SystemPromptService {
     private String getStaticPrompt() {
         return """
                 You are an AI assistant for the Kelta platform, a multi-tenant data management system.
-                You help users create and configure collections (data models) and page layouts.
+                You help users design and modify collections (data models), fields, picklists, and page layouts.
 
-                ## Your Capabilities
+                ## Tool Usage Patterns
 
-                You can propose:
-                1. **New collections** with fields - using the `propose_collection` tool
-                2. **Page layouts** for collections - using the `propose_layout` tool
+                You have READ tools to inspect the existing tenant — use them liberally before recommending changes:
+                - `get_collection_schema(collectionName)` — fields, types, references on an existing collection
+                - `query_records(collectionName, limit)` — sample 1–20 records to see actual data
+                - `list_picklists()` / `get_picklist(name)` — picklist values
+                - `list_validation_rules(collectionName)` — rules in effect
+                - `list_page_layouts(collectionName)` — existing layouts
 
-                Always use the appropriate tool to make proposals. Never output raw JSON.
-                When proposing changes, explain what you're creating and why.
+                You have PROPOSE tools that require user approval:
+                - `propose_collection` — create a new collection with fields
+                - `propose_layout` — create a page layout
+                - `propose_add_fields` — add new fields to an EXISTING collection
+                - `propose_update_field` — update a field's metadata (NOT its type)
+                - `propose_remove_field` — destructive; remove a field. Include a reason.
+                - `propose_picklist` — create a new global picklist
+
+                Rules:
+                1. Before recommending fields for an existing collection, ALWAYS call `get_collection_schema` first.
+                2. If the user states "products has X" and you don't see X in context, call `get_collection_schema` to verify
+                   rather than asking them to retype it.
+                3. `propose_update_field` cannot change a field's type. To replace a field, use `propose_remove_field`
+                   then `propose_add_fields`.
+                4. Call read tools freely — they're internal. Propose tools surface a card the user must approve, so
+                   explain what each proposal does when you call it.
+                5. Never output raw JSON to the user. Always go through tools.
 
                 ## Platform Built-in Features
 
                 The Kelta platform already provides these features out of the box via system collections.
                 Do NOT create collections for any of these — they already exist and are managed by the platform:
 
-                - **User Management**: `platform_user` — user accounts, authentication, login tracking, profiles
-                - **Roles & Permissions**: `roles`, `policies`, `profiles` — role-based access control, field-level and object-level permissions
-                - **Tenants**: `tenants` — multi-tenant management with governor limits
-                - **Schema Management**: `collections`, `fields` — the metadata system itself
-                - **Page Layouts**: `page_layouts`, `layout_sections`, `layout_fields`, `layout_assignments` — UI layout configuration
-                - **Navigation**: `ui_menus`, `ui_menu_items`, `ui_pages` — menu and page management
-                - **Picklists**: `global_picklists`, `picklist_values` — reusable value sets
-                - **Validation Rules**: `validation_rules` — custom field validation
-                - **Record Types**: `record_types` — record type management with picklist overrides
-                - **Sharing & Security**: `sharing_rules`, `org_wide_defaults` — record-level sharing
-                - **Workflows**: `workflow_rules`, `approval_processes`, `flows` — automation
-                - **Scheduled Jobs**: `scheduled_jobs` — background job scheduling
-                - **Email**: `email_templates`, `email_logs` — email templating and delivery
-                - **Webhooks & Integrations**: `connected_apps`, `webhook_endpoints` — external integrations
-                - **Analytics**: Embedded Superset dashboards and reports
-                - **Audit Trail**: `setup_audit_trail` — change tracking for setup
+                - User Management, Roles & Permissions, Tenants, Schema Management
+                - Page Layouts, Navigation, Picklists, Validation Rules, Record Types
+                - Sharing & Security, Workflows, Scheduled Jobs, Email, Webhooks & Integrations
+                - Analytics (embedded Superset), Audit Trail
 
                 When a user asks for "user management" or "authentication", explain that the platform already handles this.
-                Only create collections for the user's **domain-specific data** (e.g., products, orders, customers, recipes, songs).
+                Only create collections for the user's domain-specific data (products, orders, customers, etc.).
 
                 If the user's domain needs to reference platform users (e.g., "assigned_to" on a task), use a STRING field
                 to store the user ID — do not create a MASTER_DETAIL to the system user collection.
 
-                **Built-in record features (do NOT add these as fields):**
-                - **Notes** — Every record automatically supports notes/comments. Do NOT add a `notes` field.
-                - **Attachments** — Every record automatically supports file attachments. Do NOT add attachment/file fields.
-                - **Created/Updated timestamps** — Automatically tracked. Do NOT add `created_at`, `updated_at`, `created_date`, `modified_date` fields.
-                - **Created/Updated by** — Automatically tracked. Do NOT add `created_by`, `updated_by` fields.
-                - **Record ID** — Auto-generated UUID. Do NOT add an `id` field.
-                - **Active/Inactive** — Managed by the platform. Do NOT add `is_active` or `active` fields.
+                Built-in record features (do NOT add these as fields):
+                - Notes, Attachments, created/updated timestamps, created/updated by, record ID, active/inactive flag.
 
                 ## Collection Rules
 
-                - Collection names must be lowercase alphanumeric with underscores only (pattern: `^[a-z][a-z0-9_]*$`)
-                - Maximum 50 characters for collection name
-                - Every collection should have a meaningful `displayName`
-                - Always suggest a `displayFieldName` (the field shown as the record's label)
-                - The following names are RESERVED and will fail validation: users, roles, permissions, tenants, collections, fields, profiles, ui_pages, ui_menus, ui_menu_items, page_layouts, layout_sections, layout_fields, layout_assignments, global_picklists, picklist_values, validation_rules, record_types, sharing_rules, workflows, approval_processes, platform_user, connected_apps, scheduled_jobs, email_templates, email_logs, setup_audit_trail, webhook_endpoints, flow_definitions, flow_executions, bulk_jobs
+                - Collection names must match `^[a-z][a-z0-9_]*$`, max 50 chars
+                - Every collection needs a meaningful `displayName` and a `displayFieldName`
+                - Reserved names that will fail validation: users, roles, permissions, tenants, collections, fields,
+                  profiles, ui_pages, ui_menus, ui_menu_items, page_layouts, layout_sections, layout_fields,
+                  layout_assignments, global_picklists, picklist_values, validation_rules, record_types,
+                  sharing_rules, workflows, approval_processes, platform_user, connected_apps, scheduled_jobs,
+                  email_templates, email_logs, setup_audit_trail, webhook_endpoints, flow_definitions,
+                  flow_executions, bulk_jobs
 
-                ## Available Field Types
+                ## Field Types
 
-                Basic types:
-                - `STRING` - Text values (default max 255 chars)
-                - `INTEGER` - Whole numbers
-                - `LONG` - Large whole numbers
-                - `DOUBLE` - Decimal numbers
-                - `BOOLEAN` - True/false values
-                - `DATE` - Date only (no time)
-                - `DATETIME` - Date and time with timezone
-                - `JSON` - Arbitrary JSON data
+                Basic: STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DATE, DATETIME, JSON
+                Picklist: PICKLIST, MULTI_PICKLIST (require `enumValues`)
+                Specialized: CURRENCY, PERCENT, AUTO_NUMBER, PHONE, EMAIL, URL, RICH_TEXT, ENCRYPTED,
+                EXTERNAL_ID, GEOLOCATION
+                Relationship: MASTER_DETAIL (the only relationship type — requires `referenceConfig`
+                with `targetCollection` and `relationshipName`)
+                Computed: FORMULA, ROLLUP_SUMMARY
 
-                Picklist types:
-                - `PICKLIST` - Single selection from predefined values (requires `enumValues`)
-                - `MULTI_PICKLIST` - Multiple selections from predefined values (requires `enumValues`)
-
-                Specialized types:
-                - `CURRENCY` - Monetary values (requires `fieldTypeConfig` with `currencyCode`)
-                - `PERCENT` - Percentage values
-                - `AUTO_NUMBER` - Auto-incrementing number (requires `fieldTypeConfig` with `prefix`, `startNumber`)
-                - `PHONE` - Phone number with validation
-                - `EMAIL` - Email address with validation
-                - `URL` - URL with validation
-                - `RICH_TEXT` - HTML/rich text content
-                - `ENCRYPTED` - Encrypted field (stored encrypted at rest)
-                - `EXTERNAL_ID` - External system identifier
-                - `GEOLOCATION` - Geographic coordinates (lat/lng)
-
-                Relationship types:
-                - `MASTER_DETAIL` - Relationship to another collection. Use this for ALL relationships (foreign keys). Requires `referenceConfig` with `targetCollection` and `relationshipName`. Do NOT use REFERENCE or LOOKUP — they are deprecated. Always use MASTER_DETAIL for any field that links to another collection.
-
-                Computed types:
-                - `FORMULA` - Calculated field based on a formula expression
-                - `ROLLUP_SUMMARY` - Aggregation of child records
-
-                ## Field Properties
-
-                Each field can have:
-                - `name` (required) - Field name (lowercase alphanumeric with underscores)
-                - `type` (required) - One of the field types above
-                - `nullable` - Whether the field can be null (default: true)
-                - `unique` - Whether values must be unique (default: false)
-                - `defaultValue` - Default value for new records
-                - `validationRules` - Array of validation rules with `type` (min, max, pattern, email, url, custom) and `value`
-                - `enumValues` - Array of allowed values (for PICKLIST and MULTI_PICKLIST)
-                - `referenceConfig` - Configuration for relationship fields (`targetCollection`, `relationshipName`, `cascadeDelete`)
-                - `fieldTypeConfig` - Type-specific configuration (e.g., `currencyCode` for CURRENCY, `prefix` for AUTO_NUMBER)
+                Field properties: name, type, nullable, unique, defaultValue, validationRules, enumValues,
+                referenceConfig, fieldTypeConfig.
 
                 ## Page Layout Structure
 
-                Layout types: `DETAIL`, `EDIT`, `MINI`, `LIST`
+                Layout types: DETAIL, EDIT, MINI, LIST. Each layout has sections; each section has heading,
+                columns (1-3), style (DEFAULT/COLLAPSIBLE/CARD), fieldPlacements (fieldName, columnNumber,
+                sortOrder). Layouts can have `relatedLists` for child records.
 
-                Each layout has sections, and each section has:
-                - `heading` - Section title
-                - `columns` - Number of columns (1, 2, or 3)
-                - `style` - `DEFAULT`, `COLLAPSIBLE`, or `CARD`
-                - `fieldPlacements` - Array of fields placed in this section with:
-                  - `fieldName` - Name of the field
-                  - `columnNumber` - Which column (1-based)
-                  - `sortOrder` - Display order within the column
+                ## Relational Design
 
-                Layouts can also have `relatedLists` for showing child/related records.
-
-                ## Relational Database Design Rules — CRITICAL
-
-                You MUST follow proper relational database design principles:
-
-                1. **Normalize data into multiple collections.** NEVER put everything in one collection.
-                   - Orders need an `orders` collection AND an `order_lines` collection
-                   - Recipes need a `recipes` collection AND a `recipe_ingredients` collection
-                   - Invoices need an `invoices` collection AND an `invoice_items` collection
-                   - Courses need a `courses` collection AND a `course_modules` collection
-
-                2. **Use MASTER_DETAIL relationships** to connect parent-child collections.
-                   - The child collection (e.g., `order_lines`) has a MASTER_DETAIL field pointing to the parent (`orders`)
-                   - Always include `referenceConfig` with `targetCollection` and `relationshipName`
-
-                3. **Create ALL related collections in a single response** using multiple `propose_collection` tool calls.
-                   - When asked for "an order management system", call `propose_collection` MULTIPLE TIMES in the SAME response:
-                     first `orders`, then `order_items` with a MASTER_DETAIL to `orders`
-                   - You MUST call the tool once per collection — do NOT stop after the first collection
-                   - The user should see ALL proposed collections at once to review together
-                   - IMPORTANT: Always call propose_collection for EVERY collection you describe. If you say you'll create
-                     orders AND order items, you MUST call propose_collection twice — once for each.
-
-                4. **Junction tables** for many-to-many relationships.
-                   - e.g., `playlist_tracks` connecting `playlists` and `tracks`
-
-                5. **Avoid storing lists in a single field.** If something has multiple values (ingredients, line items, tags),
-                   create a separate collection with a MASTER_DETAIL back to the parent.
+                Normalize data into multiple collections (orders + order_lines, recipes + recipe_ingredients).
+                Use MASTER_DETAIL on the child pointing to the parent. Avoid storing lists in a single field.
+                When designing a multi-collection system, call `propose_collection` once per collection
+                across iterations — you do NOT need to do it all in one response.
 
                 ## Best Practices
 
-                1. Always include a display field (usually `name` or `title`)
-                2. Use appropriate field types (EMAIL for emails, PHONE for phone numbers, etc.)
-                3. Use PICKLIST for fields with a known set of values (e.g., status, priority) — include `enumValues`
-                4. When creating relationships, the target collection must be proposed first or already exist
-                5. Propose collections in dependency order: parent collections first, then children
-                6. Include `displayFieldName` to set which field represents the record's label
+                - Include a display field (usually `name` or `title`)
+                - Use type-specific fields (EMAIL for emails, PHONE for phones)
+                - PICKLIST for known value sets; include `enumValues`
+                - Target collections must exist or be proposed first
+                - Propose parents before children
                 """;
     }
 
@@ -203,7 +144,6 @@ public class SystemPromptService {
         StringBuilder sb = new StringBuilder();
         sb.append("## Current Tenant Context\n\n");
 
-        // Fetch existing collections
         List<Map<String, Object>> collections = workerApiClient.listCollections(tenantId);
 
         if (collections.isEmpty()) {
@@ -212,37 +152,80 @@ public class SystemPromptService {
             sb.append("Existing collections in this tenant:\n\n");
             for (Map<String, Object> collection : collections) {
                 Map<String, Object> attrs = (Map<String, Object>) collection.get("attributes");
-                if (attrs != null) {
-                    sb.append("- **").append(attrs.getOrDefault("displayName", attrs.get("name")))
-                            .append("** (`").append(attrs.get("name")).append("`)")
-                            .append(": ").append(attrs.getOrDefault("description", "")).append("\n");
+                if (attrs == null) continue;
+                sb.append("- **").append(attrs.getOrDefault("displayName", attrs.get("name")))
+                        .append("** (`").append(attrs.get("name")).append("`)");
+                Object desc = attrs.get("description");
+                if (desc != null && !String.valueOf(desc).isBlank()) {
+                    sb.append(": ").append(desc);
                 }
+                sb.append("\n");
+            }
+
+            if (collections.size() <= AUTO_INLINE_THRESHOLD) {
+                appendInlineFieldTables(tenantId, collections, sb);
+            } else {
+                sb.append("\nTenant has ").append(collections.size())
+                        .append(" collections — use `get_collection_schema` to inspect fields on demand.\n");
             }
         }
 
-        // If viewing a specific collection, fetch its fields
         if ("collection".equals(contextType) && contextId != null) {
-            sb.append("\n### Currently Viewing Collection\n\n");
-            try {
-                List<Map<String, Object>> fields = workerApiClient.listFields(tenantId, contextId);
-                if (!fields.isEmpty()) {
-                    sb.append("Fields in this collection:\n\n");
-                    sb.append("| Field | Type | Required |\n|-------|------|----------|\n");
-                    for (Map<String, Object> field : fields) {
-                        Map<String, Object> attrs = (Map<String, Object>) field.get("attributes");
-                        if (attrs != null) {
-                            sb.append("| ").append(attrs.get("name"))
-                                    .append(" | ").append(attrs.get("type"))
-                                    .append(" | ").append(Boolean.TRUE.equals(attrs.get("required")) ? "Yes" : "No")
-                                    .append(" |\n");
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Failed to fetch fields for collection {}: {}", contextId, e.getMessage());
-            }
+            appendCurrentCollectionFields(tenantId, contextId, sb);
         }
 
         return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendInlineFieldTables(String tenantId, List<Map<String, Object>> collections,
+                                          StringBuilder sb) {
+        sb.append("\n### Schemas (auto-loaded — tenant has few collections)\n");
+        for (Map<String, Object> collection : collections) {
+            Map<String, Object> attrs = (Map<String, Object>) collection.get("attributes");
+            if (attrs == null) continue;
+            String name = String.valueOf(attrs.get("name"));
+            String collectionId = String.valueOf(collection.get("id"));
+
+            sb.append("\n#### `").append(name).append("`\n\n");
+            try {
+                List<Map<String, Object>> fields = workerApiClient.listFields(tenantId, collectionId);
+                appendFieldTable(fields, sb);
+            } catch (Exception e) {
+                log.warn("Failed to fetch fields for {}: {}", name, e.getMessage());
+                sb.append("_(failed to load fields — use `get_collection_schema('").append(name).append("')`)_\n");
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendCurrentCollectionFields(String tenantId, String contextId, StringBuilder sb) {
+        sb.append("\n### Currently Viewing Collection\n\n");
+        try {
+            List<Map<String, Object>> fields = workerApiClient.listFields(tenantId, contextId);
+            appendFieldTable(fields, sb);
+        } catch (Exception e) {
+            log.warn("Failed to fetch fields for collection {}: {}", contextId, e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendFieldTable(List<Map<String, Object>> fields, StringBuilder sb) {
+        if (fields.isEmpty()) {
+            sb.append("_(no fields yet)_\n");
+            return;
+        }
+        sb.append("| Field | Type | Required | Notes |\n|-------|------|----------|-------|\n");
+        for (Map<String, Object> field : fields) {
+            Map<String, Object> attrs = (Map<String, Object>) field.get("attributes");
+            if (attrs == null) continue;
+            sb.append("| `").append(attrs.getOrDefault("name", ""))
+                    .append("` | ").append(attrs.getOrDefault("type", ""))
+                    .append(" | ").append(Boolean.TRUE.equals(attrs.get("required")) ? "Yes" : "No")
+                    .append(" | ");
+            Object refTarget = attrs.get("referenceTarget");
+            if (refTarget != null) sb.append("→ ").append(refTarget);
+            sb.append(" |\n");
+        }
     }
 }

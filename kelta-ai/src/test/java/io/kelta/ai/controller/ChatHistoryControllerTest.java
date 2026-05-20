@@ -88,8 +88,7 @@ class ChatHistoryControllerTest {
             Instant now = Instant.now();
             Conversation conv = new Conversation(convId, "tenant-1", "user-1", "Test", now, now);
 
-            ChatMessage msg = new ChatMessage(UUID.randomUUID(), "tenant-1", convId,
-                    "user", "Hello", null, 0, 0, now);
+            ChatMessage msg = ChatMessage.user("tenant-1", convId, "Hello");
 
             when(conversationRepository.findById(convId, "tenant-1")).thenReturn(Optional.of(conv));
             when(messageRepository.findByConversation(convId, "tenant-1")).thenReturn(List.of(msg));
@@ -116,6 +115,45 @@ class ChatHistoryControllerTest {
 
             ResponseEntity<Map<String, Object>> response =
                     controller.getConversation("tenant-1", id);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("getMessages")
+    class GetMessages {
+
+        @Test
+        @DisplayName("returns messages with contentBlocks for rehydration")
+        void returnsContentBlocks() {
+            UUID convId = UUID.randomUUID();
+            Instant now = Instant.now();
+            Conversation conv = new Conversation(convId, "tenant-1", "user-1", "Test", now, now);
+            ChatMessage msg = ChatMessage.user("tenant-1", convId, "Hello");
+
+            when(conversationRepository.findById(convId, "tenant-1")).thenReturn(Optional.of(conv));
+            when(messageRepository.findByConversation(convId, "tenant-1")).thenReturn(List.of(msg));
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.getMessages("tenant-1", convId);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().get("conversationId")).isEqualTo(convId.toString());
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> messages = (List<Map<String, Object>>) response.getBody().get("messages");
+            assertThat(messages).hasSize(1);
+            assertThat(messages.getFirst().get("role")).isEqualTo("user");
+            assertThat(messages.getFirst().get("contentBlocks")).isNotNull();
+        }
+
+        @Test
+        @DisplayName("returns 404 when conversation not found")
+        void returns404() {
+            UUID id = UUID.randomUUID();
+            when(conversationRepository.findById(id, "tenant-1")).thenReturn(Optional.empty());
+
+            ResponseEntity<Map<String, Object>> response = controller.getMessages("tenant-1", id);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }

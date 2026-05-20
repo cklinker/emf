@@ -5,6 +5,7 @@ import com.anthropic.models.messages.*;
 import com.anthropic.services.blocking.MessageService;
 import io.kelta.ai.config.AiConfigProperties;
 import io.kelta.ai.repository.AiConfigRepository;
+import io.kelta.ai.service.tools.ToolRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,6 +34,9 @@ class AnthropicServiceTest {
     @Mock
     private AiConfigRepository aiConfigRepository;
 
+    @Mock
+    private ToolRegistry toolRegistry;
+
     private AnthropicService service;
 
     @BeforeEach
@@ -40,7 +44,7 @@ class AnthropicServiceTest {
         AiConfigProperties config = new AiConfigProperties(
                 new AiConfigProperties.AnthropicProperties("test-key", "claude-sonnet-4-20250514", 4096, 0.7),
                 "http://localhost:8080", 30000L);
-        service = new AnthropicService(client, config, aiConfigRepository);
+        service = new AnthropicService(client, config, aiConfigRepository, toolRegistry);
     }
 
     private MessageParam userMessage(String text) {
@@ -61,6 +65,7 @@ class AnthropicServiceTest {
                     .thenReturn(Optional.of("claude-opus-4-20250514"));
             when(aiConfigRepository.getConfig("tenant-1", "anthropic.maxTokens"))
                     .thenReturn(Optional.of("8192"));
+            when(toolRegistry.toolDefinitions()).thenReturn(List.of());
 
             List<MessageParam> messages = List.of(userMessage("Hello"));
 
@@ -82,6 +87,7 @@ class AnthropicServiceTest {
                     .thenReturn(Optional.empty());
             when(aiConfigRepository.getConfig("0", "anthropic.maxTokens"))
                     .thenReturn(Optional.empty());
+            when(toolRegistry.toolDefinitions()).thenReturn(List.of());
 
             List<MessageParam> messages = List.of(userMessage("Hello"));
 
@@ -93,23 +99,25 @@ class AnthropicServiceTest {
         }
 
         @Test
-        @DisplayName("includes tool definitions in request")
-        void includesToolDefinitions() {
-            when(aiConfigRepository.getConfig("tenant-1", "anthropic.model"))
-                    .thenReturn(Optional.empty());
-            when(aiConfigRepository.getConfig("0", "anthropic.model"))
-                    .thenReturn(Optional.empty());
-            when(aiConfigRepository.getConfig("tenant-1", "anthropic.maxTokens"))
-                    .thenReturn(Optional.empty());
-            when(aiConfigRepository.getConfig("0", "anthropic.maxTokens"))
-                    .thenReturn(Optional.empty());
+        @DisplayName("injects tool definitions from registry")
+        void injectsToolDefinitions() {
+            when(aiConfigRepository.getConfig(anyString(), anyString())).thenReturn(Optional.empty());
+
+            Tool fake = Tool.builder()
+                    .name("fake_tool")
+                    .description("test")
+                    .inputSchema(Tool.InputSchema.builder()
+                            .properties(com.anthropic.core.JsonValue.from(java.util.Map.of()))
+                            .build())
+                    .build();
+            when(toolRegistry.toolDefinitions()).thenReturn(List.of(ToolUnion.ofTool(fake)));
 
             MessageCreateParams params = service.buildRequest(
                     "tenant-1", "System", List.of(userMessage("Hello"))
             ).build();
 
             assertThat(params.tools()).isPresent();
-            assertThat(params.tools().get()).hasSize(2);
+            assertThat(params.tools().get()).hasSize(1);
         }
     }
 

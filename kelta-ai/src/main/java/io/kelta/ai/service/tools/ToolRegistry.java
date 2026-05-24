@@ -5,6 +5,7 @@ import com.anthropic.models.messages.Tool;
 import com.anthropic.models.messages.ToolUnion;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,10 +50,34 @@ public class ToolRegistry {
         Tool tool = Tool.builder()
                 .name(handler.name())
                 .description(handler.description())
-                .inputSchema(Tool.InputSchema.builder()
-                        .properties(JsonValue.from(handler.inputSchema()))
-                        .build())
+                .inputSchema(buildInputSchema(handler.inputSchema()))
                 .build();
         return ToolUnion.ofTool(tool);
+    }
+
+    private Tool.InputSchema buildInputSchema(Map<String, Object> rawSchema) {
+        Tool.InputSchema.Properties.Builder propertiesBuilder = Tool.InputSchema.Properties.builder();
+        Object propertiesObj = rawSchema.get("properties");
+        if (propertiesObj instanceof Map<?, ?> propertiesMap) {
+            for (Map.Entry<?, ?> entry : propertiesMap.entrySet()) {
+                propertiesBuilder.putAdditionalProperty(
+                        String.valueOf(entry.getKey()),
+                        JsonValue.from(entry.getValue()));
+            }
+        }
+
+        Tool.InputSchema.Builder schemaBuilder = Tool.InputSchema.builder()
+                .properties(propertiesBuilder.build());
+
+        Object requiredObj = rawSchema.get("required");
+        if (requiredObj instanceof List<?> requiredList && !requiredList.isEmpty()) {
+            List<String> required = new ArrayList<>(requiredList.size());
+            for (Object item : requiredList) {
+                required.add(String.valueOf(item));
+            }
+            schemaBuilder.required(required);
+        }
+
+        return schemaBuilder.build();
     }
 }

@@ -1,5 +1,7 @@
 package io.kelta.ai.service.tools;
 
+import com.anthropic.models.messages.Tool;
+import com.anthropic.models.messages.ToolUnion;
 import io.kelta.ai.model.AiProposal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,5 +68,40 @@ class ToolRegistryTest {
     void unknownToolReturnsEmpty() {
         ToolRegistry registry = new ToolRegistry(List.of());
         assertThat(registry.handler("anything")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("unpacks handler schema into Tool.InputSchema properties + required")
+    void unpacksSchemaForAnthropicSdk() {
+        ReadToolHandler handler = new ReadToolHandler() {
+            @Override public String name() { return "query_records"; }
+            @Override public String description() { return "fetch sample"; }
+            @Override public Map<String, Object> inputSchema() {
+                return Map.of(
+                        "type", "object",
+                        "properties", Map.of(
+                                "collectionName", Map.of("type", "string"),
+                                "limit", Map.of("type", "integer")
+                        ),
+                        "required", List.of("collectionName")
+                );
+            }
+            @Override public Object execute(String tenantId, String userId, Map<String, Object> input) {
+                return Map.of();
+            }
+        };
+
+        ToolRegistry registry = new ToolRegistry(List.of(handler));
+        List<ToolUnion> definitions = registry.toolDefinitions();
+        assertThat(definitions).hasSize(1);
+
+        Tool tool = definitions.get(0).tool().orElseThrow();
+        Tool.InputSchema schema = tool.inputSchema();
+
+        Tool.InputSchema.Properties properties = schema.properties().orElseThrow();
+        assertThat(properties._additionalProperties()).containsOnlyKeys("collectionName", "limit");
+        assertThat(properties._additionalProperties()).doesNotContainKeys("type", "properties", "required");
+
+        assertThat(schema.required().orElseThrow()).containsExactly("collectionName");
     }
 }

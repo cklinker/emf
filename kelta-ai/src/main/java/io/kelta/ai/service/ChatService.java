@@ -113,14 +113,20 @@ public class ChatService {
             emitter.complete();
         } catch (Exception e) {
             log.error("Error in chat stream: {}", e.getMessage(), e);
+            // Send the error to the client as an SSE event then close the stream cleanly.
+            // Calling completeWithError(e) would re-throw on Spring's async dispatch and
+            // route the exception to GlobalExceptionHandler, which then fails with
+            // "No converter for LinkedHashMap with preset Content-Type 'text/event-stream'"
+            // because the response is already committed as text/event-stream.
             try {
-                Map<String, Object> errorData = Map.of("code", "AI_PROVIDER_ERROR", "message", e.getMessage());
+                Map<String, Object> errorData = Map.of(
+                        "code", "AI_PROVIDER_ERROR",
+                        "message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
                 emitter.send(SseEmitter.event().name("error").data(objectMapper.writeValueAsString(errorData)));
-                emitter.completeWithError(e);
             } catch (IOException ex) {
-                log.error("Failed to send error event: {}", ex.getMessage());
-                emitter.completeWithError(e);
+                log.warn("Failed to send error event to client: {}", ex.getMessage());
             }
+            emitter.complete();
         }
     }
 

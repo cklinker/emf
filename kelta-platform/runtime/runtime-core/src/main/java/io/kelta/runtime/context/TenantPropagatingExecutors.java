@@ -47,30 +47,37 @@ public final class TenantPropagatingExecutors {
         return () -> snapshot.call(task);
     }
 
-    /** Immutable capture of the submitter's tenant binding, replayed on the worker thread. */
-    private record Snapshot(String tenantId, String tenantSlug) {
+    /**
+     * Immutable capture of the submitter's tenant binding plus OpenTelemetry
+     * context. Replayed on the worker thread so DB queries see the right
+     * tenant AND tracer spans on the worker attach to the submitter's parent
+     * span.
+     */
+    private record Snapshot(String tenantId, String tenantSlug, Object otelContext) {
 
         static Snapshot capture() {
-            return new Snapshot(TenantContext.get(), TenantContext.getSlug());
+            return new Snapshot(TenantContext.get(), TenantContext.getSlug(), OtelBridge.currentContext());
         }
 
         void run(Runnable task) {
+            Runnable wrapped = OtelBridge.wrap(otelContext, task);
             if (!hasBinding()) {
-                task.run();
+                wrapped.run();
                 return;
             }
-            carrier().run(task::run);
+            carrier().run(wrapped);
         }
 
         <T> T call(Callable<T> task) throws Exception {
+            Callable<T> wrapped = OtelBridge.wrap(otelContext, task);
             if (!hasBinding()) {
-                return task.call();
+                return wrapped.call();
             }
             AtomicReference<T> result = new AtomicReference<>();
             AtomicReference<Exception> failure = new AtomicReference<>();
             carrier().run(() -> {
                 try {
-                    result.set(task.call());
+                    result.set(wrapped.call());
                 } catch (Exception e) {
                     failure.set(e);
                 }
@@ -101,6 +108,50 @@ public final class TenantPropagatingExecutors {
 
         private static boolean notBlank(String s) {
             return s != null && !s.isBlank();
+        }
+    }
+
+    /**
+     * Reflection-friendly bridge to {@code io.opentelemetry.context.Context}.
+     * Uses direct types when the OTel API is on the classpath; gracefully
+     * degrades to a no-op when it is not (the dep is declared
+     * {@code <optional>true</optional>} in {@code runtime-core}). The
+     * methods are short enough that JIT erases the indirection.
+     */
+    private static final class OtelBridge {
+
+        private static final boolean OTEL_AVAILABLE = isOtelAvailable();
+
+        private OtelBridge() {}
+
+        private static boolean isOtelAvailable() {
+            try {
+                Class.forName("io.opentelemetry.context.Context");
+                return true;
+            } catch (ClassNotFoundException e) {
+                return false;
+            }
+        }
+
+        static Object currentContext() {
+            if (!OTEL_AVAILABLE) {
+                return null;
+            }
+            return io.opentelemetry.context.Context.current();
+        }
+
+        static Runnable wrap(Object ctx, Runnable task) {
+            if (!OTEL_AVAILABLE || ctx == null) {
+                return task;
+            }
+            return ((io.opentelemetry.context.Context) ctx).wrap(task);
+        }
+
+        static <T> Callable<T> wrap(Object ctx, Callable<T> task) {
+            if (!OTEL_AVAILABLE || ctx == null) {
+                return task;
+            }
+            return ((io.opentelemetry.context.Context) ctx).wrap(task);
         }
     }
 

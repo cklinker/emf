@@ -2,6 +2,8 @@ package io.kelta.worker.controller;
 
 import io.kelta.worker.repository.GovernorLimitsRepository;
 import io.kelta.worker.service.S3StorageService;
+import io.kelta.worker.service.TenantQuotaResolver;
+import io.kelta.worker.service.TenantTierQuotas;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +30,9 @@ class AttachmentUploadControllerTest {
     private GovernorLimitsRepository governorLimitsRepository;
 
     @Mock
+    private TenantQuotaResolver quotaResolver;
+
+    @Mock
     private JdbcTemplate jdbcTemplate;
 
     private AttachmentUploadController controller;
@@ -37,8 +42,9 @@ class AttachmentUploadControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new AttachmentUploadController(storageService, governorLimitsRepository, jdbcTemplate);
+        controller = new AttachmentUploadController(storageService, governorLimitsRepository, quotaResolver, jdbcTemplate);
         lenient().when(storageService.isEnabled()).thenReturn(true);
+        lenient().when(quotaResolver.intQuota(TENANT_ID, TenantTierQuotas.KEY_STORAGE_GB)).thenReturn(10);
     }
 
     private Map<String, Object> validUploadBody() {
@@ -57,7 +63,7 @@ class AttachmentUploadControllerTest {
 
         when(storageService.getMaxFileSize()).thenReturn(52_428_800L);
         when(governorLimitsRepository.sumStorageBytes(TENANT_ID)).thenReturn(0L);
-        when(governorLimitsRepository.findTenantLimits(TENANT_ID)).thenReturn(Optional.empty());
+        // quotaResolver stubbed in setUp
         when(jdbcTemplate.update(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
         when(storageService.getDefaultExpiry()).thenReturn(Duration.ofMinutes(15));
@@ -119,7 +125,7 @@ class AttachmentUploadControllerTest {
         when(storageService.getMaxFileSize()).thenReturn(52_428_800L);
         // Current usage is 9.99 GB, limit is 10 GB, adding 1 MB would exceed
         when(governorLimitsRepository.sumStorageBytes(TENANT_ID)).thenReturn(10_737_000_000L);
-        when(governorLimitsRepository.findTenantLimits(TENANT_ID)).thenReturn(Optional.empty());
+        // quotaResolver stubbed in setUp
 
         ResponseEntity<Map<String, Object>> response = controller.requestUploadUrl(TENANT_ID, USER_EMAIL, body);
 

@@ -94,11 +94,17 @@ export interface RecordHeaderConfigDto {
  * adding a new block kind on the server doesn't crash older clients.
  */
 export type RailBlockDto =
-  | { kind: 'metadataCard'; config: { title: string; rows: Array<{ label: string; value: string; mono?: boolean }> } }
+  | {
+      kind: 'metadataCard'
+      config: { title: string; rows: Array<{ label: string; value: string; mono?: boolean }> }
+    }
   | { kind: 'statStrip'; config: { tiles: Array<Record<string, unknown>> } }
   | { kind: 'scoreCard'; config: Record<string, unknown> }
   | { kind: 'tagsCard'; config: { title: string; tags: Array<{ label: string; tone?: string }> } }
-  | { kind: 'aiCard'; config: { title: string; summary: string; actions?: Array<{ label: string }> } }
+  | {
+      kind: 'aiCard'
+      config: { title: string; summary: string; actions?: Array<{ label: string }> }
+    }
   | { kind: 'timeline'; config: { title: string; events: Array<Record<string, unknown>> } }
 
 export interface PageLayoutDto {
@@ -331,7 +337,7 @@ export function usePageLayout(
         let rules: LayoutRuleDto[] = []
         try {
           rules = await apiClient.getList<LayoutRuleDto>(
-            `/api/layout-rules?filter[layoutId][eq]=${layoutId}&filter[active][eq]=true&sort=sortOrder&page[size]=100`,
+            `/api/layout-rules?filter[layoutId][eq]=${layoutId}&filter[active][eq]=true&sort=sortOrder&page[size]=100`
           )
         } catch {
           rules = []

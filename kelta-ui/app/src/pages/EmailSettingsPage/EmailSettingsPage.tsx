@@ -223,14 +223,17 @@ export function EmailSettingsPage({ className }: EmailSettingsPageProps): React.
         <CardHeader>
           <CardTitle>User invites</CardTitle>
           <CardDescription>
-            When enabled, new users provisioned via SCIM or the admin UI receive an invite email automatically.
+            When enabled, new users provisioned via SCIM or the admin UI receive an invite email
+            automatically.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
             <Switch
               checked={form.autoInviteOnCreate}
-              onCheckedChange={(checked) => setForm((prev) => ({ ...prev, autoInviteOnCreate: checked }))}
+              onCheckedChange={(checked) =>
+                setForm((prev) => ({ ...prev, autoInviteOnCreate: checked }))
+              }
               disabled={!canManage}
             />
             <span className="text-sm">Send invite emails automatically on user creation</span>
@@ -242,7 +245,8 @@ export function EmailSettingsPage({ className }: EmailSettingsPageProps): React.
         <CardHeader>
           <CardTitle>Test delivery</CardTitle>
           <CardDescription>
-            Sends a templated message using the saved settings. Save first if you've changed anything above.
+            Sends a templated message using the saved settings. Save first if you've changed
+            anything above.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-3">

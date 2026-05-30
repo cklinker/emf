@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import './styles/kelta-design.css';
+import './styles/kelta-design.css'
 // Map controls + popup styling for the optional interactive map in
 // @kelta/components AddressMap. Lazy-loaded chunk imports maplibre-gl at
 // runtime; the CSS must be present from the first render so popovers

@@ -78,10 +78,14 @@ function staticMapUrl(
   tokenOverride?: string,
   styleOverride?: string
 ): string {
+  // import.meta.env is provided by Vite at consumer-app build time. The
+  // double `as unknown` step lets the cast through without TS complaining
+  // about insufficient type overlap.
   const env =
     typeof import.meta !== 'undefined' &&
-    typeof (import.meta as { env?: Record<string, string | undefined> }).env !== 'undefined'
-      ? (import.meta as { env: Record<string, string | undefined> }).env
+    typeof (import.meta as unknown as { env?: Record<string, string | undefined> }).env !==
+      'undefined'
+      ? (import.meta as unknown as { env: Record<string, string | undefined> }).env
       : undefined;
   const mapboxToken = tokenOverride ?? env?.VITE_MAPBOX_TOKEN;
   if (mapboxToken) {

@@ -72,10 +72,7 @@ export function useTenantSettings(): {
     },
   })
 
-  const settings = useMemo<TenantSettings>(
-    () => data?.settings ?? {},
-    [data?.settings]
-  )
+  const settings = useMemo<TenantSettings>(() => data?.settings ?? {}, [data?.settings])
 
   return {
     tenant: data ?? null,

@@ -12,10 +12,7 @@ import {
 } from '@/components/ui/sheet'
 import { Wand2 } from 'lucide-react'
 import { PayloadMapper } from '@/components/PayloadMapper'
-import type {
-  SourceVariable,
-  TargetField,
-} from '@/components/PayloadMapper'
+import type { SourceVariable, TargetField } from '@/components/PayloadMapper'
 
 interface EmailAlertParamsProps {
   parameters?: Record<string, unknown>
@@ -134,9 +131,9 @@ export function EmailAlertParams({ parameters, onUpdate }: EmailAlertParamsProps
           <SheetHeader>
             <SheetTitle>Email body builder</SheetTitle>
             <SheetDescription>
-              Map flow state variables into the email subject and body. Strings
-              starting with <code>=</code> are evaluated as JSONata at send time;
-              everything else flows through <code>${'${$.path}'}</code> substitution.
+              Map flow state variables into the email subject and body. Strings starting with{' '}
+              <code>=</code> are evaluated as JSONata at send time; everything else flows through{' '}
+              <code>${'${$.path}'}</code> substitution.
             </SheetDescription>
           </SheetHeader>
           <div className="mt-4">

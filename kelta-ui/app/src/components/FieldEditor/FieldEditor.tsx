@@ -571,8 +571,7 @@ export function FieldEditor({
         globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
         rollupChildCollection: (parsedConfig.childCollection as string) ?? '',
         rollupForeignKey: (parsedConfig.foreignKeyField as string) ?? '',
-        rollupFunction:
-          (parsedConfig.aggregateFunction as RollupAggregateFunction) ?? undefined,
+        rollupFunction: (parsedConfig.aggregateFunction as RollupAggregateFunction) ?? undefined,
         rollupField: (parsedConfig.aggregateField as string) ?? '',
         description: field.description ?? '',
         trackHistory: field.trackHistory ?? false,
@@ -1237,10 +1236,7 @@ export function FieldEditor({
                   {getErrorMessage(errors.rollupField.message)}
                 </span>
               )}
-              <span
-                id="field-rollup-field-hint"
-                className="text-xs text-muted-foreground mt-1"
-              >
+              <span id="field-rollup-field-hint" className="text-xs text-muted-foreground mt-1">
                 {t('fieldEditor.rollup.fieldHint')}
               </span>
             </div>

@@ -78,9 +78,7 @@ export function UpdateFieldProposalCard({
             {changeEntries.map(([key, value]) => (
               <tr key={key} className="border-b border-dashed last:border-0">
                 <td className="py-1 font-mono">{key}</td>
-                <td className="py-1">
-                  {Array.isArray(value) ? value.join(', ') : String(value)}
-                </td>
+                <td className="py-1">{Array.isArray(value) ? value.join(', ') : String(value)}</td>
               </tr>
             ))}
           </tbody>

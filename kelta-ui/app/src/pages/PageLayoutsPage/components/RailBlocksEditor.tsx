@@ -267,13 +267,7 @@ function FieldLabel({ children }: { children: React.ReactNode }): React.ReactEle
   )
 }
 
-function ArrayHeader({
-  label,
-  onAdd,
-}: {
-  label: string
-  onAdd: () => void
-}): React.ReactElement {
+function ArrayHeader({ label, onAdd }: { label: string; onAdd: () => void }): React.ReactElement {
   return (
     <div className="flex items-center justify-between">
       <FieldLabel>{label}</FieldLabel>
@@ -354,14 +348,19 @@ function MetadataCardSub({
           className="h-7 text-xs"
         />
       </div>
-      <ArrayHeader label="Rows" onAdd={() => update({ rows: [...rows, { label: '', value: '' }] })} />
+      <ArrayHeader
+        label="Rows"
+        onAdd={() => update({ rows: [...rows, { label: '', value: '' }] })}
+      />
       <div className="space-y-1">
         {rows.map((row, idx) => (
           <div key={idx} className="flex items-center gap-1">
             <Input
               value={row.label}
               onChange={(e) =>
-                update({ rows: rows.map((r, i) => (i === idx ? { ...r, label: e.target.value } : r)) })
+                update({
+                  rows: rows.map((r, i) => (i === idx ? { ...r, label: e.target.value } : r)),
+                })
               }
               placeholder="Label"
               className="h-7 flex-1 text-xs"
@@ -370,7 +369,9 @@ function MetadataCardSub({
             <Input
               value={row.value}
               onChange={(e) =>
-                update({ rows: rows.map((r, i) => (i === idx ? { ...r, value: e.target.value } : r)) })
+                update({
+                  rows: rows.map((r, i) => (i === idx ? { ...r, value: e.target.value } : r)),
+                })
               }
               placeholder="Value"
               className={cn('h-7 flex-1 text-xs', row.mono && 'font-mono')}
@@ -580,9 +581,7 @@ function ScoreCardSub({
               type="checkbox"
               checked={!!m.ok}
               onChange={(e) =>
-                setMetrics(
-                  metrics.map((x, i) => (i === idx ? { ...x, ok: e.target.checked } : x))
-                )
+                setMetrics(metrics.map((x, i) => (i === idx ? { ...x, ok: e.target.checked } : x)))
               }
               className="h-3 w-3"
               aria-label={`Metric ${idx + 1} ok-tinted`}
@@ -635,9 +634,7 @@ function TagsCardSub({
           <ToneSelect
             value={(tag.tone as Tone | undefined) ?? 'default'}
             options={TONE_OPTIONS}
-            onChange={(tone) =>
-              set({ tags: tags.map((t, i) => (i === idx ? { ...t, tone } : t)) })
-            }
+            onChange={(tone) => set({ tags: tags.map((t, i) => (i === idx ? { ...t, tone } : t)) })}
             ariaLabel={`Tag ${idx + 1} tone`}
           />
           <RowDeleteBtn onClick={() => set({ tags: tags.filter((_, i) => i !== idx) })} />
@@ -691,9 +688,7 @@ function AICardSub({
             className="h-7 flex-1 text-xs"
             aria-label={`Action ${idx + 1} label`}
           />
-          <RowDeleteBtn
-            onClick={() => set({ actions: actions.filter((_, i) => i !== idx) })}
-          />
+          <RowDeleteBtn onClick={() => set({ actions: actions.filter((_, i) => i !== idx) })} />
         </div>
       ))}
     </div>

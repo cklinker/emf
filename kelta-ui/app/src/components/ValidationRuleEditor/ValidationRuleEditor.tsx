@@ -218,8 +218,9 @@ export function ValidationRuleEditor({
               id="rule-formula"
               ref={(el) => {
                 rhfRef(el)
-                ;(formulaTextareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current =
-                  el
+                ;(
+                  formulaTextareaRef as React.MutableRefObject<HTMLTextAreaElement | null>
+                ).current = el
               }}
               className={cn(
                 inputClasses,

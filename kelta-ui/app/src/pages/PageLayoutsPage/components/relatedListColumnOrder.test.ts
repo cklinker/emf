@@ -12,12 +12,7 @@ describe('computeDisplayOrder', () => {
   })
 
   it('floats user-arranged fields to the front in their stored order', () => {
-    expect(computeDisplayOrder(['a', 'b', 'c', 'd'], ['c', 'a'])).toEqual([
-      'c',
-      'a',
-      'b',
-      'd',
-    ])
+    expect(computeDisplayOrder(['a', 'b', 'c', 'd'], ['c', 'a'])).toEqual(['c', 'a', 'b', 'd'])
   })
 
   it('drops stored names that are no longer available', () => {
@@ -25,22 +20,13 @@ describe('computeDisplayOrder', () => {
   })
 
   it('appends newly available fields after the user-arranged prefix', () => {
-    expect(computeDisplayOrder(['a', 'b', 'newField'], ['b', 'a'])).toEqual([
-      'b',
-      'a',
-      'newField',
-    ])
+    expect(computeDisplayOrder(['a', 'b', 'newField'], ['b', 'a'])).toEqual(['b', 'a', 'newField'])
   })
 })
 
 describe('reorderColumns', () => {
   it('moves dragged item into the target position', () => {
-    expect(reorderColumns(['a', 'b', 'c', 'd'], 'd', 'b')).toEqual([
-      'a',
-      'd',
-      'b',
-      'c',
-    ])
+    expect(reorderColumns(['a', 'b', 'c', 'd'], 'd', 'b')).toEqual(['a', 'd', 'b', 'c'])
   })
 
   it('returns a fresh copy when the move is a no-op', () => {
@@ -81,10 +67,7 @@ describe('swapAdjacent', () => {
 
 describe('selectedInDisplayOrder', () => {
   it('filters selected names to the order from displayOrder', () => {
-    expect(selectedInDisplayOrder(['a', 'b', 'c', 'd'], ['d', 'b'])).toEqual([
-      'b',
-      'd',
-    ])
+    expect(selectedInDisplayOrder(['a', 'b', 'c', 'd'], ['d', 'b'])).toEqual(['b', 'd'])
   })
 
   it('drops selected names that are not in displayOrder', () => {

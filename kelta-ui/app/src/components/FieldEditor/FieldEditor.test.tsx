@@ -935,7 +935,12 @@ describe('FieldEditor Integration', () => {
       onCancel: vi.fn(),
     }
     const childFields = [
-      { name: 'orderId', displayName: 'Order', type: 'master_detail' as const, referenceTarget: 'orders' },
+      {
+        name: 'orderId',
+        displayName: 'Order',
+        type: 'master_detail' as const,
+        referenceTarget: 'orders',
+      },
       { name: 'amount', displayName: 'Amount', type: 'number' as const },
       { name: 'placedAt', displayName: 'Placed At', type: 'datetime' as const },
       { name: 'note', displayName: 'Note', type: 'string' as const },
@@ -1004,9 +1009,7 @@ describe('FieldEditor Integration', () => {
       await user.type(screen.getByTestId('field-name-input'), 'line_count')
       await user.selectOptions(screen.getByTestId('field-type-select'), 'rollup_summary')
       await user.selectOptions(screen.getByTestId('field-rollup-child-select'), 'products')
-      await waitFor(() =>
-        expect(screen.getByTestId('field-rollup-fk-select')).not.toBeDisabled()
-      )
+      await waitFor(() => expect(screen.getByTestId('field-rollup-fk-select')).not.toBeDisabled())
       await user.selectOptions(screen.getByTestId('field-rollup-fk-select'), 'orderId')
       await user.selectOptions(screen.getByTestId('field-rollup-fn-select'), 'COUNT')
 

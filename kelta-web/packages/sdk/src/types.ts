@@ -2,6 +2,11 @@
  * Core types used throughout the SDK
  */
 
+// Re-export the admin FieldDefinition so consumers and ResourceMetadata
+// share a single shape. Type-only import — no runtime cycle.
+import type { FieldDefinition } from './admin/types';
+export type { FieldDefinition };
+
 /**
  * Resource metadata from discovery endpoint
  */
@@ -11,44 +16,6 @@ export interface ResourceMetadata {
   fields: FieldDefinition[];
   operations: string[];
   authz?: AuthzConfig;
-}
-
-/**
- * Field definition within a resource
- */
-export interface FieldDefinition {
-  name: string;
-  type:
-    | 'string'
-    | 'number'
-    | 'boolean'
-    | 'date'
-    | 'datetime'
-    | 'json'
-    | 'reference'
-    | 'picklist'
-    | 'multi_picklist'
-    | 'currency'
-    | 'percent'
-    | 'auto_number'
-    | 'phone'
-    | 'email'
-    | 'url'
-    | 'rich_text'
-    | 'encrypted'
-    | 'external_id'
-    | 'geolocation'
-    | 'lookup'
-    | 'master_detail'
-    | 'formula'
-    | 'rollup_summary';
-  displayName?: string;
-  required?: boolean;
-  unique?: boolean;
-  validation?: ValidationRule[];
-  defaultValue?: unknown;
-  referenceTarget?: string;
-  fieldTypeConfig?: Record<string, unknown>;
 }
 
 /**

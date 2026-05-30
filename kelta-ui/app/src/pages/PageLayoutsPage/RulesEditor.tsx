@@ -72,11 +72,12 @@ const emptyDraft = (kind: RuleKind, sortOrder: number): DraftRule => ({
   description: '',
   kind,
   active: true,
-  whenEvents: kind === 'TRANSFORM'
-    ? ['onBlur']
-    : kind === 'VALIDATE'
-      ? ['onChange', 'onBeforeSave']
-      : ['onChange', 'onLoad'],
+  whenEvents:
+    kind === 'TRANSFORM'
+      ? ['onBlur']
+      : kind === 'VALIDATE'
+        ? ['onChange', 'onBeforeSave']
+        : ['onChange', 'onLoad'],
   targetField: '',
   formula: '',
   errorMessage: '',
@@ -90,7 +91,11 @@ const evaluator = new FormulaEvaluator()
 function parseField<T>(raw: unknown, fallback: T): T {
   if (raw === null || raw === undefined) return fallback
   if (typeof raw === 'string') {
-    try { return JSON.parse(raw) as T } catch { return fallback }
+    try {
+      return JSON.parse(raw) as T
+    } catch {
+      return fallback
+    }
   }
   return raw as T
 }
@@ -110,7 +115,10 @@ function apiRuleToDraft(rule: ApiLayoutRule): DraftRule {
     errorMessage: typeof body.errorMessage === 'string' ? body.errorMessage : '',
     enforce: body.enforce === 'warn' ? 'warn' : 'block',
     transformType:
-      transformSpec === 'lower' || transformSpec === 'trim' || transformSpec === 'titleCase' || transformSpec === 'formula'
+      transformSpec === 'lower' ||
+      transformSpec === 'trim' ||
+      transformSpec === 'titleCase' ||
+      transformSpec === 'formula'
         ? transformSpec
         : 'upper',
     sortOrder: rule.sortOrder,
@@ -131,9 +139,10 @@ function draftToBody(draft: DraftRule): Record<string, unknown> {
       }
     case 'TRANSFORM':
       return {
-        transform: draft.transformType === 'formula'
-          ? { type: 'formula', formula: draft.formula }
-          : { type: draft.transformType },
+        transform:
+          draft.transformType === 'formula'
+            ? { type: 'formula', formula: draft.formula }
+            : { type: draft.transformType },
       }
   }
 }
@@ -157,7 +166,7 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
     queryFn: async () => {
       try {
         const list = await apiClient.getList<ApiLayoutRule>(
-          `/api/layout-rules?filter[layoutId][eq]=${layoutId}&sort=sortOrder&page[size]=200`,
+          `/api/layout-rules?filter[layoutId][eq]=${layoutId}&sort=sortOrder&page[size]=200`
         )
         return list
       } catch {
@@ -214,12 +223,17 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
   const saveError = saveMutation.error as Error | null
   const deleteError = deleteMutation.error as Error | null
 
-  const formulaError = useMemo(
-    () => (draft ? syntaxError(draft.formula) : null),
-    [draft?.formula],
-  )
+  // Intentionally depend only on draft?.formula — recomputing on any draft
+  // mutation would thrash the memo for every keystroke on unrelated fields.
+  /* eslint-disable react-hooks/preserve-manual-memoization, react-hooks/exhaustive-deps */
+  const formulaError = useMemo(() => (draft ? syntaxError(draft.formula) : null), [draft?.formula])
+  /* eslint-enable react-hooks/preserve-manual-memoization, react-hooks/exhaustive-deps */
 
-  // Cycle check across the saved set + the in-flight draft.
+  // Cycle check across the saved set + the in-flight draft. We deliberately
+  // setState inside the effect to react to changes in `rules` or `draft` —
+  // refactoring this to useMemo would require duplicating the dependency
+  // tracking of the cycle-detection algorithm.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!draft) {
       setCycleError(null)
@@ -242,10 +256,7 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
     }
     const nodes: RuleNode[] = rules
       .filter(
-        (r) =>
-          (r.kind === 'COMPUTE' || r.kind === 'DEFAULT') &&
-          r.id !== draft.id &&
-          r.targetField,
+        (r) => (r.kind === 'COMPUTE' || r.kind === 'DEFAULT') && r.id !== draft.id && r.targetField
       )
       .map((r) => {
         const body = parseField<Record<string, unknown>>(r.body, {})
@@ -262,6 +273,7 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
     const result = topologicalSort(nodes)
     setCycleError(result.ok ? null : `Cycle detected: ${result.cycle.join(' -> ')}`)
   }, [draft, rules, formulaError])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const canSave =
     !!draft &&
@@ -271,7 +283,7 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
     !formulaError &&
     !cycleError &&
     (draft.kind !== 'TRANSFORM' || !!draft.targetField) &&
-    (draft.kind !== 'COMPUTE' && draft.kind !== 'DEFAULT' || !!draft.targetField) &&
+    ((draft.kind !== 'COMPUTE' && draft.kind !== 'DEFAULT') || !!draft.targetField) &&
     (draft.kind !== 'VALIDATE' || !!draft.errorMessage.trim())
 
   return (
@@ -306,9 +318,7 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
           {/* Rule list */}
           <aside className="overflow-y-auto border-r border-border p-4">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="m-0 text-sm font-semibold text-foreground">
-                Rules ({rules.length})
-              </h3>
+              <h3 className="m-0 text-sm font-semibold text-foreground">Rules ({rules.length})</h3>
             </div>
             <div className="mb-3 grid grid-cols-2 gap-1">
               {(['COMPUTE', 'VALIDATE', 'DEFAULT', 'TRANSFORM'] as RuleKind[]).map((k) => (
@@ -337,12 +347,13 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
                       onClick={() => setDraft(apiRuleToDraft(r))}
                       className={cn(
                         'flex w-full cursor-pointer flex-col items-start gap-0.5 rounded border border-transparent bg-transparent px-2 py-1.5 text-left hover:bg-muted',
-                        draft?.id === r.id && 'border-primary bg-muted',
+                        draft?.id === r.id && 'border-primary bg-muted'
                       )}
                       data-testid={`rules-editor-rule-${r.id}`}
                     >
                       <span className="text-sm font-medium text-foreground">
-                        {r.name}{!r.active && ' (inactive)'}
+                        {r.name}
+                        {!r.active && ' (inactive)'}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {RULE_KIND_LABEL[r.kind]}
@@ -410,7 +421,9 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
                   type="button"
                   className={cn(
                     'cursor-pointer rounded border-none px-3 py-1.5 text-sm text-primary-foreground',
-                    canSave ? 'bg-primary hover:bg-primary/90' : 'cursor-not-allowed bg-muted text-muted-foreground',
+                    canSave
+                      ? 'bg-primary hover:bg-primary/90'
+                      : 'cursor-not-allowed bg-muted text-muted-foreground'
                   )}
                   disabled={!canSave || saveMutation.isPending}
                   onClick={() => draft && saveMutation.mutate(draft)}
@@ -454,10 +467,14 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+        <label
+          htmlFor="rule-kind"
+          className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+        >
           Kind
         </label>
         <select
+          id="rule-kind"
           className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
           value={draft.kind}
           onChange={(e) => update('kind', e.target.value as RuleKind)}
@@ -470,10 +487,14 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+        <label
+          htmlFor="rule-name"
+          className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+        >
           Name
         </label>
         <input
+          id="rule-name"
           type="text"
           className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
           value={draft.name}
@@ -483,10 +504,14 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+        <label
+          htmlFor="rule-description"
+          className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+        >
           Description
         </label>
         <input
+          id="rule-description"
           type="text"
           className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
           value={draft.description}
@@ -496,16 +521,22 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
 
       {showTarget && (
         <div>
-          <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+          <label
+            htmlFor="rule-target"
+            className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+          >
             Target field {draft.kind !== 'VALIDATE' && <span className="text-destructive">*</span>}
           </label>
           <input
+            id="rule-target"
             type="text"
             list="rule-fields"
             className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm font-mono"
             value={draft.targetField}
             onChange={(e) => update('targetField', e.target.value)}
-            placeholder={draft.kind === 'VALIDATE' ? 'optional — leave blank for form-level' : 'field_api_name'}
+            placeholder={
+              draft.kind === 'VALIDATE' ? 'optional — leave blank for form-level' : 'field_api_name'
+            }
             data-testid="rule-target-input"
           />
           <datalist id="rule-fields">
@@ -518,10 +549,14 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
 
       {draft.kind === 'TRANSFORM' && (
         <div>
-          <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+          <label
+            htmlFor="rule-transform-type"
+            className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+          >
             Transform type
           </label>
           <select
+            id="rule-transform-type"
             className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
             value={draft.transformType}
             onChange={(e) => update('transformType', e.target.value as DraftRule['transformType'])}
@@ -537,13 +572,17 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
 
       {showFormula && (
         <div>
-          <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+          <label
+            htmlFor="rule-formula"
+            className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+          >
             Formula {draft.kind !== 'TRANSFORM' && <span className="text-destructive">*</span>}
           </label>
           <textarea
+            id="rule-formula"
             className={cn(
               'w-full rounded border border-border bg-background px-2 py-1.5 font-mono text-sm',
-              formulaError && 'border-destructive',
+              formulaError && 'border-destructive'
             )}
             rows={3}
             value={draft.formula}
@@ -564,7 +603,10 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
       )}
 
       {cycleError && (
-        <div className="rounded border border-destructive bg-destructive/10 p-2 text-xs text-destructive" role="alert">
+        <div
+          className="rounded border border-destructive bg-destructive/10 p-2 text-xs text-destructive"
+          role="alert"
+        >
           {cycleError}
         </div>
       )}
@@ -572,10 +614,14 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
       {draft.kind === 'VALIDATE' && (
         <>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+            <label
+              htmlFor="rule-error-message"
+              className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+            >
               Error message <span className="text-destructive">*</span>
             </label>
             <input
+              id="rule-error-message"
               type="text"
               className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
               value={draft.errorMessage}
@@ -584,10 +630,14 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+            <label
+              htmlFor="rule-enforce"
+              className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+            >
               Enforce
             </label>
             <select
+              id="rule-enforce"
               className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
               value={draft.enforce}
               onChange={(e) => update('enforce', e.target.value as 'block' | 'warn')}
@@ -600,9 +650,7 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
       )}
 
       <div>
-        <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
-          When
-        </label>
+        <span className="mb-1 block text-xs font-medium uppercase text-muted-foreground">When</span>
         <div className="flex flex-wrap gap-2">
           {ALL_EVENTS.map((e) => (
             <label key={e} className="flex cursor-pointer items-center gap-1 text-sm">
@@ -630,10 +678,14 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
+        <label
+          htmlFor="rule-sort-order"
+          className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+        >
           Sort order
         </label>
         <input
+          id="rule-sort-order"
           type="number"
           className="w-32 rounded border border-border bg-background px-2 py-1.5 text-sm"
           value={draft.sortOrder}

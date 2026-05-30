@@ -5,10 +5,7 @@ import { ZoneContextManager } from '@opentelemetry/context-zone'
 import { FetchInstrumentation } from '@opentelemetry/instrumentation-fetch'
 import { XMLHttpRequestInstrumentation } from '@opentelemetry/instrumentation-xml-http-request'
 import { Resource } from '@opentelemetry/resources'
-import {
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-} from '@opentelemetry/semantic-conventions'
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions'
 import { W3CTraceContextPropagator } from '@opentelemetry/core'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { SpanStatusCode, trace, type Tracer } from '@opentelemetry/api'
@@ -61,8 +58,7 @@ export function initTelemetry(): void {
 
   const serviceName = env?.VITE_OTEL_SERVICE_NAME || 'kelta-ui'
   const serviceNamespace = env?.VITE_OTEL_SERVICE_NAMESPACE || 'emf'
-  const deploymentEnvironment =
-    env?.VITE_OTEL_DEPLOYMENT_ENVIRONMENT || 'production'
+  const deploymentEnvironment = env?.VITE_OTEL_DEPLOYMENT_ENVIRONMENT || 'production'
   const serviceVersion = env?.VITE_APP_VERSION || 'unknown'
 
   const resource = new Resource({
@@ -71,10 +67,8 @@ export function initTelemetry(): void {
     [ATTR_SERVICE_VERSION]: serviceVersion,
     [ATTR_DEPLOYMENT_ENVIRONMENT]: deploymentEnvironment,
     [ATTR_SESSION_ID]: generateSessionId(),
-    [ATTR_BROWSER_USER_AGENT]:
-      typeof navigator !== 'undefined' ? navigator.userAgent : '',
-    [ATTR_BROWSER_LANGUAGE]:
-      typeof navigator !== 'undefined' ? navigator.language : '',
+    [ATTR_BROWSER_USER_AGENT]: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    [ATTR_BROWSER_LANGUAGE]: typeof navigator !== 'undefined' ? navigator.language : '',
   })
 
   const exporter = new OTLPTraceExporter({
@@ -135,7 +129,7 @@ export function getTracer(): Tracer | null {
 function recordBrowserError(
   name: string,
   error: unknown,
-  extraAttrs: Record<string, string> = {},
+  extraAttrs: Record<string, string> = {}
 ): void {
   if (!tracer) return
 

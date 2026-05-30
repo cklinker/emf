@@ -5,10 +5,7 @@ import {
   type FieldDefinition,
   type FieldType,
 } from '../../hooks/useCollectionSchema'
-import {
-  useCollectionStore,
-  type CollectionStoreValue,
-} from '../../context/CollectionStoreContext'
+import { useCollectionStore, type CollectionStoreValue } from '../../context/CollectionStoreContext'
 import type { CollectionSchema } from '../../hooks/useCollectionSchema'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'

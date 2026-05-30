@@ -2,12 +2,7 @@ import React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import {
-  createTestWrapper,
-  setupAuthMocks,
-  mockAxios,
-  resetMockAxios,
-} from '../../test/testUtils'
+import { createTestWrapper, setupAuthMocks, mockAxios, resetMockAxios } from '../../test/testUtils'
 import { EmailSettingsPage } from './EmailSettingsPage'
 
 describe('EmailSettingsPage', () => {
@@ -82,10 +77,9 @@ describe('EmailSettingsPage', () => {
     await user.click(screen.getByRole('button', { name: /Send test/i }))
 
     await waitFor(() => {
-      expect(mockAxios.post).toHaveBeenCalledWith(
-        '/api/admin/tenant/email-settings/test',
-        { to: 'qa@example.com' }
-      )
+      expect(mockAxios.post).toHaveBeenCalledWith('/api/admin/tenant/email-settings/test', {
+        to: 'qa@example.com',
+      })
     })
   })
 })

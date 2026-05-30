@@ -42,7 +42,9 @@ export function dtoToLayoutRule(dto: LayoutRuleDto, tenantId: string): LayoutRul
         kind: 'default',
         target: dto.targetField ?? '',
         formula: String(body.formula ?? ''),
-        triggerFields: Array.isArray(body.triggerFields) ? (body.triggerFields as string[]) : undefined,
+        triggerFields: Array.isArray(body.triggerFields)
+          ? (body.triggerFields as string[])
+          : undefined,
       }
     case 'VALIDATE': {
       const enforce = body.enforce === 'warn' ? 'warn' : 'block'
@@ -57,10 +59,17 @@ export function dtoToLayoutRule(dto: LayoutRuleDto, tenantId: string): LayoutRul
     }
     case 'TRANSFORM': {
       const t = (body.transform as { type?: string; formula?: string }) ?? {}
-      let transform: { type: 'upper' | 'lower' | 'trim' | 'titleCase' } | { type: 'formula'; formula: string }
+      let transform:
+        | { type: 'upper' | 'lower' | 'trim' | 'titleCase' }
+        | { type: 'formula'; formula: string }
       if (t.type === 'formula') {
         transform = { type: 'formula', formula: String(t.formula ?? '') }
-      } else if (t.type === 'upper' || t.type === 'lower' || t.type === 'trim' || t.type === 'titleCase') {
+      } else if (
+        t.type === 'upper' ||
+        t.type === 'lower' ||
+        t.type === 'trim' ||
+        t.type === 'titleCase'
+      ) {
         transform = { type: t.type }
       } else {
         return null
@@ -91,7 +100,7 @@ function parseJsonField<T>(raw: unknown, fallback: T): T {
 
 export function dtosToLayoutRules(
   dtos: LayoutRuleDto[] | undefined,
-  tenantId: string,
+  tenantId: string
 ): LayoutRule[] {
   if (!dtos) return []
   return dtos

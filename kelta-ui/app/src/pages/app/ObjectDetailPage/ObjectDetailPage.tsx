@@ -49,11 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/detail'
-import type {
-  RecordHeaderAction,
-  RecordHeaderMetaField,
-  MetadataRow,
-} from '@/components/detail'
+import type { RecordHeaderAction, RecordHeaderMetaField, MetadataRow } from '@/components/detail'
 import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
 import { useInspectMode } from '@/hooks/useInspectMode'
 import { cn } from '@/lib/utils'
@@ -738,9 +734,7 @@ export function ObjectDetailPage(): React.ReactElement {
 
                       return (
                         <div key={field.name} className="min-w-0 space-y-1">
-                          <dt className="kelta-field-label">
-                            {field.displayName || field.name}
-                          </dt>
+                          <dt className="kelta-field-label">{field.displayName || field.name}</dt>
                           <dd className="text-sm font-medium">
                             <FieldRenderer
                               type={field.type}
@@ -791,9 +785,7 @@ export function ObjectDetailPage(): React.ReactElement {
           {railBlocks && railBlocks.length > 0 ? (
             <RailRenderer blocks={railBlocks} />
           ) : (
-            <MetadataCard
-              config={{ title: 'System information', rows: systemRows }}
-            />
+            <MetadataCard config={{ title: 'System information', rows: systemRows }} />
           )}
         </aside>
       </div>

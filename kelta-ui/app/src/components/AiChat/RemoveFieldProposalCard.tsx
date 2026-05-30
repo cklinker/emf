@@ -64,9 +64,7 @@ export function RemoveFieldProposalCard({
         </div>
         <div className="flex items-start gap-2 rounded border border-destructive/30 bg-background p-2 mt-2">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 text-destructive shrink-0" />
-          <p className="text-xs">
-            Destructive — the column and all its data will be deleted.
-          </p>
+          <p className="text-xs">Destructive — the column and all its data will be deleted.</p>
         </div>
       </CardHeader>
 

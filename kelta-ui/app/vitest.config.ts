@@ -40,6 +40,12 @@ export default defineConfig({
       // the workspace package; npm's symlink alone isn't always enough when
       // the import is hoisted across packages.
       '@kelta/formula': resolve(__dirname, 'node_modules/@kelta/formula'),
+      // Force a single React instance across all workspace packages. Without
+      // this, @kelta/components uses its own (hoisted) React copy and hooks
+      // like useRef return null because hook dispatcher state lives in a
+      // different React module instance than the test renderer's React.
+      react: resolve(__dirname, 'node_modules/react'),
+      'react-dom': resolve(__dirname, 'node_modules/react-dom'),
     },
   },
 })

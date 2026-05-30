@@ -38,10 +38,9 @@ export function SqlQueryParams({ parameters, onUpdate }: SqlQueryParamsProps) {
         />
         <p className="mt-1 text-[10px] leading-tight text-muted-foreground">
           Runs against the current tenant&apos;s schema. Use{' '}
-          <code className="font-mono">{'${$.path}'}</code> to interpolate flow
-          variables. SELECT/WITH/RETURNING returns{' '}
-          <code className="font-mono">records</code>; other statements return{' '}
-          <code className="font-mono">rowsAffected</code>.
+          <code className="font-mono">{'${$.path}'}</code> to interpolate flow variables.
+          SELECT/WITH/RETURNING returns <code className="font-mono">records</code>; other statements
+          return <code className="font-mono">rowsAffected</code>.
         </p>
       </div>
 

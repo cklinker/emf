@@ -130,8 +130,8 @@ function MetaFieldsEditor({
       </Label>
       {values.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          No meta items configured — ObjectDetailPage will auto-derive a row from common
-          contact-ish fields.
+          No meta items configured — ObjectDetailPage will auto-derive a row from common contact-ish
+          fields.
         </p>
       )}
       <div className="space-y-1.5">

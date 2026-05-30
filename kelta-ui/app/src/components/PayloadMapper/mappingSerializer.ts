@@ -21,10 +21,7 @@ export function serializeBindings(bindings: MappingMap): SerializedMapping {
   return out
 }
 
-export function deserializeMapping(
-  template: unknown,
-  knownTargets: string[]
-): MappingMap {
+export function deserializeMapping(template: unknown, knownTargets: string[]): MappingMap {
   const result: MappingMap = {}
   for (const target of knownTargets) {
     const value = readNested(template, target)

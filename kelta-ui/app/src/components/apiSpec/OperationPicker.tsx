@@ -85,14 +85,10 @@ export function OperationPicker({
               </span>
               <span className="font-mono text-xs">{op.pathTemplate}</span>
               {op.summary && (
-                <span className="text-xs text-muted-foreground truncate">
-                  — {op.summary}
-                </span>
+                <span className="text-xs text-muted-foreground truncate">— {op.summary}</span>
               )}
               {op.deprecated && (
-                <span className="ml-auto text-[10px] text-muted-foreground">
-                  deprecated
-                </span>
+                <span className="ml-auto text-[10px] text-muted-foreground">deprecated</span>
               )}
             </button>
           )

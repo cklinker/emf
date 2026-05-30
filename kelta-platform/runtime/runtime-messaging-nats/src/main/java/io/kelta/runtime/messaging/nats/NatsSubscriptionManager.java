@@ -1,6 +1,10 @@
 package io.kelta.runtime.messaging.nats;
 
 import io.kelta.runtime.event.EventSubscription;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.Timer;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
@@ -24,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manages NATS JetStream subscriptions for event handlers.
@@ -44,14 +49,31 @@ public class NatsSubscriptionManager implements DisposableBean {
 
     private final NatsConnectionManager connectionManager;
     private final ObjectMapper objectMapper;
+    private final NatsTracing tracing;
+    private final MeterRegistry meterRegistry;
     private final List<EventSubscription> subscriptions = new ArrayList<>();
     private final List<JetStreamSubscription> activeSubscriptions = new ArrayList<>();
     private final ExecutorService pullExecutor = Executors.newVirtualThreadPerTaskExecutor();
     private volatile boolean running = true;
 
     public NatsSubscriptionManager(NatsConnectionManager connectionManager, ObjectMapper objectMapper) {
+        this(connectionManager, objectMapper, NatsTracing.NOOP, null);
+    }
+
+    public NatsSubscriptionManager(NatsConnectionManager connectionManager,
+                                   ObjectMapper objectMapper,
+                                   NatsTracing tracing) {
+        this(connectionManager, objectMapper, tracing, null);
+    }
+
+    public NatsSubscriptionManager(NatsConnectionManager connectionManager,
+                                   ObjectMapper objectMapper,
+                                   NatsTracing tracing,
+                                   MeterRegistry meterRegistry) {
         this.connectionManager = connectionManager;
         this.objectMapper = objectMapper;
+        this.tracing = tracing != null ? tracing : NatsTracing.NOOP;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -99,18 +121,22 @@ public class NatsSubscriptionManager implements DisposableBean {
                 try {
                     List<Message> messages = jsSub.fetch(10, Duration.ofSeconds(1));
                     for (Message msg : messages) {
-                        try {
+                        long start = System.nanoTime();
+                        try (NatsTracing.Scope ignored = tracing.extractAndOpen(msg.getHeaders())) {
                             String data = new String(msg.getData(), StandardCharsets.UTF_8);
                             if (!tenantEnvelopeValid(sub.name(), msg.getHeaders(), data)) {
                                 msg.ack(); // discard, don't redeliver a poisoned message
+                                recordProcessed(sub.name(), start);
                                 continue;
                             }
                             sub.handler().accept(data);
                             msg.ack();
+                            recordProcessed(sub.name(), start);
                         } catch (Exception e) {
                             log.error("Error processing message in '{}': {}",
                                     sub.name(), e.getMessage(), e);
                             msg.nak();
+                            recordFailed(sub.name(), start);
                         }
                     }
                 } catch (Exception e) {
@@ -143,18 +169,22 @@ public class NatsSubscriptionManager implements DisposableBean {
                 .build();
 
         JetStreamSubscription jsSub = js.subscribe(sub.subject(), dispatcher, msg -> {
-            try {
+            long start = System.nanoTime();
+            try (NatsTracing.Scope ignored = tracing.extractAndOpen(msg.getHeaders())) {
                 String data = new String(msg.getData(), StandardCharsets.UTF_8);
                 if (!tenantEnvelopeValid(sub.name(), msg.getHeaders(), data)) {
                     msg.ack(); // discard, don't redeliver a poisoned message
+                    recordProcessed(sub.name(), start);
                     return;
                 }
                 sub.handler().accept(data);
                 msg.ack();
+                recordProcessed(sub.name(), start);
             } catch (Exception e) {
                 log.error("Error processing broadcast message in '{}': {}",
                         sub.name(), e.getMessage(), e);
                 msg.nak();
+                recordFailed(sub.name(), start);
             }
         }, false, options);
 
@@ -194,6 +224,40 @@ public class NatsSubscriptionManager implements DisposableBean {
                     subscription, e.getMessage());
         }
         return true;
+    }
+
+    void recordProcessed(String subscription, long startNanos) {
+        if (meterRegistry == null) {
+            return;
+        }
+        Tags tags = Tags.of("subscription", subscription);
+        Counter.builder("kelta.nats.consume.processed")
+                .description("NATS messages successfully processed (including poisoned-message drops)")
+                .tags(tags)
+                .register(meterRegistry)
+                .increment();
+        Timer.builder("kelta.nats.consume.latency")
+                .description("End-to-end handler latency from message receipt to ack/nak")
+                .tags(tags)
+                .register(meterRegistry)
+                .record(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
+    }
+
+    void recordFailed(String subscription, long startNanos) {
+        if (meterRegistry == null) {
+            return;
+        }
+        Tags tags = Tags.of("subscription", subscription);
+        Counter.builder("kelta.nats.consume.failed")
+                .description("NATS messages whose handler threw and were nak'd for redelivery")
+                .tags(tags)
+                .register(meterRegistry)
+                .increment();
+        Timer.builder("kelta.nats.consume.latency")
+                .description("End-to-end handler latency from message receipt to ack/nak")
+                .tags(tags)
+                .register(meterRegistry)
+                .record(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
     }
 
     @Override

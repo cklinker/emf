@@ -24,6 +24,10 @@ public class GovernorLimitsRepository {
             SELECT limits FROM tenant WHERE id = ?
             """;
 
+    private static final String SELECT_TENANT_EDITION_AND_LIMITS = """
+            SELECT edition, limits FROM tenant WHERE id = ?
+            """;
+
     private static final String COUNT_ACTIVE_USERS = """
             SELECT COUNT(*) FROM platform_user WHERE tenant_id = ? AND status = 'ACTIVE'
             """;
@@ -54,6 +58,24 @@ public class GovernorLimitsRepository {
         }
         return Optional.ofNullable(rows.get(0).get("limits"));
     }
+
+    /**
+     * Returns both the tenant's edition (FREE/PROFESSIONAL/ENTERPRISE/UNLIMITED)
+     * and its limits JSONB in a single query so callers can resolve tier-based
+     * default quotas without a second round-trip.
+     */
+    public Optional<EditionAndLimits> findEditionAndLimits(String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_TENANT_EDITION_AND_LIMITS, tenantId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<String, Object> row = rows.get(0);
+        String edition = row.get("edition") != null ? row.get("edition").toString() : null;
+        Object limits = row.get("limits");
+        return Optional.of(new EditionAndLimits(edition, limits));
+    }
+
+    public record EditionAndLimits(String edition, Object limits) {}
 
     public int countActiveUsers(String tenantId) {
         try {

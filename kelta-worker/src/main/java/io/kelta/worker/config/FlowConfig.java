@@ -269,6 +269,28 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.CollectionQuotaEnforcementHook collectionQuotaEnforcementHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.service.TenantQuotaResolver quotaResolver,
+            io.kelta.worker.repository.GovernorLimitsRepository governorLimitsRepository) {
+        io.kelta.worker.listener.CollectionQuotaEnforcementHook hook =
+                new io.kelta.worker.listener.CollectionQuotaEnforcementHook(quotaResolver, governorLimitsRepository);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public io.kelta.worker.listener.FieldQuotaEnforcementHook fieldQuotaEnforcementHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.service.TenantQuotaResolver quotaResolver,
+            JdbcTemplate jdbcTemplate) {
+        io.kelta.worker.listener.FieldQuotaEnforcementHook hook =
+                new io.kelta.worker.listener.FieldQuotaEnforcementHook(quotaResolver, jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public FieldConfigEventPublisher fieldConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher,

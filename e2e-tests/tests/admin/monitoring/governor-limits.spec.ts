@@ -10,12 +10,18 @@ test.describe("Governor Limits", () => {
     await expect(governorLimitsPage.governorLimitsPage).toBeVisible();
   });
 
-  test("shows tenant tier badge in header", async ({ page }) => {
+  test("shows tenant tier indicator in header", async ({ page }) => {
     const governorLimitsPage = new GovernorLimitsPage(page);
     await governorLimitsPage.goto();
 
-    await expect(governorLimitsPage.tierBadge).toBeVisible({ timeout: 10_000 });
-    const tierText = (await governorLimitsPage.tierBadge.textContent())?.trim();
+    // tierIndicator matches either the read-only badge (non-admin) or the
+    // tier select dropdown (admin with MANAGE_TENANTS). The e2e test user
+    // has admin perms, but we accept both so this passes for either fixture.
+    await expect(governorLimitsPage.tierIndicator).toBeVisible({ timeout: 10_000 });
+    const tierText =
+      (await governorLimitsPage.tierSelect.inputValue().catch(() => null)) ??
+      (await governorLimitsPage.tierBadge.textContent().catch(() => null))?.trim() ??
+      "";
     expect(tierText).toMatch(/^(FREE|PROFESSIONAL|ENTERPRISE|UNLIMITED)$/);
   });
 

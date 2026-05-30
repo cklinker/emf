@@ -119,10 +119,41 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
     { key: 'maxReports', labelKey: 'governorLimits.maxReports' },
   ]
 
+  const tierClass = (() => {
+    switch (status.tier) {
+      case 'FREE':
+        return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+      case 'PROFESSIONAL':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200'
+      case 'ENTERPRISE':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200'
+      case 'UNLIMITED':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+      default:
+        return 'bg-muted text-muted-foreground'
+    }
+  })()
+
   return (
     <div className={cn('mx-auto max-w-[1200px] p-6', className)} data-testid="governor-limits-page">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('governorLimits.title')}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="m-0 text-2xl font-semibold text-foreground">
+            {t('governorLimits.title')}
+          </h1>
+          {status.tier && (
+            <span
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
+                tierClass
+              )}
+              data-testid="governor-limits-tier-badge"
+              title={t('governorLimits.tierTooltip')}
+            >
+              {status.tier}
+            </span>
+          )}
+        </div>
         {canManageTenants && !isEditing && (
           <button
             onClick={handleEdit}

@@ -635,6 +635,8 @@ export interface SetupAuditTrailEntry {
  * Governor limits status
  */
 export interface GovernorLimitsStatus {
+  /** Tenant tier; drives default quotas before per-tenant overrides apply. */
+  tier: 'FREE' | 'PROFESSIONAL' | 'ENTERPRISE' | 'UNLIMITED';
   limits: GovernorLimits;
   apiCallsUsed: number;
   apiCallsLimit: number;
@@ -642,6 +644,11 @@ export interface GovernorLimitsStatus {
   usersLimit: number;
   collectionsUsed: number;
   collectionsLimit: number;
+  storageUsedBytes: number;
+  storageGbLimit: number;
+  aiTokensUsed: number;
+  aiTokensLimit: number;
+  aiEnabled: boolean;
 }
 
 /**

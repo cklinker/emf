@@ -10,6 +10,15 @@ test.describe("Governor Limits", () => {
     await expect(governorLimitsPage.governorLimitsPage).toBeVisible();
   });
 
+  test("shows tenant tier badge in header", async ({ page }) => {
+    const governorLimitsPage = new GovernorLimitsPage(page);
+    await governorLimitsPage.goto();
+
+    await expect(governorLimitsPage.tierBadge).toBeVisible({ timeout: 10_000 });
+    const tierText = (await governorLimitsPage.tierBadge.textContent())?.trim();
+    expect(tierText).toMatch(/^(FREE|PROFESSIONAL|ENTERPRISE|UNLIMITED)$/);
+  });
+
   test("shows usage metric cards", async ({ page }) => {
     const governorLimitsPage = new GovernorLimitsPage(page);
     await governorLimitsPage.goto();

@@ -43,7 +43,8 @@ class AnthropicServiceTest {
     void setUp() {
         AiConfigProperties config = new AiConfigProperties(
                 new AiConfigProperties.AnthropicProperties("test-key", "claude-sonnet-4-20250514", 4096, 0.7),
-                "http://localhost:8080", 30000L);
+                "http://localhost:8080", 30000L,
+                new AiConfigProperties.RateLimitProperties(false, 60));
         service = new AnthropicService(client, config, aiConfigRepository, toolRegistry);
     }
 

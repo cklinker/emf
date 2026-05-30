@@ -43,6 +43,9 @@ kelta:
       default-temperature: ${AI_DEFAULT_TEMPERATURE:0.7}
     worker-service-url: ${WORKER_SERVICE_URL:http://localhost:8080}
     sse-timeout-ms: ${AI_SSE_TIMEOUT_MS:300000}
+    rate-limit:
+      enabled: ${AI_RATE_LIMIT_ENABLED:true}
+      requests-per-minute: ${AI_RATE_LIMIT_REQUESTS_PER_MINUTE:60}
 
 management:
   endpoints:

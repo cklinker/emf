@@ -36,7 +36,8 @@ class ChatControllerTest {
         config = new AiConfigProperties(
                 new AiConfigProperties.AnthropicProperties("test-key", "claude-sonnet-4-20250514", 4096, 0.7),
                 "http://localhost:8080",
-                30000L
+                30000L,
+                new AiConfigProperties.RateLimitProperties(false, 60)
         );
         controller = new ChatController(chatService, config);
     }

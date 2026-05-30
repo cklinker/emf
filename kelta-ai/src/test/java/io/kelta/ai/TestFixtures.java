@@ -70,7 +70,8 @@ public final class TestFixtures {
                         0.7
                 ),
                 "http://localhost:8080",
-                30000L
+                30000L,
+                new AiConfigProperties.RateLimitProperties(false, 60)
         );
     }
 }

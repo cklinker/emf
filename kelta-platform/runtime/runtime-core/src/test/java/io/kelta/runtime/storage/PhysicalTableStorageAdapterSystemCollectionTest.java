@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
@@ -157,6 +158,57 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
                     eq("products"), typeCaptor.capture(), anyString());
             assertEquals(SchemaMigrationEngine.MigrationType.CREATE_TABLE, typeCaptor.getValue());
             verify(migrationEngine).reconcileSchema(eq(nonSystemDef), any(TableRef.class));
+        }
+
+        @Test
+        @DisplayName("Should swallow DuplicateKeyException from concurrent CREATE TABLE race")
+        void initializeCollection_swallowsDuplicateKey_fromConcurrentCreateRace() {
+            // PostgreSQL's CREATE TABLE IF NOT EXISTS is not atomic against
+            // concurrent CREATEs: two transactions can both pass the existence
+            // check and then both try to INSERT into pg_type, leaving one with
+            // SQLSTATE 23505 on pg_type_typname_nsp_index. Multi-pod workers
+            // consuming the same NATS CollectionChanged event hit this race.
+            // The losing pod must continue (the table now exists, committed by
+            // the winner) so reconcileSchema can fill in any missing columns.
+            CollectionDefinition nonSystemDef = buildNonSystemCollection();
+            doThrow(new DuplicateKeyException(
+                    "duplicate key value violates unique constraint \"pg_type_typname_nsp_index\""))
+                    .when(jdbcTemplate).execute(argThat((String sql) ->
+                            sql != null && sql.contains("CREATE TABLE IF NOT EXISTS")));
+
+            assertDoesNotThrow(() -> adapter.initializeCollection(nonSystemDef));
+
+            // Even though CREATE failed, reconcileSchema and migration recording
+            // must still run — the table exists from the winning concurrent
+            // transaction and we still need to bring this pod's view in line.
+            verify(migrationEngine).reconcileSchema(eq(nonSystemDef), any(TableRef.class));
+            verify(migrationEngine).recordMigration(
+                    eq("products"), eq(SchemaMigrationEngine.MigrationType.CREATE_TABLE), anyString());
+        }
+
+        @Test
+        @DisplayName("Should still propagate DuplicateKeyException from post-create statements")
+        void initializeCollection_propagatesDuplicateKey_fromPostCreateStatements() {
+            // The race-recovery path only applies to the CREATE TABLE statement
+            // itself. A duplicate-key failure from a FK or index statement is a
+            // real error (e.g. a constraint name collision) and must surface as
+            // a StorageException so the caller can retry or log it.
+            CollectionDefinition childDef = new CollectionDefinitionBuilder()
+                    .name("order_lines")
+                    .displayName("Order Lines")
+                    .addField(FieldDefinition.requiredString("amount"))
+                    .addField(new FieldDefinitionBuilder()
+                            .name("parentRef")
+                            .type(FieldType.MASTER_DETAIL)
+                            .referenceConfig(ReferenceConfig.masterDetail("orders", "parent"))
+                            .build())
+                    .build();
+            doThrow(new DuplicateKeyException("constraint name collision"))
+                    .when(jdbcTemplate).execute(argThat((String sql) ->
+                            sql != null && sql.contains("FOREIGN KEY")));
+
+            assertThrows(StorageException.class,
+                    () -> adapter.initializeCollection(childDef));
         }
 
         @Test

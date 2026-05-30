@@ -1,6 +1,7 @@
 package io.kelta.ai.controller;
 
 import io.kelta.ai.config.AiConfigProperties;
+import io.kelta.ai.service.AiSseMetrics;
 import io.kelta.ai.service.ChatService;
 import io.kelta.runtime.context.TenantPropagatingExecutors;
 import org.slf4j.Logger;
@@ -21,10 +22,12 @@ public class ChatController {
 
     private final ChatService chatService;
     private final AiConfigProperties config;
+    private final AiSseMetrics sseMetrics;
 
-    public ChatController(ChatService chatService, AiConfigProperties config) {
+    public ChatController(ChatService chatService, AiConfigProperties config, AiSseMetrics sseMetrics) {
         this.chatService = chatService;
         this.config = config;
+        this.sseMetrics = sseMetrics;
     }
 
     @PostMapping
@@ -65,6 +68,10 @@ public class ChatController {
         log.info("Stream chat request from tenant {} user {}", tenantId, userId);
 
         SseEmitter emitter = new SseEmitter(config.sseTimeoutMs());
+        sseMetrics.streamOpened();
+        emitter.onCompletion(() -> sseMetrics.streamClosed(AiSseMetrics.CloseReason.COMPLETION));
+        emitter.onTimeout(() -> sseMetrics.streamClosed(AiSseMetrics.CloseReason.TIMEOUT));
+        emitter.onError(ex -> sseMetrics.streamClosed(AiSseMetrics.CloseReason.ERROR));
 
         // Run the streaming on a virtual thread; propagate the caller's tenant
         // ScopedValue so downstream DB queries see the right app.current_tenant_id.

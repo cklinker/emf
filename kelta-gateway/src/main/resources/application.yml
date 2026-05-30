@@ -27,9 +27,10 @@ spring:
       connect-timeout: 2000ms
       lettuce:
         pool:
-          min-idle: 5
-          max-idle: 10
-          max-active: 20
+          min-idle: ${REDIS_POOL_MIN_IDLE:10}
+          max-idle: ${REDIS_POOL_MAX_IDLE:50}
+          max-active: ${REDIS_POOL_MAX_ACTIVE:100}
+          max-wait: ${REDIS_POOL_MAX_WAIT_MS:2000}ms
   
   # Security configuration for JWT validation
   security:
@@ -50,8 +51,9 @@ spring:
         response-timeout: 120s
         max-header-size: 16384     # 16 KB max header size to prevent header-based attacks
         pool:
-          max-connections: 500
-          max-idle-time: 30s
+          max-connections: ${GATEWAY_HTTPCLIENT_MAX_CONNECTIONS:2000}
+          max-idle-time: ${GATEWAY_HTTPCLIENT_MAX_IDLE_TIME:30s}
+          acquire-timeout: ${GATEWAY_HTTPCLIENT_ACQUIRE_TIMEOUT_MS:5000}
 
 
 # Kelta Gateway specific configuration

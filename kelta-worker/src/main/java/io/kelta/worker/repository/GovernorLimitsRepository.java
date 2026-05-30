@@ -37,6 +37,14 @@ public class GovernorLimitsRepository {
             WHERE tenant_id = ? AND active = true AND (system_collection = false OR system_collection IS NULL)
             """;
 
+    private static final String COUNT_ACTIVE_FLOWS = """
+            SELECT COUNT(*) FROM flow WHERE tenant_id = ?
+            """;
+
+    private static final String COUNT_REPORTS = """
+            SELECT COUNT(*) FROM report WHERE tenant_id = ?
+            """;
+
     private static final String SUM_STORAGE_BYTES = """
             SELECT COALESCE(SUM(file_size), 0) FROM file_attachment WHERE tenant_id = ?
             """;
@@ -93,6 +101,26 @@ public class GovernorLimitsRepository {
             return count != null ? count : 0;
         } catch (Exception e) {
             log.warn("Failed to count active collections for tenant {}: {}", tenantId, e.getMessage());
+            return 0;
+        }
+    }
+
+    public int countActiveFlows(String tenantId) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(COUNT_ACTIVE_FLOWS, Integer.class, tenantId);
+            return count != null ? count : 0;
+        } catch (Exception e) {
+            log.warn("Failed to count active flows for tenant {}: {}", tenantId, e.getMessage());
+            return 0;
+        }
+    }
+
+    public int countReports(String tenantId) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(COUNT_REPORTS, Integer.class, tenantId);
+            return count != null ? count : 0;
+        } catch (Exception e) {
+            log.warn("Failed to count reports for tenant {}: {}", tenantId, e.getMessage());
             return 0;
         }
     }

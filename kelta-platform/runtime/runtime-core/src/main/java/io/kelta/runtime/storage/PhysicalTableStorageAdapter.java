@@ -221,7 +221,22 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         sql.append(")");
 
         try {
-            jdbcTemplate.execute(sql.toString());
+            try {
+                jdbcTemplate.execute(sql.toString());
+            } catch (DuplicateKeyException e) {
+                // PostgreSQL's CREATE TABLE IF NOT EXISTS is not atomic against
+                // concurrent CREATEs: two transactions can both pass the existence
+                // check and then both try to INSERT into pg_type, leaving one
+                // with a unique-violation on pg_type_typname_nsp_index (SQLSTATE
+                // 23505). When multiple worker pods consume the same NATS
+                // CollectionChanged event in parallel they hit exactly this race.
+                // The losing transaction's CREATE rolls back, but the winner's
+                // table is committed and visible, so we can safely continue to
+                // reconcileSchema which will fill in any missing columns.
+                log.warn("Concurrent CREATE TABLE race for '{}' (likely another worker pod created it "
+                        + "first); treating as success and reconciling schema. Cause: {}",
+                        qualifiedName, e.getMostSpecificCause().getMessage());
+            }
 
             // Reconcile schema BEFORE running post-create statements. If the table
             // already existed, CREATE TABLE IF NOT EXISTS was a no-op and columns

@@ -1167,6 +1167,18 @@ export class AdminClient {
       const response = await this.axios.get('/api/governor-limits');
       return unwrapJsonApiResource<GovernorLimitsStatus>(response.data);
     },
+
+    /**
+     * Update the tenant's tier (edition). Server validates the value against
+     * the allowed CHECK constraint set: FREE / PROFESSIONAL / ENTERPRISE / UNLIMITED.
+     * Returns the refreshed status (with new tier defaults already merged in).
+     */
+    updateTier: async (
+      tier: 'FREE' | 'PROFESSIONAL' | 'ENTERPRISE' | 'UNLIMITED'
+    ): Promise<GovernorLimitsStatus> => {
+      const response = await this.axios.put('/api/governor-limits/tier', { tier });
+      return unwrapJsonApiResource<GovernorLimitsStatus>(response.data);
+    },
   };
 
   // ---------------------------------------------------------------------------

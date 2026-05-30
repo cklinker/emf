@@ -930,7 +930,9 @@
     "editLimits": "Editar Limites",
     "saveSuccess": "Limites do governador atualizados com sucesso.",
     "saveError": "Falha ao atualizar limites do governador.",
-    "tierTooltip": "Nível do inquilino — define cotas padrão antes das substituições por inquilino."
+    "tierTooltip": "Nível do inquilino — define cotas padrão antes das substituições por inquilino.",
+    "tierUpdated": "Nível do inquilino atualizado.",
+    "tierUpdateError": "Falha ao atualizar nível do inquilino."
   },
   "metrics": {
     "title": "Métricas",

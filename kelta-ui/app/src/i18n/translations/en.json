@@ -930,7 +930,9 @@
     "editLimits": "Edit Limits",
     "saveSuccess": "Governor limits updated successfully.",
     "saveError": "Failed to update governor limits.",
-    "tierTooltip": "Tenant tier — drives default quotas before per-tenant overrides apply."
+    "tierTooltip": "Tenant tier — drives default quotas before per-tenant overrides apply.",
+    "tierUpdated": "Tenant tier updated.",
+    "tierUpdateError": "Failed to update tenant tier."
   },
   "metrics": {
     "title": "Metrics",

@@ -32,6 +32,27 @@ import java.sql.Statement;
  * circular dependency issues that arise from declaring a {@code @Primary @Bean} DataSource
  * that injects another DataSource.
  *
+ * <h2>WARNING: PgBouncer transaction-pool incompatibility</h2>
+ * <p>The {@code SET app.current_tenant_id} issued here is a Postgres <b>session</b>
+ * setting. Under PgBouncer's {@code pool_mode = transaction} the underlying physical
+ * connection is recycled per transaction, so the session variable is lost — RLS then
+ * sees the empty default and the {@code admin_bypass} policy lets a query return rows
+ * for <b>all tenants</b>. This is a tenant-isolation correctness bug, not just a perf
+ * issue.
+ *
+ * <p>When deploying PgBouncer (or any other transaction-level pooler) in front of
+ * Postgres, you must either:
+ * <ul>
+ *   <li>Configure {@code pool_mode = session} (lower pooling efficiency but preserves
+ *       session state — current default for kelta workloads), or
+ *   <li>Migrate every tenant-scoped callsite to issue
+ *       {@code SET LOCAL app.current_tenant_id = '...'} inside an explicit transaction.
+ *       This requires rewriting all {@code JdbcTemplate} auto-commit calls and auditing
+ *       {@code @Transactional} boundaries (tracked as Tier-2 DB scaling work).
+ * </ul>
+ *
+ * <p>See {@code .claude/docs/concerns.md} → "Connection Pooler Compatibility".
+ *
  * @since 1.0.0
  */
 @Configuration

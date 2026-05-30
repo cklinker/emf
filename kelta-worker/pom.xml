@@ -244,6 +244,14 @@
                                   registration (which uses reflection) runs during the build.
                                 -->
                                 <buildArg>--initialize-at-build-time=com.google.protobuf</buildArg>
+                                <!-- Protobuf 4.x JavaFeaturesProto + DescriptorProtos pull in
+                                     com.google.protobuf.GeneratedMessage$GeneratedExtension
+                                     accessors via static blocks that call getDescriptor() before
+                                     internalInit() has run when initialized at build time. Force
+                                     them to runtime init — the more-specific rule overrides the
+                                     com.google.protobuf package-level build-time rule above. -->
+                                <buildArg>--initialize-at-run-time=com.google.protobuf.JavaFeaturesProto</buildArg>
+                                <buildArg>--initialize-at-run-time=com.google.protobuf.DescriptorProtos</buildArg>
                                 <buildArg>--initialize-at-build-time=com.google.api</buildArg>
                                 <buildArg>--initialize-at-build-time=com.google.gson</buildArg>
                                 <buildArg>--initialize-at-build-time=dev.cerbos</buildArg>

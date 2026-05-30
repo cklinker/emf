@@ -3,6 +3,8 @@ package io.kelta.worker.controller;
 import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.worker.repository.GovernorLimitsRepository;
 import io.kelta.worker.service.S3StorageService;
+import io.kelta.worker.service.TenantQuotaResolver;
+import io.kelta.worker.service.TenantTierQuotas;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -65,13 +67,16 @@ public class AttachmentUploadController {
 
     private final S3StorageService storageService;
     private final GovernorLimitsRepository governorLimitsRepository;
+    private final TenantQuotaResolver quotaResolver;
     private final JdbcTemplate jdbcTemplate;
 
     public AttachmentUploadController(S3StorageService storageService,
                                        GovernorLimitsRepository governorLimitsRepository,
+                                       TenantQuotaResolver quotaResolver,
                                        JdbcTemplate jdbcTemplate) {
         this.storageService = storageService;
         this.governorLimitsRepository = governorLimitsRepository;
+        this.quotaResolver = quotaResolver;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -126,21 +131,9 @@ public class AttachmentUploadController {
                             "File size must be between 1 and " + maxFileSize + " bytes"));
         }
 
-        // Check storage governor limit
+        // Check storage governor limit — resolver applies tier defaults and per-tenant overrides.
         long currentStorageBytes = governorLimitsRepository.sumStorageBytes(tenantId);
-        long storageGbLimit = 10; // default
-        try {
-            Optional<Object> limitsOpt = governorLimitsRepository.findTenantLimits(tenantId);
-            if (limitsOpt.isPresent() && limitsOpt.get() instanceof Map<?,?> limitsMap) {
-                Object storageGbObj = limitsMap.get("storageGb");
-                if (storageGbObj instanceof Number num) {
-                    storageGbLimit = num.longValue();
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to read storage limits for tenant {}: {}", tenantId, e.getMessage());
-        }
-
+        long storageGbLimit = quotaResolver.intQuota(tenantId, TenantTierQuotas.KEY_STORAGE_GB);
         long storageLimitBytes = storageGbLimit * BYTES_PER_GB;
         if (currentStorageBytes + fileSize > storageLimitBytes) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(

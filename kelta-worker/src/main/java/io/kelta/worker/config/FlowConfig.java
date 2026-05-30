@@ -291,6 +291,39 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.UserQuotaEnforcementHook userQuotaEnforcementHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.service.TenantQuotaResolver quotaResolver,
+            io.kelta.worker.repository.GovernorLimitsRepository governorLimitsRepository) {
+        io.kelta.worker.listener.UserQuotaEnforcementHook hook =
+                new io.kelta.worker.listener.UserQuotaEnforcementHook(quotaResolver, governorLimitsRepository);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public io.kelta.worker.listener.FlowQuotaEnforcementHook flowQuotaEnforcementHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.service.TenantQuotaResolver quotaResolver,
+            io.kelta.worker.repository.GovernorLimitsRepository governorLimitsRepository) {
+        io.kelta.worker.listener.FlowQuotaEnforcementHook hook =
+                new io.kelta.worker.listener.FlowQuotaEnforcementHook(quotaResolver, governorLimitsRepository);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public io.kelta.worker.listener.ReportQuotaEnforcementHook reportQuotaEnforcementHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.service.TenantQuotaResolver quotaResolver,
+            io.kelta.worker.repository.GovernorLimitsRepository governorLimitsRepository) {
+        io.kelta.worker.listener.ReportQuotaEnforcementHook hook =
+                new io.kelta.worker.listener.ReportQuotaEnforcementHook(quotaResolver, governorLimitsRepository);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public FieldConfigEventPublisher fieldConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher,

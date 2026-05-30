@@ -124,6 +124,46 @@ public class GovernorLimitsController {
     public record TenantLimitsView(TenantTierQuotas.Tier tier, Map<String, Object> limits) {}
 
     /**
+     * Updates the tenant's tier (edition). Triggers a cache eviction so the
+     * new tier defaults take effect on the next governor-limits read. Per-tenant
+     * overrides in {@code tenant.limits} JSONB still win key-by-key over the
+     * new tier defaults.
+     *
+     * @param tenantId the tenant ID from the gateway's X-Tenant-ID header
+     * @param body     {@code {"tier": "FREE" | "PROFESSIONAL" | "ENTERPRISE" | "UNLIMITED"}}
+     */
+    @PutMapping("/tier")
+    public ResponseEntity<Map<String, Object>> updateTier(
+            @RequestHeader("X-Tenant-ID") String tenantId,
+            @RequestBody Map<String, Object> body) {
+        Object tierObj = body.get("tier");
+        if (!(tierObj instanceof String tierStr) || tierStr.isBlank()) {
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Missing tier",
+                            "Body must include {\"tier\": \"FREE|PROFESSIONAL|ENTERPRISE|UNLIMITED\"}"));
+        }
+        String normalized = tierStr.trim().toUpperCase();
+        TenantTierQuotas.Tier validated;
+        try {
+            validated = TenantTierQuotas.Tier.valueOf(normalized);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Invalid tier",
+                            "Tier must be one of FREE, PROFESSIONAL, ENTERPRISE, UNLIMITED"));
+        }
+
+        int updated = repository.updateTenantEdition(tenantId, validated.name());
+        if (updated == 0) {
+            return ResponseEntity.notFound().build();
+        }
+        cacheManager.evictTenantLimits(tenantId);
+        featureEventPublisher.publishUpdated(tenantId, "limits");
+
+        log.info("Updated tenant {} tier to {}", tenantId, validated);
+        return getStatus(tenantId);
+    }
+
+    /**
      * Updates the governor limits for the current tenant.
      *
      * @param tenantId the tenant ID from the gateway's X-Tenant-ID header

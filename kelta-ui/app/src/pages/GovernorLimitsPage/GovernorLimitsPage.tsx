@@ -32,6 +32,9 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
   const [isEditing, setIsEditing] = useState(false)
   const [editLimits, setEditLimits] = useState<GovernorLimits | null>(null)
 
+  const TIERS = ['FREE', 'PROFESSIONAL', 'ENTERPRISE', 'UNLIMITED'] as const
+  type Tier = (typeof TIERS)[number]
+
   const {
     data: status,
     isLoading,
@@ -53,6 +56,17 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
     },
     onError: () => {
       showToast(t('governorLimits.saveError'), 'error')
+    },
+  })
+
+  const tierMutation = useMutation({
+    mutationFn: (tier: Tier) => keltaClient.admin.governorLimits.updateTier(tier),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['governor-limits'] })
+      showToast(t('governorLimits.tierUpdated'), 'success')
+    },
+    onError: () => {
+      showToast(t('governorLimits.tierUpdateError'), 'error')
     },
   })
 
@@ -141,7 +155,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
           <h1 className="m-0 text-2xl font-semibold text-foreground">
             {t('governorLimits.title')}
           </h1>
-          {status.tier && (
+          {status.tier && !canManageTenants && (
             <span
               className={cn(
                 'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
@@ -152,6 +166,30 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
             >
               {status.tier}
             </span>
+          )}
+          {status.tier && canManageTenants && (
+            <select
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide outline-none cursor-pointer',
+                tierClass
+              )}
+              data-testid="governor-limits-tier-select"
+              value={status.tier}
+              disabled={tierMutation.isPending}
+              onChange={(e) => {
+                const next = e.target.value as Tier
+                if (next !== status.tier) {
+                  tierMutation.mutate(next)
+                }
+              }}
+              title={t('governorLimits.tierTooltip')}
+            >
+              {TIERS.map((tier) => (
+                <option key={tier} value={tier}>
+                  {tier}
+                </option>
+              ))}
+            </select>
           )}
         </div>
         {canManageTenants && !isEditing && (

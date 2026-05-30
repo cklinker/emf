@@ -930,7 +930,9 @@
     "editLimits": "Editar limites",
     "saveSuccess": "Limites del gobernador actualizados correctamente.",
     "saveError": "Error al actualizar los limites del gobernador.",
-    "tierTooltip": "Nivel del inquilino — define cuotas predeterminadas antes de aplicar anulaciones específicas."
+    "tierTooltip": "Nivel del inquilino — define cuotas predeterminadas antes de aplicar anulaciones específicas.",
+    "tierUpdated": "Nivel del inquilino actualizado.",
+    "tierUpdateError": "Error al actualizar el nivel del inquilino."
   },
   "metrics": {
     "title": "Métricas",

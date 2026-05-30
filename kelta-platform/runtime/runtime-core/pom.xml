@@ -74,6 +74,13 @@
             <artifactId>json-path</artifactId>
         </dependency>
 
+        <!-- OpenTelemetry context for trace propagation across executors (optional) -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-context</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Jackson for JSON serialization -->
         <dependency>
             <groupId>tools.jackson.core</groupId>
@@ -85,6 +92,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
             <scope>test</scope>
         </dependency>
         

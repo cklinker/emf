@@ -54,21 +54,31 @@ public class NatsEventPublisher implements PlatformEventPublisher {
     private final NatsConnectionManager connectionManager;
     private final ObjectMapper objectMapper;
     private final Semaphore inflight;
+    private final NatsTracing tracing;
     private final LongAdder successCount = new LongAdder();
     private final LongAdder failureCount = new LongAdder();
     private final LongAdder droppedCount = new LongAdder();
 
     public NatsEventPublisher(NatsConnectionManager connectionManager, ObjectMapper objectMapper) {
-        this(connectionManager, objectMapper, 1000, null);
+        this(connectionManager, objectMapper, 1000, null, NatsTracing.NOOP);
     }
 
     public NatsEventPublisher(NatsConnectionManager connectionManager,
                               ObjectMapper objectMapper,
                               int maxInflightPublishes,
                               MeterRegistry meterRegistry) {
+        this(connectionManager, objectMapper, maxInflightPublishes, meterRegistry, NatsTracing.NOOP);
+    }
+
+    public NatsEventPublisher(NatsConnectionManager connectionManager,
+                              ObjectMapper objectMapper,
+                              int maxInflightPublishes,
+                              MeterRegistry meterRegistry,
+                              NatsTracing tracing) {
         this.connectionManager = connectionManager;
         this.objectMapper = objectMapper;
         this.inflight = new Semaphore(Math.max(1, maxInflightPublishes));
+        this.tracing = tracing != null ? tracing : NatsTracing.NOOP;
         registerMetrics(meterRegistry, maxInflightPublishes);
     }
 
@@ -112,6 +122,7 @@ public class NatsEventPublisher implements PlatformEventPublisher {
             if (tenantId != null && !tenantId.isBlank()) {
                 headers.add(TENANT_ID_HEADER, tenantId);
             }
+            tracing.inject(headers);
 
             NatsMessage message = NatsMessage.builder()
                     .subject(subject)

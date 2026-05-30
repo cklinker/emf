@@ -45,6 +45,10 @@ public class GovernorLimitsRepository {
             UPDATE tenant SET limits = ?::jsonb, updated_at = NOW() WHERE id = ?
             """;
 
+    private static final String UPDATE_TENANT_EDITION = """
+            UPDATE tenant SET edition = ?, updated_at = NOW() WHERE id = ?
+            """;
+
     private final JdbcTemplate jdbcTemplate;
 
     public GovernorLimitsRepository(JdbcTemplate jdbcTemplate) {
@@ -109,5 +113,14 @@ public class GovernorLimitsRepository {
 
     public void updateTenantLimits(String tenantId, String limitsJson) {
         jdbcTemplate.update(UPDATE_TENANT_LIMITS, limitsJson, tenantId);
+    }
+
+    /**
+     * Updates a tenant's edition (tier). Caller is responsible for validating
+     * the input against the allowed CHECK constraint values
+     * (FREE/PROFESSIONAL/ENTERPRISE/UNLIMITED) before invocation.
+     */
+    public int updateTenantEdition(String tenantId, String edition) {
+        return jdbcTemplate.update(UPDATE_TENANT_EDITION, edition, tenantId);
     }
 }

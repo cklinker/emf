@@ -348,6 +348,75 @@ class GovernorLimitsControllerTest {
         }
     }
 
+    // ==================== Tier Tests ====================
+
+    @Nested
+    @DisplayName("PUT /api/governor-limits/tier")
+    class UpdateTierTests {
+
+        @Test
+        @DisplayName("rejects request with missing tier field")
+        void rejectsMissingTier() {
+            ResponseEntity<Map<String, Object>> response = controller.updateTier(
+                    "tenant-1", Map.of());
+
+            assertThat(response.getStatusCode().is4xxClientError()).isTrue();
+        }
+
+        @Test
+        @DisplayName("rejects request with invalid tier value")
+        void rejectsInvalidTier() {
+            ResponseEntity<Map<String, Object>> response = controller.updateTier(
+                    "tenant-1", Map.of("tier", "DELUXE"));
+
+            assertThat(response.getStatusCode().is4xxClientError()).isTrue();
+        }
+
+        @Test
+        @DisplayName("normalises lowercase tier to canonical form")
+        void normalisesLowercase() {
+            when(repository.updateTenantEdition("tenant-1", "ENTERPRISE")).thenReturn(1);
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(
+                    Optional.of(new GovernorLimitsRepository.EditionAndLimits("ENTERPRISE", "{}")));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(0);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(0);
+
+            ResponseEntity<Map<String, Object>> response = controller.updateTier(
+                    "tenant-1", Map.of("tier", "enterprise"));
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            verify(repository).updateTenantEdition("tenant-1", "ENTERPRISE");
+        }
+
+        @Test
+        @DisplayName("returns 404 when tenant not found")
+        void notFoundOnMissingTenant() {
+            when(repository.updateTenantEdition("missing", "FREE")).thenReturn(0);
+
+            ResponseEntity<Map<String, Object>> response = controller.updateTier(
+                    "missing", Map.of("tier", "FREE"));
+
+            assertThat(response.getStatusCode().value()).isEqualTo(404);
+        }
+
+        @Test
+        @DisplayName("evicts cache and broadcasts feature event on success")
+        void evictsCacheAndBroadcasts() {
+            when(repository.updateTenantEdition("tenant-1", "FREE")).thenReturn(1);
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(
+                    Optional.of(new GovernorLimitsRepository.EditionAndLimits("FREE", "{}")));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(0);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(0);
+
+            ResponseEntity<Map<String, Object>> response = controller.updateTier(
+                    "tenant-1", Map.of("tier", "FREE"));
+
+            Map<String, Object> attrs = getAttributes(response.getBody());
+            assertThat(attrs.get("tier")).isEqualTo("FREE");
+            verify(platformEventPublisher).publish(anyString(), any());
+        }
+    }
+
     // ==================== PUT Tests ====================
 
     @Nested

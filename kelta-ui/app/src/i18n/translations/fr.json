@@ -929,7 +929,10 @@
     "maxReports": "Nombre maximum de rapports",
     "editLimits": "Modifier les limites",
     "saveSuccess": "Limites de gouvernance mises à jour avec succès.",
-    "saveError": "Échec de la mise à jour des limites de gouvernance."
+    "saveError": "Échec de la mise à jour des limites de gouvernance.",
+    "tierTooltip": "Palier du locataire — définit les quotas par défaut avant les remplacements spécifiques au locataire.",
+    "tierUpdated": "Palier du locataire mis à jour.",
+    "tierUpdateError": "Échec de la mise à jour du palier du locataire."
   },
   "metrics": {
     "title": "Métriques",

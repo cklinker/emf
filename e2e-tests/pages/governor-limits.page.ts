@@ -4,6 +4,7 @@ import { BasePage } from "./base.page";
 export class GovernorLimitsPage extends BasePage {
   readonly governorLimitsPage: Locator;
   readonly heading: Locator;
+  readonly tierBadge: Locator;
   readonly editButton: Locator;
   readonly saveButton: Locator;
   readonly cancelButton: Locator;
@@ -14,6 +15,7 @@ export class GovernorLimitsPage extends BasePage {
     super(page, tenantSlug);
     this.governorLimitsPage = this.testId("governor-limits-page");
     this.heading = page.getByRole("heading", { name: /governor limits/i });
+    this.tierBadge = this.testId("governor-limits-tier-badge");
     this.editButton = this.testId("governor-limits-edit-button");
     this.saveButton = this.testId("governor-limits-save-button");
     this.cancelButton = this.testId("governor-limits-cancel-button");

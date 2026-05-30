@@ -15,6 +15,7 @@ vi.mock('../../hooks/useSystemPermissions', () => ({
 }))
 
 const mockStatus = {
+  tier: 'PROFESSIONAL' as const,
   limits: {
     apiCallsPerDay: 100000,
     storageGb: 10,
@@ -30,6 +31,11 @@ const mockStatus = {
   usersLimit: 100,
   collectionsUsed: 10,
   collectionsLimit: 200,
+  storageUsedBytes: 0,
+  storageGbLimit: 10,
+  aiTokensUsed: 0,
+  aiTokensLimit: 1_000_000,
+  aiEnabled: true,
 }
 
 /**

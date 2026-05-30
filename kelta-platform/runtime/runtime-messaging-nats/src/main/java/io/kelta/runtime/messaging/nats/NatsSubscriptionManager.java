@@ -2,6 +2,7 @@ package io.kelta.runtime.messaging.nats;
 
 import io.kelta.runtime.event.EventSubscription;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
@@ -13,6 +14,7 @@ import io.nats.client.Message;
 import io.nats.client.PullSubscribeOptions;
 import io.nats.client.PushSubscribeOptions;
 import io.nats.client.api.ConsumerConfiguration;
+import io.nats.client.api.ConsumerInfo;
 import io.nats.client.api.DeliverPolicy;
 import io.nats.client.impl.Headers;
 import org.slf4j.Logger;
@@ -26,9 +28,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Manages NATS JetStream subscriptions for event handlers.
@@ -53,7 +58,14 @@ public class NatsSubscriptionManager implements DisposableBean {
     private final MeterRegistry meterRegistry;
     private final List<EventSubscription> subscriptions = new ArrayList<>();
     private final List<JetStreamSubscription> activeSubscriptions = new ArrayList<>();
+    private final ConcurrentHashMap<String, JetStreamSubscription> subsByName = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> lagByName = new ConcurrentHashMap<>();
     private final ExecutorService pullExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    private final ScheduledExecutorService lagPoller = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "nats-consumer-lag-poller");
+        t.setDaemon(true);
+        return t;
+    });
     private volatile boolean running = true;
 
     public NatsSubscriptionManager(NatsConnectionManager connectionManager, ObjectMapper objectMapper) {
@@ -96,6 +108,10 @@ public class NatsSubscriptionManager implements DisposableBean {
                         sub.name(), sub.subject(), e.getMessage(), e);
             }
         }
+        // Schedule consumer-lag polling after all subscriptions are registered.
+        if (meterRegistry != null && !subsByName.isEmpty()) {
+            lagPoller.scheduleAtFixedRate(this::pollLagOnce, 30, 30, TimeUnit.SECONDS);
+        }
     }
 
     private void startPullConsumer(EventSubscription sub) throws Exception {
@@ -114,6 +130,7 @@ public class NatsSubscriptionManager implements DisposableBean {
 
         JetStreamSubscription jsSub = js.subscribe(sub.subject(), options);
         activeSubscriptions.add(jsSub);
+        registerForLagPolling(sub.name(), jsSub);
 
         pullExecutor.submit(() -> {
             log.info("Pull consumer '{}' started on subject '{}'", sub.name(), sub.subject());
@@ -189,7 +206,43 @@ public class NatsSubscriptionManager implements DisposableBean {
         }, false, options);
 
         activeSubscriptions.add(jsSub);
+        registerForLagPolling(sub.name(), jsSub);
         log.info("Push consumer '{}' started on subject '{}'", sub.name(), sub.subject());
+    }
+
+    /**
+     * Track this subscription for periodic lag polling and register a gauge
+     * backed by the {@link AtomicLong} we update each tick. Idempotent —
+     * second registration with the same name replaces the prior gauge.
+     */
+    void registerForLagPolling(String name, JetStreamSubscription jsSub) {
+        if (meterRegistry == null) {
+            return;
+        }
+        subsByName.put(name, jsSub);
+        AtomicLong lag = lagByName.computeIfAbsent(name, k -> new AtomicLong(0L));
+        Gauge.builder("kelta.nats.consume.lag", lag, AtomicLong::doubleValue)
+                .description("NATS JetStream consumer pending message count (lag)")
+                .tags("subscription", name)
+                .register(meterRegistry);
+    }
+
+    /** Polls each tracked subscription for ConsumerInfo and updates lag gauges. */
+    void pollLagOnce() {
+        for (var entry : subsByName.entrySet()) {
+            String name = entry.getKey();
+            JetStreamSubscription sub = entry.getValue();
+            try {
+                ConsumerInfo info = sub.getConsumerInfo();
+                long pending = info.getNumPending();
+                AtomicLong lag = lagByName.get(name);
+                if (lag != null) {
+                    lag.set(pending);
+                }
+            } catch (Exception e) {
+                log.debug("Lag poll failed for subscription '{}': {}", name, e.getMessage());
+            }
+        }
     }
 
     /**
@@ -263,6 +316,7 @@ public class NatsSubscriptionManager implements DisposableBean {
     @Override
     public void destroy() {
         running = false;
+        lagPoller.shutdownNow();
         for (JetStreamSubscription sub : activeSubscriptions) {
             try {
                 sub.drain(Duration.ofSeconds(5));

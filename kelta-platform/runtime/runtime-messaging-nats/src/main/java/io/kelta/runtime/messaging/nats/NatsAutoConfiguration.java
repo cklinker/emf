@@ -1,6 +1,8 @@
 package io.kelta.runtime.messaging.nats;
 
 import io.kelta.runtime.event.PlatformEventPublisher;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -28,8 +30,12 @@ public class NatsAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(PlatformEventPublisher.class)
     public NatsEventPublisher natsEventPublisher(NatsConnectionManager connectionManager,
-                                                  ObjectMapper objectMapper) {
-        return new NatsEventPublisher(connectionManager, objectMapper);
+                                                  ObjectMapper objectMapper,
+                                                  NatsProperties properties,
+                                                  ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        return new NatsEventPublisher(connectionManager, objectMapper,
+                properties.getMaxInflightPublishes(),
+                meterRegistryProvider.getIfAvailable());
     }
 
     @Bean

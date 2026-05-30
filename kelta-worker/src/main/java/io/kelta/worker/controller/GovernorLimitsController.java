@@ -8,6 +8,7 @@ import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.listener.SystemFeatureEventPublisher;
 import io.kelta.worker.repository.GovernorLimitsRepository;
+import io.kelta.worker.service.TenantTierQuotas;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,16 +39,10 @@ public class GovernorLimitsController {
 
     private static final Logger log = LoggerFactory.getLogger(GovernorLimitsController.class);
 
-    // Default limits when tenant has empty {} or missing keys
-    private static final int DEFAULT_API_CALLS_PER_DAY = 100_000;
-    private static final int DEFAULT_STORAGE_GB = 10;
-    private static final int DEFAULT_MAX_USERS = 100;
-    private static final int DEFAULT_MAX_COLLECTIONS = 200;
-    private static final int DEFAULT_MAX_FIELDS_PER_COLLECTION = 500;
-    private static final int DEFAULT_MAX_WORKFLOWS = 50;
-    private static final int DEFAULT_MAX_REPORTS = 200;
-    private static final long DEFAULT_AI_TOKENS_PER_MONTH = 1_000_000L;
-    private static final boolean DEFAULT_AI_ENABLED = true;
+    // Tier-based defaults live in TenantTierQuotas; this controller resolves
+    // them per request via the tenant's edition. Hardcoded fall-throughs below
+    // are only used when a customer override is mid-write and the tier lookup
+    // already happened.
 
     private static final String DAILY_KEY_PREFIX = "api-calls-daily:";
     private static final String AI_TOKEN_KEY_PREFIX = "ai-tokens-monthly:";
@@ -86,7 +81,9 @@ public class GovernorLimitsController {
             @RequestHeader("X-Tenant-ID") String tenantId) {
         log.debug("GET governor-limits for tenant {}", tenantId);
 
-        Map<String, Object> limits = loadLimits(tenantId);
+        TenantLimitsView view = loadTenantLimits(tenantId);
+        Map<String, Object> limits = view.limits();
+        TenantTierQuotas.Tier tier = view.tier();
 
         // Count current usage
         int usersUsed = repository.countActiveUsers(tenantId);
@@ -103,24 +100,28 @@ public class GovernorLimitsController {
 
         // Build attributes
         Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("tier", tier.name());
         attributes.put("limits", limits);
         attributes.put("apiCallsUsed", apiCallsUsed);
-        attributes.put("apiCallsLimit", getIntOrDefault(limits, "apiCallsPerDay", DEFAULT_API_CALLS_PER_DAY));
+        attributes.put("apiCallsLimit", getNumberOrTierDefault(limits, TenantTierQuotas.KEY_API_CALLS_PER_DAY, tier));
         attributes.put("usersUsed", usersUsed);
-        attributes.put("usersLimit", getIntOrDefault(limits, "maxUsers", DEFAULT_MAX_USERS));
+        attributes.put("usersLimit", getNumberOrTierDefault(limits, TenantTierQuotas.KEY_MAX_USERS, tier));
         attributes.put("collectionsUsed", collectionsUsed);
-        attributes.put("collectionsLimit", getIntOrDefault(limits, "maxCollections", DEFAULT_MAX_COLLECTIONS));
+        attributes.put("collectionsLimit", getNumberOrTierDefault(limits, TenantTierQuotas.KEY_MAX_COLLECTIONS, tier));
         attributes.put("storageUsedBytes", storageUsedBytes);
-        attributes.put("storageGbLimit", getIntOrDefault(limits, "storageGb", DEFAULT_STORAGE_GB));
+        attributes.put("storageGbLimit", getNumberOrTierDefault(limits, TenantTierQuotas.KEY_STORAGE_GB, tier));
         attributes.put("aiTokensUsed", aiTokensUsed);
-        attributes.put("aiTokensLimit", getLongOrDefault(limits, "aiTokensPerMonth", DEFAULT_AI_TOKENS_PER_MONTH));
-        attributes.put("aiEnabled", getBooleanOrDefault(limits, "aiEnabled", DEFAULT_AI_ENABLED));
+        attributes.put("aiTokensLimit", getNumberOrTierDefault(limits, TenantTierQuotas.KEY_AI_TOKENS_PER_MONTH, tier));
+        attributes.put("aiEnabled", getBooleanOrTierDefault(limits, TenantTierQuotas.KEY_AI_ENABLED, tier));
 
-        log.info("Returning governor-limits for tenant {}: {} users, {} collections",
-                tenantId, usersUsed, collectionsUsed);
+        log.info("Returning governor-limits for tenant {} (tier {}): {} users, {} collections",
+                tenantId, tier, usersUsed, collectionsUsed);
 
         return ResponseEntity.ok(JsonApiResponseBuilder.single("governor-limits", tenantId, attributes));
     }
+
+    /** Result of resolving tenant tier + effective quotas (defaults merged with overrides). */
+    public record TenantLimitsView(TenantTierQuotas.Tier tier, Map<String, Object> limits) {}
 
     /**
      * Updates the governor limits for the current tenant.
@@ -187,78 +188,50 @@ public class GovernorLimitsController {
     // =========================================================================
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> loadLimits(String tenantId) {
-        // Check cache first
+    TenantLimitsView loadTenantLimits(String tenantId) {
+        Optional<GovernorLimitsRepository.EditionAndLimits> rowOpt = repository.findEditionAndLimits(tenantId);
+        TenantTierQuotas.Tier tier;
+        Object limitsObj;
+        if (rowOpt.isEmpty()) {
+            tier = TenantTierQuotas.Tier.PROFESSIONAL;
+            limitsObj = null;
+        } else {
+            tier = TenantTierQuotas.Tier.fromEdition(rowOpt.get().edition());
+            limitsObj = rowOpt.get().limits();
+        }
+
+        // Check cache; cached map already has tier defaults merged with overrides.
         Optional<Map<String, Object>> cached = cacheManager.getTenantLimits(tenantId);
         if (cached.isPresent()) {
-            return cached.get();
+            return new TenantLimitsView(tier, cached.get());
         }
 
-        Optional<Object> limitsOpt = repository.findTenantLimits(tenantId);
-        if (limitsOpt.isEmpty()) {
-            return buildDefaultLimits();
-        }
-
-        Object limitsObj = limitsOpt.get();
-        Map<String, Object> parsed = null;
-
-        if (limitsObj instanceof String limitsStr && !limitsStr.isBlank()) {
-            try {
-                parsed = objectMapper.readValue(limitsStr,
-                        objectMapper.getTypeFactory().constructMapType(
-                                HashMap.class, String.class, Object.class));
-            } catch (Exception e) {
-                log.warn("Failed to parse limits JSON for tenant {}: {}", tenantId, e.getMessage());
-            }
-        } else if (limitsObj instanceof Map) {
-            parsed = (Map<String, Object>) limitsObj;
-        } else {
-            // Handle PGobject and other types by converting to string first
-            String limitsStr = limitsObj.toString();
-            if (limitsStr != null && !limitsStr.isBlank()) {
-                try {
-                    parsed = objectMapper.readValue(limitsStr,
-                            objectMapper.getTypeFactory().constructMapType(
-                                    HashMap.class, String.class, Object.class));
-                } catch (Exception e) {
-                    log.warn("Failed to parse limits from {} for tenant {}: {}",
-                            limitsObj.getClass().getSimpleName(), tenantId, e.getMessage());
-                }
-            }
-        }
-
-        if (parsed == null || parsed.isEmpty()) {
-            return buildDefaultLimits();
-        }
-
-        // Fill in defaults for any missing keys
-        Map<String, Object> limits = new LinkedHashMap<>();
-        limits.put("apiCallsPerDay", getIntOrDefault(parsed, "apiCallsPerDay", DEFAULT_API_CALLS_PER_DAY));
-        limits.put("storageGb", getIntOrDefault(parsed, "storageGb", DEFAULT_STORAGE_GB));
-        limits.put("maxUsers", getIntOrDefault(parsed, "maxUsers", DEFAULT_MAX_USERS));
-        limits.put("maxCollections", getIntOrDefault(parsed, "maxCollections", DEFAULT_MAX_COLLECTIONS));
-        limits.put("maxFieldsPerCollection", getIntOrDefault(parsed, "maxFieldsPerCollection", DEFAULT_MAX_FIELDS_PER_COLLECTION));
-        limits.put("maxWorkflows", getIntOrDefault(parsed, "maxWorkflows", DEFAULT_MAX_WORKFLOWS));
-        limits.put("maxReports", getIntOrDefault(parsed, "maxReports", DEFAULT_MAX_REPORTS));
-        limits.put("aiTokensPerMonth", getLongOrDefault(parsed, "aiTokensPerMonth", DEFAULT_AI_TOKENS_PER_MONTH));
-        limits.put("aiEnabled", getBooleanOrDefault(parsed, "aiEnabled", DEFAULT_AI_ENABLED));
-
-        cacheManager.putTenantLimits(tenantId, limits);
-        return limits;
+        Map<String, Object> parsedOverrides = parseLimits(tenantId, limitsObj);
+        Map<String, Object> merged = TenantTierQuotas.mergeOverrides(tier, parsedOverrides);
+        cacheManager.putTenantLimits(tenantId, merged);
+        return new TenantLimitsView(tier, merged);
     }
 
-    private Map<String, Object> buildDefaultLimits() {
-        Map<String, Object> limits = new LinkedHashMap<>();
-        limits.put("apiCallsPerDay", DEFAULT_API_CALLS_PER_DAY);
-        limits.put("storageGb", DEFAULT_STORAGE_GB);
-        limits.put("maxUsers", DEFAULT_MAX_USERS);
-        limits.put("maxCollections", DEFAULT_MAX_COLLECTIONS);
-        limits.put("maxFieldsPerCollection", DEFAULT_MAX_FIELDS_PER_COLLECTION);
-        limits.put("maxWorkflows", DEFAULT_MAX_WORKFLOWS);
-        limits.put("maxReports", DEFAULT_MAX_REPORTS);
-        limits.put("aiTokensPerMonth", DEFAULT_AI_TOKENS_PER_MONTH);
-        limits.put("aiEnabled", DEFAULT_AI_ENABLED);
-        return limits;
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseLimits(String tenantId, Object limitsObj) {
+        if (limitsObj == null) {
+            return Map.of();
+        }
+        if (limitsObj instanceof Map<?, ?> m) {
+            return (Map<String, Object>) m;
+        }
+        String limitsStr = limitsObj instanceof String s ? s : limitsObj.toString();
+        if (limitsStr == null || limitsStr.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(limitsStr,
+                    objectMapper.getTypeFactory().constructMapType(
+                            HashMap.class, String.class, Object.class));
+        } catch (Exception e) {
+            log.warn("Failed to parse limits JSON for tenant {}: {}", tenantId, e.getMessage());
+            return Map.of();
+        }
     }
 
     /**
@@ -306,27 +279,20 @@ public class GovernorLimitsController {
         return 0L;
     }
 
-    private int getIntOrDefault(Map<String, Object> map, String key, int defaultValue) {
+    private Object getNumberOrTierDefault(Map<String, Object> map, String key, TenantTierQuotas.Tier tier) {
         Object value = map.get(key);
-        if (value instanceof Number num) {
-            return num.intValue();
+        if (value instanceof Number) {
+            return value;
         }
-        return defaultValue;
+        return TenantTierQuotas.defaultsFor(tier).get(key);
     }
 
-    private long getLongOrDefault(Map<String, Object> map, String key, long defaultValue) {
-        Object value = map.get(key);
-        if (value instanceof Number num) {
-            return num.longValue();
-        }
-        return defaultValue;
-    }
-
-    private boolean getBooleanOrDefault(Map<String, Object> map, String key, boolean defaultValue) {
+    private boolean getBooleanOrTierDefault(Map<String, Object> map, String key, TenantTierQuotas.Tier tier) {
         Object value = map.get(key);
         if (value instanceof Boolean bool) {
             return bool;
         }
-        return defaultValue;
+        Object tierDefault = TenantTierQuotas.defaultsFor(tier).get(key);
+        return tierDefault instanceof Boolean b && b;
     }
 }

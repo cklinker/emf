@@ -1,7 +1,9 @@
 package io.kelta.ai.controller;
 
 import io.kelta.ai.config.AiConfigProperties;
+import io.kelta.ai.service.AiSseMetrics;
 import io.kelta.ai.service.ChatService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,7 +41,7 @@ class ChatControllerTest {
                 30000L,
                 new AiConfigProperties.RateLimitProperties(false, 60)
         );
-        controller = new ChatController(chatService, config);
+        controller = new ChatController(chatService, config, new AiSseMetrics(new SimpleMeterRegistry()));
     }
 
     @Nested

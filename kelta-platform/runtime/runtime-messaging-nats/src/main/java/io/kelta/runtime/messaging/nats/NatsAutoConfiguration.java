@@ -55,8 +55,10 @@ public class NatsAutoConfiguration {
     @ConditionalOnMissingBean
     public NatsSubscriptionManager natsSubscriptionManager(NatsConnectionManager connectionManager,
                                                             ObjectMapper objectMapper,
-                                                            NatsTracing tracing) {
-        return new NatsSubscriptionManager(connectionManager, objectMapper, tracing);
+                                                            NatsTracing tracing,
+                                                            ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        return new NatsSubscriptionManager(connectionManager, objectMapper, tracing,
+                meterRegistryProvider.getIfAvailable());
     }
 
     @Bean

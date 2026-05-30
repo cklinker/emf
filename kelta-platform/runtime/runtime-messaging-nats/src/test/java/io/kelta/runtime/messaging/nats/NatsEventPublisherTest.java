@@ -3,11 +3,13 @@ package io.kelta.runtime.messaging.nats;
 import io.kelta.runtime.event.PlatformEvent;
 import io.nats.client.JetStream;
 import io.nats.client.api.PublishAck;
+import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
@@ -18,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -93,6 +96,24 @@ class NatsEventPublisherTest {
         assertThat(publisher.droppedCount()).isEqualTo(1L);
         assertThat(publisher.successCount()).isEqualTo(0L);
         assertThat(publisher.availableInflightPermits()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("invokes NatsTracing.inject so trace context propagates to subscribers")
+    void invokesTracingInject() throws Exception {
+        when(connectionManager.jetStream()).thenReturn(jetStream);
+        PublishAck ack = ackStub();
+        when(jetStream.publishAsync(any(NatsMessage.class)))
+                .thenReturn(CompletableFuture.completedFuture(ack));
+        NatsTracing tracing = mock(NatsTracing.class);
+        NatsEventPublisher publisher = new NatsEventPublisher(
+                connectionManager, objectMapper, 10, null, tracing);
+
+        publisher.publish("subject", event());
+
+        ArgumentCaptor<Headers> captor = ArgumentCaptor.forClass(Headers.class);
+        verify(tracing).inject(captor.capture());
+        assertThat(captor.getValue().getFirst("Nats-Msg-Id")).isEqualTo("evt-1");
     }
 
     @Test

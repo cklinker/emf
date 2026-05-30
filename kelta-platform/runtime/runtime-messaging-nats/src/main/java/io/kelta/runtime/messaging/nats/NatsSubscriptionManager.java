@@ -44,14 +44,22 @@ public class NatsSubscriptionManager implements DisposableBean {
 
     private final NatsConnectionManager connectionManager;
     private final ObjectMapper objectMapper;
+    private final NatsTracing tracing;
     private final List<EventSubscription> subscriptions = new ArrayList<>();
     private final List<JetStreamSubscription> activeSubscriptions = new ArrayList<>();
     private final ExecutorService pullExecutor = Executors.newVirtualThreadPerTaskExecutor();
     private volatile boolean running = true;
 
     public NatsSubscriptionManager(NatsConnectionManager connectionManager, ObjectMapper objectMapper) {
+        this(connectionManager, objectMapper, NatsTracing.NOOP);
+    }
+
+    public NatsSubscriptionManager(NatsConnectionManager connectionManager,
+                                   ObjectMapper objectMapper,
+                                   NatsTracing tracing) {
         this.connectionManager = connectionManager;
         this.objectMapper = objectMapper;
+        this.tracing = tracing != null ? tracing : NatsTracing.NOOP;
     }
 
     /**
@@ -99,7 +107,7 @@ public class NatsSubscriptionManager implements DisposableBean {
                 try {
                     List<Message> messages = jsSub.fetch(10, Duration.ofSeconds(1));
                     for (Message msg : messages) {
-                        try {
+                        try (NatsTracing.Scope ignored = tracing.extractAndOpen(msg.getHeaders())) {
                             String data = new String(msg.getData(), StandardCharsets.UTF_8);
                             if (!tenantEnvelopeValid(sub.name(), msg.getHeaders(), data)) {
                                 msg.ack(); // discard, don't redeliver a poisoned message
@@ -143,7 +151,7 @@ public class NatsSubscriptionManager implements DisposableBean {
                 .build();
 
         JetStreamSubscription jsSub = js.subscribe(sub.subject(), dispatcher, msg -> {
-            try {
+            try (NatsTracing.Scope ignored = tracing.extractAndOpen(msg.getHeaders())) {
                 String data = new String(msg.getData(), StandardCharsets.UTF_8);
                 if (!tenantEnvelopeValid(sub.name(), msg.getHeaders(), data)) {
                     msg.ack(); // discard, don't redeliver a poisoned message

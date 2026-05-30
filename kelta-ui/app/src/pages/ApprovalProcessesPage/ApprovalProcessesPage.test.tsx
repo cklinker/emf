@@ -3,7 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApprovalProcessesPage } from './ApprovalProcessesPage'
-import { createTestWrapper, setupAuthMocks, getMockAxiosInstance, resetMockAxios } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  getMockAxiosInstance,
+  resetMockAxios,
+} from '../../test/testUtils'
 
 vi.mock('../../components/FieldExpressionPicker', () => ({
   FieldExpressionPicker: vi.fn(

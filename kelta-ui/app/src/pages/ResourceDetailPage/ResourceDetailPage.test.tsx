@@ -200,7 +200,6 @@ vi.mock('../../components/LayoutFieldSections/LayoutFieldSections', () => ({
   LayoutFieldSections: () => <div data-testid="layout-field-sections">Layout Fields</div>,
 }))
 
-
 // Sample test data
 const mockSchema: CollectionSchema = {
   id: 'col-1',

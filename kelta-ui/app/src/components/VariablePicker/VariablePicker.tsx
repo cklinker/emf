@@ -30,7 +30,12 @@ export interface VariablePickerProps {
  * current flow state. Used by the payload mapper, JSON body editors, and any
  * other surface that wants quick variable insertion.
  */
-export function VariablePicker({ variables, onPick, trigger, raw }: VariablePickerProps): React.ReactElement {
+export function VariablePicker({
+  variables,
+  onPick,
+  trigger,
+  raw,
+}: VariablePickerProps): React.ReactElement {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState('')
 
@@ -38,9 +43,7 @@ export function VariablePicker({ variables, onPick, trigger, raw }: VariablePick
     if (!filter) return variables
     const q = filter.toLowerCase()
     return variables.filter(
-      (v) =>
-        v.path.toLowerCase().includes(q) ||
-        (v.label?.toLowerCase().includes(q) ?? false)
+      (v) => v.path.toLowerCase().includes(q) || (v.label?.toLowerCase().includes(q) ?? false)
     )
   }, [variables, filter])
 
@@ -93,9 +96,7 @@ export function VariablePicker({ variables, onPick, trigger, raw }: VariablePick
                             {v.type}
                           </span>
                         )}
-                        {v.label && (
-                          <span className="text-muted-foreground">— {v.label}</span>
-                        )}
+                        {v.label && <span className="text-muted-foreground">— {v.label}</span>}
                         <ChevronRight className="h-3 w-3 opacity-40" />
                       </button>
                     </li>
@@ -104,9 +105,7 @@ export function VariablePicker({ variables, onPick, trigger, raw }: VariablePick
               </div>
             ))}
             {filtered.length === 0 && (
-              <p className="px-2 py-3 text-xs text-muted-foreground">
-                No variables match.
-              </p>
+              <p className="px-2 py-3 text-xs text-muted-foreground">No variables match.</p>
             )}
           </div>
         </div>

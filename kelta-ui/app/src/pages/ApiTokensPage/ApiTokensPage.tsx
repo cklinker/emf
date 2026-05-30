@@ -346,6 +346,10 @@ function CreateTokenForm({
  * Mirrors the API base URL convention: VITE_API_BASE_URL when set
  * (production), otherwise the current page origin (local dev).
  */
+// Vite's react-refresh requires page modules to export only components.
+// Re-export non-component helpers below from this file so callers' import
+// paths stay stable, but mark them so the lint doesn't flag fast-refresh.
+// eslint-disable-next-line react-refresh/only-export-components
 export function resolveMcpBaseUrl(): string {
   const apiBase = import.meta.env.VITE_API_BASE_URL || ''
   if (apiBase) return apiBase
@@ -355,11 +359,12 @@ export function resolveMcpBaseUrl(): string {
   return ''
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function buildMcpAddCommand(
   profile: 'user' | 'admin',
   mcpBaseUrl: string,
   tenantSlug: string,
-  token: string,
+  token: string
 ): string {
   // Slug binds the URL to a tenant (matches the platform-wide /{slug}/...
   // convention). Different PAT in a different tenant → different URL.
@@ -484,10 +489,10 @@ function TokenCreatedDialog({
             <div>
               <h3 className="text-sm font-semibold text-foreground">Use with Claude Code</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Run one or both of these in a terminal to register Kelta as an MCP server.
-                The <code className="font-mono">/mcp/user</code> endpoint exposes data-plane
-                tools (CRUD, flows, approvals); <code className="font-mono">/mcp/admin</code>{' '}
-                exposes control-plane tools (collection / layout / flow definition).
+                Run one or both of these in a terminal to register Kelta as an MCP server. The{' '}
+                <code className="font-mono">/mcp/user</code> endpoint exposes data-plane tools
+                (CRUD, flows, approvals); <code className="font-mono">/mcp/admin</code> exposes
+                control-plane tools (collection / layout / flow definition).
               </p>
             </div>
             <CopyableCommandBlock

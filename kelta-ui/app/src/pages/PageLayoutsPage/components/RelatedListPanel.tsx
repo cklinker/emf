@@ -350,7 +350,11 @@ export function RelatedListPanel(): React.ReactElement {
   // remaining displayable fields in their natural order. Computed each render
   // so we don't need an effect to reconcile when fields load or change.
   const displayOrder = useMemo(
-    () => computeDisplayOrder(displayableFields.map((f) => f.name), orderedFieldNames),
+    () =>
+      computeDisplayOrder(
+        displayableFields.map((f) => f.name),
+        orderedFieldNames
+      ),
     [displayableFields, orderedFieldNames]
   )
 

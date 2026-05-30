@@ -16,7 +16,7 @@
  * - Loading states
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Save, X, Loader2, AlertCircle } from 'lucide-react'
@@ -434,10 +434,7 @@ function ObjectFormBody({
   // Layout client-side rules engine: compute/validate/default/transform rules
   // attached to the resolved layout. The engine is no-op when the layout has
   // no rules (engine.enabled === false).
-  const layoutRules = useMemo(
-    () => dtosToLayoutRules(layout?.rules, ''),
-    [layout?.rules],
-  )
+  const layoutRules = useMemo(() => dtosToLayoutRules(layout?.rules, ''), [layout?.rules])
   const setFieldValueForEngine = useCallback((name: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }, [])
@@ -504,9 +501,12 @@ function ObjectFormBody({
   // Handle field change. Use a functional ref of the latest values so we can
   // pass the post-mutation map directly to the engine — without that, the
   // engine reads stale values because setFormData is async and useLayoutRules'
-  // valuesRef only refreshes on the next render.
+  // valuesRef only refreshes on the next render. Sync the ref via effect to
+  // satisfy react-hooks/refs (no direct .current = during render).
   const formDataRef = useRef(formData)
-  formDataRef.current = formData
+  useEffect(() => {
+    formDataRef.current = formData
+  }, [formData])
   const handleFieldChange = useCallback(
     (name: string, value: unknown) => {
       const next = { ...formDataRef.current, [name]: value }

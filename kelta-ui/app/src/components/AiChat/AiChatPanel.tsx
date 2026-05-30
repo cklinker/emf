@@ -35,7 +35,10 @@ interface RawHistoryMessage {
   createdAt: string
 }
 
-function rehydrateMessages(raw: RawHistoryMessage[]): { messages: ChatMessageType[]; proposals: AiProposal[] } {
+function rehydrateMessages(raw: RawHistoryMessage[]): {
+  messages: ChatMessageType[]
+  proposals: AiProposal[]
+} {
   const messages: ChatMessageType[] = []
   const proposals: AiProposal[] = []
 
@@ -155,7 +158,9 @@ export function AiChatPanel({
         const token = await getAccessToken()
         const headers: Record<string, string> = {}
         if (token) headers['Authorization'] = `Bearer ${token}`
-        const response = await fetch(`${baseUrl}/api/ai/conversations/${convId}/messages`, { headers })
+        const response = await fetch(`${baseUrl}/api/ai/conversations/${convId}/messages`, {
+          headers,
+        })
         if (!response.ok) return
         const body = await response.json()
         const raw = (body.messages ?? []) as RawHistoryMessage[]

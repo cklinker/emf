@@ -32,7 +32,12 @@ describe('RulesEditor', () => {
 
   it('renders empty state when no rules exist', async () => {
     renderWithProviders(
-      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={['quantity', 'unit_price']} onClose={() => {}} />,
+      <RulesEditor
+        layoutId="lay-1"
+        layoutName="Edit"
+        fieldNames={['quantity', 'unit_price']}
+        onClose={() => {}}
+      />
     )
     await waitFor(() => expect(screen.getByText(/No rules yet/i)).toBeInTheDocument())
   })
@@ -40,22 +45,25 @@ describe('RulesEditor', () => {
   it('opens compute draft and validates formula syntax live', async () => {
     const user = userEvent.setup()
     renderWithProviders(
-      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={['quantity', 'unit_price']} onClose={() => {}} />,
+      <RulesEditor
+        layoutId="lay-1"
+        layoutName="Edit"
+        fieldNames={['quantity', 'unit_price']}
+        onClose={() => {}}
+      />
     )
     await waitFor(() => screen.getByTestId('rules-editor-add-compute'))
     await user.click(screen.getByTestId('rules-editor-add-compute'))
 
     const formula = screen.getByTestId('rule-formula-input')
     await user.type(formula, '1 + +')
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(/Unexpected/i),
-    )
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/Unexpected/i))
   })
 
   it('save is disabled until required fields are filled', async () => {
     const user = userEvent.setup()
     renderWithProviders(
-      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={[]} onClose={() => {}} />,
+      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={[]} onClose={() => {}} />
     )
     await waitFor(() => screen.getByTestId('rules-editor-add-compute'))
     await user.click(screen.getByTestId('rules-editor-add-compute'))
@@ -82,7 +90,12 @@ describe('RulesEditor', () => {
 
     const user = userEvent.setup()
     renderWithProviders(
-      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={['fa', 'fb']} onClose={() => {}} />,
+      <RulesEditor
+        layoutId="lay-1"
+        layoutName="Edit"
+        fieldNames={['fa', 'fb']}
+        onClose={() => {}}
+      />
     )
     await waitFor(() => screen.getByTestId('rules-editor-rule-r1'))
     await user.click(screen.getByTestId('rules-editor-add-compute'))
@@ -98,7 +111,7 @@ describe('RulesEditor', () => {
     apiClientMock.post.mockResolvedValue({})
     const user = userEvent.setup()
     renderWithProviders(
-      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={[]} onClose={() => {}} />,
+      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={[]} onClose={() => {}} />
     )
     await waitFor(() => screen.getByTestId('rules-editor-add-compute'))
     await user.click(screen.getByTestId('rules-editor-add-compute'))

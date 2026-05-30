@@ -23,11 +23,7 @@ function makeProposal(overrides: Partial<AiProposal> = {}): AiProposal {
 describe('AddFieldsProposalCard', () => {
   it('renders the target collection and field rows for a pending proposal', () => {
     render(
-      <AddFieldsProposalCard
-        proposal={makeProposal()}
-        onApply={vi.fn()}
-        onDismiss={vi.fn()}
-      />
+      <AddFieldsProposalCard proposal={makeProposal()} onApply={vi.fn()} onDismiss={vi.fn()} />
     )
     expect(screen.getByText('Add fields')).toBeInTheDocument()
     expect(screen.getByText('→ customers')).toBeInTheDocument()

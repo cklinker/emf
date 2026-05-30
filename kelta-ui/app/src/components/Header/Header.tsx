@@ -49,6 +49,9 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
     if (typeof window === 'undefined') return
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`)
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    // Initial sync — useState initializer reads window.innerWidth, but the
+    // media query may classify differently. Subscribe-via-callback pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobile(mql.matches)
     mql.addEventListener('change', handler)
     return () => mql.removeEventListener('change', handler)

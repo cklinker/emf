@@ -82,13 +82,25 @@ export function PayloadMapper({
       {header}
 
       <div className="flex items-center gap-2">
-        <ViewTab active={view === 'visual'} onClick={() => setView('visual')} icon={<FormInput className="h-3.5 w-3.5" />}>
+        <ViewTab
+          active={view === 'visual'}
+          onClick={() => setView('visual')}
+          icon={<FormInput className="h-3.5 w-3.5" />}
+        >
           Visual
         </ViewTab>
-        <ViewTab active={view === 'code'} onClick={() => setView('code')} icon={<Code2 className="h-3.5 w-3.5" />}>
+        <ViewTab
+          active={view === 'code'}
+          onClick={() => setView('code')}
+          icon={<Code2 className="h-3.5 w-3.5" />}
+        >
           Code
         </ViewTab>
-        <ViewTab active={view === 'preview'} onClick={() => setView('preview')} icon={<Eye className="h-3.5 w-3.5" />}>
+        <ViewTab
+          active={view === 'preview'}
+          onClick={() => setView('preview')}
+          icon={<Eye className="h-3.5 w-3.5" />}
+        >
           Preview
         </ViewTab>
       </div>
@@ -247,7 +259,9 @@ function CodeView({
   const [text, setText] = useState(() => JSON.stringify(template, null, 2))
   const [error, setError] = useState<string | null>(null)
 
+  // Resync editor text when parent passes a new template shape.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setText(JSON.stringify(template, null, 2))
   }, [JSON.stringify(template)])
 
@@ -274,8 +288,8 @@ function CodeView({
       />
       {error && <p className="text-xs text-red-600">{error}</p>}
       <p className="text-xs text-muted-foreground">
-        Strings starting with <code>=</code> are evaluated as JSONata; everything else flows
-        through <code>${'${$.path}'}</code> substitution.
+        Strings starting with <code>=</code> are evaluated as JSONata; everything else flows through{' '}
+        <code>${'${$.path}'}</code> substitution.
       </p>
     </div>
   )
@@ -320,8 +334,8 @@ function PreviewView({
           {resolved ? JSON.stringify(resolved, null, 2) : '— invalid sample state —'}
         </pre>
         <p className="text-xs text-muted-foreground">
-          Preview resolves <code>${'${$.path}'}</code> tokens client-side. JSONata expressions
-          are not evaluated here — they're only run by the worker.
+          Preview resolves <code>${'${$.path}'}</code> tokens client-side. JSONata expressions are
+          not evaluated here — they're only run by the worker.
         </p>
       </div>
     </div>
@@ -345,7 +359,10 @@ function sampleValueFor(v: SourceVariable): unknown {
 }
 
 function setSamplePath(target: Record<string, unknown>, path: string, value: unknown) {
-  const segments = path.replace(/^\$\.?/, '').split('.').filter(Boolean)
+  const segments = path
+    .replace(/^\$\.?/, '')
+    .split('.')
+    .filter(Boolean)
   if (segments.length === 0) return
   let cursor: Record<string, unknown> = target
   for (let i = 0; i < segments.length - 1; i++) {

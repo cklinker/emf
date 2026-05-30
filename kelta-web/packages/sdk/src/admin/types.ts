@@ -2,7 +2,7 @@
  * Admin/Control Plane types
  */
 
-import type { AuthzConfig } from '../types';
+import type { AuthzConfig, ValidationRule } from '../types';
 
 /**
  * Collection definition for admin operations
@@ -102,6 +102,12 @@ export interface FieldDefinition {
   active?: boolean;
   description?: string;
   constraints?: string;
+  /**
+   * Per-field validation rules. Distinct from the schema-level
+   * {@code validation} module — these run client-side before submit and
+   * are also enforced server-side by the worker.
+   */
+  validation?: ValidationRule[];
   relationshipType?: 'LOOKUP' | 'MASTER_DETAIL';
   relationshipName?: string;
   cascadeDelete?: boolean;

@@ -31,9 +31,7 @@ describe('RemoveFieldProposalCard', () => {
 
   it('renders applied state without action buttons', () => {
     const applied: AiProposal = { ...makeProposal(), status: 'applied' }
-    render(
-      <RemoveFieldProposalCard proposal={applied} onApply={vi.fn()} onDismiss={vi.fn()} />
-    )
+    render(<RemoveFieldProposalCard proposal={applied} onApply={vi.fn()} onDismiss={vi.fn()} />)
     expect(screen.getByText('Removed')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Remove field/ })).not.toBeInTheDocument()
   })

@@ -42,9 +42,7 @@ import { getTenantSlug, setResolvedTenantId, getResolvedTenantId } from './Tenan
  * are passed as an idp_hint so kelta-auth handles the federation server-side
  * and mints a platform-issued token.
  */
-function findInternalProvider(
-  providers: OIDCProviderSummary[]
-): OIDCProviderSummary | undefined {
+function findInternalProvider(providers: OIDCProviderSummary[]): OIDCProviderSummary | undefined {
   return providers.find((p) => p.isInternal === true)
 }
 

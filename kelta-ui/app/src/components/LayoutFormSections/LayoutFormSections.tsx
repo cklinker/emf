@@ -75,7 +75,7 @@ function resolvePlacements(
   fieldsById: Map<string, LayoutFormFieldDefinition>,
   columns: number,
   record: Record<string, unknown> | undefined,
-  isComputed?: (fieldName: string) => boolean,
+  isComputed?: (fieldName: string) => boolean
 ): ResolvedField[] {
   const visiblePlacements = record
     ? placements.filter((p) => isVisible(p.visibilityRule, record))
@@ -235,7 +235,7 @@ export function LayoutFormSections({
         fieldsById,
         section.columns || 1,
         record,
-        isComputed,
+        isComputed
       )
       result.push({ section, resolved, startIndex: acc })
       return acc + resolved.length

@@ -58,15 +58,11 @@ export function CallApiParams({ parameters, onUpdate }: CallApiParamsProps) {
 
   const update = (next: Record<string, unknown>) => onUpdate({ ...params, ...next })
 
-  const [headerEntries, setHeaderEntries] = useState<KeyValue[]>(() =>
-    toEntries(params.headers)
-  )
+  const [headerEntries, setHeaderEntries] = useState<KeyValue[]>(() => toEntries(params.headers))
   const [pathParamEntries, setPathParamEntries] = useState<KeyValue[]>(() =>
     toEntries(params.pathParams)
   )
-  const [queryEntries, setQueryEntries] = useState<KeyValue[]>(() =>
-    toEntries(params.queryParams)
-  )
+  const [queryEntries, setQueryEntries] = useState<KeyValue[]>(() => toEntries(params.queryParams))
 
   const updateHeaders = (entries: KeyValue[]) => {
     setHeaderEntries(entries)
@@ -89,20 +85,11 @@ export function CallApiParams({ parameters, onUpdate }: CallApiParamsProps) {
     <div className="space-y-4">
       <div className="space-y-1">
         <FieldLabel>Mode</FieldLabel>
-        <div
-          role="tablist"
-          className="grid grid-cols-2 rounded-md border p-1 text-sm bg-muted/30"
-        >
-          <ModeTab
-            active={mode === 'operation'}
-            onClick={() => update({ mode: 'operation' })}
-          >
+        <div role="tablist" className="grid grid-cols-2 rounded-md border p-1 text-sm bg-muted/30">
+          <ModeTab active={mode === 'operation'} onClick={() => update({ mode: 'operation' })}>
             From OpenAPI spec
           </ModeTab>
-          <ModeTab
-            active={mode === 'raw'}
-            onClick={() => update({ mode: 'raw' })}
-          >
+          <ModeTab active={mode === 'raw'} onClick={() => update({ mode: 'raw' })}>
             Ad-hoc (Postman)
           </ModeTab>
         </div>
@@ -116,10 +103,7 @@ export function CallApiParams({ parameters, onUpdate }: CallApiParamsProps) {
       {mode === 'operation' ? (
         <Card className="bg-muted/20">
           <CardContent className="space-y-3 p-3">
-            <SpecPicker
-              value={specId}
-              onChange={(id) => update({ specId: id, operationId: '' })}
-            />
+            <SpecPicker value={specId} onChange={(id) => update({ specId: id, operationId: '' })} />
             {specId && (
               <OperationPicker
                 specId={specId}
@@ -165,10 +149,7 @@ export function CallApiParams({ parameters, onUpdate }: CallApiParamsProps) {
         </Card>
       )}
 
-      <CredentialPicker
-        value={credentialId}
-        onChange={(id) => update({ credentialRef: id })}
-      />
+      <CredentialPicker value={credentialId} onChange={(id) => update({ credentialRef: id })} />
 
       {mode === 'operation' && (
         <KeyValueList
@@ -223,8 +204,8 @@ export function CallApiParams({ parameters, onUpdate }: CallApiParamsProps) {
           placeholder={'{ "name": "${$.record.data.name}" }'}
         />
         <p className="text-xs text-muted-foreground">
-          Strings starting with <code className="font-mono">=</code> are evaluated as
-          JSONata; everything else flows through <code className="font-mono">${'${$.path}'}</code>{' '}
+          Strings starting with <code className="font-mono">=</code> are evaluated as JSONata;
+          everything else flows through <code className="font-mono">${'${$.path}'}</code>{' '}
           substitution.
         </p>
       </div>
@@ -265,8 +246,8 @@ export function CallApiParams({ parameters, onUpdate }: CallApiParamsProps) {
               className="font-mono text-xs"
             />
             <p className="text-xs text-muted-foreground">
-              When set, the platform sends an Idempotency-Key header upstream and replays
-              cached responses on retry.
+              When set, the platform sends an Idempotency-Key header upstream and replays cached
+              responses on retry.
             </p>
           </div>
         </div>

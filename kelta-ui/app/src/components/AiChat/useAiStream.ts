@@ -154,7 +154,8 @@ export function useAiStream() {
                     break
                   }
                   case 'tool_result': {
-                    const status = (parsed.status as ToolCallStatus | undefined) ??
+                    const status =
+                      (parsed.status as ToolCallStatus | undefined) ??
                       (parsed.isError ? 'error' : 'done')
                     dispatch({
                       type: 'UPDATE_TOOL_CALL_STATUS',

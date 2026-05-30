@@ -14,31 +14,21 @@ describe('buildMcpAddCommand', () => {
       'user',
       'https://emf.rzware.com',
       'threadline-clothing',
-      'klt_abc123',
+      'klt_abc123'
     )
     expect(cmd).toBe(
-      "claude mcp add kelta-user --transport http --url https://emf.rzware.com/threadline-clothing/mcp/user --header 'Authorization: Bearer klt_abc123'",
+      "claude mcp add kelta-user --transport http --url https://emf.rzware.com/threadline-clothing/mcp/user --header 'Authorization: Bearer klt_abc123'"
     )
   })
 
   it('builds an admin-profile command at the right slug-prefixed URL', () => {
-    const cmd = buildMcpAddCommand(
-      'admin',
-      'https://emf.rzware.com',
-      'another-tenant',
-      'klt_xyz',
-    )
+    const cmd = buildMcpAddCommand('admin', 'https://emf.rzware.com', 'another-tenant', 'klt_xyz')
     expect(cmd).toContain('--url https://emf.rzware.com/another-tenant/mcp/admin')
     expect(cmd).toContain('kelta-admin')
   })
 
   it('uses single quotes around the auth header so the token is opaque to the shell', () => {
-    const cmd = buildMcpAddCommand(
-      'user',
-      'https://emf.rzware.com',
-      't',
-      'klt_token_with$pecial',
-    )
+    const cmd = buildMcpAddCommand('user', 'https://emf.rzware.com', 't', 'klt_token_with$pecial')
     expect(cmd).toContain("'Authorization: Bearer klt_token_with$pecial'")
   })
 })

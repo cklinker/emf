@@ -135,7 +135,7 @@ describe('telemetry', () => {
         filename: 'app.js',
         lineno: 10,
         colno: 5,
-      }),
+      })
     )
 
     expect(startSpanMock).toHaveBeenCalledWith(
@@ -146,12 +146,10 @@ describe('telemetry', () => {
           'error.lineno': '10',
           'error.colno': '5',
         }),
-      }),
+      })
     )
     expect(recordExceptionMock).toHaveBeenCalledWith(err)
-    expect(setStatusMock).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 2 }),
-    )
+    expect(setStatusMock).toHaveBeenCalledWith(expect.objectContaining({ code: 2 }))
     expect(endMock).toHaveBeenCalled()
   })
 
@@ -166,10 +164,7 @@ describe('telemetry', () => {
     Object.defineProperty(event, 'promise', { value: Promise.resolve() })
     window.dispatchEvent(event)
 
-    expect(startSpanMock).toHaveBeenCalledWith(
-      'browser.unhandled_rejection',
-      expect.any(Object),
-    )
+    expect(startSpanMock).toHaveBeenCalledWith('browser.unhandled_rejection', expect.any(Object))
     expect(recordExceptionMock).toHaveBeenCalledWith(reason)
   })
 })

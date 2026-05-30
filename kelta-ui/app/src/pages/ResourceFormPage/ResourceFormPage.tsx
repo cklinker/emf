@@ -11,7 +11,7 @@
  * - 12.4: Use custom field renderers when registered, fall back to defaults
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
@@ -372,10 +372,7 @@ export function ResourceFormPage({
   // Convert raw layout-rules DTOs into the typed LayoutRule[] the engine
   // consumes. Memoized on the rules array so the engine memo inside
   // useLayoutRules is stable and doesn't rebuild every render.
-  const layoutRules = useMemo(
-    () => dtosToLayoutRules(layout?.rules, ''),
-    [layout?.rules],
-  )
+  const layoutRules = useMemo(() => dtosToLayoutRules(layout?.rules, ''), [layout?.rules])
 
   // Mirror collection-wide validation rules with enforce_on_client = true so
   // the form can show inline errors live and block submission for ERROR
@@ -388,7 +385,7 @@ export function ResourceFormPage({
       if (!schema?.id) return []
       try {
         return await apiClient.getList<import('@kelta/sdk').CollectionValidationRule>(
-          `/api/validation-rules?filter[collectionId][eq]=${schema.id}&filter[active][eq]=true&filter[enforceOnClient][eq]=true&page[size]=100`,
+          `/api/validation-rules?filter[collectionId][eq]=${schema.id}&filter[active][eq]=true&filter[enforceOnClient][eq]=true&page[size]=100`
         )
       } catch {
         return []
@@ -966,9 +963,12 @@ export function ResourceFormPage({
   // Mirror formData in a ref so handleFieldChange can compute the post-mutation
   // values map and pass it straight into the engine, bypassing the
   // useState/useRef async-update race that would otherwise have the engine
-  // evaluate against stale values.
+  // evaluate against stale values. Updated in an effect (not during render)
+  // to satisfy react-hooks/refs.
   const formDataRef = useRef(formData)
-  formDataRef.current = formData
+  useEffect(() => {
+    formDataRef.current = formData
+  }, [formData])
 
   const handleFieldChange = useCallback(
     (fieldName: string, value: unknown) => {
@@ -995,7 +995,7 @@ export function ResourceFormPage({
     (fieldName: string) => {
       ruleEngine.onFieldBlur(fieldName, formDataRef.current)
     },
-    [ruleEngine],
+    [ruleEngine]
   )
 
   /**
@@ -1015,10 +1015,7 @@ export function ResourceFormPage({
       // allow the submit to proceed.
       const ruleResult = ruleEngine.runBeforeSave()
       if (ruleResult.blocked) {
-        showToast(
-          ruleResult.violations[0]?.message ?? t('errors.validation'),
-          'error',
-        )
+        showToast(ruleResult.violations[0]?.message ?? t('errors.validation'), 'error')
         return
       }
 
@@ -1096,7 +1093,17 @@ export function ResourceFormPage({
         createMutation.mutate(submitData)
       }
     },
-    [validateForm, sortedFields, formData, isEditMode, updateMutation, createMutation, showToast, t, ruleEngine]
+    [
+      validateForm,
+      sortedFields,
+      formData,
+      isEditMode,
+      updateMutation,
+      createMutation,
+      showToast,
+      t,
+      ruleEngine,
+    ]
   )
 
   /**

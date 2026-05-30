@@ -36,6 +36,15 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- RestClient autoconfig — provides Spring-managed RestClient.Builder
+             bean that OTel/Observation customizers attach to. Spring Boot 4 split
+             this out of spring-boot-autoconfigure; without it RestClient.Builder
+             is not exposed and @Autowired injection fails. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-restclient</artifactId>
+        </dependency>
+
         <!-- Spring Security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

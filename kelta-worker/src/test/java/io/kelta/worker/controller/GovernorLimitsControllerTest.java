@@ -82,7 +82,7 @@ class GovernorLimitsControllerTest {
         @Test
         @DisplayName("Should return JSON:API envelope with type and id")
         void returnsJsonApiEnvelope() {
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{}"));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{}")));
             when(repository.countActiveUsers("tenant-1")).thenReturn(0);
             when(repository.countActiveCollections("tenant-1")).thenReturn(0);
 
@@ -99,7 +99,7 @@ class GovernorLimitsControllerTest {
         @Test
         @DisplayName("Should return default limits when tenant has empty limits")
         void returnsDefaultLimitsWhenEmpty() {
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{}"));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{}")));
             when(repository.countActiveUsers("tenant-1")).thenReturn(5);
             when(repository.countActiveCollections("tenant-1")).thenReturn(12);
 
@@ -130,7 +130,7 @@ class GovernorLimitsControllerTest {
         @DisplayName("Should return configured limits from tenant")
         void returnsConfiguredLimits() {
             String limitsJson = "{\"apiCallsPerDay\":50000,\"storageGb\":50,\"maxUsers\":500,\"maxCollections\":100,\"maxFieldsPerCollection\":1000,\"maxWorkflows\":200,\"maxReports\":500}";
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of(limitsJson));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", limitsJson)));
             when(repository.countActiveUsers("tenant-1")).thenReturn(25);
             when(repository.countActiveCollections("tenant-1")).thenReturn(8);
 
@@ -155,7 +155,7 @@ class GovernorLimitsControllerTest {
         @DisplayName("Should fill defaults for missing limit keys")
         void fillsDefaultsForMissingKeys() {
             String limitsJson = "{\"apiCallsPerDay\":75000}";
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of(limitsJson));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", limitsJson)));
             when(repository.countActiveUsers("tenant-1")).thenReturn(0);
             when(repository.countActiveCollections("tenant-1")).thenReturn(0);
 
@@ -172,7 +172,7 @@ class GovernorLimitsControllerTest {
         @Test
         @DisplayName("Should handle tenant not found")
         void handlesTenantNotFound() {
-            when(repository.findTenantLimits("nonexistent")).thenReturn(Optional.empty());
+            when(repository.findEditionAndLimits("nonexistent")).thenReturn(Optional.empty());
             when(repository.countActiveUsers("nonexistent")).thenReturn(0);
             when(repository.countActiveCollections("nonexistent")).thenReturn(0);
 
@@ -187,7 +187,7 @@ class GovernorLimitsControllerTest {
         @Test
         @DisplayName("Should handle malformed limits JSON")
         void handlesMalformedJson() {
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{invalid}"));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{invalid}")));
             when(repository.countActiveUsers("tenant-1")).thenReturn(3);
             when(repository.countActiveCollections("tenant-1")).thenReturn(5);
 
@@ -207,7 +207,7 @@ class GovernorLimitsControllerTest {
             limitsMap.put("apiCallsPerDay", 60000);
             limitsMap.put("maxUsers", 250);
 
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of(limitsMap));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", limitsMap)));
             when(repository.countActiveUsers("tenant-1")).thenReturn(10);
             when(repository.countActiveCollections("tenant-1")).thenReturn(20);
 
@@ -232,7 +232,7 @@ class GovernorLimitsControllerTest {
                 }
             };
 
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of(pgObjectLike));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", pgObjectLike)));
             when(repository.countActiveUsers("tenant-1")).thenReturn(10);
             when(repository.countActiveCollections("tenant-1")).thenReturn(5);
 
@@ -248,9 +248,68 @@ class GovernorLimitsControllerTest {
         }
 
         @Test
+        @DisplayName("Should return FREE-tier defaults and tier=FREE in response")
+        void returnsFreeTierDefaults() {
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(
+                    Optional.of(new GovernorLimitsRepository.EditionAndLimits("FREE", "{}")));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(2);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(3);
+
+            ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
+
+            Map<String, Object> attrs = getAttributes(response.getBody());
+            assertThat(attrs.get("tier")).isEqualTo("FREE");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> limits = (Map<String, Object>) attrs.get("limits");
+            assertThat(limits.get("maxUsers")).isEqualTo(5);
+            assertThat(limits.get("maxCollections")).isEqualTo(10);
+            assertThat(limits.get("aiEnabled")).isEqualTo(false);
+            assertThat(attrs.get("aiEnabled")).isEqualTo(false);
+        }
+
+        @Test
+        @DisplayName("Should return ENTERPRISE-tier defaults and tier=ENTERPRISE in response")
+        void returnsEnterpriseTierDefaults() {
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(
+                    Optional.of(new GovernorLimitsRepository.EditionAndLimits("ENTERPRISE", "{}")));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(0);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(0);
+
+            ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
+
+            Map<String, Object> attrs = getAttributes(response.getBody());
+            assertThat(attrs.get("tier")).isEqualTo("ENTERPRISE");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> limits = (Map<String, Object>) attrs.get("limits");
+            assertThat(limits.get("maxUsers")).isEqualTo(1_000);
+            assertThat(limits.get("maxCollections")).isEqualTo(2_000);
+            assertThat(limits.get("aiTokensPerMonth")).isEqualTo(10_000_000L);
+        }
+
+        @Test
+        @DisplayName("Should let tenant overrides win over tier defaults")
+        void tenantOverrideWinsOverTierDefault() {
+            // FREE tier default for maxUsers is 5; override to 50 should win
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(
+                    Optional.of(new GovernorLimitsRepository.EditionAndLimits("FREE", "{\"maxUsers\":50}")));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(0);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(0);
+
+            ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
+
+            Map<String, Object> attrs = getAttributes(response.getBody());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> limits = (Map<String, Object>) attrs.get("limits");
+            // Override wins
+            assertThat(limits.get("maxUsers")).isEqualTo(50);
+            // Untouched key falls back to FREE default
+            assertThat(limits.get("maxCollections")).isEqualTo(10);
+        }
+
+        @Test
         @DisplayName("Should return zero apiCallsUsed when Redis key is absent")
         void returnsZeroApiCallsUsedWhenRedisEmpty() {
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{}"));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{}")));
             when(repository.countActiveUsers("tenant-1")).thenReturn(0);
             when(repository.countActiveCollections("tenant-1")).thenReturn(0);
 
@@ -262,7 +321,7 @@ class GovernorLimitsControllerTest {
         @Test
         @DisplayName("Should return daily API call count from Redis")
         void returnsDailyApiCallCountFromRedis() {
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{}"));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{}")));
             when(repository.countActiveUsers("tenant-1")).thenReturn(0);
             when(repository.countActiveCollections("tenant-1")).thenReturn(0);
 
@@ -277,7 +336,7 @@ class GovernorLimitsControllerTest {
         @Test
         @DisplayName("Should return zero when Redis throws exception")
         void returnsZeroWhenRedisThrows() {
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{}"));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{}")));
             when(repository.countActiveUsers("tenant-1")).thenReturn(0);
             when(repository.countActiveCollections("tenant-1")).thenReturn(0);
 
@@ -309,7 +368,7 @@ class GovernorLimitsControllerTest {
 
             // Mock re-read for response
             String updatedJson = "{\"apiCallsPerDay\":200000,\"storageGb\":100,\"maxUsers\":1000,\"maxCollections\":500,\"maxFieldsPerCollection\":1000,\"maxWorkflows\":100,\"maxReports\":400}";
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of(updatedJson));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", updatedJson)));
             when(repository.countActiveUsers("tenant-1")).thenReturn(50);
             when(repository.countActiveCollections("tenant-1")).thenReturn(30);
 
@@ -332,7 +391,7 @@ class GovernorLimitsControllerTest {
             Map<String, Object> newLimits = new LinkedHashMap<>();
             newLimits.put("apiCallsPerDay", 200_000);
 
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{\"apiCallsPerDay\":200000}"));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{\"apiCallsPerDay\":200000}")));
             when(repository.countActiveUsers("tenant-1")).thenReturn(0);
             when(repository.countActiveCollections("tenant-1")).thenReturn(0);
 
@@ -359,7 +418,7 @@ class GovernorLimitsControllerTest {
             doThrow(new RuntimeException("Kafka is down"))
                     .when(recordEventPublisher).publish(any());
 
-            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{\"apiCallsPerDay\":200000}"));
+            when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{\"apiCallsPerDay\":200000}")));
             when(repository.countActiveUsers("tenant-1")).thenReturn(0);
             when(repository.countActiveCollections("tenant-1")).thenReturn(0);
 

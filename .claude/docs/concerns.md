@@ -53,6 +53,23 @@
 
 - Multiple BOM version overrides in worker POM increase transitive conflict risk (`kelta-worker/pom.xml`)
 
+## Connection Pooler Compatibility
+
+**RLS tenant variable is session-scoped, not transaction-scoped:**
+- `TenantAwareDataSourceConfig` issues `SET app.current_tenant_id = '<id>'` on every connection borrowed from HikariCP. This is a Postgres **session** setting that persists until the connection is closed or reset.
+- File: `kelta-worker/src/main/java/io/kelta/worker/config/TenantAwareDataSourceConfig.java` (line 89)
+- Also: `kelta-ai/src/main/resources/application.yml` (`hikari.connection-init-sql: SET app.current_tenant_id = ''`)
+
+**Impact under PgBouncer transaction-pool mode:**
+- PgBouncer's `pool_mode = transaction` returns a different physical Postgres connection per transaction. Session state set on a prior transaction is lost — RLS `current_setting('app.current_tenant_id', true)` returns the empty default, and the `admin_bypass` policy hits, returning rows for **all tenants**.
+- This is a tenant-isolation correctness bug, not just a perf issue.
+
+**Required configuration when deploying PgBouncer:**
+- Set `pool_mode = session` for all kelta workloads (worker, auth, ai). Lower pooling efficiency than transaction mode but preserves session state. Or:
+- Migrate every tenant-scoped DB callsite to issue `SET LOCAL app.current_tenant_id = '<id>'` inside an explicit transaction (requires refactor of all `JdbcTemplate` auto-commit calls + audit of `@Transactional` boundaries).
+
+**Followup**: dedicated rewrite to `SET LOCAL`-inside-transaction is tracked under Tier-2 DB scaling work.
+
 ## Test Coverage Gaps
 
 - Federated user provisioning (`FederatedUserMapper`) — no tests

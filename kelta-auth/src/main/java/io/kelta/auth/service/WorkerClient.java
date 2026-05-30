@@ -29,6 +29,7 @@ public class WorkerClient {
 
     public WorkerClient(AuthProperties properties,
                         ObjectMapper objectMapper,
+                        RestClient.Builder restClientBuilder,
                         @Value("${kelta.internal.token:}") String internalToken,
                         @Autowired(required = false) @Qualifier("internalWorkerRestClient")
                         @Nullable RestClient internalRestClient) {
@@ -37,11 +38,17 @@ public class WorkerClient {
         // that attaches a bearer token to every /internal/** request. Fall back
         // to a plain RestClient otherwise so the service keeps working while
         // the flag is off or during rollout.
+        //
+        // Both paths now use the Spring-managed RestClient.Builder bean rather
+        // than RestClient.builder() static factory: the managed bean is
+        // auto-instrumented by Spring Boot's OTel starter so outbound calls
+        // get traceparent headers and a CLIENT span. The static factory does
+        // not, which previously broke the gateway→auth→worker trace.
         if (internalRestClient != null) {
             log.info("WorkerClient using OAuth2 client_credentials for /internal/** calls");
             this.restClient = internalRestClient;
         } else {
-            this.restClient = RestClient.builder()
+            this.restClient = restClientBuilder
                     .baseUrl(properties.getWorkerUrl())
                     .build();
         }

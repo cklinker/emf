@@ -929,7 +929,8 @@
     "maxReports": "Maximale Berichte",
     "editLimits": "Limits bearbeiten",
     "saveSuccess": "Governor Limits erfolgreich aktualisiert.",
-    "saveError": "Governor Limits konnten nicht aktualisiert werden."
+    "saveError": "Governor Limits konnten nicht aktualisiert werden.",
+    "tierTooltip": "Mandantenstufe — bestimmt Standardkontingente vor mandantenspezifischen Überschreibungen."
   },
   "metrics": {
     "title": "Metriken",

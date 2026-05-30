@@ -53,6 +53,33 @@
 
 - Multiple BOM version overrides in worker POM increase transitive conflict risk (`kelta-worker/pom.xml`)
 
+## Postgres max_connections sizing
+
+**Current state (homelab):**
+- Single Postgres at `192.168.0.5:5432`, default `max_connections = 100`.
+- Per-pod HikariCP defaults after [#917](https://github.com/cklinker/emf/pull/917): worker max=30, auth max=15, ai max=15.
+- Cerbos has its own pool against the same Postgres (`cerbos:cerbos` DB, connection details in `emf/cerbos-configmap.yaml`).
+
+**Connection budget at scale:**
+
+| Service | Pool max | Typical replicas | Connections |
+|---------|---------:|-----------------:|------------:|
+| kelta-worker | 30 | 2-3 | 60-90 |
+| kelta-auth   | 15 | 1-2 | 15-30 |
+| kelta-ai     | 15 | 1-2 | 15-30 |
+| cerbos       | ~10 | 1 | ~10 |
+| **Subtotal** | | | **100-160** |
+| Migrations PreSync (transient) | 10 | 1 | 10 |
+| Headroom for psql / admin | | | 10 |
+| **Required** | | | **120-180** |
+
+**Recommendations:**
+1. **Immediate**: raise `max_connections` to `200` on `192.168.0.5` (`ALTER SYSTEM SET max_connections = 200; SELECT pg_reload_conf();`). Each connection costs ~10 MB shared memory; 200 × 10 MB = 2 GB. Verify Postgres host has the headroom.
+2. **After PgBouncer ships ([homelab-argo#94](https://github.com/cklinker/homelab-argo/pull/94))**: services connect to PgBouncer (which fans in via session pool). Real Postgres connections drop to PgBouncer's `default_pool_size = 60` × 1 connection per logical DB = 60. `max_connections = 100` then becomes enough again.
+3. **Long-term**: move Postgres to a dedicated host or managed service with `max_connections = 500+` once tenant count grows past 1k.
+
+**Followup**: alert on `pg_stat_database.numbackends / max_connections > 0.8` via the Prometheus rules in [homelab-argo#93](https://github.com/cklinker/homelab-argo/pull/93). Requires `postgres_exporter` to be deployed alongside Postgres — not yet in homelab-argo.
+
 ## Connection Pooler Compatibility
 
 **RLS tenant variable is session-scoped, not transaction-scoped:**

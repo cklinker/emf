@@ -110,12 +110,14 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
         }
 
         RegisteredClient existing = clientRepository.findByClientId(clientId);
-        if (existing != null) {
-            log.info("Superset OAuth2 client '{}' already registered (id={})", clientId, existing.getId());
+        String registrationId = existing != null ? existing.getId() : UUID.randomUUID().toString();
+
+        if (existing != null && existing.getRedirectUris().contains(redirectUri)) {
+            log.info("Superset OAuth2 client '{}' already registered with correct redirect URI", clientId);
             return;
         }
 
-        RegisteredClient supersetClient = RegisteredClient.withId(UUID.randomUUID().toString())
+        RegisteredClient supersetClient = RegisteredClient.withId(registrationId)
                 .clientId(clientId)
                 .clientSecret(passwordEncoder.encode(clientSecret))
                 .clientName("Apache Superset")
@@ -139,6 +141,11 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
                 .build();
 
         clientRepository.save(supersetClient);
-        log.info("Registered Superset OAuth2 client '{}' with redirect URI '{}'", clientId, redirectUri);
+        if (existing == null) {
+            log.info("Registered Superset OAuth2 client '{}' with redirect URI '{}'", clientId, redirectUri);
+        } else {
+            log.info("Updated Superset OAuth2 client '{}' redirect URI to '{}' (was '{}')",
+                    clientId, redirectUri, existing.getRedirectUris());
+        }
     }
 }

@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("DynamicReactiveJwtDecoder")
 class DynamicReactiveJwtDecoderTest {
 
-    private static final String INTERNAL_ISSUER = "https://auth.rzware.com";
+    private static final String INTERNAL_ISSUER = "https://auth.kelta.io";
 
     private DynamicReactiveJwtDecoder decoder;
 

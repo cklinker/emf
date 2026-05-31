@@ -12,23 +12,23 @@ describe('buildMcpAddCommand', () => {
   it('builds a user-profile URL with the slug before /mcp/...', () => {
     const cmd = buildMcpAddCommand(
       'user',
-      'https://emf.rzware.com',
+      'https://api.kelta.io',
       'threadline-clothing',
       'klt_abc123'
     )
     expect(cmd).toBe(
-      "claude mcp add kelta-user --transport http --url https://emf.rzware.com/threadline-clothing/mcp/user --header 'Authorization: Bearer klt_abc123'"
+      "claude mcp add kelta-user --transport http --url https://api.kelta.io/threadline-clothing/mcp/user --header 'Authorization: Bearer klt_abc123'"
     )
   })
 
   it('builds an admin-profile command at the right slug-prefixed URL', () => {
-    const cmd = buildMcpAddCommand('admin', 'https://emf.rzware.com', 'another-tenant', 'klt_xyz')
-    expect(cmd).toContain('--url https://emf.rzware.com/another-tenant/mcp/admin')
+    const cmd = buildMcpAddCommand('admin', 'https://api.kelta.io', 'another-tenant', 'klt_xyz')
+    expect(cmd).toContain('--url https://api.kelta.io/another-tenant/mcp/admin')
     expect(cmd).toContain('kelta-admin')
   })
 
   it('uses single quotes around the auth header so the token is opaque to the shell', () => {
-    const cmd = buildMcpAddCommand('user', 'https://emf.rzware.com', 't', 'klt_token_with$pecial')
+    const cmd = buildMcpAddCommand('user', 'https://api.kelta.io', 't', 'klt_token_with$pecial')
     expect(cmd).toContain("'Authorization: Bearer klt_token_with$pecial'")
   })
 })
@@ -49,8 +49,8 @@ describe('resolveMcpBaseUrl', () => {
   })
 
   it('prefers VITE_API_BASE_URL when set', () => {
-    vi.stubEnv('VITE_API_BASE_URL', 'https://emf.rzware.com')
-    expect(resolveMcpBaseUrl()).toBe('https://emf.rzware.com')
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.kelta.io')
+    expect(resolveMcpBaseUrl()).toBe('https://api.kelta.io')
   })
 
   it('falls back to window.location.origin when env is empty (local dev)', () => {

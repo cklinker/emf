@@ -40,7 +40,7 @@ class TenantContextFilterTest {
         when(request.getMethod()).thenReturn("GET");
         when(request.getServletPath()).thenReturn("/oauth2/authorize");
         when(request.getParameter("redirect_uri"))
-                .thenReturn("https://app.rzware.com/default/auth/callback");
+                .thenReturn("https://app.kelta.io/default/auth/callback");
         when(request.getSession()).thenReturn(session);
 
         filter.doFilterInternal(request, response, filterChain);
@@ -68,7 +68,7 @@ class TenantContextFilterTest {
         when(request.getMethod()).thenReturn("GET");
         when(request.getServletPath()).thenReturn("/oauth2/authorize");
         when(request.getParameter("redirect_uri"))
-                .thenReturn("https://app.rzware.com/auth/callback");
+                .thenReturn("https://app.kelta.io/auth/callback");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -119,7 +119,7 @@ class TenantContextFilterTest {
         when(request.getMethod()).thenReturn("GET");
         when(request.getServletPath()).thenReturn("/oauth2/authorize");
         when(request.getParameter("redirect_uri"))
-                .thenReturn("https://app.rzware.com/default/auth/callback");
+                .thenReturn("https://app.kelta.io/default/auth/callback");
         when(request.getSession()).thenReturn(session);
         when(session.getAttribute("tenantId")).thenReturn("threadline-clothing");
 
@@ -148,7 +148,7 @@ class TenantContextFilterTest {
         when(request.getMethod()).thenReturn("GET");
         when(request.getServletPath()).thenReturn("/oauth2/authorize");
         when(request.getParameter("redirect_uri"))
-                .thenReturn("https://app.rzware.com/default/auth/callback");
+                .thenReturn("https://app.kelta.io/default/auth/callback");
         when(request.getSession()).thenReturn(session);
         when(session.getAttribute("tenantId")).thenReturn("default");
 

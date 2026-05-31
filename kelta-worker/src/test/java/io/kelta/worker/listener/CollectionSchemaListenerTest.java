@@ -2,6 +2,7 @@ package io.kelta.worker.listener;
 
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
+import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SearchIndexService;
 import tools.jackson.databind.ObjectMapper;
@@ -19,6 +20,7 @@ class CollectionSchemaListenerTest {
 
     private CollectionLifecycleManager lifecycleManager;
     private SearchIndexService searchIndexService;
+    private CerbosAuthorizationService cerbosAuthorizationService;
     private ObjectMapper objectMapper;
     private CollectionSchemaListener listener;
 
@@ -26,8 +28,10 @@ class CollectionSchemaListenerTest {
     void setUp() {
         lifecycleManager = mock(CollectionLifecycleManager.class);
         searchIndexService = mock(SearchIndexService.class);
+        cerbosAuthorizationService = mock(CerbosAuthorizationService.class);
         objectMapper = new ObjectMapper();
-        listener = new CollectionSchemaListener(lifecycleManager, searchIndexService, objectMapper);
+        listener = new CollectionSchemaListener(lifecycleManager, searchIndexService,
+                cerbosAuthorizationService, objectMapper);
     }
 
     @Nested

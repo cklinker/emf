@@ -3,6 +3,7 @@ package io.kelta.worker.listener;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.PlatformEventPublisher;
+import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,7 @@ class FieldConfigEventPublisherTest {
     private PlatformEventPublisher eventPublisher;
     private JdbcTemplate jdbcTemplate;
     private CollectionLifecycleManager lifecycleManager;
+    private CerbosAuthorizationService cerbosAuthorizationService;
     private FieldConfigEventPublisher publisher;
 
     @BeforeEach
@@ -34,7 +36,9 @@ class FieldConfigEventPublisherTest {
         eventPublisher = mock(PlatformEventPublisher.class);
         jdbcTemplate = mock(JdbcTemplate.class);
         lifecycleManager = mock(CollectionLifecycleManager.class);
-        publisher = new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager);
+        cerbosAuthorizationService = mock(CerbosAuthorizationService.class);
+        publisher = new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager,
+                cerbosAuthorizationService);
     }
 
     @Test

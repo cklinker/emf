@@ -7,6 +7,7 @@ import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
+import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,13 +39,16 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
     private final PlatformEventPublisher eventPublisher;
     private final JdbcTemplate jdbcTemplate;
     private final CollectionLifecycleManager lifecycleManager;
+    private final CerbosAuthorizationService cerbosAuthorizationService;
 
     public FieldConfigEventPublisher(PlatformEventPublisher eventPublisher,
                                       JdbcTemplate jdbcTemplate,
-                                      CollectionLifecycleManager lifecycleManager) {
+                                      CollectionLifecycleManager lifecycleManager,
+                                      CerbosAuthorizationService cerbosAuthorizationService) {
         this.eventPublisher = eventPublisher;
         this.jdbcTemplate = jdbcTemplate;
         this.lifecycleManager = lifecycleManager;
+        this.cerbosAuthorizationService = cerbosAuthorizationService;
     }
 
     @Override
@@ -60,13 +64,13 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
 
     @Override
     public void afterCreate(Map<String, Object> record, String tenantId) {
-        publishCollectionUpdated(record);
+        publishCollectionUpdated(record, tenantId);
     }
 
     @Override
     public void afterUpdate(String id, Map<String, Object> record,
                              Map<String, Object> previous, String tenantId) {
-        publishCollectionUpdated(record);
+        publishCollectionUpdated(record, tenantId);
     }
 
     @Override
@@ -77,7 +81,7 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         log.info("Field '{}' deleted — collection refresh will occur on next schema sync", id);
     }
 
-    private void publishCollectionUpdated(Map<String, Object> record) {
+    private void publishCollectionUpdated(Map<String, Object> record, String tenantId) {
         String collectionId = getString(record, "collectionId");
         if (collectionId == null) {
             log.warn("Field record missing collectionId, cannot publish collection changed event");
@@ -108,6 +112,15 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         // just-added rollup_summary field missing from getById) until the
         // self-consume lands. Refresh this pod synchronously as well.
         lifecycleManager.refreshOrInitializeLocally(collectionId);
+
+        // Evict CerbosAuthorizationService field-access cache for this
+        // (tenant, collection): the cached allow-list was built before the
+        // new field existed and would otherwise strip it from the response
+        // for up to CACHE_TTL (10 min). The local refresh above is useless
+        // if Cerbos still considers the field unknown. Other pods perform
+        // the equivalent eviction when they consume the NATS event above
+        // (see CollectionSchemaListener).
+        cerbosAuthorizationService.evictForCollection(tenantId, collectionId);
     }
 
     private String resolveCollectionName(String collectionId) {

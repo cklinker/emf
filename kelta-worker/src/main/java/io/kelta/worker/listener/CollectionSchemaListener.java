@@ -3,6 +3,7 @@ package io.kelta.worker.listener;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
+import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SearchIndexService;
 import tools.jackson.databind.ObjectMapper;
@@ -28,13 +29,16 @@ public class CollectionSchemaListener {
 
     private final CollectionLifecycleManager lifecycleManager;
     private final SearchIndexService searchIndexService;
+    private final CerbosAuthorizationService cerbosAuthorizationService;
     private final ObjectMapper objectMapper;
 
     public CollectionSchemaListener(CollectionLifecycleManager lifecycleManager,
                                      SearchIndexService searchIndexService,
+                                     CerbosAuthorizationService cerbosAuthorizationService,
                                      ObjectMapper objectMapper) {
         this.lifecycleManager = lifecycleManager;
         this.searchIndexService = searchIndexService;
+        this.cerbosAuthorizationService = cerbosAuthorizationService;
         this.objectMapper = objectMapper;
     }
 
@@ -111,6 +115,12 @@ public class CollectionSchemaListener {
         log.info("Collection '{}' (id={}) schema changed (type={}), refreshing definition",
                 collectionName, collectionId, changeType);
         lifecycleManager.refreshCollection(collectionId);
+
+        // Evict CerbosAuthorizationService field-access cache so any
+        // newly-added/removed field is reflected immediately on subsequent
+        // reads instead of being silently stripped until the 10-minute TTL.
+        // See FieldConfigEventPublisher for the originating-pod equivalent.
+        cerbosAuthorizationService.evictForCollection(tenantId, collectionId);
 
         // Rebuild search index for the collection (searchable fields may have changed)
         if (tenantId != null && collectionName != null) {

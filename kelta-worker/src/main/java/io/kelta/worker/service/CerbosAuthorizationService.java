@@ -369,6 +369,33 @@ public class CerbosAuthorizationService {
         }
     }
 
+    /**
+     * Evicts cached field access entries for a single (tenant, collection) across
+     * all profiles. Called when a field is added/updated/removed on the collection
+     * so subsequent reads re-query Cerbos for the new field set.
+     *
+     * <p>Without this, {@link #batchCheckFieldAccess} would keep returning the
+     * pre-change allow-list and silently strip the newly-added field (e.g. a
+     * rollup_summary attribute) from responses until the {@link #CACHE_TTL}
+     * expires — see issue #910.
+     */
+    public void evictForCollection(String tenantId, String collectionId) {
+        if (tenantId == null || collectionId == null) {
+            return;
+        }
+        String suffix = ":" + collectionId;
+        String prefix = tenantId + ":";
+        long evicted = fieldAccessCache.asMap().keySet().stream()
+                .filter(key -> key.startsWith(prefix) && key.endsWith(suffix))
+                .peek(fieldAccessCache::invalidate)
+                .count();
+        if (evicted > 0) {
+            cacheEvictions.increment(evicted);
+            log.info("Evicted {} cached field access entries for tenant={} collection={}",
+                    evicted, tenantId, collectionId);
+        }
+    }
+
     // ── Cache key builders ──────────────────────────────────────────────
 
     private static String fieldCacheKey(String tenantId, String profileId, String collectionId) {

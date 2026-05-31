@@ -47,7 +47,7 @@ kelta:
   auth:
     issuer-uri: ${KELTA_AUTH_ISSUER_URI:http://localhost:8080}
     worker-url: ${WORKER_SERVICE_URL:http://localhost:8081}
-    # Cookie domain for SSO across subdomains (e.g., .rzware.com)
+    # Cookie domain for SSO across subdomains (e.g., .kelta.io)
     cookie-domain: ${COOKIE_DOMAIN:localhost}
     # RSA key for JWT signing (JWK JSON format)
     jwk-set: ${JWK_SET:}

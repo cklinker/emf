@@ -438,7 +438,7 @@ export function AuthProvider({
       // All logins authenticate against the internal kelta-auth provider.
       // When the caller picks an external provider, we forward its id as an
       // idp_hint so kelta-auth runs the federation server-side and returns
-      // a platform-issued token (iss=auth.rzware.com).
+      // a platform-issued token (iss=auth.kelta.io).
       const internal = findInternalProvider(providers)
       if (!internal) {
         loginInProgress = false

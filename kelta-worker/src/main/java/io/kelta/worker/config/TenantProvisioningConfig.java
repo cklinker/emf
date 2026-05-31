@@ -22,7 +22,7 @@ public class TenantProvisioningConfig {
     public TenantProvisioningHook tenantProvisioningHook(
             BeforeSaveHookRegistry hookRegistry,
             JdbcTemplate jdbcTemplate,
-            @Value("${kelta.auth.issuer-uri:https://auth.rzware.com}") String authIssuerUri) {
+            @Value("${kelta.auth.issuer-uri:https://auth.kelta.io}") String authIssuerUri) {
         TenantProvisioningHook hook = new TenantProvisioningHook(jdbcTemplate, authIssuerUri);
         hookRegistry.register(hook);
         return hook;

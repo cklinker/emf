@@ -30,8 +30,8 @@ public class OidcDiscoveryHook implements BeforeSaveHook {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
-    public OidcDiscoveryHook(ObjectMapper objectMapper) {
-        this.restClient = RestClient.builder()
+    public OidcDiscoveryHook(ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder
                 .defaultHeader("Accept", "application/json")
                 .build();
         this.objectMapper = objectMapper;

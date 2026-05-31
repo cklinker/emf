@@ -12,6 +12,8 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,10 +31,14 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
 
     private static final Logger log = LoggerFactory.getLogger(DynamicClientRegistrationRepository.class);
 
+    private static final Duration CACHE_TTL = Duration.ofMinutes(5);
+
+    private record CachedRegistration(ClientRegistration registration, Instant cachedAt) {}
+
     private final WorkerClient workerClient;
     private final OidcDiscoveryService discoveryService;
     private final EncryptionService encryptionService;
-    private final Map<String, ClientRegistration> registrationCache = new ConcurrentHashMap<>();
+    private final Map<String, CachedRegistration> registrationCache = new ConcurrentHashMap<>();
 
     public DynamicClientRegistrationRepository(
             WorkerClient workerClient,
@@ -45,10 +51,11 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
 
     @Override
     public ClientRegistration findByRegistrationId(String registrationId) {
-        // Check cache first
-        ClientRegistration cached = registrationCache.get(registrationId);
-        if (cached != null) {
-            return cached;
+        // Check cache first — entries expire after CACHE_TTL so secret rotations
+        // and provider config changes take effect without a pod restart.
+        CachedRegistration cached = registrationCache.get(registrationId);
+        if (cached != null && cached.cachedAt().plus(CACHE_TTL).isAfter(Instant.now())) {
+            return cached.registration();
         }
 
         // The registrationId format is: {tenantId}:{providerId}
@@ -67,7 +74,7 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
             if (providerId.equals(provider.id())) {
                 ClientRegistration registration = buildClientRegistration(registrationId, provider);
                 if (registration != null) {
-                    registrationCache.put(registrationId, registration);
+                    registrationCache.put(registrationId, new CachedRegistration(registration, Instant.now()));
                 }
                 return registration;
             }
@@ -91,7 +98,7 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
                     String registrationId = tenantId + ":" + p.id();
                     ClientRegistration reg = buildClientRegistration(registrationId, p);
                     if (reg != null) {
-                        registrationCache.put(registrationId, reg);
+                        registrationCache.put(registrationId, new CachedRegistration(reg, Instant.now()));
                     }
                     return reg;
                 })

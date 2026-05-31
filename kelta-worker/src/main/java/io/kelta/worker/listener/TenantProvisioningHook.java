@@ -2,6 +2,7 @@ package io.kelta.worker.listener;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.workflow.BeforeSaveHook;
+import io.kelta.worker.service.CerbosPolicySyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,10 +43,14 @@ public class TenantProvisioningHook implements BeforeSaveHook {
 
     private final JdbcTemplate jdbcTemplate;
     private final String authIssuerUri;
+    private final CerbosPolicySyncService cerbosPolicySyncService;
 
-    public TenantProvisioningHook(JdbcTemplate jdbcTemplate, String authIssuerUri) {
+    public TenantProvisioningHook(JdbcTemplate jdbcTemplate,
+                                   String authIssuerUri,
+                                   CerbosPolicySyncService cerbosPolicySyncService) {
         this.jdbcTemplate = jdbcTemplate;
         this.authIssuerUri = authIssuerUri;
+        this.cerbosPolicySyncService = cerbosPolicySyncService;
     }
 
     @Override
@@ -73,6 +78,7 @@ public class TenantProvisioningHook implements BeforeSaveHook {
             seedDefaultProfiles(id);
             seedOidcProvider(id);
             seedAdminUser(id, slug);
+            syncCerbosPolicies(id);
             activateTenant(id);
             log.info("Tenant provisioning complete for tenant '{}' (slug={})", id, slug);
         } catch (Exception e) {
@@ -81,6 +87,20 @@ public class TenantProvisioningHook implements BeforeSaveHook {
         } finally {
             TenantContext.clear();
         }
+    }
+
+    /**
+     * Pushes Cerbos policies for the newly seeded profiles. Required because
+     * seedDefaultProfiles writes directly via JDBC and bypasses the profiles
+     * collection BeforeSaveHook that normally triggers sync. Without this,
+     * gateway API_ACCESS checks fail-closed for the new tenant.
+     */
+    void syncCerbosPolicies(String tenantId) {
+        if (cerbosPolicySyncService == null) {
+            log.debug("CerbosPolicySyncService not configured, skipping policy sync for tenant {}", tenantId);
+            return;
+        }
+        cerbosPolicySyncService.syncTenant(tenantId);
     }
 
     /**

@@ -3,10 +3,13 @@ package io.kelta.worker.listener;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.PlatformEventPublisher;
+import io.kelta.worker.service.CerbosAuthorizationService;
+import io.kelta.worker.service.CollectionLifecycleManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.HashMap;
@@ -24,13 +27,18 @@ class FieldConfigEventPublisherTest {
 
     private PlatformEventPublisher eventPublisher;
     private JdbcTemplate jdbcTemplate;
+    private CollectionLifecycleManager lifecycleManager;
+    private CerbosAuthorizationService cerbosAuthorizationService;
     private FieldConfigEventPublisher publisher;
 
     @BeforeEach
     void setUp() {
         eventPublisher = mock(PlatformEventPublisher.class);
         jdbcTemplate = mock(JdbcTemplate.class);
-        publisher = new FieldConfigEventPublisher(eventPublisher, jdbcTemplate);
+        lifecycleManager = mock(CollectionLifecycleManager.class);
+        cerbosAuthorizationService = mock(CerbosAuthorizationService.class);
+        publisher = new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager,
+                cerbosAuthorizationService);
     }
 
     @Test
@@ -66,6 +74,12 @@ class FieldConfigEventPublisherTest {
         CollectionChangedPayload payload = eventCaptor.getValue().getPayload();
         assertEquals("col-1", payload.getId());
         assertEquals("orders", payload.getName());
+
+        // Read-after-write (#910): originating pod refreshed locally, AFTER the
+        // NATS broadcast so other pods still receive the event.
+        InOrder inOrder = inOrder(eventPublisher, lifecycleManager);
+        inOrder.verify(eventPublisher).publish(anyString(), any());
+        inOrder.verify(lifecycleManager).refreshOrInitializeLocally("col-1");
     }
 
     @Test
@@ -93,6 +107,8 @@ class FieldConfigEventPublisherTest {
         CollectionChangedPayload payload = eventCaptor.getValue().getPayload();
         assertEquals("col-1", payload.getId());
         assertEquals("orders", payload.getName());
+
+        verify(lifecycleManager).refreshOrInitializeLocally("col-1");
     }
 
     @Test
@@ -107,6 +123,7 @@ class FieldConfigEventPublisherTest {
 
         verify(eventPublisher, never()).publish(anyString(), any());
         verifyNoInteractions(jdbcTemplate);
+        verifyNoInteractions(lifecycleManager);
     }
 
     @Test
@@ -124,6 +141,8 @@ class FieldConfigEventPublisherTest {
         publisher.afterCreate(record, "tenant-1");
 
         verify(eventPublisher, never()).publish(anyString(), any());
+        // No broadcast → no local refresh either (refresh only alongside publish).
+        verifyNoInteractions(lifecycleManager);
     }
 
     @Test
@@ -141,6 +160,7 @@ class FieldConfigEventPublisherTest {
         publisher.afterCreate(record, "tenant-1");
 
         verify(eventPublisher, never()).publish(anyString(), any());
+        verifyNoInteractions(lifecycleManager);
     }
 
     @Test
@@ -150,6 +170,7 @@ class FieldConfigEventPublisherTest {
 
         verify(eventPublisher, never()).publish(anyString(), any());
         verifyNoInteractions(jdbcTemplate);
+        verifyNoInteractions(lifecycleManager);
     }
 
     @SuppressWarnings("unchecked")

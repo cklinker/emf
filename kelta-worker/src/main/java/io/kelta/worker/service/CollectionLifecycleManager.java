@@ -277,6 +277,39 @@ public class CollectionLifecycleManager {
     }
 
     /**
+     * Makes the local pod's CollectionDefinition and storage schema consistent
+     * for a collection immediately, without waiting for the async NATS
+     * config-changed round-trip (issue #910 read-after-write).
+     *
+     * <p>Mirrors the UPDATED branch of
+     * {@code CollectionSchemaListener.processCollectionChange}: refresh if the
+     * collection is already active on this worker, otherwise initialize it
+     * (covers a freshly-created collection whose CREATED event has not yet
+     * self-consumed).
+     *
+     * <p>This is a local-only operation. Callers MUST still publish the NATS
+     * config event so other pods stay consistent — never use this as a
+     * substitute for the broadcast.
+     *
+     * <p>Failures are swallowed (logged at WARN): the originating request must
+     * not break, and the async NATS event remains the cross-pod backstop.
+     *
+     * @param collectionId the collection ID to make locally consistent
+     */
+    public void refreshOrInitializeLocally(String collectionId) {
+        try {
+            if (getActiveCollections().contains(collectionId)) {
+                refreshCollection(collectionId);
+            } else {
+                initializeCollection(collectionId);
+            }
+        } catch (Exception e) {
+            log.warn("Local read-after-write refresh failed for collection {} "
+                    + "(NATS event remains the backstop): {}", collectionId, e.getMessage(), e);
+        }
+    }
+
+    /**
      * Tears down a collection on this worker by removing it from the local registry.
      * Data is not dropped -- it persists in the database.
      *

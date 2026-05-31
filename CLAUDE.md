@@ -29,7 +29,9 @@ Stack: Java 25, Spring Boot 4.x, Maven, PostgreSQL + Flyway, NATS JetStream, Red
 2. In after-create/update/delete, publish via `PlatformEventPublisher` (e.g., to subject `kelta.config.collection.changed`)
 3. All pods consume the event and refresh their local registries
 
-Do NOT call `lifecycleManager.refreshX()` directly from a hook — that only updates the local pod.
+Do NOT call `lifecycleManager.refreshX()` directly from a hook **as a substitute for** the broadcast — that only updates the local pod and leaves every other pod stale.
+
+**Read-after-write exception (issue #910)**: a hook MAY *additionally* call a synchronous local refresh (e.g. `CollectionLifecycleManager.refreshOrInitializeLocally`) so the originating pod is consistent for an immediate same-pod read-after-write — **only when it also publishes the NATS config event** for all other pods. Skipping the broadcast is still forbidden.
 
 **Coding patterns**:
 - All new entities extend `BaseEntity` (UUID id, createdAt, updatedAt)

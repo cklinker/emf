@@ -42,6 +42,7 @@ import io.kelta.worker.repository.ApprovalRepository;
 import io.kelta.worker.service.ApprovalService;
 import io.kelta.worker.service.AuditBeforeSaveHook;
 import io.kelta.worker.service.CerbosPolicySyncService;
+import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SetupAuditService;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -294,9 +295,12 @@ public class FlowConfig {
     public FieldConfigEventPublisher fieldConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            CollectionLifecycleManager lifecycleManager,
+            io.kelta.worker.service.CerbosAuthorizationService cerbosAuthorizationService) {
         FieldConfigEventPublisher publisher =
-                new FieldConfigEventPublisher(eventPublisher, jdbcTemplate);
+                new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager,
+                        cerbosAuthorizationService);
         hookRegistry.register(publisher);
         return publisher;
     }

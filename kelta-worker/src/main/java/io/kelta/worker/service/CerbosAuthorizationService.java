@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,8 +62,21 @@ public class CerbosAuthorizationService {
     private final int circuitBreakerThreshold;
     private final long circuitBreakerCooldownSeconds;
 
-    // Cache for field access: key = "tenantId:profileId:collectionId" → allowed field IDs
-    private final Cache<String, List<String>> fieldAccessCache;
+    /**
+     * Cached batch-Cerbos result for a single (tenant, profile, collection).
+     *
+     * <p>{@code asked} is the set of field IDs we have previously sent to
+     * Cerbos for this key; {@code allowed} is the subset Cerbos approved.
+     * Storing the asked set (not just the allow-list) lets us distinguish
+     * "field is denied" from "field has never been queried" — critical when
+     * a newly-added field (e.g. rollup_summary) shows up in a subsequent
+     * request: without {@code asked} we would silently strip it as if it
+     * had been denied. See issue #910.
+     */
+    private record FieldAccessEntry(Set<String> asked, Set<String> allowed) {}
+
+    // Cache for field access: key = "tenantId:profileId:collectionId" → asked+allowed sets
+    private final Cache<String, FieldAccessEntry> fieldAccessCache;
 
     // Metrics
     private final Counter cacheHits;
@@ -207,15 +220,17 @@ public class CerbosAuthorizationService {
             return fieldIds;
         }
 
-        // Check cache: if we have a cached result for this (tenant, profile, collection),
-        // filter the requested fieldIds against it.
+        // Cache hit only when every requested field has already been queried
+        // for this (tenant, profile, collection) — otherwise a new field
+        // (e.g. just-added rollup_summary) would be silently stripped because
+        // "absent from allow-list" is indistinguishable from "denied".
         String cacheKey = fieldCacheKey(tenantId, profileId, collectionId);
-        List<String> cachedAllowed = fieldAccessCache.getIfPresent(cacheKey);
-        if (cachedAllowed != null) {
+        FieldAccessEntry cached = fieldAccessCache.getIfPresent(cacheKey);
+        Set<String> requestedSet = Set.copyOf(fieldIds);
+        if (cached != null && cached.asked().containsAll(requestedSet)) {
             cacheHits.increment();
-            Set<String> allowedSet = Set.copyOf(cachedAllowed);
             List<String> result = fieldIds.stream()
-                    .filter(allowedSet::contains)
+                    .filter(cached.allowed()::contains)
                     .toList();
             log.debug("Cerbos batch field check (cached): user={} collection={} fields={} allowed={}",
                     email, collectionId, fieldIds.size(), result.size());
@@ -223,11 +238,19 @@ public class CerbosAuthorizationService {
         }
         cacheMisses.increment();
 
-        Future<List<String>> future = cerbosExecutor.submit(() -> {
+        // Re-query the UNION of (previously asked) ∪ (requested) so we retain
+        // deny knowledge for fields the cache already knew about and pick up
+        // decisions for any newly-requested fields in a single batch.
+        Set<String> toQuery = new HashSet<>(requestedSet);
+        if (cached != null) {
+            toQuery.addAll(cached.asked());
+        }
+
+        Future<Set<String>> future = cerbosExecutor.submit(() -> {
             Principal principal = buildPrincipal(email, profileId, tenantId);
 
             var batchRequest = cerbosClient.batch(principal);
-            for (String fieldId : fieldIds) {
+            for (String fieldId : toQuery) {
                 Resource resource = Resource.newInstance("field", fieldId)
                         .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
                         .withAttribute("fieldId", AttributeValue.stringValue(fieldId))
@@ -236,8 +259,8 @@ public class CerbosAuthorizationService {
             }
 
             CheckResourcesResult result = batchRequest.check();
-            List<String> allowed = new ArrayList<>();
-            for (String fieldId : fieldIds) {
+            Set<String> allowed = new HashSet<>();
+            for (String fieldId : toQuery) {
                 result.find(fieldId).ifPresentOrElse(
                         checkResult -> {
                             if (checkResult.isAllowed(action)) {
@@ -251,13 +274,16 @@ public class CerbosAuthorizationService {
         });
 
         try {
-            List<String> allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            Set<String> allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             recordSuccess();
-            // Cache the allowed fields for this (tenant, profile, collection)
-            fieldAccessCache.put(cacheKey, List.copyOf(allowed));
+            fieldAccessCache.put(cacheKey,
+                    new FieldAccessEntry(Set.copyOf(toQuery), Set.copyOf(allowed)));
+            List<String> result = fieldIds.stream()
+                    .filter(allowed::contains)
+                    .toList();
             log.debug("Cerbos batch field check: user={} collection={} fields={} allowed={}",
-                    email, collectionId, fieldIds.size(), allowed.size());
-            return allowed;
+                    email, collectionId, fieldIds.size(), result.size());
+            return result;
         } catch (TimeoutException e) {
             future.cancel(true);
             recordFailure();

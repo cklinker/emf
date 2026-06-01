@@ -40,6 +40,7 @@ import io.kelta.auth.federation.DynamicClientRegistrationRepository;
 import io.kelta.auth.federation.FederatedLoginSuccessHandler;
 import io.kelta.auth.federation.FederatedUserMapper;
 import io.kelta.auth.model.KeltaUserDetails;
+import io.kelta.auth.service.AuthDomainResolver;
 import io.kelta.auth.service.OidcDiscoveryService;
 import io.kelta.auth.service.PasswordPolicyService;
 import io.kelta.auth.service.TotpService;
@@ -72,7 +73,9 @@ public class AuthorizationServerConfig {
 
     @Bean
     @Order(1)
-    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain authorizationServerSecurityFilterChain(
+            HttpSecurity http,
+            AuthDomainResolver authDomainResolver) throws Exception {
         // Configure OIDC on the configurer BEFORE capturing endpoint matchers,
         // so that OIDC discovery endpoints (/.well-known/openid-configuration)
         // are included in the security matcher for this chain.
@@ -82,7 +85,7 @@ public class AuthorizationServerConfig {
                 .oidc(Customizer.withDefaults())
                 .authorizationEndpoint(endpoint -> endpoint
                         .consentPage("/oauth2/consent")
-                        .authenticationProviders(configureRedirectUriValidator()));
+                        .authenticationProviders(configureRedirectUriValidator(authDomainResolver)));
 
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
 
@@ -315,9 +318,18 @@ public class AuthorizationServerConfig {
 
     @Bean
     public AuthorizationServerSettings authorizationServerSettings(AuthProperties properties) {
-        return AuthorizationServerSettings.builder()
-                .issuer(properties.getIssuerUri())
-                .build();
+        AuthorizationServerSettings.Builder builder = AuthorizationServerSettings.builder();
+        // When KELTA_AUTH_ISSUER_URI is unset, Spring Authorization Server derives
+        // the issuer from each request's base URL — exactly what we need so that
+        // logins on a customer custom domain (e.g. https://acme.com) issue tokens
+        // with iss=https://acme.com instead of the platform default.
+        String issuer = properties.getIssuerUri();
+        if (issuer != null && !issuer.isBlank()) {
+            builder.issuer(issuer);
+        } else {
+            log.info("AuthorizationServerSettings.issuer not set — issuer will be derived from each request (custom-domain mode enabled)");
+        }
+        return builder.build();
     }
 
     @Bean
@@ -358,11 +370,11 @@ public class AuthorizationServerConfig {
      * Replaces the default redirect_uri validator on the authorization code request
      * authentication provider with our multi-tenant-aware validator.
      */
-    private Consumer<List<AuthenticationProvider>> configureRedirectUriValidator() {
+    private Consumer<List<AuthenticationProvider>> configureRedirectUriValidator(AuthDomainResolver resolver) {
         return authenticationProviders -> {
             for (AuthenticationProvider provider : authenticationProviders) {
                 if (provider instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider authCodeProvider) {
-                    authCodeProvider.setAuthenticationValidator(new PlatformRedirectUriValidator());
+                    authCodeProvider.setAuthenticationValidator(new PlatformRedirectUriValidator(resolver));
                 }
             }
         };

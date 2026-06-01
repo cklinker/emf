@@ -382,6 +382,28 @@ class TenantSlugExtractionFilterTest {
         }
     }
 
+    // --- Custom domain short-circuit ---
+
+    @Test
+    void shouldShortCircuitWhenCustomDomainResolved() {
+        // When CustomDomainFilter has already resolved the tenant from Host,
+        // this filter must not attempt to strip a slug from the path.
+        TenantSlugExtractionFilter filter = createFilter(true, true);
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        exchange.getAttributes().put(CustomDomainFilter.CUSTOM_DOMAIN_RESOLVED, true);
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_SLUG_ATTR, "acme");
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        // Exchange passed through untouched
+        verify(chain).filter(exchange);
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+        assertThat(exchange.getRequest().getPath().value()).isEqualTo("/api/users");
+    }
+
     // --- Slug pattern validation ---
 
     @Test

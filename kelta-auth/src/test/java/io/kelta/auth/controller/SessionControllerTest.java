@@ -1,11 +1,13 @@
 package io.kelta.auth.controller;
 
 import io.kelta.auth.config.AuthProperties;
+import io.kelta.auth.config.CookieDomainResolver;
 import io.kelta.auth.model.KeltaSession;
 import io.kelta.auth.service.ExternalTokenValidator;
 import io.kelta.auth.service.SessionService;
 import io.kelta.auth.service.WorkerClient;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,13 +44,17 @@ class SessionControllerTest {
     @Mock
     private HttpServletResponse response;
 
+    @Mock
+    private HttpServletRequest request;
+
     private SessionController controller;
 
     @BeforeEach
     void setUp() {
         AuthProperties props = new AuthProperties();
-        props.setCookieDomain("localhost");
-        controller = new SessionController(sessionService, tokenValidator, workerClient, props);
+        controller = new SessionController(sessionService, tokenValidator, workerClient, props,
+                new CookieDomainResolver());
+        lenient().when(request.getServerName()).thenReturn("auth.kelta.io");
     }
 
     @Nested
@@ -59,7 +65,7 @@ class SessionControllerTest {
         @DisplayName("returns 400 for invalid auth header")
         void returns400ForInvalidAuthHeader() {
             ResponseEntity<Map<String, String>> result =
-                    controller.createSession("InvalidHeader", null, null, response);
+                    controller.createSession("InvalidHeader", null, null, request, response);
 
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
@@ -70,7 +76,7 @@ class SessionControllerTest {
             when(tokenValidator.validate("bad-token")).thenReturn(Optional.empty());
 
             ResponseEntity<Map<String, String>> result =
-                    controller.createSession("Bearer bad-token", null, null, response);
+                    controller.createSession("Bearer bad-token", null, null, request, response);
 
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
@@ -84,7 +90,7 @@ class SessionControllerTest {
             when(sessionService.createSession(any(KeltaSession.class))).thenReturn("session-abc");
 
             ResponseEntity<Map<String, String>> result =
-                    controller.createSession("Bearer valid-token", "tenant-1", "acme", response);
+                    controller.createSession("Bearer valid-token", "tenant-1", "acme", request, response);
 
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -104,7 +110,7 @@ class SessionControllerTest {
         @Test
         @DisplayName("deletes session and clears cookie")
         void deletesSessionAndClearsCookie() {
-            ResponseEntity<Void> result = controller.deleteSession("session-abc", response);
+            ResponseEntity<Void> result = controller.deleteSession("session-abc", request, response);
 
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
             verify(sessionService).deleteSession("session-abc");
@@ -118,7 +124,7 @@ class SessionControllerTest {
         @Test
         @DisplayName("clears cookie even without session ID")
         void clearsCookieWithoutSession() {
-            ResponseEntity<Void> result = controller.deleteSession(null, response);
+            ResponseEntity<Void> result = controller.deleteSession(null, request, response);
 
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
             verify(sessionService, never()).deleteSession(anyString());

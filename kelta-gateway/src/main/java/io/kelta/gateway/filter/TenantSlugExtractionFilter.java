@@ -87,6 +87,12 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
             return chain.filter(exchange);
         }
 
+        // Custom-domain resolution already attached a tenant; do not look for a
+        // slug in the path. Paths arrive bare (e.g. /api/users) on custom domains.
+        if (Boolean.TRUE.equals(exchange.getAttributes().get(CustomDomainFilter.CUSTOM_DOMAIN_RESOLVED))) {
+            return chain.filter(exchange);
+        }
+
         String path = exchange.getRequest().getPath().value();
 
         // Platform endpoints bypass slug requirement

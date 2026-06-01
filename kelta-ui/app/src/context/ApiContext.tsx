@@ -17,7 +17,7 @@ import { KeltaClient } from '@kelta/sdk'
 import type { TokenProvider } from '@kelta/sdk'
 import { ApiClient } from '../services/apiClient'
 import { useAuth } from './AuthContext'
-import { getTenantSlug } from './TenantContext'
+import { getTenantSlug, isCustomDomainHost } from './TenantContext'
 
 interface ApiContextValue {
   apiClient: ApiClient
@@ -94,8 +94,8 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
             // originated from a component that fires on the login page.
             console.warn('[API] Token refresh failed on 401, redirecting to login')
             sessionStorage.removeItem('kelta_auth_tokens')
-            const slug = getTenantSlug()
-            window.location.assign(`/${slug}/login`)
+            const loginPath = isCustomDomainHost() ? '/login' : `/${getTenantSlug()}/login`
+            window.location.assign(loginPath)
           }
         }
         return Promise.reject(error)

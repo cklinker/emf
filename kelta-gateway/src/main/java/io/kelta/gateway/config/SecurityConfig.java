@@ -132,8 +132,8 @@ public class SecurityConfig {
      * which mints platform JWTs.
      */
     @Bean
-    public DynamicReactiveJwtDecoder jwtDecoder() {
-        log.info("Gateway JWT decoder: only tokens issued by {} accepted", issuerUri);
-        return new DynamicReactiveJwtDecoder(issuerUri, Duration.ofSeconds(jwtClockSkewSeconds));
+    public DynamicReactiveJwtDecoder jwtDecoder(io.kelta.gateway.cache.GatewayCacheManager cacheManager) {
+        log.info("Gateway JWT decoder: primary issuer {} + verified tenant custom domains", issuerUri);
+        return new DynamicReactiveJwtDecoder(issuerUri, Duration.ofSeconds(jwtClockSkewSeconds), cacheManager);
     }
 }

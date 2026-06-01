@@ -1,5 +1,6 @@
 package io.kelta.gateway.auth;
 
+import io.kelta.gateway.cache.GatewayCacheManager;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -12,43 +13,43 @@ import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Reactive JWT decoder for the API gateway. Accepts only tokens issued by the
- * internal kelta-auth provider — external IdPs federate through kelta-auth,
- * which mints platform-issued JWTs.
+ * Reactive JWT decoder for the API gateway. Accepts tokens issued by the
+ * internal kelta-auth provider on:
+ * <ul>
+ *   <li>the configured platform issuer URI (e.g. {@code https://auth.kelta.io}), and</li>
+ *   <li>any verified tenant custom domain that maps to a known slug
+ *       (e.g. {@code https://acme.com} when {@code acme.com} is registered for
+ *       tenant {@code acme}).</li>
+ * </ul>
  *
- * <p>Validation flow:
- * <ol>
- *   <li>Parse the JWT to extract the {@code iss} claim (without signature validation).</li>
- *   <li>Reject if {@code iss} does not match the configured kelta-auth issuer.</li>
- *   <li>Validate signature and timestamps against kelta-auth's JWKS.</li>
- * </ol>
+ * <p>External IdPs federate through kelta-auth — they never sign tokens directly.
  */
 public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
 
     private static final Logger log = LoggerFactory.getLogger(DynamicReactiveJwtDecoder.class);
 
-    private final String issuerUri;
+    private final String primaryIssuer;
     private final Duration clockSkew;
+    private final GatewayCacheManager cacheManager;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private volatile NimbusReactiveJwtDecoder delegate;
+    private final ConcurrentHashMap<String, NimbusReactiveJwtDecoder> delegates = new ConcurrentHashMap<>();
 
-    public DynamicReactiveJwtDecoder(String issuerUri) {
-        this(issuerUri, Duration.ZERO);
-    }
-
-    public DynamicReactiveJwtDecoder(String issuerUri, Duration clockSkew) {
-        if (issuerUri == null || issuerUri.isBlank()) {
-            throw new IllegalArgumentException("issuerUri must be set to the internal kelta-auth issuer");
+    public DynamicReactiveJwtDecoder(String primaryIssuer, Duration clockSkew, GatewayCacheManager cacheManager) {
+        if (primaryIssuer == null || primaryIssuer.isBlank()) {
+            throw new IllegalArgumentException("primaryIssuer must be set to the internal kelta-auth issuer");
         }
-        this.issuerUri = issuerUri;
+        this.primaryIssuer = stripTrailingSlash(primaryIssuer);
         this.clockSkew = clockSkew != null ? clockSkew : Duration.ZERO;
-        log.info("DynamicReactiveJwtDecoder initialized: issuerUri={}, clockSkew={}s",
-                issuerUri, this.clockSkew.getSeconds());
+        this.cacheManager = cacheManager;
+        log.info("DynamicReactiveJwtDecoder initialized: primaryIssuer={}, clockSkew={}s",
+                this.primaryIssuer, this.clockSkew.getSeconds());
     }
 
     @Override
@@ -58,8 +59,8 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
 
     /**
      * Decodes a JWT. The {@code tenantId} parameter is retained for source
-     * compatibility with callers and ignored — issuer validation is global
-     * because only kelta-auth-issued tokens are accepted.
+     * compatibility with callers and ignored — issuer validation matches against
+     * the primary issuer or any verified tenant custom domain.
      */
     public Mono<Jwt> decode(String token, String tenantId) throws JwtException {
         String issuer;
@@ -73,30 +74,46 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
             return Mono.error(new JwtException("JWT missing issuer (iss) claim"));
         }
 
-        if (!issuerUri.equals(issuer)) {
-            log.warn("Rejecting JWT: iss={} expected={}", issuer, issuerUri);
+        String normalised = stripTrailingSlash(issuer);
+        if (!isAcceptedIssuer(normalised)) {
+            log.warn("Rejecting JWT: iss={} not platform issuer or verified custom domain", normalised);
             return Mono.error(new JwtException(
-                    "JWT issuer not accepted: only tokens issued by " + issuerUri + " are allowed"));
+                    "JWT issuer not accepted: " + normalised + " is not the platform issuer "
+                            + "(" + primaryIssuer + ") or a verified tenant custom domain"));
         }
 
-        return delegate().decode(token);
+        return delegateFor(normalised).decode(token);
     }
 
-    private NimbusReactiveJwtDecoder delegate() {
-        NimbusReactiveJwtDecoder local = delegate;
-        if (local != null) {
-            return local;
-        }
-        synchronized (this) {
-            if (delegate == null) {
-                String jwksUri = issuerUri.endsWith("/") ? issuerUri + "oauth2/jwks" : issuerUri + "/oauth2/jwks";
-                NimbusReactiveJwtDecoder nimbus = NimbusReactiveJwtDecoder.withJwkSetUri(jwksUri).build();
-                nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                        List.of(new JwtTimestampValidator(clockSkew))));
-                log.debug("Initialized JWKS decoder for {}", jwksUri);
-                delegate = nimbus;
-            }
-            return delegate;
+    private boolean isAcceptedIssuer(String issuer) {
+        if (primaryIssuer.equals(issuer)) return true;
+        // Anything else: only accept when the issuer's host is a registered
+        // custom domain. This stops attackers from supplying tokens signed by
+        // arbitrary URLs.
+        String host = hostOf(issuer);
+        return host != null && cacheManager.resolveCustomDomain(host).isPresent();
+    }
+
+    private NimbusReactiveJwtDecoder delegateFor(String issuer) {
+        return delegates.computeIfAbsent(issuer, iss -> {
+            String jwksUri = iss + "/oauth2/jwks";
+            NimbusReactiveJwtDecoder nimbus = NimbusReactiveJwtDecoder.withJwkSetUri(jwksUri).build();
+            nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                    List.of(new JwtTimestampValidator(clockSkew))));
+            log.debug("Initialized JWKS decoder for {}", jwksUri);
+            return nimbus;
+        });
+    }
+
+    private static String stripTrailingSlash(String s) {
+        return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+    }
+
+    private static String hostOf(String issuer) {
+        try {
+            return URI.create(issuer).getHost();
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
@@ -116,13 +133,11 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     }
 
     /**
-     * Drops the cached JWKS decoder so the next decode rebuilds it. Called when
-     * key rotation or configuration changes are signaled.
+     * Drops the cached JWKS decoders so the next decode rebuilds them. Called
+     * when key rotation or configuration changes are signalled.
      */
     public void evictAll() {
-        synchronized (this) {
-            delegate = null;
-        }
-        log.info("Evicted cached JWT decoder");
+        delegates.clear();
+        log.info("Evicted cached JWT decoders");
     }
 }

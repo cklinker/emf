@@ -1,8 +1,8 @@
 package io.kelta.auth.config;
 
+import io.kelta.auth.service.AuthDomainResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationContext;
@@ -27,6 +27,12 @@ public class PlatformRedirectUriValidator
 
     private static final Logger log = LoggerFactory.getLogger(PlatformRedirectUriValidator.class);
 
+    private final AuthDomainResolver domainResolver;
+
+    public PlatformRedirectUriValidator(AuthDomainResolver domainResolver) {
+        this.domainResolver = domainResolver;
+    }
+
     @Override
     public void accept(OAuth2AuthorizationCodeRequestAuthenticationContext context) {
         OAuth2AuthorizationCodeRequestAuthenticationToken authenticationToken =
@@ -49,6 +55,12 @@ public class PlatformRedirectUriValidator
         // 2. Has a path ending with /auth/callback
         if ("kelta-platform".equals(registeredClient.getClientId())) {
             if (isOriginMatchWithSuffix(requestedRedirectUri, registeredClient, "/auth/callback")) {
+                return;
+            }
+            // Also accept any verified tenant custom domain so customer-branded
+            // callbacks like https://acme.com/auth/callback work without each
+            // origin having to be pre-registered on the platform client.
+            if (isVerifiedCustomDomainCallback(requestedRedirectUri)) {
                 return;
             }
         }
@@ -111,6 +123,24 @@ public class PlatformRedirectUriValidator
             }
         } catch (IllegalArgumentException e) {
             // Invalid URI
+        }
+        return false;
+    }
+
+    private boolean isVerifiedCustomDomainCallback(String requestedRedirectUri) {
+        try {
+            URI uri = URI.create(requestedRedirectUri);
+            String host = uri.getHost();
+            String path = uri.getPath();
+            if (host == null || path == null || !path.endsWith("/auth/callback")) {
+                return false;
+            }
+            if (domainResolver.resolveTenantSlug(host).isPresent()) {
+                log.debug("Allowing custom-domain redirect_uri: {}", requestedRedirectUri);
+                return true;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // fall through to false
         }
         return false;
     }

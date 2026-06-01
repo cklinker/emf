@@ -21,6 +21,10 @@ RUN microdnf install -y findutils && \
 # Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
 COPY ci/maven-settings.xml /root/.m2/settings.xml
 
+# Belt-and-braces: retry on transient 429 / 503 / connection resets in case the
+# mirror is unreachable and Maven falls back to central.
+ENV MAVEN_OPTS="-Dmaven.wagon.http.retryHandler.count=10 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Daether.connector.http.retryHandler.count=10"
+
 # Copy only POMs first for dependency layer caching
 COPY kelta-platform/pom.xml ./
 COPY kelta-platform/runtime/pom.xml ./runtime/
@@ -64,6 +68,10 @@ RUN microdnf install -y findutils && \
 
 # Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
 COPY ci/maven-settings.xml /root/.m2/settings.xml
+
+# Belt-and-braces: retry on transient 429 / 503 / connection resets in case the
+# mirror is unreachable and Maven falls back to central.
+ENV MAVEN_OPTS="-Dmaven.wagon.http.retryHandler.count=10 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Daether.connector.http.retryHandler.count=10"
 
 COPY --from=runtime-builder /root/.m2/repository /root/.m2/repository
 

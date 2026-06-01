@@ -45,10 +45,15 @@ kelta:
   encryption:
     key: ${KELTA_ENCRYPTION_KEY:}
   auth:
-    issuer-uri: ${KELTA_AUTH_ISSUER_URI:http://localhost:8080}
+    # Leave blank to derive the issuer from each request's host (recommended:
+    # required for tenant custom domains so tokens carry iss=https://<host>).
+    # Set explicitly to pin a single issuer URL.
+    issuer-uri: ${KELTA_AUTH_ISSUER_URI:}
     worker-url: ${WORKER_SERVICE_URL:http://localhost:8081}
-    # Cookie domain for SSO across subdomains (e.g., .kelta.io)
-    cookie-domain: ${COOKIE_DOMAIN:localhost}
+    # cookie-domain is no longer read directly — CookieDomainResolver derives
+    # the cookie Domain attribute from each request's host. The property is
+    # retained as a no-op for migration; remove once all deployments have rolled.
+    cookie-domain: ${COOKIE_DOMAIN:}
     # RSA key for JWT signing (JWK JSON format)
     jwk-set: ${JWK_SET:}
     # UI login redirect URL pattern

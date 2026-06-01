@@ -5,7 +5,7 @@
  * and module-level tenant slug/id accessors.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import {
@@ -14,6 +14,7 @@ import {
   getTenantSlug,
   setResolvedTenantId,
   getResolvedTenantId,
+  isCustomDomainHost,
 } from './TenantContext'
 
 /**
@@ -122,6 +123,48 @@ describe('TenantContext', () => {
 
       // After render + useEffect, the module-level variable should be updated
       expect(getTenantSlug()).toBe('synced-org')
+    })
+  })
+
+  describe('isCustomDomainHost', () => {
+    const original = { hostname: window.location.hostname, pathname: window.location.pathname }
+
+    function setLocation(hostname: string, pathname: string) {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...window.location, hostname, pathname },
+      })
+    }
+
+    afterEach(() => {
+      setLocation(original.hostname, original.pathname)
+    })
+
+    it('returns false for *.kelta.io regardless of path', () => {
+      setLocation('app.kelta.io', '/login')
+      expect(isCustomDomainHost()).toBe(false)
+    })
+
+    it('returns false for localhost', () => {
+      setLocation('localhost', '/')
+      expect(isCustomDomainHost()).toBe(false)
+    })
+
+    it('returns false for non-kelta host when first segment is a slug', () => {
+      // The CI E2E case: container host kelta-ui with /default/app
+      setLocation('kelta-ui', '/default/app')
+      expect(isCustomDomainHost()).toBe(false)
+    })
+
+    it('returns true for non-kelta host on a platform route', () => {
+      // Real customer custom domain landing on /login
+      setLocation('acme.com', '/login')
+      expect(isCustomDomainHost()).toBe(true)
+    })
+
+    it('returns true for non-kelta host at root', () => {
+      setLocation('acme.com', '/')
+      expect(isCustomDomainHost()).toBe(true)
     })
   })
 

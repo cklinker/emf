@@ -50,4 +50,32 @@ class CustomDomainFilterTest {
             assertThat(CustomDomainFilter.sanitizeHost("my-app.acme.co.uk")).isEqualTo("my-app.acme.co.uk");
         }
     }
+
+    @Nested
+    @DisplayName("Reserved Hosts")
+    class ReservedHosts {
+        @Test
+        void shouldReserveKeltaApex() {
+            assertThat(CustomDomainFilter.isReservedHost("kelta.io")).isTrue();
+        }
+
+        @Test
+        void shouldReserveKeltaSubdomains() {
+            assertThat(CustomDomainFilter.isReservedHost("app.kelta.io")).isTrue();
+            assertThat(CustomDomainFilter.isReservedHost("auth.kelta.io")).isTrue();
+            assertThat(CustomDomainFilter.isReservedHost("api.kelta.io")).isTrue();
+            assertThat(CustomDomainFilter.isReservedHost("mcp.kelta.io")).isTrue();
+        }
+
+        @Test
+        void shouldReserveLocalhost() {
+            assertThat(CustomDomainFilter.isReservedHost("localhost")).isTrue();
+        }
+
+        @Test
+        void shouldNotReserveCustomerDomain() {
+            assertThat(CustomDomainFilter.isReservedHost("acme.com")).isFalse();
+            assertThat(CustomDomainFilter.isReservedHost("app.acme.com")).isFalse();
+        }
+    }
 }

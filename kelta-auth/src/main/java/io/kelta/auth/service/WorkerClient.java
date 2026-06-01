@@ -302,6 +302,30 @@ public class WorkerClient {
         }
     }
 
+    /**
+     * Resolves a custom domain (Host header value) to a tenant slug via the
+     * worker's internal endpoint. Returns {@code Optional.empty()} for unknown
+     * domains or transient failures — callers fall back to other tenant
+     * resolution strategies.
+     */
+    public Optional<String> resolveCustomDomain(String domain) {
+        if (domain == null || domain.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            String slug = restClient.get()
+                    .uri("/internal/domains/resolve?domain={domain}", domain)
+                    .retrieve()
+                    .body(String.class);
+            return (slug == null || slug.isBlank()) ? Optional.empty() : Optional.of(slug.trim());
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound nf) {
+            return Optional.empty();
+        } catch (Exception e) {
+            log.warn("Custom domain resolve failed for '{}': {}", domain, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     // -----------------------------------------------------------------------
     // SMS Verification
     // -----------------------------------------------------------------------

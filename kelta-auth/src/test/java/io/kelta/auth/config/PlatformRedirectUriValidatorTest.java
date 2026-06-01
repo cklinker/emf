@@ -1,9 +1,11 @@
 package io.kelta.auth.config;
 
+import io.kelta.auth.service.AuthDomainResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException;
@@ -13,6 +15,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.authentication.TestingAuthenticationToken;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,10 +26,35 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PlatformRedirectUriValidatorTest {
 
     private PlatformRedirectUriValidator validator;
+    private AuthDomainResolver domainResolver;
 
     @BeforeEach
     void setUp() {
-        validator = new PlatformRedirectUriValidator();
+        domainResolver = Mockito.mock(AuthDomainResolver.class);
+        Mockito.lenient().when(domainResolver.resolveTenantSlug(Mockito.anyString()))
+                .thenReturn(Optional.empty());
+        validator = new PlatformRedirectUriValidator(domainResolver);
+    }
+
+    @Test
+    @DisplayName("accepts verified custom-domain callback for kelta-platform")
+    void shouldAllowVerifiedCustomDomainCallback() {
+        Mockito.when(domainResolver.resolveTenantSlug("acme.com"))
+                .thenReturn(Optional.of("acme"));
+        var context = buildContext("kelta-platform",
+                "https://acme.com/auth/callback",
+                "http://localhost:5173/auth/callback");
+        assertThatCode(() -> validator.accept(context)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("rejects unknown custom-domain callback")
+    void shouldRejectUnknownCustomDomain() {
+        var context = buildContext("kelta-platform",
+                "https://attacker.com/auth/callback",
+                "http://localhost:5173/auth/callback");
+        assertThatThrownBy(() -> validator.accept(context))
+                .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);
     }
 
     @Nested

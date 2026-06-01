@@ -209,6 +209,36 @@ describe('ResourceClient', () => {
       });
     });
 
+    it('should send correct operator strings matching backend FilterOperator enum', async () => {
+      mockAxiosGet.mockResolvedValue({ data: validListResponse });
+
+      await resourceClient.list({
+        filters: [
+          { field: 'name', operator: 'neq', value: 'admin' },
+          { field: 'bio', operator: 'starts', value: 'Hello' },
+          { field: 'email', operator: 'ends', value: '.com' },
+          { field: 'note', operator: 'icontains', value: 'urgent' },
+          { field: 'tag', operator: 'istarts', value: 'vip' },
+          { field: 'code', operator: 'iends', value: 'xyz' },
+          { field: 'type', operator: 'ieq', value: 'admin' },
+          { field: 'deletedAt', operator: 'isnull', value: 'true' },
+        ],
+      });
+
+      expect(mockAxiosGet).toHaveBeenCalledWith('/api/users', {
+        params: {
+          'filter[name][neq]': 'admin',
+          'filter[bio][starts]': 'Hello',
+          'filter[email][ends]': '.com',
+          'filter[note][icontains]': 'urgent',
+          'filter[tag][istarts]': 'vip',
+          'filter[code][iends]': 'xyz',
+          'filter[type][ieq]': 'admin',
+          'filter[deletedAt][isnull]': 'true',
+        },
+      });
+    });
+
     it('should include JSON:API sparse fieldsets with type bracket notation (Requirement 3.5)', async () => {
       mockAxiosGet.mockResolvedValue({ data: validListResponse });
 

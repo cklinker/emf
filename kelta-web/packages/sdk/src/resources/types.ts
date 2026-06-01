@@ -17,14 +17,19 @@ export interface FilterExpression {
   field: string;
   operator:
     | 'eq'
-    | 'ne'
+    | 'neq'
     | 'gt'
     | 'gte'
     | 'lt'
     | 'lte'
+    | 'isnull'
     | 'contains'
-    | 'startsWith'
-    | 'endsWith'
+    | 'starts'
+    | 'ends'
+    | 'icontains'
+    | 'istarts'
+    | 'iends'
+    | 'ieq'
     | 'in';
   value: unknown;
 }

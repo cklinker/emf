@@ -19,10 +19,20 @@ export function clearTokenCache(): void {
 /**
  * Get an API bearer token for test data operations.
  *
- * Strategy 1: Use kelta-auth direct-login endpoint (preferred).
- * Strategy 2: Fall back to Authentik client_credentials grant.
+ * Strategy 0: Use a pre-issued PAT from E2E_API_TOKEN (highest priority).
+ *             PATs are long-lived and tenant-scoped, so they sidestep both
+ *             the direct-login dependency and the dead Authentik fallback.
+ * Strategy 1: Use kelta-auth direct-login endpoint.
+ * Strategy 2: Fall back to Authentik client_credentials grant (legacy).
  */
 export async function getApiToken(): Promise<string> {
+  // Strategy 0: pre-issued PAT. Long-lived, no caching/refresh needed —
+  // the gateway accepts `Authorization: Bearer klt_*` directly.
+  const staticToken = process.env.E2E_API_TOKEN;
+  if (staticToken) {
+    return staticToken;
+  }
+
   // Return cached token if still valid (with 60s buffer)
   if (cachedToken && Date.now() < tokenExpiry - 60_000) {
     return cachedToken;
@@ -80,11 +90,25 @@ async function getAuthentikToken(): Promise<string> {
     scope: "openid profile email",
   });
 
-  const response = await fetch(tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-  });
+  let response: Response;
+  try {
+    response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+  } catch (err) {
+    // Authentik was decommissioned during the rzware.com → kelta.io migration;
+    // from inside the cluster the legacy hostname now serves a self-signed cert
+    // that node's fetch rejects. Don't let the network error bubble up as a
+    // test failure — direct-login is the supported path; this branch only
+    // exists for legacy local-dev setups.
+    console.warn(
+      `Authentik token endpoint unreachable: ${err}. ` +
+        "DataFactory API calls will fail — use direct-login (E2E_AUTH_BASE_URL) instead.",
+    );
+    return "";
+  }
 
   if (!response.ok) {
     const errorBody = await response.text().catch(() => "");

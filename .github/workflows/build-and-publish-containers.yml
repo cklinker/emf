@@ -540,6 +540,9 @@ jobs:
           # serves /auth/direct-login (returns HTML, breaking JSON.parse).
           E2E_AUTH_BASE_URL: https://auth.kelta.io
           E2E_AUTH_DIRECT_LOGIN_URL: https://auth.kelta.io
+          # Pre-issued PAT for DataFactory API calls. When set, fixtures
+          # short-circuit the direct-login / Authentik dance entirely.
+          E2E_API_TOKEN: ${{ secrets.E2E_API_TOKEN }}
           E2E_AUTHENTIK_URL: ${{ secrets.E2E_AUTHENTIK_URL }}
           E2E_CLIENT_ID: ${{ secrets.E2E_CLIENT_ID }}
           E2E_OIDC_PROVIDER_ID: ${{ secrets.E2E_OIDC_PROVIDER_ID }}

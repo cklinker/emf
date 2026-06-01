@@ -19,10 +19,20 @@ export function clearTokenCache(): void {
 /**
  * Get an API bearer token for test data operations.
  *
- * Strategy 1: Use kelta-auth direct-login endpoint (preferred).
- * Strategy 2: Fall back to Authentik client_credentials grant.
+ * Strategy 0: Use a pre-issued PAT from E2E_API_TOKEN (highest priority).
+ *             PATs are long-lived and tenant-scoped, so they sidestep both
+ *             the direct-login dependency and the dead Authentik fallback.
+ * Strategy 1: Use kelta-auth direct-login endpoint.
+ * Strategy 2: Fall back to Authentik client_credentials grant (legacy).
  */
 export async function getApiToken(): Promise<string> {
+  // Strategy 0: pre-issued PAT. Long-lived, no caching/refresh needed —
+  // the gateway accepts `Authorization: Bearer klt_*` directly.
+  const staticToken = process.env.E2E_API_TOKEN;
+  if (staticToken) {
+    return staticToken;
+  }
+
   // Return cached token if still valid (with 60s buffer)
   if (cachedToken && Date.now() < tokenExpiry - 60_000) {
     return cachedToken;

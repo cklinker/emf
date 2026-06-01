@@ -1,5 +1,6 @@
 package io.kelta.worker.listener;
 
+import io.kelta.worker.service.CerbosPolicySyncService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.*;
 class TenantProvisioningHookTest {
 
     private JdbcTemplate jdbcTemplate;
+    private CerbosPolicySyncService cerbosPolicySyncService;
     private TenantProvisioningHook hook;
 
     private static final String AUTH_ISSUER = "https://auth.example.com";
@@ -27,7 +29,8 @@ class TenantProvisioningHookTest {
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
-        hook = new TenantProvisioningHook(jdbcTemplate, AUTH_ISSUER);
+        cerbosPolicySyncService = mock(CerbosPolicySyncService.class);
+        hook = new TenantProvisioningHook(jdbcTemplate, AUTH_ISSUER, cerbosPolicySyncService);
     }
 
     @Test
@@ -245,6 +248,44 @@ class TenantProvisioningHookTest {
             verify(jdbcTemplate).update(
                     contains("UPDATE tenant SET status = 'ACTIVE'"),
                     eq(TENANT_ID));
+        }
+    }
+
+    @Nested
+    @DisplayName("syncCerbosPolicies")
+    class SyncCerbosPolicies {
+
+        @Test
+        @DisplayName("Should delegate to CerbosPolicySyncService")
+        void shouldDelegateToSyncService() {
+            hook.syncCerbosPolicies(TENANT_ID);
+
+            verify(cerbosPolicySyncService).syncTenant(TENANT_ID);
+        }
+
+        @Test
+        @DisplayName("Should no-op when sync service is null")
+        void shouldNoOpWhenServiceNull() {
+            TenantProvisioningHook hookNoSync =
+                    new TenantProvisioningHook(jdbcTemplate, AUTH_ISSUER, null);
+
+            assertDoesNotThrow(() -> hookNoSync.syncCerbosPolicies(TENANT_ID));
+            verifyNoInteractions(cerbosPolicySyncService);
+        }
+
+        @Test
+        @DisplayName("Should be invoked from afterCreate after seeding")
+        void shouldBeInvokedFromAfterCreate() {
+            Map<String, Object> record = new HashMap<>(Map.of("id", TENANT_ID, "slug", TENANT_SLUG));
+
+            when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any()))
+                    .thenReturn(0);
+            when(jdbcTemplate.queryForList(anyString(), eq(String.class), any()))
+                    .thenReturn(List.of("profile-sys-admin"));
+
+            hook.afterCreate(record, TENANT_ID);
+
+            verify(cerbosPolicySyncService).syncTenant(TENANT_ID);
         }
     }
 }

@@ -2,6 +2,7 @@ package io.kelta.worker.config;
 
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
 import io.kelta.worker.listener.TenantProvisioningHook;
+import io.kelta.worker.service.CerbosPolicySyncService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +23,10 @@ public class TenantProvisioningConfig {
     public TenantProvisioningHook tenantProvisioningHook(
             BeforeSaveHookRegistry hookRegistry,
             JdbcTemplate jdbcTemplate,
+            CerbosPolicySyncService cerbosPolicySyncService,
             @Value("${kelta.auth.issuer-uri:https://auth.kelta.io}") String authIssuerUri) {
-        TenantProvisioningHook hook = new TenantProvisioningHook(jdbcTemplate, authIssuerUri);
+        TenantProvisioningHook hook = new TenantProvisioningHook(
+                jdbcTemplate, authIssuerUri, cerbosPolicySyncService);
         hookRegistry.register(hook);
         return hook;
     }

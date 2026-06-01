@@ -53,10 +53,6 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
         String clientId = "kelta-platform";
 
         RegisteredClient existing = clientRepository.findByClientId(clientId);
-        if (existing != null) {
-            log.info("Platform OAuth2 client '{}' already registered (id={})", clientId, existing.getId());
-            return;
-        }
 
         String uiBaseUrl = properties.getUiBaseUrl();
         if (uiBaseUrl == null || uiBaseUrl.isBlank()) {
@@ -67,7 +63,16 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
             uiBaseUrl = uiBaseUrl.substring(0, uiBaseUrl.length() - 1);
         }
 
-        RegisteredClient platformClient = RegisteredClient.withId(UUID.randomUUID().toString())
+        String registrationId = existing != null ? existing.getId() : UUID.randomUUID().toString();
+        String expectedRedirectUri = uiBaseUrl + "/auth/callback";
+
+        // If the client already exists with the correct redirect URI, nothing to do.
+        if (existing != null && existing.getRedirectUris().contains(expectedRedirectUri)) {
+            log.info("Platform OAuth2 client '{}' already registered with correct redirect URI", clientId);
+            return;
+        }
+
+        RegisteredClient platformClient = RegisteredClient.withId(registrationId)
                 .clientId(clientId)
                 .clientName("Kelta Platform UI")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
@@ -75,7 +80,7 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 // Base redirect URI — the actual tenant-scoped URI is validated by
                 // PlatformRedirectUriValidator which allows any path under this origin
-                .redirectUri(uiBaseUrl + "/auth/callback")
+                .redirectUri(expectedRedirectUri)
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope("email")
@@ -91,7 +96,12 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
                 .build();
 
         clientRepository.save(platformClient);
-        log.info("Registered Platform OAuth2 client '{}' with redirect URIs under '{}'", clientId, uiBaseUrl);
+        if (existing == null) {
+            log.info("Registered Platform OAuth2 client '{}' with redirect URI '{}'", clientId, expectedRedirectUri);
+        } else {
+            log.info("Updated Platform OAuth2 client '{}' redirect URI to '{}' (was '{}')",
+                    clientId, expectedRedirectUri, existing.getRedirectUris());
+        }
     }
 
     private void registerSupersetClient() {

@@ -143,6 +143,10 @@ jobs:
             curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
             echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
           fi
+          # Route all Maven traffic through the homelab Nexus proxy so direct
+          # mvn calls on the runner share the same mirror as the Docker builds.
+          mkdir -p ~/.m2
+          cp ci/maven-settings.xml ~/.m2/settings.xml
 
       - name: Cache Maven dependencies
         if: matrix.changed == 'true' || needs.changes.outputs.workflows == 'true'

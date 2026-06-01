@@ -6,12 +6,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.stereotype.Component;
 
 /**
- * Default {@link CustomDomainProvisioner} that just logs the events. Used when
- * no cluster-aware impl is registered (local dev, tests, environments where the
- * worker has no Kubernetes RBAC). When
- * {@code kelta.worker.k8s-provisioner.enabled=true} the
- * {@link K8sCustomDomainProvisioner} bean takes precedence and this one is
- * suppressed by {@link ConditionalOnMissingBean}.
+ * Default {@link CustomDomainProvisioner} that just logs the events. A
+ * cluster-aware impl (Fabric8 IngressRoute + Certificate management) is
+ * planned as a follow-up and will register a bean that wins over this one
+ * via {@link ConditionalOnMissingBean}.
  */
 @Component
 @ConditionalOnMissingBean(value = CustomDomainProvisioner.class, ignored = LoggingCustomDomainProvisioner.class)

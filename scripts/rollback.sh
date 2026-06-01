@@ -49,6 +49,20 @@ git config user.email "github-actions[bot]@users.noreply.github.com"
 
 REVERT_MSG="revert: roll back image bump (${REASON})"
 git revert --no-edit HEAD
+
+# Safety net: if the resulting tree is the well-known empty tree, the parent
+# commit object was unreachable (shallow clone) and `git revert` silently
+# produced an empty revert. Pushing this would prune every workload via
+# ArgoCD. Abort instead.
+EMPTY_TREE_SHA="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+REVERT_TREE_SHA="$(git log -1 --pretty=%T HEAD)"
+if [[ "$REVERT_TREE_SHA" == "$EMPTY_TREE_SHA" ]]; then
+  echo "ERROR: revert produced the empty tree — likely a shallow-clone issue." >&2
+  echo "Refusing to push. Check the workflow's actions/checkout fetch-depth." >&2
+  git reset --hard HEAD~ >/dev/null 2>&1 || true
+  exit 5
+fi
+
 # git revert produces a default message; rewrite the subject for searchability.
 git commit --amend -m "$REVERT_MSG" -m "Reverts $(git log -1 --pretty=%H HEAD~ 2>/dev/null || echo unknown)"
 

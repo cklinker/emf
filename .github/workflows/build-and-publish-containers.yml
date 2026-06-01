@@ -474,6 +474,12 @@ jobs:
           repository: cklinker/homelab-argo
           token: ${{ secrets.ARGOCD_REPO_TOKEN }}
           path: homelab-argo
+          # CRITICAL: fetch full history. `git revert HEAD` needs the parent
+          # commit object to compute the inverse diff. With the default
+          # fetch-depth: 1, the parent is unreachable and revert silently
+          # produces an empty tree — wiping every manifest in homelab-argo
+          # and tearing down every workload via ArgoCD prune.
+          fetch-depth: 0
 
       - name: Roll back image bump
         env:

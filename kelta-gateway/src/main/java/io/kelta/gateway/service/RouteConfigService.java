@@ -45,13 +45,13 @@ public class RouteConfigService {
             WebClient.Builder webClientBuilder,
             RouteRegistry routeRegistry,
             GatewayCacheManager cacheManager,
-            @Value("${kelta.gateway.worker-service-url:http://kelta-worker:80}") String workerServiceUrl) {
+            @Value("${kelta.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
         this.webClient = webClientBuilder.baseUrl(workerServiceUrl).build();
         this.routeRegistry = routeRegistry;
         this.cacheManager = cacheManager;
         this.workerServiceUrl = workerServiceUrl;
 
-        logger.info("RouteConfigService initialized with worker URL: {}", workerServiceUrl);
+        logger.info("Gateway → worker URL resolved to: {}", workerServiceUrl);
     }
 
     /**
@@ -138,7 +138,7 @@ public class RouteConfigService {
             // Always use the configured worker service URL (K8s Service DNS) instead
             // of the pod-specific IP from the bootstrap response. Pod IPs are ephemeral
             // and become stale when pods restart, causing routing failures. The K8s
-            // Service URL (e.g., http://kelta-worker:80) is stable and load-balances
+            // Service URL (e.g., http://emf-worker:80) is stable and load-balances
             // across all worker pods.
             RouteDefinition route = new RouteDefinition(
                 collectionId,

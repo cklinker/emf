@@ -42,7 +42,7 @@ public class UserIdentityResolutionFilter implements GlobalFilter, Ordered {
             ReactiveRedisTemplate<String, String> redisTemplate,
             ObjectMapper objectMapper,
             PublicPathMatcher publicPathMatcher,
-            @Value("${kelta.gateway.worker-service-url:http://kelta-worker:80}") String workerServiceUrl,
+            @Value("${kelta.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl,
             @Value("${kelta.gateway.security.identity-cache-ttl-minutes:5}") int cacheTtlMinutes) {
         this.webClient = webClientBuilder.baseUrl(workerServiceUrl).build();
         this.redisTemplate = redisTemplate;

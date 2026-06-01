@@ -40,7 +40,7 @@ public class ConfigEventListener {
     public ConfigEventListener(RouteRegistry routeRegistry,
                               ObjectMapper objectMapper,
                               ApplicationEventPublisher applicationEventPublisher,
-                              @org.springframework.beans.factory.annotation.Value("${kelta.gateway.worker-service-url:http://kelta-worker:80}") String workerServiceUrl) {
+                              @org.springframework.beans.factory.annotation.Value("${kelta.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
         this.routeRegistry = routeRegistry;
         this.objectMapper = objectMapper;
         this.applicationEventPublisher = applicationEventPublisher;

@@ -44,7 +44,7 @@ spring.security.oauth2.resourceserver.jwt:
   issuer-uri: ${OIDC_ISSUER_URI:http://localhost:9000/realms/kelta}
 
 kelta.gateway:
-  worker-service-url: ${WORKER_SERVICE_URL:http://kelta-worker:80}
+  worker-service-url: ${WORKER_SERVICE_URL:http://emf-worker:80}
   tenant-slug:
     enabled: ${TENANT_SLUG_ENABLED:true}
     cache-refresh-ms: 60000

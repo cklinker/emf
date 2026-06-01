@@ -31,7 +31,7 @@ spring:
 # Kelta Gateway test configuration
 kelta:
   gateway:
-    worker-service-url: http://kelta-worker:80
+    worker-service-url: http://emf-worker:80
     kafka:
       topics:
         collection-changed: kelta.collection.changed

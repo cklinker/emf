@@ -23,3 +23,7 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-05-30
 
 - 2026-05-30 fix(runtime): swallow `DuplicateKeyException` on `pg_type_typname_nsp_index` from concurrent CREATE TABLE in `PhysicalTableStorageAdapter.initializeCollection` so the losing pod in a multi-pod NATS race continues to reconcile the winner's table instead of failing initialization (BUG-2026-05-30-2228)
+
+## 2026-06-01
+
+- 2026-06-01 fix(e2e): point E2E workflow + `.env.example` at `app.kelta.io`/`api.kelta.io`/`auth.kelta.io` after the rzware.com cutover; the legacy hostnames no longer serve a valid cert so Playwright was failing every test with `ERR_CERT_AUTHORITY_INVALID` (BUG-2026-06-01-4324)

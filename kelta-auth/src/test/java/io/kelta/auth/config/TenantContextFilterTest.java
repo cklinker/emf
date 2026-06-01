@@ -1,5 +1,6 @@
 package io.kelta.auth.config;
 
+import io.kelta.auth.service.AuthDomainResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -13,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,10 +31,12 @@ class TenantContextFilterTest {
     @Mock private HttpServletResponse response;
     @Mock private FilterChain filterChain;
     @Mock private HttpSession session;
+    @Mock private AuthDomainResolver domainResolver;
 
     @BeforeEach
     void setUp() {
-        filter = new TenantContextFilter();
+        filter = new TenantContextFilter(domainResolver);
+        lenient().when(domainResolver.resolveTenantSlug(anyString())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -158,5 +163,38 @@ class TenantContextFilterTest {
                 HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
         verify(session).setAttribute("tenantId", "default");
         verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("should resolve tenant from Host header when redirect_uri has no slug prefix")
+    void shouldResolveTenantFromHostHeader() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/oauth2/authorize");
+        // Slug-less redirect_uri on a custom domain
+        when(request.getParameter("redirect_uri"))
+                .thenReturn("https://acme.com/auth/callback");
+        when(request.getServerName()).thenReturn("acme.com");
+        when(request.getSession()).thenReturn(session);
+        when(domainResolver.resolveTenantSlug("acme.com")).thenReturn(Optional.of("acme"));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(session).setAttribute("tenantId", "acme");
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("path-slug wins over Host header when both are present")
+    void pathSlugPrecedesHost() throws Exception {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getServletPath()).thenReturn("/oauth2/authorize");
+        when(request.getParameter("redirect_uri"))
+                .thenReturn("https://app.kelta.io/threadline/auth/callback");
+        when(request.getSession()).thenReturn(session);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(session).setAttribute("tenantId", "threadline");
+        verify(domainResolver, never()).resolveTenantSlug(anyString());
     }
 }

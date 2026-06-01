@@ -7,6 +7,7 @@ import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.listener.CustomDomainEventPublisher;
+import io.kelta.worker.service.CustomDomainProvisioner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -49,14 +50,17 @@ public class TenantDomainController {
     private final WorkerCacheManager cacheManager;
     private final RecordEventPublisher recordEventPublisher;
     private final CustomDomainEventPublisher domainEventPublisher;
+    private final CustomDomainProvisioner provisioner;
 
     public TenantDomainController(JdbcTemplate jdbcTemplate, WorkerCacheManager cacheManager,
                                    RecordEventPublisher recordEventPublisher,
-                                   CustomDomainEventPublisher domainEventPublisher) {
+                                   CustomDomainEventPublisher domainEventPublisher,
+                                   CustomDomainProvisioner provisioner) {
         this.jdbcTemplate = jdbcTemplate;
         this.cacheManager = cacheManager;
         this.recordEventPublisher = recordEventPublisher;
         this.domainEventPublisher = domainEventPublisher;
+        this.provisioner = provisioner;
     }
 
     @GetMapping("/api/admin/domains")
@@ -112,6 +116,35 @@ public class TenantDomainController {
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("data", Map.of("id", id, "domain", domain)));
     }
 
+    @PostMapping("/api/admin/domains/{domainId}/verify")
+    public ResponseEntity<?> verifyDomain(@PathVariable String domainId) {
+        String tenantId = TenantContext.get();
+        if (tenantId == null) return ResponseEntity.badRequest().body(Map.of("error", "No tenant context"));
+
+        // Look up the row so we have the domain string (for cache eviction +
+        // provisioning) and so the response carries the verified state back.
+        var rows = jdbcTemplate.queryForList(
+                "SELECT domain FROM tenant_custom_domain WHERE id = ? AND tenant_id = ?",
+                domainId, tenantId);
+        if (rows.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        String domain = (String) rows.get(0).get("domain");
+
+        int updated = jdbcTemplate.update(
+                "UPDATE tenant_custom_domain SET verified = true WHERE id = ? AND tenant_id = ? AND verified = false",
+                domainId, tenantId);
+
+        if (updated > 0) {
+            cacheManager.evictCustomDomain(domain);
+            publishRecordEvent("record.updated", tenantId, domainId, Map.of("domain", domain, "verified", true));
+            domainEventPublisher.publishCreated(domainId, domain, tenantId);
+            provisioner.onVerified(domainId, domain, tenantId);
+            log.info("Custom domain verified: {} (id={}) tenant={}", domain, domainId, tenantId);
+        }
+        return ResponseEntity.ok(Map.of("data", Map.of("id", domainId, "domain", domain, "verified", true)));
+    }
+
     @DeleteMapping("/api/admin/domains/{domainId}")
     public ResponseEntity<?> removeDomain(@PathVariable String domainId) {
         String tenantId = TenantContext.get();
@@ -132,6 +165,7 @@ public class TenantDomainController {
             cacheManager.evictCustomDomain(domain);
             publishRecordEvent("record.deleted", tenantId, domainId, Map.of("domain", domain));
             domainEventPublisher.publishDeleted(domainId, domain, tenantId);
+            provisioner.onRemoved(domainId, domain, tenantId);
         }
 
         log.info("Custom domain removed: id={} tenant={}", domainId, tenantId);
@@ -151,8 +185,11 @@ public class TenantDomainController {
             return ResponseEntity.ok(value);
         }
 
+        // Only verified domains resolve. Unverified rows exist purely as
+        // registration state until ownership is confirmed.
         var results = jdbcTemplate.queryForList(
-                "SELECT t.slug FROM tenant_custom_domain tcd JOIN tenant t ON t.id = tcd.tenant_id WHERE tcd.domain = ?",
+                "SELECT t.slug FROM tenant_custom_domain tcd JOIN tenant t ON t.id = tcd.tenant_id "
+                        + "WHERE tcd.domain = ? AND tcd.verified = true",
                 domain);
         if (results.isEmpty()) {
             // Cache the negative result to avoid repeated DB queries
@@ -176,6 +213,9 @@ public class TenantDomainController {
             RecordChangedPayload payload;
             if (eventType.contains("created")) {
                 payload = RecordChangedPayload.created(COLLECTION_NAME, recordId, data);
+            } else if (eventType.contains("updated")) {
+                payload = RecordChangedPayload.updated(COLLECTION_NAME, recordId, data,
+                        Map.of(), List.copyOf(data.keySet()));
             } else {
                 payload = RecordChangedPayload.deleted(COLLECTION_NAME, recordId, data);
             }

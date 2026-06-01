@@ -1,11 +1,13 @@
 package io.kelta.auth.controller;
 
 import io.kelta.auth.config.AuthProperties;
+import io.kelta.auth.config.CookieDomainResolver;
 import io.kelta.auth.model.KeltaSession;
 import io.kelta.auth.service.ExternalTokenValidator;
 import io.kelta.auth.service.SessionService;
 import io.kelta.auth.service.WorkerClient;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,15 +28,18 @@ public class SessionController {
     private final ExternalTokenValidator tokenValidator;
     private final WorkerClient workerClient;
     private final AuthProperties properties;
+    private final CookieDomainResolver cookieDomainResolver;
 
     public SessionController(SessionService sessionService,
                              ExternalTokenValidator tokenValidator,
                              WorkerClient workerClient,
-                             AuthProperties properties) {
+                             AuthProperties properties,
+                             CookieDomainResolver cookieDomainResolver) {
         this.sessionService = sessionService;
         this.tokenValidator = tokenValidator;
         this.workerClient = workerClient;
         this.properties = properties;
+        this.cookieDomainResolver = cookieDomainResolver;
     }
 
     @PostMapping
@@ -42,6 +47,7 @@ public class SessionController {
             @RequestHeader("Authorization") String authHeader,
             @RequestHeader(value = "X-Tenant-ID", required = false) String tenantId,
             @RequestHeader(value = "X-Tenant-Slug", required = false) String tenantSlug,
+            HttpServletRequest request,
             HttpServletResponse response) {
 
         String token = extractBearerToken(authHeader);
@@ -84,12 +90,14 @@ public class SessionController {
 
         String sessionId = sessionService.createSession(session);
 
-        // Set SSO cookie
+        // Set SSO cookie — domain is host-derived so customer-branded domains
+        // get a host-only cookie and *.kelta.io stays single-sign-on.
         Cookie cookie = new Cookie(SESSION_COOKIE_NAME, sessionId);
-        cookie.setDomain(properties.getCookieDomain());
+        String cookieDomain = cookieDomainResolver.resolve(request);
+        if (cookieDomain != null) cookie.setDomain(cookieDomain);
         cookie.setPath("/");
         cookie.setHttpOnly(true);
-        cookie.setSecure(!"localhost".equals(properties.getCookieDomain()));
+        cookie.setSecure(cookieDomainResolver.secureForRequest(request));
         cookie.setMaxAge((int) java.time.Duration.ofHours(8).toSeconds());
         response.addCookie(cookie);
 
@@ -101,15 +109,18 @@ public class SessionController {
     @DeleteMapping
     public ResponseEntity<Void> deleteSession(
             @CookieValue(name = SESSION_COOKIE_NAME, required = false) String sessionId,
+            HttpServletRequest request,
             HttpServletResponse response) {
 
         if (sessionId != null) {
             sessionService.deleteSession(sessionId);
         }
 
-        // Clear the cookie
+        // Clear the cookie — domain must match the one we set on create so the
+        // browser actually drops it.
         Cookie cookie = new Cookie(SESSION_COOKIE_NAME, "");
-        cookie.setDomain(properties.getCookieDomain());
+        String cookieDomain = cookieDomainResolver.resolve(request);
+        if (cookieDomain != null) cookie.setDomain(cookieDomain);
         cookie.setPath("/");
         cookie.setHttpOnly(true);
         cookie.setMaxAge(0);

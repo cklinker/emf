@@ -1,5 +1,6 @@
 package io.kelta.auth.config;
 
+import io.kelta.auth.service.AuthDomainResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,6 +53,12 @@ public class TenantContextFilter extends OncePerRequestFilter {
 
     static final String SESSION_TENANT_ATTR = "tenantId";
 
+    private final AuthDomainResolver domainResolver;
+
+    public TenantContextFilter(AuthDomainResolver domainResolver) {
+        this.domainResolver = domainResolver;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -59,12 +66,18 @@ public class TenantContextFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         if ("GET".equalsIgnoreCase(request.getMethod())
                 && "/oauth2/authorize".equals(request.getServletPath())) {
+            String slug = null;
             String redirectUri = request.getParameter("redirect_uri");
             if (redirectUri != null && !redirectUri.isBlank()) {
-                String slug = extractTenantSlug(redirectUri);
-                if (slug != null) {
-                    applyTenantContext(request, slug);
-                }
+                slug = extractTenantSlug(redirectUri);
+            }
+            // Fall back to Host-based resolution when the redirect_uri does not
+            // carry a tenant prefix (slug-less custom-domain mode).
+            if (slug == null) {
+                slug = domainResolver.resolveTenantSlug(request.getServerName()).orElse(null);
+            }
+            if (slug != null) {
+                applyTenantContext(request, slug);
             }
         }
         filterChain.doFilter(request, response);

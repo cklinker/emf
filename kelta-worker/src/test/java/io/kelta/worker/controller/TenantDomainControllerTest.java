@@ -5,6 +5,7 @@ import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.listener.CustomDomainEventPublisher;
+import io.kelta.worker.service.LoggingCustomDomainProvisioner;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +36,7 @@ class TenantDomainControllerTest {
         CustomDomainEventPublisher domainEventPublisher =
                 new CustomDomainEventPublisher(platformEventPublisher);
         controller = new TenantDomainController(jdbcTemplate, cacheManager, recordEventPublisher,
-                domainEventPublisher);
+                domainEventPublisher, new LoggingCustomDomainProvisioner());
         TenantContext.set("tenant-1");
     }
 

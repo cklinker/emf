@@ -1,16 +1,23 @@
 /**
  * Tenant Context
  *
- * Provides tenant identity from the URL path slug (/:tenantSlug/...).
- * Sets a module-level variable so getTenantSlug() works outside React components.
+ * Two modes of operation:
+ * - slug: tenant identity comes from the URL path (/:tenantSlug/...). Used on
+ *   the canonical platform host (app.kelta.io).
+ * - custom-domain: the request hostname is bound to a tenant by the gateway,
+ *   so the URL contains no slug (https://acme.com/...). The slug is fetched
+ *   from /api/whoami once the API client is available.
  */
 
-import React, { createContext, useContext, useEffect } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+
+export type TenantMode = 'slug' | 'custom-domain'
 
 interface TenantContextValue {
   tenantSlug: string
   tenantBasePath: string
+  mode: TenantMode
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null)
@@ -20,6 +27,20 @@ let _currentTenantSlug: string = 'default'
 let _currentTenantId: string | null = null
 
 /**
+ * Returns true when the browser is on a tenant custom domain rather than the
+ * canonical platform host (*.kelta.io).
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function isCustomDomainHost(): boolean {
+  if (typeof window === 'undefined') return false
+  const host = window.location.hostname.toLowerCase()
+  if (!host) return false
+  if (host === 'localhost' || host === '127.0.0.1') return false
+  // Platform hosts: anything under kelta.io is slug-mode.
+  return !(host === 'kelta.io' || host.endsWith('.kelta.io'))
+}
+
+/**
  * Returns the current tenant slug for use outside React components.
  */
 // eslint-disable-next-line react-refresh/only-export-components
@@ -27,28 +48,15 @@ export function getTenantSlug(): string {
   return _currentTenantSlug
 }
 
-/**
- * Eagerly sets the tenant slug during render so child providers
- * (AuthProvider, ConfigProvider) read the correct value on mount.
- * Extracted to a function so the React Compiler does not flag it
- * as a direct variable reassignment inside a component body.
- */
 function syncTenantSlug(slug: string): void {
   _currentTenantSlug = slug
 }
 
-/**
- * Sets the resolved tenant ID from bootstrap config.
- * Called by AuthContext/ConfigContext after fetching bootstrap.
- */
 // eslint-disable-next-line react-refresh/only-export-components
 export function setResolvedTenantId(tenantId: string | null): void {
   _currentTenantId = tenantId
 }
 
-/**
- * Returns the resolved tenant ID (from bootstrap) for use outside React components.
- */
 // eslint-disable-next-line react-refresh/only-export-components
 export function getResolvedTenantId(): string | null {
   return _currentTenantId
@@ -65,21 +73,45 @@ export function useTenant(): TenantContextValue {
 
 export function TenantProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const { tenantSlug } = useParams<{ tenantSlug: string }>()
-  const slug = tenantSlug || 'default'
+  const customDomain = isCustomDomainHost()
+  const mode: TenantMode = customDomain ? 'custom-domain' : 'slug'
 
-  // Set module-level variable synchronously during render so that
-  // child providers (AuthProvider, ConfigProvider) can read the correct
-  // tenant slug when their own effects fire on mount.
-  syncTenantSlug(slug)
+  // In custom-domain mode the slug isn't in the URL — we hydrate it later
+  // from /api/whoami. Until that completes we have no slug to show, which is
+  // fine: routing and API calls work without it on a custom domain.
+  const [resolvedSlug, setResolvedSlug] = useState<string>(() =>
+    customDomain ? '' : (tenantSlug || 'default'),
+  )
 
-  // Also keep it in sync via useEffect for route changes
+  syncTenantSlug(resolvedSlug)
+
   useEffect(() => {
-    syncTenantSlug(slug)
-  }, [slug])
+    if (customDomain) {
+      // Worker echoes the gateway-injected X-Tenant-Slug header back so the UI
+      // can label things by tenant. No auth needed (custom-domain mode resolves
+      // tenant from Host pre-auth) — but the endpoint is also fine post-auth.
+      fetch('/api/whoami', { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (j && typeof j.tenantSlug === 'string' && j.tenantSlug) {
+            setResolvedSlug(j.tenantSlug)
+            syncTenantSlug(j.tenantSlug)
+          }
+        })
+        .catch(() => {
+          // Silent: tenant labels degrade gracefully without a slug
+        })
+      return
+    }
+    const next = tenantSlug || 'default'
+    setResolvedSlug(next)
+    syncTenantSlug(next)
+  }, [customDomain, tenantSlug])
 
   const value: TenantContextValue = {
-    tenantSlug: slug,
-    tenantBasePath: `/${slug}`,
+    tenantSlug: resolvedSlug,
+    tenantBasePath: customDomain ? '' : `/${resolvedSlug}`,
+    mode,
   }
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>

@@ -1,6 +1,7 @@
 package io.kelta.auth.controller;
 
 import io.kelta.auth.federation.DynamicClientRegistrationRepository;
+import io.kelta.auth.service.AuthDomainResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,9 +21,12 @@ public class LoginController {
     private static final Logger log = LoggerFactory.getLogger(LoginController.class);
 
     private final ClientRegistrationRepository clientRegistrationRepository;
+    private final AuthDomainResolver domainResolver;
 
-    public LoginController(ClientRegistrationRepository clientRegistrationRepository) {
+    public LoginController(ClientRegistrationRepository clientRegistrationRepository,
+                           AuthDomainResolver domainResolver) {
         this.clientRegistrationRepository = clientRegistrationRepository;
+        this.domainResolver = domainResolver;
     }
 
     @GetMapping("/login")
@@ -91,6 +95,15 @@ public class LoginController {
                     return hintTenant;
                 }
             }
+        }
+
+        // Custom-domain login: derive tenant from request Host. This is what
+        // makes https://acme.com/login render the right SSO buttons without a
+        // tenant slug appearing anywhere in the URL.
+        String slug = domainResolver.resolveTenantSlug(request.getServerName()).orElse(null);
+        if (slug != null) {
+            request.getSession().setAttribute("tenantId", slug);
+            return slug;
         }
 
         return null;

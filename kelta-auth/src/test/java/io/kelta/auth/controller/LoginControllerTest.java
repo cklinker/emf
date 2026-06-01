@@ -1,6 +1,7 @@
 package io.kelta.auth.controller;
 
 import io.kelta.auth.federation.DynamicClientRegistrationRepository;
+import io.kelta.auth.service.AuthDomainResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,6 +20,7 @@ import org.springframework.ui.Model;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -30,12 +32,14 @@ class LoginControllerTest {
 
     @Mock private HttpServletRequest request;
     @Mock private HttpSession session;
+    @Mock private AuthDomainResolver domainResolver;
 
     @BeforeEach
     void setUp() {
         lenient().when(request.getSession()).thenReturn(session);
         lenient().when(request.getParameter("pending_activation")).thenReturn(null);
         lenient().when(request.getParameter("federation")).thenReturn(null);
+        lenient().when(domainResolver.resolveTenantSlug(anyString())).thenReturn(Optional.empty());
     }
 
     @Nested
@@ -46,7 +50,7 @@ class LoginControllerTest {
 
         @BeforeEach
         void setUp() {
-            controller = new LoginController(dynamicRepo);
+            controller = new LoginController(dynamicRepo, domainResolver);
         }
 
         @Test
@@ -146,7 +150,7 @@ class LoginControllerTest {
 
         @BeforeEach
         void setUp() {
-            controller = new LoginController(plainRepo);
+            controller = new LoginController(plainRepo, domainResolver);
         }
 
         @Test

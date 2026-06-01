@@ -33,7 +33,7 @@ import { ConfigProvider, useConfig } from './context/ConfigContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { I18nProvider } from './context/I18nContext'
 import { PluginProvider } from './context/PluginContext'
-import { TenantProvider, useTenant } from './context/TenantContext'
+import { TenantProvider, useTenant, isCustomDomainHost } from './context/TenantContext'
 import { AppContextProvider } from './context/AppContext'
 import { useAuth } from './context/AuthContext'
 import { AiChatProvider, AiChatPanel, AiChatTrigger } from './components/AiChat'
@@ -299,7 +299,7 @@ function AdminLayout({ children }: { children: React.ReactNode }): React.ReactEl
   const { config, isLoading: configLoading, error, reload } = useConfig()
   const { helpOpen, setHelpOpen } = useGlobalShortcuts()
   const location = useLocation()
-  const { tenantSlug } = useTenant()
+  const { tenantBasePath } = useTenant()
 
   const isSetupPage = location.pathname.endsWith('/setup')
 
@@ -354,7 +354,7 @@ function AdminLayout({ children }: { children: React.ReactNode }): React.ReactEl
             <BreadcrumbList>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link to={`/${tenantSlug}/setup`}>← Setup</Link>
+                  <Link to={`${tenantBasePath}/setup`}>← Setup</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
             </BreadcrumbList>
@@ -427,15 +427,19 @@ function AdminPageRoute({
  * 9. LiveRegionProvider - Screen reader announcements
  */
 function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactElement {
-  const { tenantSlug, tenantBasePath } = useTenant()
+  const { tenantBasePath } = useTenant()
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  // tenantBasePath is "" on a custom domain, "/<slug>" on the platform host.
+  // URLs follow the same rule: callbacks and API base both skip the slug
+  // segment when we're on a custom domain.
+  const apiClientBaseUrl = `${apiBaseUrl}${tenantBasePath}`
 
   return (
     <AuthProvider
       redirectUri={window.location.origin + tenantBasePath + '/auth/callback'}
-      postLogoutRedirectUri={window.location.origin + tenantBasePath}
+      postLogoutRedirectUri={window.location.origin + (tenantBasePath || '/')}
     >
-      <ApiProvider baseUrl={`${apiBaseUrl}/${tenantSlug}`}>
+      <ApiProvider baseUrl={apiClientBaseUrl}>
         <CollectionStoreProvider>
           <ConfigProvider>
             <ThemeProvider>
@@ -446,7 +450,7 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
                       <ToastProvider>
                         <LiveRegionProvider>
                           <TenantRoutes />
-                          <AiChatPanel baseUrl={`${apiBaseUrl}/${tenantSlug}`} />
+                          <AiChatPanel baseUrl={apiClientBaseUrl} />
                           <AiChatTrigger />
                         </LiveRegionProvider>
                       </ToastProvider>
@@ -466,7 +470,7 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
  * All tenant-scoped routes. Paths are relative to /:tenantSlug/.
  */
 function TenantRoutes(): React.ReactElement {
-  const { tenantSlug } = useTenant()
+  const { tenantBasePath } = useTenant()
   return (
     <Routes>
       {/* Public routes */}
@@ -481,8 +485,8 @@ function TenantRoutes(): React.ReactElement {
         path=""
         element={
           <ProtectedRoute
-            loginPath={`/${tenantSlug}/login`}
-            unauthorizedPath={`/${tenantSlug}/unauthorized`}
+            loginPath={`${tenantBasePath}/login`}
+            unauthorizedPath={`${tenantBasePath}/unauthorized`}
           >
             <Navigate to="app" replace />
           </ProtectedRoute>
@@ -1126,8 +1130,8 @@ function TenantRoutes(): React.ReactElement {
         path="app"
         element={
           <ProtectedRoute
-            loginPath={`/${tenantSlug}/login`}
-            unauthorizedPath={`/${tenantSlug}/unauthorized`}
+            loginPath={`${tenantBasePath}/login`}
+            unauthorizedPath={`${tenantBasePath}/unauthorized`}
           >
             <EndUserShell />
           </ProtectedRoute>
@@ -1211,21 +1215,40 @@ function TenantRoutes(): React.ReactElement {
  * - * → NoTenantPage (catch-all)
  */
 function App({ plugins = [] }: AppProps): React.ReactElement {
+  // On a customer custom domain (anything not under .kelta.io) the URL has no
+  // tenant slug — the gateway resolves the tenant from the Host header. Mount
+  // the scoped app at the root in that mode so /login, /app/... etc. all work
+  // without a slug prefix. On the platform host we keep the /:tenantSlug/*
+  // route so existing URLs (and the NoTenantPage error UX) stay intact.
+  const customDomain = isCustomDomainHost()
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
-            <Route
-              path="/:tenantSlug/*"
-              element={
-                <TenantProvider>
-                  <TenantScopedApp plugins={plugins} />
-                </TenantProvider>
-              }
-            />
-            <Route path="/" element={<NoTenantPage />} />
-            <Route path="*" element={<NoTenantPage />} />
+            {customDomain ? (
+              <Route
+                path="/*"
+                element={
+                  <TenantProvider>
+                    <TenantScopedApp plugins={plugins} />
+                  </TenantProvider>
+                }
+              />
+            ) : (
+              <>
+                <Route
+                  path="/:tenantSlug/*"
+                  element={
+                    <TenantProvider>
+                      <TenantScopedApp plugins={plugins} />
+                    </TenantProvider>
+                  }
+                />
+                <Route path="/" element={<NoTenantPage />} />
+                <Route path="*" element={<NoTenantPage />} />
+              </>
+            )}
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>

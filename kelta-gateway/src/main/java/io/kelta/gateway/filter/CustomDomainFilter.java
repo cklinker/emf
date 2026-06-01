@@ -30,7 +30,16 @@ public class CustomDomainFilter implements WebFilter, Ordered {
     /** Valid domain pattern: alphanumeric, dots, hyphens only. */
     private static final Pattern DOMAIN_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9.-]{0,253}[a-zA-Z0-9]$");
 
-    static final String CUSTOM_DOMAIN_RESOLVED = "custom.domain.resolved";
+    public static final String CUSTOM_DOMAIN_RESOLVED = "custom.domain.resolved";
+
+    /**
+     * Platform-owned hosts that must never resolve as a custom domain even if a
+     * stray DB row maps them to a tenant. Anything ending in {@code .kelta.io}
+     * is also reserved (covers future service subdomains without code change).
+     */
+    private static final java.util.Set<String> RESERVED_PLATFORM_HOSTS = java.util.Set.of(
+            "kelta.io", "localhost"
+    );
 
     private final GatewayCacheManager cacheManager;
 
@@ -48,6 +57,11 @@ public class CustomDomainFilter implements WebFilter, Ordered {
         // Sanitize: strip port, validate format
         String domain = sanitizeHost(host);
         if (domain == null) {
+            return chain.filter(exchange);
+        }
+
+        // Reserved platform hosts can never be a custom domain.
+        if (isReservedHost(domain)) {
             return chain.filter(exchange);
         }
 
@@ -99,8 +113,13 @@ public class CustomDomainFilter implements WebFilter, Ordered {
         return domain;
     }
 
+    static boolean isReservedHost(String domain) {
+        if (domain == null) return false;
+        return RESERVED_PLATFORM_HOSTS.contains(domain) || domain.endsWith(".kelta.io");
+    }
+
     @Override
     public int getOrder() {
-        return -300; // Before TenantSlugExtractionFilter (-200)
+        return -310; // Must run before TenantSlugExtractionFilter (-300)
     }
 }

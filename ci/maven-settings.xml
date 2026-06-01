@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maven settings used by native-image Docker builds in CI.
+
+  Maven Central rate-limits aggressive parallel fetches (HTTP 429), which
+  breaks builds when worker/worker-migrate/gateway/ai/mcp native images
+  all download the same Spring Boot artifacts simultaneously. Route
+  fetches through Google's free GCS mirror of central — same content,
+  no rate limit, lower latency from most regions.
+
+  This is a stopgap until the homelab Nexus proxy comes online (see
+  homelab-argo#117). At that point, swap the mirror URL to
+  https://nexus.rzware.com/repository/maven-public/ and drop the GCS
+  dependency entirely.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <mirrors>
+        <mirror>
+            <id>google-maven-central</id>
+            <name>Google Cloud Storage mirror of Maven Central</name>
+            <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+            <mirrorOf>central</mirrorOf>
+        </mirror>
+    </mirrors>
+</settings>

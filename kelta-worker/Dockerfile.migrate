@@ -16,6 +16,9 @@ RUN curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/b
     tar xzf - -C /opt && \
     ln -sf /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
 
+# Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
+COPY ci/maven-settings.xml /root/.m2/settings.xml
+
 COPY kelta-platform/pom.xml ./
 COPY kelta-platform/runtime/pom.xml ./runtime/
 COPY kelta-platform/runtime/runtime-core/pom.xml ./runtime/runtime-core/
@@ -56,6 +59,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 RUN curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | \
     tar xzf - -C /opt && \
     ln -sf /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
+
+# Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
+COPY ci/maven-settings.xml /root/.m2/settings.xml
 
 COPY --from=runtime-builder /root/.m2/repository /root/.m2/repository
 

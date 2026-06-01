@@ -18,6 +18,9 @@ RUN microdnf install -y findutils && \
     tar xzf - -C /opt && \
     ln -sf /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
 
+# Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
+COPY ci/maven-settings.xml /root/.m2/settings.xml
+
 # Copy only POMs first for dependency layer caching
 COPY kelta-platform/pom.xml ./
 COPY kelta-platform/runtime/pom.xml ./runtime/
@@ -58,6 +61,9 @@ RUN microdnf install -y findutils && \
     curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | \
     tar xzf - -C /opt && \
     ln -sf /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
+
+# Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
+COPY ci/maven-settings.xml /root/.m2/settings.xml
 
 COPY --from=runtime-builder /root/.m2/repository /root/.m2/repository
 

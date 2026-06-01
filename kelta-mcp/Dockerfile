@@ -12,6 +12,9 @@ FROM maven:3.9-eclipse-temurin-25 AS runtime-builder
 
 WORKDIR /kelta-platform
 
+# Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
+COPY ci/maven-settings.xml /root/.m2/settings.xml
+
 # Copy only POMs first for dependency layer caching
 COPY kelta-platform/pom.xml ./
 COPY kelta-platform/runtime/pom.xml ./runtime/
@@ -43,6 +46,9 @@ RUN mvn clean install -DskipTests -B \
 FROM maven:3.9-eclipse-temurin-25 AS builder
 
 WORKDIR /build
+
+# Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
+COPY ci/maven-settings.xml /root/.m2/settings.xml
 
 # Copy runtime artifacts from previous stage
 COPY --from=runtime-builder /root/.m2/repository/io/kelta /root/.m2/repository/io/kelta

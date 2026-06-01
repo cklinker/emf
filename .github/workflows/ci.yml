@@ -13,8 +13,12 @@ env:
   JAVA_VERSION: '25'
   NODE_VERSION: '18'
   MAVEN_VERSION: '3.9.9'
-  # Override MAVEN_OPTS from runner env to use default ~/.m2/repository
-  MAVEN_OPTS: ''
+  # Survive transient Maven Central 429 / 503 / connection resets. Both the
+  # legacy wagon HTTP transport and the newer Aether connector retry up to 10
+  # times with exponential backoff and honour Retry-After headers. The empty
+  # default that lived here previously was overriding a runner-level value —
+  # set the retry flags explicitly so every `mvn` call picks them up.
+  MAVEN_OPTS: "-Dmaven.wagon.http.retryHandler.count=10 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Daether.connector.http.retryHandler.count=10"
 
 jobs:
   # ===========================================================================
@@ -126,6 +130,9 @@ jobs:
         run: mvn verify -f kelta-${{ matrix.service }}/pom.xml -B
 
       - name: Upload test results
+        # Artifact upload occasionally hits transient ENOTFOUND on the self-
+        # hosted runner — don't let that mask a green test run.
+        continue-on-error: true
         if: always() && (matrix.changed == 'true' || needs.changes.outputs.workflows == 'true')
         uses: actions/upload-artifact@v4
         with:
@@ -135,6 +142,7 @@ jobs:
           retention-days: 7
 
       - name: Upload coverage report
+        continue-on-error: true
         if: always() && (matrix.changed == 'true' || needs.changes.outputs.workflows == 'true')
         uses: actions/upload-artifact@v4
         with:
@@ -189,6 +197,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload coverage report
+        continue-on-error: true
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -295,10 +304,11 @@ jobs:
         env:
           TESTCONTAINERS_RYUK_DISABLED: "true"
           KELTA_HARNESS_PREBUILT_IMAGES: "true"
-          MAVEN_OPTS: "-Xmx1g -XX:MaxMetaspaceSize=384m"
+          MAVEN_OPTS: "-Xmx1g -XX:MaxMetaspaceSize=384m -Dmaven.wagon.http.retryHandler.count=10 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Daether.connector.http.retryHandler.count=10"
         run: mvn verify -f kelta-test-harness/pom.xml -Pintegration-tests -B
 
       - name: Upload harness reports
+        continue-on-error: true
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -410,6 +420,7 @@ jobs:
           done
 
       - name: Upload e2e artifacts
+        continue-on-error: true
         if: always()
         uses: actions/upload-artifact@v4
         with:

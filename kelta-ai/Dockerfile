@@ -5,6 +5,11 @@
 # =============================================================================
 FROM maven:3.9-eclipse-temurin-25 AS runtime-builder
 
+# Survive transient Maven Central 429 / 503 / connection resets — both the
+# legacy wagon HTTP transport and the newer Aether connector retry up to 10
+# times with exponential backoff and honour Retry-After headers.
+ENV MAVEN_OPTS="-Dmaven.wagon.http.retryHandler.count=10 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Daether.connector.http.retryHandler.count=10"
+
 WORKDIR /kelta-platform
 
 # Route Maven Central through Google's GCS mirror to dodge 429 rate limits.
@@ -43,6 +48,8 @@ RUN mvn clean install -DskipTests -B \
 # Stage 2: Build the application
 # =============================================================================
 FROM maven:3.9-eclipse-temurin-25 AS builder
+
+ENV MAVEN_OPTS="-Dmaven.wagon.http.retryHandler.count=10 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Daether.connector.http.retryHandler.count=10"
 
 WORKDIR /build
 

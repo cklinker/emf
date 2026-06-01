@@ -27,8 +27,32 @@ let _currentTenantSlug: string = 'default'
 let _currentTenantId: string | null = null
 
 /**
+ * Top-level route segments that the SPA itself owns. When one of these appears
+ * as the first path segment we know the URL doesn't carry a tenant slug, so a
+ * slug-less mode is in effect (custom domain or first visit before redirect).
+ * Keep in sync with TenantRoutes in App.tsx.
+ */
+const KNOWN_PLATFORM_ROUTES = new Set([
+  'login',
+  'logout',
+  'auth',
+  'app',
+  'setup',
+  'system-health',
+  'unauthorized',
+  'admin',
+])
+
+const TENANT_SLUG_REGEX = /^[a-z][a-z0-9-]{1,61}[a-z0-9]$/
+
+/**
  * Returns true when the browser is on a tenant custom domain rather than the
  * canonical platform host (*.kelta.io).
+ *
+ * <p>URL path wins over hostname: if the first segment looks like a tenant
+ * slug and isn't a known platform route, we're in slug mode regardless of
+ * hostname. This keeps the dev / E2E hosts (kelta-ui, etc.) on the legacy
+ * slug-based flow without needing an env var override.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function isCustomDomainHost(): boolean {
@@ -36,8 +60,21 @@ export function isCustomDomainHost(): boolean {
   const host = window.location.hostname.toLowerCase()
   if (!host) return false
   if (host === 'localhost' || host === '127.0.0.1') return false
-  // Platform hosts: anything under kelta.io is slug-mode.
-  return !(host === 'kelta.io' || host.endsWith('.kelta.io'))
+
+  // Path-based signal first: a slug-shaped first segment that isn't a known
+  // route means slug mode (e.g. /default/app, /acme-corp/setup).
+  const firstSegment = window.location.pathname.split('/').filter(Boolean)[0]
+  if (firstSegment) {
+    if (TENANT_SLUG_REGEX.test(firstSegment) && !KNOWN_PLATFORM_ROUTES.has(firstSegment)) {
+      return false
+    }
+  }
+
+  // Platform hosts under kelta.io are slug-mode regardless of path.
+  if (host === 'kelta.io' || host.endsWith('.kelta.io')) return false
+
+  // Anything else: custom-domain mode.
+  return true
 }
 
 /**

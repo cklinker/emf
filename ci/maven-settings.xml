@@ -2,16 +2,19 @@
 <!--
   Maven settings used by native-image Docker builds in CI.
 
-  Maven Central rate-limits aggressive parallel fetches (HTTP 429), which
-  breaks builds when worker/worker-migrate/gateway/ai/mcp native images
-  all download the same Spring Boot artifacts simultaneously. Route
-  fetches through Google's free GCS mirror of central — same content,
-  no rate limit, lower latency from most regions.
+  Routes all Maven Central traffic through the homelab Nexus 3 proxy
+  (homelab-argo#117). Benefits:
+    * One fetch from upstream → cached on Nexus PVC → every subsequent
+      build hits the local proxy at LAN speed
+    * Dodges Maven Central HTTP 429 rate limits during parallel native
+      builds (worker / worker-migrate / gateway / ai / mcp all pulling
+      the same Spring Boot tree simultaneously)
+    * Nexus itself proxies upstream from Google's GCS mirror of central
+      so the upstream side never hits a rate limit either
 
-  This is a stopgap until the homelab Nexus proxy comes online (see
-  homelab-argo#117). At that point, swap the mirror URL to
-  https://nexus.rzware.com/repository/maven-public/ and drop the GCS
-  dependency entirely.
+  If Nexus is ever down, swap the URL back to the GCS mirror as a
+  manual fallback:
+    https://maven-central.storage-download.googleapis.com/maven2/
 -->
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -19,9 +22,9 @@
                               https://maven.apache.org/xsd/settings-1.0.0.xsd">
     <mirrors>
         <mirror>
-            <id>google-maven-central</id>
-            <name>Google Cloud Storage mirror of Maven Central</name>
-            <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+            <id>nexus-maven-public</id>
+            <name>Homelab Nexus 3 mirror of Maven Central</name>
+            <url>https://nexus.rzware.com/repository/maven-public/</url>
             <mirrorOf>central</mirrorOf>
         </mirror>
     </mirrors>

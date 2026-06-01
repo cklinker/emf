@@ -221,6 +221,16 @@
             <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Fabric8 Kubernetes client — used by CustomDomainK8sProvisioner to
+             create per-tenant Traefik IngressRoutes and cert-manager
+             Certificates. Falls back to LoggingCustomDomainProvisioner when
+             kelta.worker.k8s-provisioner.enabled=false (default). -->
+        <dependency>
+            <groupId>io.fabric8</groupId>
+            <artifactId>kubernetes-client</artifactId>
+            <version>6.13.4</version>
+        </dependency>
     </dependencies>
 
     <profiles>

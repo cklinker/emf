@@ -5,6 +5,7 @@ import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.listener.CustomDomainEventPublisher;
+import io.kelta.worker.service.DomainOwnershipVerifier;
 import io.kelta.worker.service.LoggingCustomDomainProvisioner;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.*;
@@ -28,6 +29,7 @@ class TenantDomainControllerTest {
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private RecordEventPublisher recordEventPublisher;
     @Mock private PlatformEventPublisher platformEventPublisher;
+    @Mock private DomainOwnershipVerifier ownershipVerifier;
     private TenantDomainController controller;
 
     @BeforeEach
@@ -35,8 +37,10 @@ class TenantDomainControllerTest {
         WorkerCacheManager cacheManager = new WorkerCacheManager(new SimpleMeterRegistry());
         CustomDomainEventPublisher domainEventPublisher =
                 new CustomDomainEventPublisher(platformEventPublisher);
+        org.mockito.Mockito.lenient().when(ownershipVerifier.challengeRecordName(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> "_kelta-verify." + inv.getArgument(0));
         controller = new TenantDomainController(jdbcTemplate, cacheManager, recordEventPublisher,
-                domainEventPublisher, new LoggingCustomDomainProvisioner());
+                domainEventPublisher, new LoggingCustomDomainProvisioner(), ownershipVerifier);
         TenantContext.set("tenant-1");
     }
 

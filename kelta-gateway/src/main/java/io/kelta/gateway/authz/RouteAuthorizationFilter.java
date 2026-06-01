@@ -4,6 +4,7 @@ import io.kelta.gateway.auth.GatewayPrincipal;
 import io.kelta.gateway.auth.JwtAuthenticationFilter;
 import io.kelta.gateway.auth.PublicPathMatcher;
 import io.kelta.gateway.authz.cerbos.CerbosAuthorizationService;
+import io.kelta.gateway.error.ResponseHelpers;
 import io.kelta.gateway.filter.RequestLoggingFilter;
 import io.kelta.gateway.filter.TenantResolutionFilter;
 import io.kelta.gateway.metrics.GatewayMetrics;
@@ -15,7 +16,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -230,8 +230,9 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> forbidden(ServerWebExchange exchange, String message) {
-        exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
-        exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
+        if (!ResponseHelpers.prepareJsonResponse(exchange.getResponse(), HttpStatus.FORBIDDEN)) {
+            return Mono.empty();
+        }
 
         ObjectNode error = objectMapper.createObjectNode();
         error.put("status", "403");

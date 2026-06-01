@@ -1,6 +1,7 @@
 package io.kelta.gateway.filter;
 
 import io.kelta.gateway.cache.GatewayCacheManager;
+import io.kelta.gateway.error.ResponseHelpers;
 import io.kelta.gateway.metrics.GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -208,8 +208,9 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
     }
 
     private Mono<Void> notFound(ServerWebExchange exchange, String detail) {
-        exchange.getResponse().setStatusCode(HttpStatus.NOT_FOUND);
-        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        if (!ResponseHelpers.prepareJsonResponse(exchange.getResponse(), HttpStatus.NOT_FOUND)) {
+            return Mono.empty();
+        }
 
         String body = String.format(
                 "{\"errors\":[{\"status\":\"404\",\"code\":\"TENANT_NOT_FOUND\",\"title\":\"Tenant Not Found\",\"detail\":\"%s\"}]}",

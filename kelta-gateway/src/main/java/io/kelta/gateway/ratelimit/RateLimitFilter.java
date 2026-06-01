@@ -3,6 +3,7 @@ package io.kelta.gateway.ratelimit;
 import io.kelta.gateway.auth.GatewayPrincipal;
 import io.kelta.gateway.auth.JwtAuthenticationFilter;
 import io.kelta.gateway.cache.GatewayCacheManager;
+import io.kelta.gateway.error.ResponseHelpers;
 import io.kelta.gateway.filter.TenantResolutionFilter;
 import io.kelta.gateway.metrics.GatewayMetrics;
 import io.kelta.gateway.route.RateLimitConfig;
@@ -126,17 +127,13 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
      * @param result the rate limit check result
      */
     private void addRateLimitHeaders(ServerWebExchange exchange, RateLimitConfig config, RateLimitResult result) {
-        HttpHeaders headers = exchange.getResponse().getHeaders();
-
-        // X-RateLimit-Limit: Maximum requests per window
-        headers.add("X-RateLimit-Limit", String.valueOf(config.getRequestsPerWindow()));
-
-        // X-RateLimit-Remaining: Remaining requests in current window
-        headers.add("X-RateLimit-Remaining", String.valueOf(result.getRemainingRequests()));
-
-        // X-RateLimit-Reset: Timestamp when window resets (current time + window duration)
-        long resetTimestamp = Instant.now().plus(config.getWindowDuration()).getEpochSecond();
-        headers.add("X-RateLimit-Reset", String.valueOf(resetTimestamp));
+        ResponseHelpers.applyHeaderIfWritable(exchange.getResponse(), () -> {
+            HttpHeaders headers = exchange.getResponse().getHeaders();
+            headers.add("X-RateLimit-Limit", String.valueOf(config.getRequestsPerWindow()));
+            headers.add("X-RateLimit-Remaining", String.valueOf(result.getRemainingRequests()));
+            long resetTimestamp = Instant.now().plus(config.getWindowDuration()).getEpochSecond();
+            headers.add("X-RateLimit-Reset", String.valueOf(resetTimestamp));
+        });
     }
 
     /**
@@ -148,20 +145,20 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
      * @return a Mono that completes the response
      */
     private Mono<Void> tooManyRequests(ServerWebExchange exchange, RateLimitConfig config, RateLimitResult result) {
-        exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
-        exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
-
-        // Add rate limit headers
-        HttpHeaders headers = exchange.getResponse().getHeaders();
-        headers.add("X-RateLimit-Limit", String.valueOf(config.getRequestsPerWindow()));
-        headers.add("X-RateLimit-Remaining", "0");
-
-        long resetTimestamp = Instant.now().plus(config.getWindowDuration()).getEpochSecond();
-        headers.add("X-RateLimit-Reset", String.valueOf(resetTimestamp));
-
-        // Add Retry-After header (in seconds)
         long retryAfterSeconds = result.getRetryAfter().getSeconds();
-        headers.add("Retry-After", String.valueOf(retryAfterSeconds));
+
+        if (!ResponseHelpers.prepareJsonResponse(exchange.getResponse(), HttpStatus.TOO_MANY_REQUESTS)) {
+            return Mono.empty();
+        }
+
+        ResponseHelpers.applyHeaderIfWritable(exchange.getResponse(), () -> {
+            HttpHeaders headers = exchange.getResponse().getHeaders();
+            headers.add("X-RateLimit-Limit", String.valueOf(config.getRequestsPerWindow()));
+            headers.add("X-RateLimit-Remaining", "0");
+            long resetTimestamp = Instant.now().plus(config.getWindowDuration()).getEpochSecond();
+            headers.add("X-RateLimit-Reset", String.valueOf(resetTimestamp));
+            headers.add("Retry-After", String.valueOf(retryAfterSeconds));
+        });
 
         String errorJson = String.format(
             "{\"error\":{\"status\":429,\"code\":\"TOO_MANY_REQUESTS\",\"message\":\"Rate limit exceeded. Retry after %d seconds.\",\"path\":\"%s\"}}",

@@ -1,11 +1,11 @@
 package io.kelta.gateway.filter;
 
+import io.kelta.gateway.error.ResponseHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -157,9 +157,11 @@ public class IpRateLimitFilter implements GlobalFilter, Ordered {
      * Returns a 429 Too Many Requests response.
      */
     private Mono<Void> tooManyRequests(ServerWebExchange exchange, String clientIp) {
-        exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
-        exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
-        exchange.getResponse().getHeaders().add("Retry-After", String.valueOf(WINDOW_MILLIS / 1000));
+        if (!ResponseHelpers.prepareJsonResponse(exchange.getResponse(), HttpStatus.TOO_MANY_REQUESTS)) {
+            return Mono.empty();
+        }
+        ResponseHelpers.applyHeaderIfWritable(exchange.getResponse(),
+                () -> exchange.getResponse().getHeaders().add("Retry-After", String.valueOf(WINDOW_MILLIS / 1000)));
 
         String errorJson = String.format(
                 "{\"error\":{\"status\":429,\"code\":\"TOO_MANY_REQUESTS\",\"message\":\"Rate limit exceeded. Try again later.\",\"path\":\"%s\"}}",

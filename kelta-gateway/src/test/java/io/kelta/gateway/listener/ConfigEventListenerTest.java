@@ -40,7 +40,7 @@ class ConfigEventListenerTest {
     private ObjectMapper objectMapper;
     private ConfigEventListener listener;
 
-    private static final String WORKER_SERVICE_URL = "http://kelta-worker:80";
+    private static final String WORKER_SERVICE_URL = "http://emf-worker:80";
 
     @BeforeEach
     void setUp() {

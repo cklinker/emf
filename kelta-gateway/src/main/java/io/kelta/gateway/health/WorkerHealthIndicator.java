@@ -30,7 +30,7 @@ public class WorkerHealthIndicator implements HealthIndicator {
 
     public WorkerHealthIndicator(
             WebClient.Builder webClientBuilder,
-            @Value("${kelta.gateway.worker-service-url:http://kelta-worker:80}") String workerServiceUrl) {
+            @Value("${kelta.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
         this.webClient = webClientBuilder.baseUrl(workerServiceUrl).build();
         this.workerServiceUrl = workerServiceUrl;
     }

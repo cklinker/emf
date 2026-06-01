@@ -41,7 +41,7 @@ class WorkerHealthIndicatorTest {
 
     private WorkerHealthIndicator healthIndicator;
 
-    private static final String WORKER_URL = "http://kelta-worker:80";
+    private static final String WORKER_URL = "http://emf-worker:80";
     private static final String HEALTH_PATH = "/actuator/health";
 
     @BeforeEach

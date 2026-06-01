@@ -1,6 +1,7 @@
 package io.kelta.gateway.filter;
 
 import io.kelta.gateway.cache.GatewayCacheManager;
+import io.kelta.gateway.error.ResponseHelpers;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +13,6 @@ import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.http.server.reactive.ServerHttpResponseDecorator;
 import org.springframework.stereotype.Component;
@@ -189,9 +189,10 @@ public class SystemCollectionResponseCacheFilter implements GlobalFilter, Ordere
 
     private Mono<Void> writeCachedResponse(ServerWebExchange exchange, byte[] body) {
         ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(HttpStatus.OK);
-        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        response.getHeaders().setContentLength(body.length);
+        if (!ResponseHelpers.prepareJsonResponse(response, HttpStatus.OK)) {
+            return Mono.empty();
+        }
+        ResponseHelpers.applyHeaderIfWritable(response, () -> response.getHeaders().setContentLength(body.length));
         DataBuffer buffer = response.bufferFactory().wrap(body);
         return response.writeWith(Mono.just(buffer));
     }

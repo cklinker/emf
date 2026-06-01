@@ -1,5 +1,6 @@
 package io.kelta.gateway.auth;
 
+import io.kelta.gateway.error.ResponseHelpers;
 import io.kelta.gateway.filter.TenantResolutionFilter;
 import io.kelta.gateway.metrics.GatewayMetrics;
 import org.slf4j.Logger;
@@ -9,7 +10,6 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -160,8 +160,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
      * @return a Mono that completes the response
      */
     private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
-        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-        exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
+        if (!ResponseHelpers.prepareJsonResponse(exchange.getResponse(), HttpStatus.UNAUTHORIZED)) {
+            return Mono.empty();
+        }
 
         String path = exchange.getRequest().getPath().value();
         String errorJson;

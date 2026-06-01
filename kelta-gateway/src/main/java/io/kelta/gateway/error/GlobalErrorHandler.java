@@ -12,7 +12,6 @@ import org.springframework.boot.webflux.error.ErrorWebExceptionHandler;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -104,9 +103,10 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
                 ex.getMessage() != null ? ex.getMessage() : "Rate limit exceeded"
             );
 
-            // Add Retry-After header
+            // Add Retry-After header (best-effort — response may already be committed)
             long retryAfterSeconds = rateLimitEx.getRetryAfter().getSeconds();
-            exchange.getResponse().getHeaders().add("Retry-After", String.valueOf(retryAfterSeconds));
+            ResponseHelpers.applyHeaderIfWritable(exchange.getResponse(),
+                () -> exchange.getResponse().getHeaders().add("Retry-After", String.valueOf(retryAfterSeconds)));
 
             log.warn("Rate limit exceeded for path: {}, correlationId: {}, retryAfter: {}s",
                 path, correlationId, retryAfterSeconds);
@@ -174,9 +174,13 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
         meta.put("correlationId", correlationId);
         error.setMeta(meta);
 
-        // Set response status and headers
-        exchange.getResponse().setStatusCode(status);
-        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        // Set response status and headers — abandon if the response was already
+        // committed upstream so we don't surface a 500 in place of the real status.
+        if (!ResponseHelpers.prepareJsonResponse(exchange.getResponse(), status)) {
+            log.warn("Response already committed for path: {}, correlationId: {} — dropping error body",
+                path, correlationId);
+            return Mono.empty();
+        }
 
         // Serialize error response to JSON:API format
         try {

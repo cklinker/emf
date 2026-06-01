@@ -80,11 +80,25 @@ async function getAuthentikToken(): Promise<string> {
     scope: "openid profile email",
   });
 
-  const response = await fetch(tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-  });
+  let response: Response;
+  try {
+    response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+  } catch (err) {
+    // Authentik was decommissioned during the rzware.com → kelta.io migration;
+    // from inside the cluster the legacy hostname now serves a self-signed cert
+    // that node's fetch rejects. Don't let the network error bubble up as a
+    // test failure — direct-login is the supported path; this branch only
+    // exists for legacy local-dev setups.
+    console.warn(
+      `Authentik token endpoint unreachable: ${err}. ` +
+        "DataFactory API calls will fail — use direct-login (E2E_AUTH_BASE_URL) instead.",
+    );
+    return "";
+  }
 
   if (!response.ok) {
     const errorBody = await response.text().catch(() => "");

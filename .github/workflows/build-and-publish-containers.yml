@@ -535,7 +535,11 @@ jobs:
           E2E_BASE_URL: https://app.kelta.io
           E2E_API_BASE_URL: https://api.kelta.io
           E2E_TENANT_SLUG: default
-          E2E_AUTH_BASE_URL: ${{ secrets.E2E_AUTH_BASE_URL }}
+          # Hardcoded post-kelta.io cutover — the secret was set before #943
+          # and pointed at the legacy *.rzware.com host that no longer
+          # serves /auth/direct-login (returns HTML, breaking JSON.parse).
+          E2E_AUTH_BASE_URL: https://auth.kelta.io
+          E2E_AUTH_DIRECT_LOGIN_URL: https://auth.kelta.io
           E2E_AUTHENTIK_URL: ${{ secrets.E2E_AUTHENTIK_URL }}
           E2E_CLIENT_ID: ${{ secrets.E2E_CLIENT_ID }}
           E2E_OIDC_PROVIDER_ID: ${{ secrets.E2E_OIDC_PROVIDER_ID }}

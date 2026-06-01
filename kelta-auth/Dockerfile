@@ -14,7 +14,8 @@ ARG MAVEN_VERSION
 WORKDIR /kelta-platform
 
 RUN microdnf install -y findutils && \
-    curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | \
+    curl -fsSL --retry 8 --retry-delay 5 --retry-connrefused --retry-all-errors \
+      "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | \
     tar xzf - -C /opt && \
     ln -sf /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
 
@@ -62,7 +63,8 @@ ARG MAVEN_VERSION
 WORKDIR /build
 
 RUN microdnf install -y findutils && \
-    curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | \
+    curl -fsSL --retry 8 --retry-delay 5 --retry-connrefused --retry-all-errors \
+      "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | \
     tar xzf - -C /opt && \
     ln -sf /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
 

@@ -22,6 +22,7 @@ import {
 } from './definitionConverter'
 import { TriggerEditSheet } from './components/TriggerEditSheet'
 import { TestFlowDialog } from './components/TestFlowDialog'
+import { GenerateFlowDialog } from './components/GenerateFlowDialog'
 
 type ActiveTab = 'design' | 'executions' | { type: 'debug'; executionId: string }
 
@@ -50,6 +51,8 @@ export function FlowDesignerPage() {
   const [currentEdges, setCurrentEdges] = useState<Edge[]>([])
   const [triggerSheetOpen, setTriggerSheetOpen] = useState(false)
   const [testDialogOpen, setTestDialogOpen] = useState(false)
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
 
   const {
     data: flow,
@@ -207,6 +210,37 @@ export function FlowDesignerPage() {
     [activeTab]
   )
 
+  const handleGenerate = useCallback(
+    async (description: string) => {
+      setIsGenerating(true)
+      try {
+        const resp = await apiClient.fetch('/api/ai/flows/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description }),
+        })
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}))
+          throw new Error((err as Record<string, string>).error ?? 'Generation failed')
+        }
+        const data = (await resp.json()) as { definition: unknown }
+        const parsed = parseFlowDefinition(data.definition)
+        if (!parsed) throw new Error('Invalid flow definition returned')
+        const { nodes, edges } = definitionToNodesAndEdges(parsed)
+        setCurrentNodes(nodes)
+        setCurrentEdges(edges)
+        setIsDirty(true)
+        setGenerateDialogOpen(false)
+        showToast('Flow generated — review and save when ready', 'success')
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Generation failed', 'error')
+      } finally {
+        setIsGenerating(false)
+      }
+    },
+    [apiClient, showToast]
+  )
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -245,6 +279,7 @@ export function FlowDesignerPage() {
         onToggleJson={() => setShowJson((v) => !v)}
         onTest={() => setTestDialogOpen(true)}
         onPublish={() => publishMutation.mutate()}
+        onGenerate={() => setGenerateDialogOpen(true)}
       />
 
       {/* Tab Navigation */}
@@ -370,6 +405,13 @@ export function FlowDesignerPage() {
       )}
 
       <TriggerEditSheet open={triggerSheetOpen} onOpenChange={setTriggerSheetOpen} flow={flow} />
+
+      <GenerateFlowDialog
+        open={generateDialogOpen}
+        isLoading={isGenerating}
+        onOpenChange={setGenerateDialogOpen}
+        onGenerate={handleGenerate}
+      />
 
       <TestFlowDialog
         open={testDialogOpen}

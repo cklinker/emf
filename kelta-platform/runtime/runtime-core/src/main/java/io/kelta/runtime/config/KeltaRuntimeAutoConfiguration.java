@@ -15,6 +15,8 @@ import io.kelta.runtime.router.GlobalExceptionHandler;
 import io.kelta.runtime.storage.PhysicalTableStorageAdapter;
 import io.kelta.runtime.storage.SchemaMigrationEngine;
 import io.kelta.runtime.storage.StorageAdapter;
+import io.kelta.runtime.formula.FormulaEvaluator;
+import io.kelta.runtime.service.AutoNumberService;
 import io.kelta.runtime.validation.CustomValidationRuleEngine;
 import io.kelta.runtime.validation.DefaultValidationEngine;
 import io.kelta.runtime.validation.ValidationEngine;
@@ -130,6 +132,8 @@ public class KeltaRuntimeAutoConfiguration {
     @ConditionalOnMissingBean
     public QueryEngine queryEngine(StorageAdapter storageAdapter,
                                     ValidationEngine validationEngine,
+                                    @Autowired(required = false) AutoNumberService autoNumberService,
+                                    @Autowired(required = false) FormulaEvaluator formulaEvaluator,
                                     @Autowired(required = false) CustomValidationRuleEngine customValidationRuleEngine,
                                     @Autowired(required = false) RecordEventPublisher recordEventPublisher,
                                     @Autowired(required = false) BeforeSaveHookRegistry beforeSaveHookRegistry,
@@ -137,8 +141,8 @@ public class KeltaRuntimeAutoConfiguration {
                                     @Autowired(required = false) CollectionOnDemandLoader onDemandLoader,
                                     CollectionRegistry collectionRegistry) {
         DefaultQueryEngine engine = new DefaultQueryEngine(storageAdapter, validationEngine,
-                null, null, null, rollupSummaryService, customValidationRuleEngine, recordEventPublisher,
-                beforeSaveHookRegistry, collectionRegistry);
+                null, autoNumberService, formulaEvaluator, rollupSummaryService, customValidationRuleEngine,
+                recordEventPublisher, beforeSaveHookRegistry, collectionRegistry);
         if (onDemandLoader != null) {
             engine.setOnDemandLoader(onDemandLoader);
         }

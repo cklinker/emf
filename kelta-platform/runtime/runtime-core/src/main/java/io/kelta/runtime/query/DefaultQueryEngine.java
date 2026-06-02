@@ -530,6 +530,7 @@ public class DefaultQueryEngine implements QueryEngine {
                 Map<String, Object> config = field.fieldTypeConfig();
                 String prefix = "";
                 int padding = 6;
+                long startValue = 1;
                 if (config != null) {
                     if (config.containsKey("prefix")) {
                         prefix = config.get("prefix").toString();
@@ -537,8 +538,12 @@ public class DefaultQueryEngine implements QueryEngine {
                     if (config.containsKey("padding")) {
                         padding = ((Number) config.get("padding")).intValue();
                     }
+                    if (config.containsKey("startValue")) {
+                        startValue = ((Number) config.get("startValue")).longValue();
+                    }
                 }
                 try {
+                    autoNumberService.ensureSequenceExists(seqName, startValue);
                     String value = autoNumberService.generateNext(seqName, prefix, padding);
                     data.put(field.name(), value);
                 } catch (Exception e) {

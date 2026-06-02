@@ -1,4 +1,5 @@
 import React from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { FieldLabel } from '@/components/kelta'
 import { Input } from '@/components/ui/input'
 import { RESOURCE_GROUPS } from '../../types'
@@ -19,6 +20,24 @@ import { SendNotificationParams } from './SendNotificationParams'
 import { EmailAlertParams } from './EmailAlertParams'
 import { TriggerFlowParams } from './TriggerFlowParams'
 import { PublishEventParams } from './PublishEventParams'
+import { ModuleActionParams } from './ModuleActionParams'
+import { useApi } from '@/context/ApiContext'
+
+interface ModuleAction {
+  id: string
+  actionKey: string
+  name: string
+  category: string | null
+  configSchema: string | null
+}
+
+interface TenantModule {
+  id: string
+  moduleId: string
+  name: string
+  status: string
+  actions: ModuleAction[]
+}
 
 interface TaskPropertiesProps {
   nodeId: string
@@ -29,6 +48,29 @@ interface TaskPropertiesProps {
 
 export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPropertiesProps) {
   const resource = (data.resource as string) || ''
+  const { apiClient } = useApi()
+
+  const { data: modules } = useQuery({
+    queryKey: ['modules'],
+    queryFn: () => apiClient.get<TenantModule[]>('/api/modules'),
+    staleTime: 30_000,
+  })
+
+  const activeModules = (modules ?? []).filter(
+    (m) => m.status === 'ACTIVE' && m.actions.length > 0
+  )
+
+  const moduleActionMap = React.useMemo(() => {
+    const map = new Map<string, ModuleAction>()
+    for (const m of activeModules) {
+      for (const a of m.actions) {
+        map.set(a.actionKey, a)
+      }
+    }
+    return map
+  }, [activeModules])
+
+  const selectedModuleAction = moduleActionMap.get(resource) ?? null
 
   return (
     <div className="flex flex-col gap-3">
@@ -48,6 +90,15 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
               {group.options.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+          {activeModules.map((m) => (
+            <optgroup key={m.moduleId} label={`Module: ${m.name}`}>
+              {m.actions.map((a) => (
+                <option key={a.actionKey} value={a.actionKey}>
+                  {a.name}
                 </option>
               ))}
             </optgroup>
@@ -130,6 +181,13 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
       )}
       {resource === 'PUBLISH_EVENT' && (
         <PublishEventParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {selectedModuleAction && (
+        <ModuleActionParams
+          configSchema={selectedModuleAction.configSchema}
           parameters={data.parameters as Record<string, unknown> | undefined}
           onUpdate={(params) => onUpdate({ parameters: params })}
         />

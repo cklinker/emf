@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { User, Bot, Loader2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import type { ChatMessage as ChatMessageType } from './types'
 
 interface ChatMessageProps {
@@ -25,7 +26,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div className="min-w-0 flex-1 space-y-2">
         <p className="text-sm font-medium">{isUser ? 'You' : 'AI Assistant'}</p>
         <div className="prose prose-sm max-w-none dark:prose-invert">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+          {isUser ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+          ) : (
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          )}
         </div>
       </div>
     </div>
@@ -51,10 +56,8 @@ export function StreamingMessage({ text, isGenerating }: StreamingMessageProps) 
         <p className="text-sm font-medium">AI Assistant</p>
         {text ? (
           <div className="prose prose-sm max-w-none dark:prose-invert">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {text}
-              <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-foreground" />
-            </p>
+            <ReactMarkdown>{text}</ReactMarkdown>
+            <span className="inline-block h-4 w-1 animate-pulse bg-foreground" />
           </div>
         ) : (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

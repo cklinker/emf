@@ -10,6 +10,7 @@ import io.kelta.worker.listener.FlowEventListener;
 import io.kelta.worker.listener.LayoutCacheInvalidationListener;
 import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SupersetCollectionSyncListener;
+import io.kelta.worker.listener.RecordWebhookPublisher;
 import io.kelta.worker.listener.SvixWebhookPublisher;
 import io.kelta.worker.listener.SystemFeatureCacheInvalidationListener;
 import io.kelta.worker.listener.TenantEmailCacheInvalidationListener;
@@ -54,6 +55,9 @@ public class NatsSubscriptionConfig {
 
     @Autowired(required = false)
     private SvixWebhookPublisher svixWebhookPublisher;
+
+    @Autowired(required = false)
+    private RecordWebhookPublisher recordWebhookPublisher;
 
     @Autowired(required = false)
     private TenantEmailCacheInvalidationListener tenantEmailCacheInvalidationListener;
@@ -152,6 +156,13 @@ public class NatsSubscriptionConfig {
             log.info("Registered NATS subscription for Svix webhook publisher");
         }
 
+        if (recordWebhookPublisher != null) {
+            subscriptionManager.register(EventSubscription.queueGroup(
+                    "worker-svix-records", "kelta.record.changed.>", "worker-svix-records",
+                    recordWebhookPublisher::onRecordChanged));
+            log.info("Registered NATS subscription for Svix record webhook publisher");
+        }
+
         // Tenant email config invalidation — every pod evicts its
         // SmtpEmailProvider sender cache when tenant email columns change,
         // and broadly when any credential rotates (small cache, cheap to refill).
@@ -169,6 +180,7 @@ public class NatsSubscriptionConfig {
                 + (credentialCacheInvalidationListener != null ? 1 : 0)
                 + (supersetCollectionSyncListener != null ? 1 : 0)
                 + (svixWebhookPublisher != null ? 1 : 0)
+                + (recordWebhookPublisher != null ? 1 : 0)
                 + (tenantEmailCacheInvalidationListener != null ? 2 : 0));
     }
 }

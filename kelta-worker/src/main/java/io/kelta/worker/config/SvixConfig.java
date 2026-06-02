@@ -2,6 +2,7 @@ package io.kelta.worker.config;
 
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
+import io.kelta.worker.listener.RecordWebhookPublisher;
 import io.kelta.worker.listener.SvixTenantLifecycleHook;
 import io.kelta.worker.listener.SvixWebhookPublisher;
 import io.kelta.worker.service.SvixTenantService;
@@ -42,7 +43,10 @@ public class SvixConfig {
 
     private static final List<String> EVENT_TYPES = List.of(
             "collection.created",
-            "collection.updated"
+            "collection.updated",
+            "record.created",
+            "record.updated",
+            "record.deleted"
     );
 
     @Value("${kelta.svix.server-url:http://localhost:8071}")
@@ -80,6 +84,11 @@ public class SvixConfig {
     @Bean
     public SvixWebhookPublisher svixWebhookPublisher(RestClient svixRestClient, ObjectMapper objectMapper) {
         return new SvixWebhookPublisher(svixRestClient, objectMapper);
+    }
+
+    @Bean
+    public RecordWebhookPublisher recordWebhookPublisher(RestClient svixRestClient, ObjectMapper objectMapper) {
+        return new RecordWebhookPublisher(svixRestClient, objectMapper);
     }
 
     /**

@@ -12,6 +12,7 @@
 
 /* Tailwind CSS */
 @import 'tailwindcss';
+@plugin "@tailwindcss/typography";
 
 /* Import accessibility styles */
 @import './styles/accessibility.css';

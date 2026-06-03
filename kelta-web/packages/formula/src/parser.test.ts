@@ -122,6 +122,45 @@ describe('FormulaParser', () => {
     });
   });
 
+  it('parses OR keyword as ||', () => {
+    const ast = parser.parse('year < 1888 OR year > 2031');
+    expect(ast).toMatchObject({
+      kind: 'binaryOp',
+      operator: '||',
+      left: { kind: 'binaryOp', operator: '<' },
+      right: { kind: 'binaryOp', operator: '>' },
+    });
+  });
+
+  it('parses AND keyword as &&', () => {
+    const ast = parser.parse('amount > 0 AND active');
+    expect(ast).toMatchObject({
+      kind: 'binaryOp',
+      operator: '&&',
+      left: { kind: 'binaryOp', operator: '>' },
+      right: { kind: 'fieldRef', fieldName: 'active' },
+    });
+  });
+
+  it('parses NOT keyword as !', () => {
+    expect(parser.parse('NOT active')).toEqual({
+      kind: 'unaryOp',
+      operator: '!',
+      operand: { kind: 'fieldRef', fieldName: 'active' },
+    });
+  });
+
+  it('logical keywords are case insensitive', () => {
+    expect(parser.parse('a or b')).toMatchObject({ kind: 'binaryOp', operator: '||' });
+    expect(parser.parse('a And b')).toMatchObject({ kind: 'binaryOp', operator: '&&' });
+  });
+
+  it('field names that start with a keyword are not consumed', () => {
+    expect(parser.parse('orderTotal')).toEqual({ kind: 'fieldRef', fieldName: 'orderTotal' });
+    expect(parser.parse('notes')).toEqual({ kind: 'fieldRef', fieldName: 'notes' });
+    expect(parser.parse('andrew')).toEqual({ kind: 'fieldRef', fieldName: 'andrew' });
+  });
+
   it('throws on empty', () => {
     expect(() => parser.parse('')).toThrow(FormulaException);
   });

@@ -29,7 +29,7 @@ public class FormulaParser {
     private FormulaAst parseOr() {
         FormulaAst left = parseAnd();
         skipWhitespace();
-        while (pos < input.length() && match("||")) {
+        while (pos < input.length() && (match("||") || matchKeyword("OR"))) {
             FormulaAst right = parseAnd();
             left = new FormulaAst.BinaryOp("||", left, right);
             skipWhitespace();
@@ -40,7 +40,7 @@ public class FormulaParser {
     private FormulaAst parseAnd() {
         FormulaAst left = parseComparison();
         skipWhitespace();
-        while (pos < input.length() && match("&&")) {
+        while (pos < input.length() && (match("&&") || matchKeyword("AND"))) {
             FormulaAst right = parseComparison();
             left = new FormulaAst.BinaryOp("&&", left, right);
             skipWhitespace();
@@ -117,6 +117,9 @@ public class FormulaParser {
             }
             if (input.charAt(pos) == '!') {
                 pos++;
+                return new FormulaAst.UnaryOp("!", parsePrimary());
+            }
+            if (matchKeyword("NOT")) {
                 return new FormulaAst.UnaryOp("!", parsePrimary());
             }
         }
@@ -238,6 +241,32 @@ public class FormulaParser {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Matches a keyword (case-insensitive) that must end at a word boundary so
+     * field names that start with the keyword (e.g. {@code orderDate} vs
+     * {@code OR}) are not consumed by accident. Logical keywords {@code AND},
+     * {@code OR}, and {@code NOT} are accepted as infix/prefix operator
+     * synonyms for {@code &&}, {@code ||}, and {@code !}.
+     */
+    private boolean matchKeyword(String keyword) {
+        skipWhitespace();
+        int len = keyword.length();
+        if (pos + len > input.length()) {
+            return false;
+        }
+        if (!input.substring(pos, pos + len).equalsIgnoreCase(keyword)) {
+            return false;
+        }
+        if (pos + len < input.length()) {
+            char next = input.charAt(pos + len);
+            if (Character.isLetterOrDigit(next) || next == '_') {
+                return false;
+            }
+        }
+        pos += len;
+        return true;
     }
 
     private void expect(char c) {

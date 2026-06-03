@@ -106,6 +106,50 @@ class FormulaEvaluatorTest {
             assertTrue(evaluator.evaluateBoolean("Amount > 100 || Priority = 'High'",
                 Map.of("Amount", 50.0, "Priority", "High")));
         }
+
+        @Test
+        void orKeywordSynonymousWithPipes() {
+            // Regression: validation rules like `year < 1888 OR year > 2031`
+            // previously failed to parse and silently let invalid records through.
+            assertTrue(evaluator.evaluateBoolean("year < 1888 OR year > 2031",
+                Map.of("year", 1500)));
+            assertTrue(evaluator.evaluateBoolean("year < 1888 OR year > 2031",
+                Map.of("year", 3000)));
+            assertFalse(evaluator.evaluateBoolean("year < 1888 OR year > 2031",
+                Map.of("year", 2000)));
+        }
+
+        @Test
+        void andKeywordSynonymousWithAmpersands() {
+            assertTrue(evaluator.evaluateBoolean("Amount > 0 AND Active = true",
+                Map.of("Amount", 100.0, "Active", true)));
+            assertFalse(evaluator.evaluateBoolean("Amount > 0 AND Active = true",
+                Map.of("Amount", 100.0, "Active", false)));
+        }
+
+        @Test
+        void notKeywordSynonymousWithBang() {
+            assertTrue(evaluator.evaluateBoolean("NOT Active", Map.of("Active", false)));
+            assertFalse(evaluator.evaluateBoolean("NOT Active", Map.of("Active", true)));
+        }
+
+        @Test
+        void logicalKeywordsAreCaseInsensitive() {
+            assertTrue(evaluator.evaluateBoolean("year < 1888 or year > 2031",
+                Map.of("year", 1500)));
+            assertTrue(evaluator.evaluateBoolean("Amount > 0 and Active",
+                Map.of("Amount", 10.0, "Active", true)));
+        }
+
+        @Test
+        void fieldNamesStartingWithKeywordAreNotConsumed() {
+            // `orderTotal` must not be parsed as `OR` + `derTotal`.
+            assertTrue(evaluator.evaluateBoolean("orderTotal > 0",
+                Map.of("orderTotal", 50.0)));
+            // `notes` must not be parsed as `NOT` + `es`.
+            assertTrue(evaluator.evaluateBoolean("notes = 'hi'",
+                Map.of("notes", "hi")));
+        }
     }
 
     @Nested

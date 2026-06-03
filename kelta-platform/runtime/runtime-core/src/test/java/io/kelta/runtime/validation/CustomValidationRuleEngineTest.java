@@ -196,4 +196,65 @@ class CustomValidationRuleEngineTest {
             verifyNoInteractions(ruleEvaluator);
         }
     }
+
+    @Nested
+    @DisplayName("Severity handling")
+    class SeverityTests {
+
+        @Test
+        @DisplayName("Should not throw when a WARNING rule matches")
+        void shouldNotThrowForMatchingWarningRule() {
+            var warningRule = new ValidationRuleDefinition(
+                    "soft_check", "x > 0", "Should be non-positive", "x",
+                    "CREATE_AND_UPDATE", true, "WARNING");
+            ruleRegistry.register("products", List.of(warningRule));
+
+            Map<String, Object> data = Map.of("x", 100);
+            when(ruleEvaluator.isInvalid("x > 0", data)).thenReturn(true);
+
+            assertDoesNotThrow(() ->
+                    engine.evaluate("products", data, OperationType.CREATE));
+        }
+
+        @Test
+        @DisplayName("Should throw only for ERROR rules when both severities match")
+        void shouldThrowOnlyForErrorRulesWhenBothMatch() {
+            var warningRule = new ValidationRuleDefinition(
+                    "soft_check", "x > 0", "Soft check", "x",
+                    "CREATE_AND_UPDATE", true, "WARNING");
+            var errorRule = new ValidationRuleDefinition(
+                    "hard_check", "y > 0", "Hard check", "y",
+                    "CREATE_AND_UPDATE", true, "ERROR");
+            ruleRegistry.register("products", List.of(warningRule, errorRule));
+
+            Map<String, Object> data = Map.of("x", 100, "y", 100);
+            when(ruleEvaluator.isInvalid("x > 0", data)).thenReturn(true);
+            when(ruleEvaluator.isInvalid("y > 0", data)).thenReturn(true);
+
+            RecordValidationException ex = assertThrows(RecordValidationException.class, () ->
+                    engine.evaluate("products", data, OperationType.CREATE));
+
+            assertEquals(1, ex.getErrors().size());
+            assertEquals("hard_check", ex.getErrors().get(0).ruleName());
+        }
+
+        @Test
+        @DisplayName("Should default missing severity to ERROR")
+        void shouldDefaultMissingSeverityToError() {
+            var rule = new ValidationRuleDefinition(
+                    "default_severity", "x > 0", "Error", "x",
+                    "CREATE_AND_UPDATE", true);
+            assertEquals("ERROR", rule.severity());
+            assertTrue(rule.isBlocking());
+        }
+
+        @Test
+        @DisplayName("Should normalise null/blank severity to ERROR")
+        void shouldNormaliseBlankSeverity() {
+            var rule = new ValidationRuleDefinition(
+                    "blank_severity", "x > 0", "Error", "x",
+                    "CREATE_AND_UPDATE", true, "");
+            assertEquals("ERROR", rule.severity());
+        }
+    }
 }

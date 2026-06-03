@@ -25,7 +25,7 @@ export class FormulaParser {
   private parseOr(): FormulaAst {
     let left = this.parseAnd();
     this.skipWhitespace();
-    while (this.pos < this.input.length && this.match('||')) {
+    while (this.pos < this.input.length && (this.match('||') || this.matchKeyword('OR'))) {
       const right = this.parseAnd();
       left = { kind: 'binaryOp', operator: '||', left, right };
       this.skipWhitespace();
@@ -36,7 +36,7 @@ export class FormulaParser {
   private parseAnd(): FormulaAst {
     let left = this.parseComparison();
     this.skipWhitespace();
-    while (this.pos < this.input.length && this.match('&&')) {
+    while (this.pos < this.input.length && (this.match('&&') || this.matchKeyword('AND'))) {
       const right = this.parseComparison();
       left = { kind: 'binaryOp', operator: '&&', left, right };
       this.skipWhitespace();
@@ -99,6 +99,9 @@ export class FormulaParser {
         this.pos++;
         const operator: UnaryOperator = c;
         return { kind: 'unaryOp', operator, operand: this.parsePrimary() };
+      }
+      if (this.matchKeyword('NOT')) {
+        return { kind: 'unaryOp', operator: '!', operand: this.parsePrimary() };
       }
     }
     return this.parsePrimary();
@@ -219,6 +222,19 @@ export class FormulaParser {
       return true;
     }
     return false;
+  }
+
+  private matchKeyword(keyword: string): boolean {
+    this.skipWhitespace();
+    const len = keyword.length;
+    if (this.pos + len > this.input.length) return false;
+    if (this.input.substring(this.pos, this.pos + len).toUpperCase() !== keyword) return false;
+    if (this.pos + len < this.input.length) {
+      const next = this.input.charAt(this.pos + len);
+      if (this.isLetterOrDigit(next) || next === '_') return false;
+    }
+    this.pos += len;
+    return true;
   }
 
   private matchChar(c: string): boolean {

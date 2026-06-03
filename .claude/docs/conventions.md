@@ -150,3 +150,79 @@ We considered transparently renaming reserved fields on storage (e.g. accepting 
 4. **One workaround is enough.** Prefixing with the entity name takes seconds at schema-authoring time and produces clearer JSON for every downstream consumer.
 
 **Decision:** reserved names stay rejected at field-create time. Schema authors are expected to prefix. This document is the canonical reference for that rule.
+
+## Formula language (validation rules, formula fields, workflow criteria)
+
+The formula language is parsed by `io.kelta.runtime.formula.FormulaParser` and evaluated by `io.kelta.runtime.formula.FormulaEvaluator`. It is used for validation rule `errorConditionFormula`s, `FORMULA` field expressions, and workflow / rollup filter conditions. The same grammar applies everywhere.
+
+### Field references
+
+Identifiers in a formula reference field values by **API name** (the `name` column on the field record), e.g. `year`, `customer_email`, `orderTotal`. Lookups go through `FormulaContext.getFieldValue(...)`, which reads from the record's attribute map by exact key.
+
+### Literals
+
+| Form | Example | Notes |
+|------|---------|-------|
+| Integer | `42`, `1888`, `-3` | Parsed as `int` when within `Integer` range, else `long`. |
+| Decimal | `3.14`, `0.5`, `.5` | Parsed as `double`. |
+| String | `'Closed Won'`, `"Active"` | Both single and double quotes accepted; `\` escapes the next char. |
+| Boolean | `true`, `false` | Case-insensitive. |
+| Null | `null` | Case-insensitive. |
+
+### Operators
+
+Logical operators accept either symbolic or keyword form. Keyword forms (`AND`, `OR`, `NOT`) are case-insensitive and must be separated from surrounding identifiers by a word boundary (whitespace, parenthesis, or end of expression) — `OR` matches, `ORDER_DATE` does not.
+
+| Category | Operators | Notes |
+|----------|-----------|-------|
+| Logical (infix) | `&&`, `\|\|`, `AND`, `OR` | `a AND b` is identical to `a && b`. |
+| Logical (prefix) | `!`, `NOT` | `NOT a` is identical to `!a`. |
+| Comparison | `<`, `>`, `<=`, `>=`, `==`, `=`, `!=`, `<>` | `=` and `==` are equivalent. `!=` and `<>` are equivalent. |
+| Arithmetic | `+`, `-`, `*`, `/` | `+` concatenates if either operand is a string. Division by zero throws. |
+| Grouping | `(`, `)` | Standard precedence: unary > mul/div > add/sub > comparison > AND > OR. |
+
+### Functions
+
+Functions are case-insensitive and registered as `FormulaFunction` Spring beans (see `BuiltInFunctions`). Adding a new function is a matter of implementing `FormulaFunction` and annotating the class with `@Component`.
+
+| Function | Signature | Returns |
+|----------|-----------|---------|
+| `NOW()` | `() -> LocalDateTime` | Current server local datetime. |
+| `TODAY()` | `() -> LocalDate` | Current server local date. |
+| `ISBLANK(value)` | `(Object) -> boolean` | `true` if value is `null` or a blank string. |
+| `BLANKVALUE(value, fallback)` | `(Object, Object) -> Object` | Returns `fallback` if value is blank, else value. |
+| `IF(cond, then, else)` | `(boolean, Object, Object) -> Object` | Ternary. |
+| `AND(a, b, ...)` | `(boolean...) -> boolean` | Variadic logical AND. Same semantics as `a AND b AND c`. |
+| `OR(a, b, ...)` | `(boolean...) -> boolean` | Variadic logical OR. |
+| `NOT(a)` | `(boolean) -> boolean` | Logical NOT. |
+| `LEN(s)`, `UPPER(s)`, `LOWER(s)`, `TRIM(s)`, `TEXT(v)` | string helpers | Self-explanatory. |
+| `CONTAINS(text, search)` | `(String, String) -> boolean` | Substring check. |
+| `REGEX(text, pattern)` | `(String, String) -> boolean` | Whole-string match against a Java regex. |
+| `VALUE(s)` | `(Object) -> double` | Parse to number. |
+| `ROUND(n, places)`, `ABS(n)`, `MAX(a, b)`, `MIN(a, b)` | numeric helpers | |
+| `DATEDIFF(d1, d2)` | `(date, date) -> long` | Days between `d2` and `d1`. |
+
+### Null handling
+
+- Field references return `null` for missing keys.
+- Comparison against `null` follows Java semantics — `null == null` is `true`, `null == 0` is `false`, `null > 0` returns `false` (treated as non-comparable).
+- Use `ISBLANK(field)` for explicit null/blank checks; the comparison `field == null` also works for strict null tests.
+
+### Validation rule formulas
+
+For validation rules, the `errorConditionFormula` evaluates to a Boolean. **The formula expresses when the record is INVALID** — a result of `true` means the rule rejects the save. Example:
+
+```text
+year < 1888 OR year > 2031
+```
+
+This rejects any record whose `year` field is outside the open interval `[1888, 2031]`. The matching JSON:API error returned to the client has:
+
+- `status: "422"` (Unprocessable Entity)
+- `code: "VALIDATION_RULE_FAILED"`
+- `detail`: the rule's `errorMessage`
+- `source.pointer`: `/data/attributes/<errorField>` (falls back to the rule name if no field is configured)
+
+Rules with `severity: "WARNING"` are evaluated identically but **never block the request** — a matching warning rule is logged at INFO level and the save proceeds. The default severity is `ERROR`.
+
+Formulas that fail to parse or throw at evaluation time are logged at WARN and treated as non-matching (the save proceeds). This is intentional — a broken formula must not lock the entire collection out of writes. The control plane is responsible for rejecting malformed formulas at rule create/update time via `ValidationRuleEvaluator.validateFormulaSyntax(...)`.

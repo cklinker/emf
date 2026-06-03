@@ -3,6 +3,8 @@ package io.kelta.runtime.router;
 import io.kelta.jsonapi.JsonApiError;
 import io.kelta.runtime.query.InvalidQueryException;
 import io.kelta.runtime.storage.UniqueConstraintViolationException;
+import io.kelta.runtime.validation.RecordValidationException;
+import io.kelta.runtime.validation.ValidationError;
 import io.kelta.runtime.validation.ValidationException;
 import io.kelta.runtime.validation.ValidationResult;
 import jakarta.validation.ConstraintViolation;
@@ -270,6 +272,39 @@ class GlobalExceptionHandlerTest {
         assertThat(e.getCode()).isEqualTo("INVALID_QUERY");
         assertThat(e.getDetail()).isEqualTo("unknown sort field");
         assertThat(e.getSource()).containsEntry("pointer", "/data/attributes/sort");
+    }
+
+    @Test
+    void recordValidationException_emits422WithRuleFailedCode() {
+        RecordValidationException ex = new RecordValidationException(List.of(
+                new ValidationError("title_year_range",
+                        "Year must be between 1888 and 2031", "year")));
+
+        ResponseEntity<Map<String, Object>> response =
+                handler.handleRecordValidationException(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        List<JsonApiError> errors = (List<JsonApiError>) response.getBody().get("errors");
+        assertThat(errors).hasSize(1);
+        JsonApiError e = errors.get(0);
+        assertThat(e.getStatus()).isEqualTo("422");
+        assertThat(e.getCode()).isEqualTo("VALIDATION_RULE_FAILED");
+        assertThat(e.getDetail()).isEqualTo("Year must be between 1888 and 2031");
+        assertThat(e.getSource()).containsEntry("pointer", "/data/attributes/year");
+    }
+
+    @Test
+    void recordValidationException_fallsBackToRuleNameWhenErrorFieldMissing() {
+        RecordValidationException ex = new RecordValidationException(List.of(
+                new ValidationError("cross_field_rule",
+                        "Record violates a cross-field rule", null)));
+
+        ResponseEntity<Map<String, Object>> response =
+                handler.handleRecordValidationException(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
+        assertThat(e.getSource()).containsEntry("pointer", "/data/attributes/cross_field_rule");
     }
 
     @Test

@@ -92,6 +92,13 @@ public class EmailConfig {
                 log.debug("Email disabled — dropping templated email to {} (key: {})", to, templateKey);
                 return Optional.of("disabled");
             }
+
+            @Override
+            public Optional<String> sendByName(String tenantId, String to, String name,
+                                               Map<String, Object> vars, String source, String sourceId) {
+                log.debug("Email disabled — dropping templated email to {} (name: {})", to, name);
+                return Optional.of("disabled");
+            }
         };
     }
 

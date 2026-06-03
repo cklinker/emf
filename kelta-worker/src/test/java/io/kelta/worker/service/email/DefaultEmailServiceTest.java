@@ -136,6 +136,44 @@ class DefaultEmailServiceTest {
     }
 
     @Nested
+    @DisplayName("sendByName")
+    class SendByName {
+
+        @Test
+        @DisplayName("Should resolve template by name and substitute vars")
+        void shouldResolveByNameAndSubstitute() {
+            when(emailRepository.findTemplateByName("t1", "user_invite"))
+                    .thenReturn(Optional.of(Map.of(
+                            "subject", "You're invited to ${tenantName}",
+                            "body_html", "<a href=\"${inviteLink}\">Accept</a>"
+                    )));
+            when(emailRepository.createEmailLog(anyString(), anyString(), anyString(), anyString(), any()))
+                    .thenReturn("log-name-1");
+
+            Optional<String> logId = service.sendByName("t1", "user@test.com", "user_invite",
+                    Map.of("tenantName", "Acme", "inviteLink", "https://app.kelta.io/accept-invite?token=abc"),
+                    "USER_INVITE", "abc");
+
+            assertThat(logId).contains("log-name-1");
+            verify(emailRepository).createEmailLog("t1", "user@test.com",
+                    "You're invited to Acme", "USER_INVITE", "abc");
+        }
+
+        @Test
+        @DisplayName("Should return empty when name-based template is missing")
+        void shouldReturnEmptyWhenMissing() {
+            when(emailRepository.findTemplateByName("t1", "unknown"))
+                    .thenReturn(Optional.empty());
+
+            Optional<String> logId = service.sendByName("t1", "u@x.com", "unknown",
+                    Map.of(), "X", null);
+
+            assertThat(logId).isEmpty();
+            verify(emailRepository, never()).createEmailLog(anyString(), anyString(), anyString(), anyString(), any());
+        }
+    }
+
+    @Nested
     @DisplayName("sendAsync")
     class SendAsync {
 

@@ -126,6 +126,33 @@ class FederatedUserMapperTest {
         }
 
         @Test
+        @DisplayName("sends invite email when JIT provisioning creates a new user")
+        void sendsInviteWhenUserCreated() {
+            when(oidcUser.getClaim("email")).thenReturn("new@test.com");
+            when(workerClient.jitProvisionUser(eq("new@test.com"), eq("tenant1"),
+                    any(), any(), any()))
+                    .thenReturn(Optional.of(new JitProvisionResult(
+                            "user-new", "prof-1", "Admin", "ACTIVE", true)));
+
+            mapper.mapUser(oidcUser, "tenant1", provider(null, null, null, null));
+
+            verify(workerClient).sendInviteEmail(eq("tenant1"), eq("new@test.com"), anyString());
+        }
+
+        @Test
+        @DisplayName("does not send invite when user already exists")
+        void doesNotSendInviteForExistingUser() {
+            when(oidcUser.getClaim("email")).thenReturn("existing@test.com");
+            when(workerClient.jitProvisionUser(anyString(), anyString(), any(), any(), any()))
+                    .thenReturn(Optional.of(new JitProvisionResult(
+                            "user-existing", "prof-1", "Admin", "ACTIVE", false)));
+
+            mapper.mapUser(oidcUser, "tenant1", provider(null, null, null, null));
+
+            verify(workerClient, never()).sendInviteEmail(anyString(), anyString(), anyString());
+        }
+
+        @Test
         @DisplayName("returns empty for PENDING_ACTIVATION user")
         void returnsEmptyForPendingActivation() {
             when(oidcUser.getClaim("email")).thenReturn("user@test.com");

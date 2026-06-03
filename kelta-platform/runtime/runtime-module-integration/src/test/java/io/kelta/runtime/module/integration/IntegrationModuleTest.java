@@ -103,6 +103,10 @@ class IntegrationModuleTest {
                     java.util.Map<String, Object> vars, String src, String sid) {
                 return java.util.Optional.of("custom-email-id");
             }
+            @Override public java.util.Optional<String> sendByName(String t, String to, String name,
+                    java.util.Map<String, Object> vars, String src, String sid) {
+                return java.util.Optional.of("custom-email-id");
+            }
         };
         ScriptExecutor customScript = new ScriptExecutor() {
             @Override public java.util.Optional<ScriptInfo> getScript(String id) {

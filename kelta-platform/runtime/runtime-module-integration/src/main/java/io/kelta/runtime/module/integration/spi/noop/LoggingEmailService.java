@@ -41,4 +41,13 @@ public class LoggingEmailService implements EmailService {
             id, tenantId, to, templateKey, source);
         return Optional.of(id);
     }
+
+    @Override
+    public Optional<String> sendByName(String tenantId, String to, String name,
+                                       Map<String, Object> vars, String source, String sourceId) {
+        String id = UUID.randomUUID().toString();
+        log.info("[NOOP] EmailService.sendByName: id={}, tenant={}, to={}, name={}, source={}",
+            id, tenantId, to, name, source);
+        return Optional.of(id);
+    }
 }

@@ -87,6 +87,37 @@ public class WorkerClient {
     }
 
     /**
+     * Sends a user-invitation email via the worker's
+     * {@code POST /api/internal/email/invite} endpoint. The worker resolves the
+     * {@code user_invite} template (tenant override → system default) and fills
+     * {@code ${inviteLink}} / {@code ${tenantName}} placeholders.
+     *
+     * @return true when the worker accepted the request and queued delivery.
+     */
+    public boolean sendInviteEmail(String tenantId, String email, String inviteToken) {
+        try {
+            Map<String, String> requestBody = Map.of(
+                    "email", email,
+                    "tenantId", tenantId,
+                    "inviteToken", inviteToken
+            );
+
+            restClient.post()
+                    .uri("/api/internal/email/invite")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Internal-Token", internalToken)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(JsonNode.class);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to send invite email via worker: tenant={}, to={}, error={}",
+                    tenantId, email, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Sends an email using a stable {@code templateKey} resolved by the worker
      * (tenant override or system default) with {@code ${var}} substitution.
      *

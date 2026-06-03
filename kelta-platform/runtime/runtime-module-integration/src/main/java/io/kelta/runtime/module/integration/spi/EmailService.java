@@ -54,6 +54,26 @@ public interface EmailService {
                                Map<String, Object> vars, String source, String sourceId);
 
     /**
+     * Looks up a template by its {@code name} column (tenant override or
+     * platform default seeded under the {@code system} tenant), substitutes
+     * {@code ${var}} placeholders from {@code vars}, and queues the result.
+     *
+     * <p>Use this when callers prefer the short-name convention
+     * (e.g. {@code user_invite}, {@code welcome}) over the dotted
+     * {@code templateKey} form.
+     *
+     * @param tenantId owning tenant
+     * @param to       recipient email address
+     * @param name     template name (e.g. "user_invite")
+     * @param vars     variables for {@code ${name}} substitution in subject + body
+     * @param source   source tag for {@code email_log}
+     * @param sourceId optional source row id
+     * @return the generated email log id; empty if the template is missing
+     */
+    Optional<String> sendByName(String tenantId, String to, String name,
+                                Map<String, Object> vars, String source, String sourceId);
+
+    /**
      * Email template data.
      *
      * @param subject the template subject

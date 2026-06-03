@@ -177,6 +177,30 @@ class FieldLifecycleHookTest {
         }
 
         @Test
+        @DisplayName("Should accept new long-form text and vector types in lowercase")
+        void shouldAcceptLongFormTextAndVectorLowercase() {
+            for (String t : new String[]{"text", "rich_text", "vector"}) {
+                Map<String, Object> record = new HashMap<>(Map.of("name", "f", "type", t));
+                BeforeSaveResult result = hook.beforeCreate(record, "t1");
+                assertTrue(result.isSuccess(),
+                        "lowercase '" + t + "' should pass FieldLifecycleHook");
+                assertEquals(t.toUpperCase(), result.getFieldUpdates().get("type"),
+                        "type '" + t + "' should canonicalize to upper");
+            }
+        }
+
+        @Test
+        @DisplayName("Should accept new long-form text and vector types in canonical (uppercase) form")
+        void shouldAcceptLongFormTextAndVectorCanonical() {
+            for (String t : new String[]{"TEXT", "RICH_TEXT", "VECTOR"}) {
+                Map<String, Object> record = new HashMap<>(Map.of("name", "f", "type", t));
+                BeforeSaveResult result = hook.beforeCreate(record, "t1");
+                assertTrue(result.isSuccess(),
+                        "canonical '" + t + "' should pass FieldLifecycleHook");
+            }
+        }
+
+        @Test
         @DisplayName("Should leave already-canonical type unchanged")
         void shouldLeaveCanonicalTypeUnchanged() {
             Map<String, Object> record = new HashMap<>(Map.of(

@@ -692,6 +692,9 @@ public class CollectionLifecycleManager {
             case "object" -> FieldType.JSON;
             case "array" -> FieldType.ARRAY;
             case "reference" -> FieldType.REFERENCE;
+            case "text" -> FieldType.TEXT;
+            case "rich_text" -> FieldType.RICH_TEXT;
+            case "vector" -> FieldType.VECTOR;
             default -> {
                 // Try direct enum match for any non-standard values
                 try {

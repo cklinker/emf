@@ -158,7 +158,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 continue;
             }
 
-            String sqlType = mapFieldTypeToSql(field.type());
+            String sqlType = mapFieldTypeToSql(field.type(), field);
             sql.append(", ");
             sql.append(sanitizeIdentifier(columnName)).append(" ").append(sqlType);
 
@@ -791,7 +791,12 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param type the field type
      * @return the SQL type string
      */
-    private String mapFieldTypeToSql(FieldType type) {
+    /**
+     * Maps a field's type to its PostgreSQL column type. VECTOR reads its
+     * {@code dimension} (default 1536) from {@code fieldTypeConfig}; all other
+     * types ignore the {@code field} arg.
+     */
+    private String mapFieldTypeToSql(FieldType type, FieldDefinition field) {
         return switch (type) {
             case STRING -> "TEXT";
             case INTEGER -> "INTEGER";
@@ -811,7 +816,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case PHONE -> "VARCHAR(40)";
             case EMAIL -> "VARCHAR(320)";
             case URL -> "VARCHAR(2048)";
-            case RICH_TEXT -> "TEXT";
+            case TEXT, RICH_TEXT -> "TEXT";
+            case VECTOR -> "vector(" + vectorDimension(field) + ")";
             case ENCRYPTED -> "BYTEA";
             case EXTERNAL_ID -> "VARCHAR(255)";
             case GEOLOCATION -> "DOUBLE PRECISION";
@@ -819,6 +825,32 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case MASTER_DETAIL -> "VARCHAR(36)";
             case FORMULA, ROLLUP_SUMMARY -> null;
         };
+    }
+
+    /** pgvector caps each row at 16000 dimensions; default to 1536 (OpenAI small). */
+    private static int vectorDimension(FieldDefinition field) {
+        Object configured = field == null ? null : field.getConfigValue("dimension");
+        int dim = switch (configured) {
+            case Number n -> n.intValue();
+            case String s -> {
+                try {
+                    yield Integer.parseInt(s.trim());
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException(
+                            "VECTOR field '" + field.name()
+                                    + "' has non-numeric dimension: " + s);
+                }
+            }
+            case null -> 1536;
+            default -> throw new IllegalArgumentException(
+                    "VECTOR field '" + field.name()
+                            + "' has unsupported dimension type: " + configured.getClass().getName());
+        };
+        if (dim < 1 || dim > 16000) {
+            throw new IllegalArgumentException(
+                    "VECTOR dimension must be between 1 and 16000 (got " + dim + ")");
+        }
+        return dim;
     }
 
     /**

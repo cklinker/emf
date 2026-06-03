@@ -133,8 +133,12 @@ public class SchemaMigrationEngine {
             FieldType.EMAIL, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.URL, EnumSet.of(
             FieldType.URL, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.TEXT, EnumSet.of(
+            FieldType.TEXT, FieldType.RICH_TEXT, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.RICH_TEXT, EnumSet.of(
-            FieldType.RICH_TEXT, FieldType.STRING));
+            FieldType.RICH_TEXT, FieldType.TEXT, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.VECTOR, EnumSet.of(
+            FieldType.VECTOR));
         TYPE_COMPATIBILITY.put(FieldType.ENCRYPTED, EnumSet.of(
             FieldType.ENCRYPTED, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.EXTERNAL_ID, EnumSet.of(
@@ -618,7 +622,12 @@ public class SchemaMigrationEngine {
         return identifier;
     }
     
-    private String mapFieldTypeToSql(FieldType type) {
+    /**
+     * Maps a field's type to its PostgreSQL column type. The {@code field} argument
+     * is used for parameterized types — currently {@link FieldType#VECTOR}, which
+     * reads its {@code dimension} from {@code fieldTypeConfig} (default 1536).
+     */
+    String mapFieldTypeToSql(FieldType type, FieldDefinition field) {
         return switch (type) {
             case STRING -> "TEXT";
             case INTEGER -> "INTEGER";
@@ -638,7 +647,8 @@ public class SchemaMigrationEngine {
             case PHONE -> "VARCHAR(40)";
             case EMAIL -> "VARCHAR(320)";
             case URL -> "VARCHAR(2048)";
-            case RICH_TEXT -> "TEXT";
+            case TEXT, RICH_TEXT -> "TEXT";
+            case VECTOR -> "vector(" + vectorDimension(field) + ")";
             case ENCRYPTED -> "BYTEA";
             case EXTERNAL_ID -> "VARCHAR(255)";
             case GEOLOCATION -> "DOUBLE PRECISION";
@@ -646,6 +656,32 @@ public class SchemaMigrationEngine {
             case MASTER_DETAIL -> "VARCHAR(36)";
             case FORMULA, ROLLUP_SUMMARY -> null;
         };
+    }
+
+    /** pgvector caps each row at 16000 dimensions; default to 1536 (OpenAI small). */
+    private static int vectorDimension(FieldDefinition field) {
+        Object configured = field == null ? null : field.getConfigValue("dimension");
+        int dim = switch (configured) {
+            case Number n -> n.intValue();
+            case String s -> {
+                try {
+                    yield Integer.parseInt(s.trim());
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException(
+                            "VECTOR field '" + field.name()
+                                    + "' has non-numeric dimension: " + s);
+                }
+            }
+            case null -> 1536;
+            default -> throw new IllegalArgumentException(
+                    "VECTOR field '" + field.name()
+                            + "' has unsupported dimension type: " + configured.getClass().getName());
+        };
+        if (dim < 1 || dim > 16000) {
+            throw new IllegalArgumentException(
+                    "VECTOR dimension must be between 1 and 16000 (got " + dim + ")");
+        }
+        return dim;
     }
     
     /**
@@ -670,7 +706,7 @@ public class SchemaMigrationEngine {
         sql.append(" ADD COLUMN IF NOT EXISTS ");
         sql.append(sanitizeIdentifier(columnName));
         sql.append(" ");
-        sql.append(mapFieldTypeToSql(field.type()));
+        sql.append(mapFieldTypeToSql(field.type(), field));
 
         // Note: We don't add NOT NULL for new columns as existing rows would fail
         // The application layer handles nullability validation
@@ -720,7 +756,7 @@ public class SchemaMigrationEngine {
     private MigrationAction createAlterColumnTypeMigration(String tableIdentifier, CollectionDefinition definition,
             FieldDefinition oldField, FieldDefinition newField) {
         String columnName = resolvePhysicalColumnName(definition, newField);
-        String newSqlType = mapFieldTypeToSql(newField.type());
+        String newSqlType = mapFieldTypeToSql(newField.type(), newField);
 
         // PostgreSQL syntax for changing column type with USING clause for type conversion
         String sql = String.format(

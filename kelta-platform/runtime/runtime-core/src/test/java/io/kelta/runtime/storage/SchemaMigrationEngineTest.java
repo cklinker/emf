@@ -95,7 +95,7 @@ class SchemaMigrationEngineTest {
     
     private String mapFieldTypeToSql(FieldType type) {
         return switch (type) {
-            case STRING, PHONE, EMAIL, URL, RICH_TEXT, EXTERNAL_ID, PICKLIST, AUTO_NUMBER -> "TEXT";
+            case STRING, PHONE, EMAIL, URL, TEXT, RICH_TEXT, EXTERNAL_ID, PICKLIST, AUTO_NUMBER -> "TEXT";
             case INTEGER -> "INTEGER";
             case LONG -> "BIGINT";
             case DOUBLE, CURRENCY, PERCENT -> "DOUBLE PRECISION";
@@ -105,6 +105,10 @@ class SchemaMigrationEngineTest {
             case JSON, ARRAY, MULTI_PICKLIST, GEOLOCATION -> "CLOB"; // H2 doesn't have JSONB, use CLOB
             case REFERENCE, LOOKUP, MASTER_DETAIL -> "VARCHAR(36)";
             case ENCRYPTED -> "BINARY(256)";
+            // H2 has no pgvector; tests that exercise VECTOR DDL run against Postgres
+            // (PhysicalTableStorageAdapter's own SQL emission test). Here we stand in
+            // with a generic blob column so the helper stays total.
+            case VECTOR -> "BINARY(4096)";
             case FORMULA, ROLLUP_SUMMARY -> null;
         };
     }
@@ -411,9 +415,87 @@ class SchemaMigrationEngineTest {
                 false, false, false, null, null, null, null, null);
             FieldDefinition newField = new FieldDefinition("count", FieldType.LONG,
                 false, false, false, null, null, null, null, null);
-            
-            assertDoesNotThrow(() -> 
+
+            assertDoesNotThrow(() ->
                 migrationEngine.validateTypeChange("test_dataection", oldField, newField));
+        }
+
+        @Test
+        @DisplayName("TEXT and RICH_TEXT are bidirectionally compatible (shared TEXT column)")
+        void textAndRichTextAreCompatible() {
+            assertTrue(migrationEngine.isTypeChangeCompatible(FieldType.TEXT, FieldType.RICH_TEXT));
+            assertTrue(migrationEngine.isTypeChangeCompatible(FieldType.RICH_TEXT, FieldType.TEXT));
+            assertTrue(migrationEngine.isTypeChangeCompatible(FieldType.TEXT, FieldType.STRING));
+            assertTrue(migrationEngine.isTypeChangeCompatible(FieldType.RICH_TEXT, FieldType.STRING));
+        }
+
+        @Test
+        @DisplayName("VECTOR is only compatible with itself")
+        void vectorIsOnlyCompatibleWithItself() {
+            assertTrue(migrationEngine.isTypeChangeCompatible(FieldType.VECTOR, FieldType.VECTOR));
+            assertFalse(migrationEngine.isTypeChangeCompatible(FieldType.VECTOR, FieldType.STRING));
+            assertFalse(migrationEngine.isTypeChangeCompatible(FieldType.VECTOR, FieldType.JSON));
+            assertFalse(migrationEngine.isTypeChangeCompatible(FieldType.VECTOR, FieldType.ARRAY));
+        }
+    }
+
+    @Nested
+    @DisplayName("SQL Type Mapping Tests")
+    class SqlTypeMappingTests {
+
+        @Test
+        @DisplayName("TEXT and RICH_TEXT both emit the Postgres TEXT column type")
+        void textAndRichTextEmitText() {
+            FieldDefinition text = new FieldDefinition("synopsis", FieldType.TEXT,
+                    true, false, false, null, null, null, null, null);
+            FieldDefinition richText = new FieldDefinition("description", FieldType.RICH_TEXT,
+                    true, false, false, null, null, null, null, null);
+
+            assertEquals("TEXT", migrationEngine.mapFieldTypeToSql(FieldType.TEXT, text));
+            assertEquals("TEXT", migrationEngine.mapFieldTypeToSql(FieldType.RICH_TEXT, richText));
+        }
+
+        @Test
+        @DisplayName("VECTOR emits vector(N) using the dimension from fieldTypeConfig")
+        void vectorEmitsConfiguredDimension() {
+            FieldDefinition vector = new FieldDefinition("embedding", FieldType.VECTOR,
+                    true, false, false, null, null, null, null,
+                    Map.of("dimension", 768), null);
+
+            assertEquals("vector(768)",
+                    migrationEngine.mapFieldTypeToSql(FieldType.VECTOR, vector));
+        }
+
+        @Test
+        @DisplayName("VECTOR defaults to dimension 1536 when fieldTypeConfig is empty")
+        void vectorDefaultsTo1536() {
+            FieldDefinition vector = new FieldDefinition("embedding", FieldType.VECTOR,
+                    true, false, false, null, null, null, null, null, null);
+
+            assertEquals("vector(1536)",
+                    migrationEngine.mapFieldTypeToSql(FieldType.VECTOR, vector));
+        }
+
+        @Test
+        @DisplayName("VECTOR rejects dimension out of pgvector's 1..16000 range")
+        void vectorRejectsOutOfRangeDimension() {
+            FieldDefinition tooBig = new FieldDefinition("embedding", FieldType.VECTOR,
+                    true, false, false, null, null, null, null,
+                    Map.of("dimension", 20000), null);
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> migrationEngine.mapFieldTypeToSql(FieldType.VECTOR, tooBig));
+        }
+
+        @Test
+        @DisplayName("VECTOR accepts a stringified numeric dimension (JSON deserialization edge case)")
+        void vectorAcceptsStringDimension() {
+            FieldDefinition vector = new FieldDefinition("embedding", FieldType.VECTOR,
+                    true, false, false, null, null, null, null,
+                    Map.of("dimension", "1024"), null);
+
+            assertEquals("vector(1024)",
+                    migrationEngine.mapFieldTypeToSql(FieldType.VECTOR, vector));
         }
     }
     

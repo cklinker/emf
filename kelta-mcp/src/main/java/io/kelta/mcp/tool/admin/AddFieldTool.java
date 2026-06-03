@@ -30,7 +30,9 @@ public class AddFieldTool implements AdminTool {
         properties.put("collectionName", Schemas.string("Collection the field belongs to."));
         properties.put("fieldName", Schemas.string("Field name (camelCase recommended)."));
         properties.put("type", Schemas.string(
-                "Field type: text, longText, number, integer, decimal, boolean, date, datetime, reference, picklist, multiPicklist, json, file, image."));
+                "Field type: text (TEXT, long-form plain text), richText (RICH_TEXT, HTML/markdown), string,"
+                        + " longText, number, integer, decimal, boolean, date, datetime, reference,"
+                        + " picklist, multiPicklist, json, file, image, vector (requires dimension)."));
         properties.put("required", Schemas.bool("Whether the field is required (default false).", false));
         properties.put("unique", Schemas.bool("Whether values must be unique (default false).", false));
         properties.put("description", Schemas.string("Optional description shown in the admin UI."));
@@ -39,6 +41,9 @@ public class AddFieldTool implements AdminTool {
                 "Optional validation config (regex, min/max, etc.) — shape depends on the field type."));
         properties.put("referenceCollection", Schemas.string(
                 "For type=reference, the target collection name."));
+        properties.put("dimension", Schemas.integer(
+                "For type=vector, the embedding dimension (e.g. 1536 for OpenAI text-embedding-3-small). Required for VECTOR fields.",
+                1, 16_000));
 
         Tool tool = Tool.builder()
                 .name("add_field")
@@ -62,16 +67,27 @@ public class AddFieldTool implements AdminTool {
                         return error("Arguments \"collectionName\", \"fieldName\", and \"type\" are required.");
                     }
 
+                    String rawType = t.toString();
+                    String wireType = mapTypeAlias(rawType);
+
                     Map<String, Object> attrs = new LinkedHashMap<>();
                     attrs.put("collectionName", cn.toString());
                     attrs.put("fieldName", fn.toString());
-                    attrs.put("type", t.toString());
+                    attrs.put("type", wireType);
                     if (args.get("required") instanceof Boolean b) attrs.put("required", b);
                     if (args.get("unique") instanceof Boolean b) attrs.put("unique", b);
                     if (args.get("description") instanceof String s && !s.isBlank()) attrs.put("description", s);
                     if (args.get("defaultValue") instanceof String s) attrs.put("defaultValue", s);
                     if (args.get("validation") instanceof Map<?, ?> v) attrs.put("validation", v);
                     if (args.get("referenceCollection") instanceof String s && !s.isBlank()) attrs.put("referenceCollection", s);
+
+                    if (isVectorType(wireType)) {
+                        Object dim = args.get("dimension");
+                        if (!(dim instanceof Number)) {
+                            return error("Argument \"dimension\" is required when type=vector.");
+                        }
+                        attrs.put("fieldTypeConfig", Map.of("dimension", ((Number) dim).intValue()));
+                    }
 
                     Map<String, Object> body = Map.of("data", Map.of(
                             "type", "fields",
@@ -90,5 +106,23 @@ public class AddFieldTool implements AdminTool {
                 .isError(true)
                 .content(List.of(new TextContent(message)))
                 .build();
+    }
+
+    /**
+     * Translates camelCase aliases that the worker's lifecycle hook does not
+     * accept into their snake_case equivalents. Everything else is passed
+     * through untouched — the worker handles canonicalization.
+     */
+    static String mapTypeAlias(String alias) {
+        String trimmed = alias.trim();
+        return switch (trimmed) {
+            case "richText" -> "rich_text";
+            case "multiPicklist" -> "multi_picklist";
+            default -> trimmed;
+        };
+    }
+
+    static boolean isVectorType(String wireType) {
+        return "vector".equalsIgnoreCase(wireType.trim());
     }
 }

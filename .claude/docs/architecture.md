@@ -133,6 +133,40 @@ Custom domains and tenant settings live in raw JDBC tables rather than
 system collections, so the publishers are invoked directly from the
 controller after the mutation rather than via the BeforeSaveHook registry.
 
+## Field Types
+
+`FieldType` (`runtime-core/.../model/FieldType.java`) enumerates every supported
+column type. Most map directly to a PostgreSQL type in
+`SchemaMigrationEngine.mapFieldTypeToSql` and
+`PhysicalTableStorageAdapter.mapFieldTypeToSql`. Long-form text comes in two
+flavours kept semantically distinct so the admin UI can pick the right editor:
+
+| FieldType | Postgres column | UI editor |
+|-----------|-----------------|-----------|
+| `TEXT` | `TEXT` | plain textarea |
+| `RICH_TEXT` | `TEXT` | rich-text / HTML editor |
+
+### Vector embeddings (pgvector)
+
+`FieldType.VECTOR` maps to a `vector(N)` column from the
+[pgvector](https://github.com/pgvector/pgvector) extension. The dimension `N` is
+read from `FieldDefinition.fieldTypeConfig` under key `dimension`
+(`SchemaMigrationEngine.resolveVectorDimension`); the default is `1536`
+(OpenAI `text-embedding-3-small`) and valid dimensions are `1..16000`.
+
+Requirements:
+
+- The Postgres database must have the `vector` extension installed
+  (`CREATE EXTENSION IF NOT EXISTS vector`). The platform does **not** install
+  it automatically — operators add it once per database.
+- The MCP `add_field` admin tool requires a `dimension` argument when
+  `type=vector`. The value flows into the `fieldTypeConfig` JSONB column on the
+  `fields` system collection and is read back when the field is loaded.
+
+`VECTOR` dimension changes are not supported; the type is compatible only with
+itself in `SchemaMigrationEngine.TYPE_COMPATIBILITY`. To rename the dimension,
+drop and re-add the field.
+
 ## Key Abstractions
 
 | Abstraction | Purpose | Location |

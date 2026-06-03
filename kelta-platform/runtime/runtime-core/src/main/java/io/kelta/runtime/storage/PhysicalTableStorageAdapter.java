@@ -158,7 +158,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 continue;
             }
 
-            String sqlType = mapFieldTypeToSql(field.type());
+            String sqlType = mapFieldTypeToSql(field);
             sql.append(", ");
             sql.append(sanitizeIdentifier(columnName)).append(" ").append(sqlType);
 
@@ -791,8 +791,11 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param type the field type
      * @return the SQL type string
      */
-    private String mapFieldTypeToSql(FieldType type) {
-        return switch (type) {
+    private String mapFieldTypeToSql(FieldDefinition field) {
+        if (field.type() == FieldType.VECTOR) {
+            return "vector(" + SchemaMigrationEngine.resolveVectorDimension(field) + ")";
+        }
+        return switch (field.type()) {
             case STRING -> "TEXT";
             case INTEGER -> "INTEGER";
             case LONG -> "BIGINT";
@@ -811,13 +814,14 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case PHONE -> "VARCHAR(40)";
             case EMAIL -> "VARCHAR(320)";
             case URL -> "VARCHAR(2048)";
+            case TEXT -> "TEXT";
             case RICH_TEXT -> "TEXT";
             case ENCRYPTED -> "BYTEA";
             case EXTERNAL_ID -> "VARCHAR(255)";
             case GEOLOCATION -> "DOUBLE PRECISION";
             case LOOKUP -> "VARCHAR(36)";
             case MASTER_DETAIL -> "VARCHAR(36)";
-            case FORMULA, ROLLUP_SUMMARY -> null;
+            case VECTOR, FORMULA, ROLLUP_SUMMARY -> null;
         };
     }
 

@@ -74,8 +74,20 @@ public enum FieldType {
     /** URL with format validation. Maps to VARCHAR(2048) in PostgreSQL. */
     URL,
 
+    /** Long-form plain text content. Maps to TEXT in PostgreSQL. */
+    TEXT,
+
     /** Rich text / HTML content. Maps to TEXT in PostgreSQL. */
     RICH_TEXT,
+
+    // --- New: AI / Embeddings ---
+
+    /**
+     * Vector embedding for similarity search. Requires the pgvector extension.
+     * Maps to {@code vector(N)} in PostgreSQL where {@code N} is read from
+     * {@link FieldDefinition#fieldTypeConfig()} under key {@code dimension}.
+     */
+    VECTOR,
 
     // --- New: Security & Identity ---
 

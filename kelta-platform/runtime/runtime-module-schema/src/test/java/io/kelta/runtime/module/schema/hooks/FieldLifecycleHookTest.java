@@ -186,6 +186,35 @@ class FieldLifecycleHookTest {
             assertFalse(result.hasFieldUpdates(),
                     "canonical type + active set should not produce updates");
         }
+
+        @Test
+        @DisplayName("Should accept lowercase 'text' and normalize to canonical 'TEXT'")
+        void shouldAcceptTextType() {
+            Map<String, Object> record = new HashMap<>(Map.of("name", "synopsis", "type", "text"));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertEquals("TEXT", result.getFieldUpdates().get("type"));
+        }
+
+        @Test
+        @DisplayName("Should accept lowercase 'vector' and normalize to canonical 'VECTOR'")
+        void shouldAcceptVectorType() {
+            Map<String, Object> record = new HashMap<>(Map.of("name", "embedding", "type", "vector"));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertEquals("VECTOR", result.getFieldUpdates().get("type"));
+        }
+
+        @Test
+        @DisplayName("Should accept canonical 'RICH_TEXT' unchanged")
+        void shouldAcceptRichTextType() {
+            Map<String, Object> record = new HashMap<>(Map.of(
+                    "name", "description", "type", "RICH_TEXT", "active", true));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertFalse(result.hasFieldUpdates(),
+                    "canonical RICH_TEXT + active set should not produce updates");
+        }
     }
 
     @Nested

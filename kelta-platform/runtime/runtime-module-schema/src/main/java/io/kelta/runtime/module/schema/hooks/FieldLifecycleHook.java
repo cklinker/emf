@@ -26,20 +26,22 @@ public class FieldLifecycleHook implements BeforeSaveHook {
 
     static final Set<String> VALID_FIELD_TYPES = Set.of(
             // Lowercase (UI / FieldService types)
-            "string", "number", "boolean", "date", "datetime",
+            "string", "text", "number", "boolean", "date", "datetime",
             "reference", "array", "object", "json",
             "picklist", "multi_picklist", "currency", "percent",
             "auto_number", "phone", "email", "url",
             "rich_text", "encrypted", "external_id",
             "geolocation", "lookup", "master_detail",
+            "vector",
             "formula", "rollup_summary",
             // Uppercase (runtime / canonical types)
-            "STRING", "INTEGER", "LONG", "DOUBLE", "BOOLEAN",
+            "STRING", "TEXT", "INTEGER", "LONG", "DOUBLE", "BOOLEAN",
             "DATE", "DATETIME", "JSON",
             "PICKLIST", "MULTI_PICKLIST", "CURRENCY", "PERCENT",
             "AUTO_NUMBER", "PHONE", "EMAIL", "URL",
             "RICH_TEXT", "ENCRYPTED", "EXTERNAL_ID",
             "GEOLOCATION", "LOOKUP", "MASTER_DETAIL",
+            "VECTOR",
             "FORMULA", "ROLLUP_SUMMARY", "REFERENCE", "ARRAY"
     );
 

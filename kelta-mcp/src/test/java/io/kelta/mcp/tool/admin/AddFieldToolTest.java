@@ -87,4 +87,72 @@ class AddFieldToolTest {
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
                 .withRequestBody(matchingJsonPath("$.data.attributes.referenceCollection", equalTo("users"))));
     }
+
+    @Test
+    void createsTextField() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "synopsis",
+                        "type", "text"), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("text")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.fieldName", equalTo("synopsis"))));
+    }
+
+    @Test
+    void createsRichTextFieldAndTranslatesCamelCaseAlias() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "editorial-lists",
+                        "fieldName", "description",
+                        "type", "richText"), null));
+
+        // The camelCase "richText" alias is translated to "rich_text" so the
+        // worker's field lifecycle hook accepts it without a 400.
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("rich_text"))));
+    }
+
+    @Test
+    void createsVectorFieldWithDimension() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "embedding",
+                        "type", "vector",
+                        "dimension", 1536), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("vector")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.fieldTypeConfig.dimension",
+                        equalTo("1536"))));
+    }
+
+    @Test
+    void rejectsVectorWithoutDimension() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "embedding",
+                        "type", "vector"), null));
+
+        assertThat(result.isError()).isEqualTo(Boolean.TRUE);
+        wm.verify(0, WireMock.postRequestedFor(urlEqualTo("/api/fields")));
+    }
 }

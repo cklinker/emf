@@ -95,7 +95,7 @@ class SchemaMigrationEngineTest {
     
     private String mapFieldTypeToSql(FieldType type) {
         return switch (type) {
-            case STRING, PHONE, EMAIL, URL, RICH_TEXT, EXTERNAL_ID, PICKLIST, AUTO_NUMBER -> "TEXT";
+            case STRING, TEXT, PHONE, EMAIL, URL, RICH_TEXT, EXTERNAL_ID, PICKLIST, AUTO_NUMBER -> "TEXT";
             case INTEGER -> "INTEGER";
             case LONG -> "BIGINT";
             case DOUBLE, CURRENCY, PERCENT -> "DOUBLE PRECISION";
@@ -105,6 +105,8 @@ class SchemaMigrationEngineTest {
             case JSON, ARRAY, MULTI_PICKLIST, GEOLOCATION -> "CLOB"; // H2 doesn't have JSONB, use CLOB
             case REFERENCE, LOOKUP, MASTER_DETAIL -> "VARCHAR(36)";
             case ENCRYPTED -> "BINARY(256)";
+            // H2 has no pgvector support; emulate the column as TEXT for unit tests.
+            case VECTOR -> "TEXT";
             case FORMULA, ROLLUP_SUMMARY -> null;
         };
     }
@@ -684,6 +686,58 @@ class SchemaMigrationEngineTest {
         void shouldThrowForInvalidStringMigrationType() {
             assertThrows(IllegalArgumentException.class,
                 () -> migrationEngine.recordMigration("test", "INVALID_TYPE", "SQL"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Vector Dimension Resolution Tests")
+    class VectorDimensionTests {
+
+        @Test
+        @DisplayName("Should read integer dimension from fieldTypeConfig")
+        void shouldReadIntegerDimensionFromConfig() {
+            FieldDefinition field = new FieldDefinition(
+                    "embedding", FieldType.VECTOR, true, false, false, null, null, null, null,
+                    Map.of("dimension", 1536), null);
+            assertEquals(1536, SchemaMigrationEngine.resolveVectorDimension(field));
+        }
+
+        @Test
+        @DisplayName("Should read numeric-string dimension from fieldTypeConfig")
+        void shouldReadStringDimensionFromConfig() {
+            FieldDefinition field = new FieldDefinition(
+                    "embedding", FieldType.VECTOR, true, false, false, null, null, null, null,
+                    Map.of("dimension", "768"), null);
+            assertEquals(768, SchemaMigrationEngine.resolveVectorDimension(field));
+        }
+
+        @Test
+        @DisplayName("Should default dimension to 1536 when fieldTypeConfig is null")
+        void shouldDefaultDimensionWhenConfigMissing() {
+            FieldDefinition field = new FieldDefinition(
+                    "embedding", FieldType.VECTOR, true, false, false, null, null, null, null,
+                    null, null);
+            assertEquals(1536, SchemaMigrationEngine.resolveVectorDimension(field));
+        }
+
+        @Test
+        @DisplayName("Should reject zero or negative dimension")
+        void shouldRejectInvalidDimension() {
+            FieldDefinition field = new FieldDefinition(
+                    "embedding", FieldType.VECTOR, true, false, false, null, null, null, null,
+                    Map.of("dimension", 0), null);
+            assertThrows(IllegalArgumentException.class,
+                    () -> SchemaMigrationEngine.resolveVectorDimension(field));
+        }
+
+        @Test
+        @DisplayName("Should reject dimension over 16000")
+        void shouldRejectOversizedDimension() {
+            FieldDefinition field = new FieldDefinition(
+                    "embedding", FieldType.VECTOR, true, false, false, null, null, null, null,
+                    Map.of("dimension", 20_000), null);
+            assertThrows(IllegalArgumentException.class,
+                    () -> SchemaMigrationEngine.resolveVectorDimension(field));
         }
     }
 

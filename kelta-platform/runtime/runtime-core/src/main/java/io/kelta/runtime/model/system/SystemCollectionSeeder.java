@@ -332,7 +332,9 @@ public class SystemCollectionSeeder {
             case PHONE -> "string";
             case EMAIL -> "string";
             case URL -> "string";
+            case TEXT -> "string";
             case RICH_TEXT -> "string";
+            case VECTOR -> "vector";
             case ENCRYPTED -> "string";
             case EXTERNAL_ID -> "string";
             case GEOLOCATION -> "number";

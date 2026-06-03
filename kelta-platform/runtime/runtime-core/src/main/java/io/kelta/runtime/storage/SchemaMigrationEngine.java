@@ -133,8 +133,12 @@ public class SchemaMigrationEngine {
             FieldType.EMAIL, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.URL, EnumSet.of(
             FieldType.URL, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.TEXT, EnumSet.of(
+            FieldType.TEXT, FieldType.RICH_TEXT, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.RICH_TEXT, EnumSet.of(
-            FieldType.RICH_TEXT, FieldType.STRING));
+            FieldType.RICH_TEXT, FieldType.TEXT, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.VECTOR, EnumSet.of(
+            FieldType.VECTOR));
         TYPE_COMPATIBILITY.put(FieldType.ENCRYPTED, EnumSet.of(
             FieldType.ENCRYPTED, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.EXTERNAL_ID, EnumSet.of(
@@ -618,6 +622,13 @@ public class SchemaMigrationEngine {
         return identifier;
     }
     
+    private String mapFieldTypeToSql(FieldDefinition field) {
+        if (field.type() == FieldType.VECTOR) {
+            return "vector(" + resolveVectorDimension(field) + ")";
+        }
+        return mapFieldTypeToSql(field.type());
+    }
+
     private String mapFieldTypeToSql(FieldType type) {
         return switch (type) {
             case STRING -> "TEXT";
@@ -638,7 +649,12 @@ public class SchemaMigrationEngine {
             case PHONE -> "VARCHAR(40)";
             case EMAIL -> "VARCHAR(320)";
             case URL -> "VARCHAR(2048)";
+            case TEXT -> "TEXT";
             case RICH_TEXT -> "TEXT";
+            // Callers that have a FieldDefinition must use the overload above
+            // so the dimension is included; without it we fall back to a
+            // 1536-dim column (OpenAI text-embedding-3-small default).
+            case VECTOR -> "vector(" + DEFAULT_VECTOR_DIMENSION + ")";
             case ENCRYPTED -> "BYTEA";
             case EXTERNAL_ID -> "VARCHAR(255)";
             case GEOLOCATION -> "DOUBLE PRECISION";
@@ -646,6 +662,33 @@ public class SchemaMigrationEngine {
             case MASTER_DETAIL -> "VARCHAR(36)";
             case FORMULA, ROLLUP_SUMMARY -> null;
         };
+    }
+
+    private static final int DEFAULT_VECTOR_DIMENSION = 1536;
+    private static final int MIN_VECTOR_DIMENSION = 1;
+    private static final int MAX_VECTOR_DIMENSION = 16_000;
+
+    static int resolveVectorDimension(FieldDefinition field) {
+        Object raw = field.fieldTypeConfig() != null
+                ? field.fieldTypeConfig().get("dimension")
+                : null;
+        int dim = DEFAULT_VECTOR_DIMENSION;
+        if (raw instanceof Number n) {
+            dim = n.intValue();
+        } else if (raw instanceof String s && !s.isBlank()) {
+            try {
+                dim = Integer.parseInt(s.trim());
+            } catch (NumberFormatException ignored) {
+                // fall through to default
+            }
+        }
+        if (dim < MIN_VECTOR_DIMENSION || dim > MAX_VECTOR_DIMENSION) {
+            throw new IllegalArgumentException(
+                "VECTOR field '" + field.name() + "' has invalid dimension " + dim
+                + " (must be between " + MIN_VECTOR_DIMENSION
+                + " and " + MAX_VECTOR_DIMENSION + ")");
+        }
+        return dim;
     }
     
     /**
@@ -670,7 +713,7 @@ public class SchemaMigrationEngine {
         sql.append(" ADD COLUMN IF NOT EXISTS ");
         sql.append(sanitizeIdentifier(columnName));
         sql.append(" ");
-        sql.append(mapFieldTypeToSql(field.type()));
+        sql.append(mapFieldTypeToSql(field));
 
         // Note: We don't add NOT NULL for new columns as existing rows would fail
         // The application layer handles nullability validation
@@ -720,7 +763,7 @@ public class SchemaMigrationEngine {
     private MigrationAction createAlterColumnTypeMigration(String tableIdentifier, CollectionDefinition definition,
             FieldDefinition oldField, FieldDefinition newField) {
         String columnName = resolvePhysicalColumnName(definition, newField);
-        String newSqlType = mapFieldTypeToSql(newField.type());
+        String newSqlType = mapFieldTypeToSql(newField);
 
         // PostgreSQL syntax for changing column type with USING clause for type conversion
         String sql = String.format(

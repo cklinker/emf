@@ -31,3 +31,4 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-06-03
 
 - 2026-06-03 chore(mcp): add `delete_collection` admin tool that wraps `DELETE /api/collections/{id}` and resolves a name argument via `filter[name][EQ]` so stale collections can be removed without falling back to direct REST (CHORE-2026-06-02-0009)
+- 2026-06-03 feat(runtime): filter orphan columns out of JSON:API `data.attributes` in `DynamicCollectionRouter.toJsonApiResourceObject` — keys with no matching `FieldDefinition` (and not framework metadata or a live CURRENCY/GEOLOCATION companion) are dropped, so columns left behind by `DELETE /api/fields/{id}` no longer leak into record reads/writes (TASK-2026-06-02-0005)

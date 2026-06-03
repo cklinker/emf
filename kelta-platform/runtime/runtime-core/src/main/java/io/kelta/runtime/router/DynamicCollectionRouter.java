@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -75,6 +76,20 @@ public class DynamicCollectionRouter {
 
     private static final Pattern UUID_PATTERN = Pattern.compile(
             "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+
+    /**
+     * Record-payload keys that are part of every collection's response envelope
+     * even though they have no {@link FieldDefinition}. Kept in sync with
+     * {@code PhysicalTableStorageAdapter.PAYLOAD_SYSTEM_KEYS}. Used by
+     * {@link #toJsonApiResourceObject} to distinguish framework metadata from
+     * orphan columns left behind by a deleted field (TASK-2026-06-02-0005).
+     */
+    private static final Set<String> SYSTEM_ATTRIBUTE_KEYS = Set.of(
+            "createdAt", "updatedAt", "createdBy", "updatedBy",
+            "tenantId", "recordTypeId");
+
+    private static final String[] COMPANION_SUFFIXES = {
+            "_currency_code", "_longitude", "_latitude"};
     
     private final CollectionRegistry registry;
     private final QueryEngine queryEngine;
@@ -1097,9 +1112,15 @@ public class DynamicCollectionRouter {
                     relationshipData.put("data", null);
                 }
                 relationships.put(key, relationshipData);
-            } else {
+            } else if (fieldDef != null || isSystemOrCompanionKey(key, definition)) {
                 attributes.put(key, value);
             }
+            // else: drop — orphan column with no matching FieldDefinition.
+            // DELETE /api/fields/{id} removes the definition but leaves the
+            // physical column in place (SchemaMigrationEngine only deprecates,
+            // does not DROP), so SELECT * still returns the stale column.
+            // Filtering here keeps the public response in sync with the live
+            // field set. See TASK-2026-06-02-0005.
         }
 
         resourceObject.put("attributes", attributes);
@@ -1108,6 +1129,29 @@ public class DynamicCollectionRouter {
         }
 
         return resourceObject;
+    }
+
+    /**
+     * Returns {@code true} if {@code key} is framework metadata
+     * (createdAt/updatedAt/audit/tenant) or a CURRENCY/GEOLOCATION companion
+     * column whose primary field still exists in the definition. Used to keep
+     * legitimate non-field keys in the response while filtering orphan columns
+     * left behind by a deleted field.
+     */
+    private boolean isSystemOrCompanionKey(String key, CollectionDefinition definition) {
+        if (SYSTEM_ATTRIBUTE_KEYS.contains(key)) {
+            return true;
+        }
+        for (String suffix : COMPANION_SUFFIXES) {
+            if (key.length() > suffix.length() && key.endsWith(suffix)) {
+                String primaryName = key.substring(0, key.length() - suffix.length());
+                FieldDefinition primary = definition.getField(primaryName);
+                if (primary != null && primary.type().hasCompanionColumns()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

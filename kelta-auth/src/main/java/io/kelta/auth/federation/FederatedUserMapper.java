@@ -102,6 +102,20 @@ public class FederatedUserMapper {
 
         WorkerClient.JitProvisionResult provision = result.get();
 
+        if (provision.created()) {
+            // Notify the freshly provisioned user via the worker's invite endpoint
+            // (uses the `user_invite` system template). Best-effort: log and continue
+            // even if the worker rejects the request, since SSO login itself is what
+            // gates access — the email is informational.
+            try {
+                String inviteToken = UUID.randomUUID().toString();
+                workerClient.sendInviteEmail(tenantId, email, inviteToken);
+            } catch (Exception e) {
+                log.warn("Failed to send invite email for newly-provisioned user {}: {}",
+                        email, e.getMessage());
+            }
+        }
+
         if ("PENDING_ACTIVATION".equals(provision.status())) {
             log.info("User {} created as PENDING_ACTIVATION (no profile match)", email);
             return Optional.empty(); // User cannot log in yet

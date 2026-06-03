@@ -194,6 +194,19 @@ tenant override (a row the tenant inserted with the same key/name) wins; the
 system default is only returned when no tenant override exists. Callers don't
 branch on the source — the same row shape is returned in either case.
 
+### User invitation flow
+
+`POST /api/internal/email/invite` (worker `InternalEmailController`) accepts
+`{ email, tenantId, inviteToken }` and sends the invitation email using the
+`user_invite` template (V141, name-based lookup). The controller resolves the
+tenant display name, builds an `inviteLink` from `kelta.external-base-url` +
+the token, substitutes `${inviteLink}` and `${tenantName}`, and queues delivery
+via `DefaultEmailService.sendByName` — which honours the tenant's SMTP
+credential override (or falls back to the platform default) the same way as
+the rest of the email pipeline. `kelta-auth`'s `WorkerClient.sendInviteEmail`
+calls this endpoint after a federated user is newly JIT-provisioned, so SSO
+sign-ups receive a notification email in addition to their existing session.
+
 ## Where to Add New Code
 
 | What | Where |

@@ -68,6 +68,8 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 - **Model**: CollectionDefinition, FieldDefinition, FieldType, ReferenceConfig, ValidationRules — `runtime-core/.../model/`
 - **Query Engine**: DefaultQueryEngine — pagination, sorting, filtering, field selection, virtual fields — `runtime-core/.../query/`
 - **Storage**: PhysicalTableStorageAdapter — PostgreSQL with dynamic schema — `runtime-core/.../storage/`
+  - Single-column uniqueness: `FieldDefinition.unique=true` emits inline `UNIQUE` in `CREATE TABLE`.
+  - Composite uniqueness: `PhysicalTableStorageAdapter.createCompositeUniqueConstraint(definition, fieldNames)` emits `ALTER TABLE … ADD CONSTRAINT cuq_<table>_<crc> UNIQUE (…)`. Constraint metadata is read back from `information_schema.table_constraints` (no extra system collection); REST: `POST/GET/DELETE /api/_composite-unique-constraints`; MCP: `create_unique_constraint`.
 - **Flow Engine**: Flow execution, node processing, branching — `runtime-core/.../flow/`
 - **Modules**: Action handlers (CreateRecord, UpdateRecord, QueryRecords, DeleteRecord, TriggerFlow, Decision, LogMessage) — `runtime-module-core/.../module/core/`
 

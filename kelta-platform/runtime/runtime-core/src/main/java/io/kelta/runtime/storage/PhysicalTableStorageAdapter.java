@@ -668,6 +668,252 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
     }
 
+    // ==================== Composite Unique Constraints ====================
+
+    /**
+     * Creates a composite unique constraint covering {@code fieldNames} on the
+     * collection's physical table. Uses {@code ALTER TABLE ... ADD CONSTRAINT
+     * ... UNIQUE (...)} so the metadata is discoverable through
+     * {@code information_schema.table_constraints} on both PostgreSQL and H2.
+     *
+     * <p>The operation is idempotent: if a constraint with the generated name
+     * already exists on the same column tuple, this method returns its name
+     * without re-issuing the DDL.
+     *
+     * @param definition the collection (must have a physical table)
+     * @param fieldNames API field names participating in the constraint;
+     *                   must contain at least 2 elements and each must resolve
+     *                   to a physical column of the collection
+     * @return the database-level constraint name that was created or already existed
+     * @throws StorageException on DDL failure
+     * @throws IllegalArgumentException if {@code fieldNames} is null/empty/too short
+     *         or references a field that does not exist or has no physical column
+     */
+    public String createCompositeUniqueConstraint(
+            CollectionDefinition definition, List<String> fieldNames) {
+        if (fieldNames == null || fieldNames.size() < 2) {
+            throw new IllegalArgumentException(
+                "A composite unique constraint requires at least 2 field names");
+        }
+        if (definition.systemCollection()) {
+            throw new IllegalArgumentException(
+                "Composite unique constraints on system collections are managed by Flyway, "
+                    + "not the runtime API");
+        }
+
+        List<String> columnNames = resolveColumnNamesOrThrow(definition, fieldNames);
+        TableRef tableRef = getTableRef(definition);
+        String qualifiedTable = tableRef.toSql();
+        String constraintName = buildCompositeConstraintName(
+            getBaseTableName(definition), columnNames);
+
+        if (constraintExists(tableRef, constraintName)) {
+            log.debug("Composite unique constraint '{}' already exists on '{}'; skipping",
+                constraintName, qualifiedTable);
+            return constraintName;
+        }
+
+        StringBuilder ddl = new StringBuilder("ALTER TABLE ");
+        ddl.append(qualifiedTable);
+        ddl.append(" ADD CONSTRAINT ").append(constraintName);
+        ddl.append(" UNIQUE (");
+        for (int i = 0; i < columnNames.size(); i++) {
+            if (i > 0) ddl.append(", ");
+            ddl.append(sanitizeIdentifier(columnNames.get(i)));
+        }
+        ddl.append(")");
+
+        try {
+            jdbcTemplate.execute(ddl.toString());
+            log.info("Created composite unique constraint '{}' on '{}' over {}",
+                constraintName, qualifiedTable, columnNames);
+            return constraintName;
+        } catch (DuplicateKeyException e) {
+            log.debug("Composite unique constraint '{}' was created concurrently; treating as success",
+                constraintName);
+            return constraintName;
+        } catch (DataAccessException e) {
+            throw new StorageException(
+                "Failed to create composite unique constraint '" + constraintName
+                    + "' on '" + qualifiedTable + "': " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Drops a composite unique constraint previously created by
+     * {@link #createCompositeUniqueConstraint}. Uses {@code DROP CONSTRAINT IF
+     * EXISTS} so calling it for a missing constraint is a no-op.
+     *
+     * @param definition     the collection owning the constraint
+     * @param constraintName the constraint name returned by create or list
+     * @throws StorageException on DDL failure
+     */
+    public void dropCompositeUniqueConstraint(
+            CollectionDefinition definition, String constraintName) {
+        sanitizeIdentifier(constraintName);
+        TableRef tableRef = getTableRef(definition);
+        String qualifiedTable = tableRef.toSql();
+        String ddl = "ALTER TABLE " + qualifiedTable
+            + " DROP CONSTRAINT IF EXISTS " + constraintName;
+        try {
+            jdbcTemplate.execute(ddl);
+            log.info("Dropped composite unique constraint '{}' from '{}'",
+                constraintName, qualifiedTable);
+        } catch (DataAccessException e) {
+            throw new StorageException(
+                "Failed to drop composite unique constraint '" + constraintName
+                    + "' from '" + qualifiedTable + "': " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Lists all composite unique constraints (≥2 columns) on the collection's
+     * physical table, ordered by constraint name and then column position.
+     *
+     * <p>Each result's {@code fieldNames} are the <em>API</em> field names —
+     * i.e. snake_case columns are reverse-mapped to their declared field names
+     * when present in the collection definition.
+     *
+     * <p>Single-column UNIQUE constraints (from the existing per-field
+     * {@code unique} flag) are excluded since they are already surfaced via
+     * {@link FieldDefinition#unique()}.
+     */
+    public List<CompositeUniqueConstraint> listCompositeUniqueConstraints(
+            CollectionDefinition definition) {
+        TableRef tableRef = getTableRef(definition);
+        String tableName = getBaseTableName(definition);
+        String schema = tableRef.schema();
+
+        String sql =
+            "SELECT tc.constraint_name AS name, kcu.column_name AS col, "
+                + "       kcu.ordinal_position AS pos "
+                + "FROM information_schema.table_constraints tc "
+                + "JOIN information_schema.key_column_usage kcu "
+                + "  ON kcu.constraint_name = tc.constraint_name "
+                + " AND kcu.constraint_schema = tc.constraint_schema "
+                + " AND kcu.table_name = tc.table_name "
+                + "WHERE tc.constraint_type = 'UNIQUE' "
+                + "  AND LOWER(tc.table_name) = LOWER(?) "
+                + "  AND LOWER(tc.table_schema) = LOWER(?) "
+                + "ORDER BY tc.constraint_name, kcu.ordinal_position";
+
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbcTemplate.queryForList(sql, tableName, schema);
+        } catch (DataAccessException e) {
+            throw new StorageException(
+                "Failed to list composite unique constraints on '" + tableRef.toSql()
+                    + "': " + e.getMessage(), e);
+        }
+
+        // Group rows by constraint name, preserving column order via ordinal_position.
+        Map<String, List<String>> byName = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            String name = String.valueOf(getCi(row, "name"));
+            String col = String.valueOf(getCi(row, "col"));
+            byName.computeIfAbsent(name, k -> new ArrayList<>()).add(col);
+        }
+
+        // Build reverse column→field map for this collection.
+        Map<String, String> columnToField = new HashMap<>();
+        for (FieldDefinition field : definition.fields()) {
+            if (!field.type().hasPhysicalColumn()) continue;
+            columnToField.put(getColumnName(definition, field).toLowerCase(), field.name());
+        }
+
+        List<CompositeUniqueConstraint> result = new ArrayList<>();
+        for (Map.Entry<String, List<String>> e : byName.entrySet()) {
+            List<String> cols = e.getValue();
+            // Skip single-column UNIQUE constraints — those are covered by FieldDefinition.unique().
+            if (cols.size() < 2) continue;
+            List<String> fields = new ArrayList<>(cols.size());
+            for (String col : cols) {
+                fields.add(columnToField.getOrDefault(col.toLowerCase(), col));
+            }
+            result.add(new CompositeUniqueConstraint(e.getKey(), fields));
+        }
+        return result;
+    }
+
+    private static Object getCi(Map<String, Object> row, String key) {
+        Object v = row.get(key);
+        if (v != null) return v;
+        v = row.get(key.toUpperCase());
+        if (v != null) return v;
+        for (Map.Entry<String, Object> e : row.entrySet()) {
+            if (e.getKey().equalsIgnoreCase(key)) return e.getValue();
+        }
+        return null;
+    }
+
+    private boolean constraintExists(TableRef tableRef, String constraintName) {
+        String sql =
+            "SELECT COUNT(*) FROM information_schema.table_constraints "
+                + "WHERE LOWER(table_schema) = LOWER(?) "
+                + "  AND LOWER(table_name) = LOWER(?) "
+                + "  AND LOWER(constraint_name) = LOWER(?)";
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                sql, Integer.class, tableRef.schema(), tableRef.tableName(), constraintName);
+            return count != null && count > 0;
+        } catch (DataAccessException e) {
+            // Best-effort check; if information_schema is unreachable, fall through
+            // and let the ALTER TABLE attempt surface the error.
+            log.warn("Could not check existence of constraint '{}' on '{}': {}",
+                constraintName, tableRef.toSql(), e.getMessage());
+            return false;
+        }
+    }
+
+    private List<String> resolveColumnNamesOrThrow(
+            CollectionDefinition definition, List<String> fieldNames) {
+        List<String> cols = new ArrayList<>(fieldNames.size());
+        Set<String> seen = new HashSet<>();
+        for (String fieldName : fieldNames) {
+            if (fieldName == null || fieldName.isBlank()) {
+                throw new IllegalArgumentException(
+                    "Composite unique constraint contains a blank field name");
+            }
+            if (!seen.add(fieldName)) {
+                throw new IllegalArgumentException(
+                    "Composite unique constraint repeats field '" + fieldName + "'");
+            }
+            FieldDefinition field = definition.getField(fieldName);
+            if (field == null) {
+                throw new IllegalArgumentException(
+                    "Field '" + fieldName + "' does not exist on collection '"
+                        + definition.name() + "'");
+            }
+            if (!field.type().hasPhysicalColumn()) {
+                throw new IllegalArgumentException(
+                    "Field '" + fieldName + "' has no physical column (type "
+                        + field.type() + ") and cannot participate in a unique constraint");
+            }
+            cols.add(getColumnName(definition, field));
+        }
+        return cols;
+    }
+
+    /**
+     * Builds a deterministic constraint name of the form
+     * {@code cuq_<table>_<crc>}. The CRC is taken over the column names in
+     * the order supplied, so {@code (a, b)} and {@code (b, a)} yield distinct
+     * names — matching PostgreSQL's behaviour where column order is part of
+     * a multi-column unique constraint's identity (it affects which index can
+     * serve query predicates).
+     */
+    static String buildCompositeConstraintName(String baseTable, List<String> columnNames) {
+        StringBuilder joined = new StringBuilder();
+        for (int i = 0; i < columnNames.size(); i++) {
+            if (i > 0) joined.append('_');
+            joined.append(columnNames.get(i));
+        }
+        CRC32 crc = new CRC32();
+        crc.update(joined.toString().getBytes(StandardCharsets.UTF_8));
+        String suffix = String.format("%08x", crc.getValue());
+        return buildBoundedIdentifier("cuq_", baseTable, suffix);
+    }
+
     // ==================== Helper Methods ====================
 
     /**
@@ -1286,7 +1532,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      */
     private String detectUniqueViolationField(CollectionDefinition definition, Map<String, Object> data,
             DuplicateKeyException e) {
-        // Check each unique field to see which one has a duplicate
+        // First, see if the failure message mentions a composite-unique constraint —
+        // these are named cuq_<table>_<crc>, which gives us a stable, dialect-neutral
+        // marker. Looking them up explicitly produces a clear "(a, b, c)" pointer
+        // instead of falling through to a single-field guess.
+        String compositeFields = detectCompositeUniqueViolationFields(definition, e);
+        if (compositeFields != null) {
+            return compositeFields;
+        }
+
+        // Check each single-column unique field to see which one has a duplicate
         for (FieldDefinition field : definition.fields()) {
             if (field.unique() && data.containsKey(field.name())) {
                 if (!isUnique(definition, field.name(), data.get(field.name()), (String) data.get("id"))) {
@@ -1301,5 +1556,61 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
 
         return "unknown";
+    }
+
+    /**
+     * Inspects a DuplicateKeyException's chained messages for a composite
+     * unique constraint name (prefix {@code cuq_}) and, if found, resolves
+     * the constraint's columns back to API field names so the caller can
+     * report a descriptive {@code "(field1, field2, ...)"} pointer.
+     *
+     * <p>Returns null when the violation does not look like a composite
+     * unique constraint — letting the caller fall back to single-field
+     * detection.
+     */
+    private String detectCompositeUniqueViolationFields(
+            CollectionDefinition definition, DuplicateKeyException e) {
+        String message = collectThrowableMessages(e);
+        if (message == null) {
+            return null;
+        }
+        // Extract a token that starts with cuq_. Postgres reports the constraint
+        // name verbatim ("violates unique constraint \"cuq_...\""); H2 surfaces the
+        // generated index name instead ("CUQ_...._INDEX_2"), so we match on the
+        // constraint-name prefix (case-insensitive) and tolerate trailing decoration.
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("(?i)cuq_[a-zA-Z0-9_]+")
+            .matcher(message);
+        if (!m.find()) {
+            return null;
+        }
+        String token = m.group().toLowerCase();
+        try {
+            for (CompositeUniqueConstraint c : listCompositeUniqueConstraints(definition)) {
+                String name = c.name().toLowerCase();
+                if (token.equals(name) || token.startsWith(name + "_")) {
+                    return "(" + String.join(", ", c.fieldNames()) + ")";
+                }
+            }
+        } catch (RuntimeException lookupFailure) {
+            log.debug("Could not resolve composite constraint '{}' on '{}': {}",
+                token, definition.name(), lookupFailure.getMessage());
+        }
+        return null;
+    }
+
+    private static String collectThrowableMessages(Throwable t) {
+        if (t == null) return null;
+        StringBuilder sb = new StringBuilder();
+        Throwable cur = t;
+        int guard = 0;
+        while (cur != null && guard++ < 16) {
+            if (cur.getMessage() != null) {
+                if (sb.length() > 0) sb.append(" | ");
+                sb.append(cur.getMessage());
+            }
+            cur = cur.getCause();
+        }
+        return sb.length() == 0 ? null : sb.toString();
     }
 }

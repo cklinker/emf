@@ -74,10 +74,15 @@ public class KeltaRuntimeAutoConfiguration {
     
     /**
      * Creates the physical table storage adapter.
+     *
+     * <p>The bean is declared with its concrete type so that callers needing
+     * the adapter-specific surface (e.g. {@link PhysicalTableStorageAdapter#createCompositeUniqueConstraint})
+     * can inject it directly. Spring will still satisfy {@code StorageAdapter}
+     * injection points because the concrete class implements the interface.
      */
     @Bean
     @ConditionalOnMissingBean(StorageAdapter.class)
-    public StorageAdapter physicalTableStorageAdapter(
+    public PhysicalTableStorageAdapter physicalTableStorageAdapter(
             JdbcTemplate jdbcTemplate,
             SchemaMigrationEngine migrationEngine,
             tools.jackson.databind.ObjectMapper objectMapper) {

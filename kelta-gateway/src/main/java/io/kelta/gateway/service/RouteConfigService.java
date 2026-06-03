@@ -170,6 +170,7 @@ public class RouteConfigService {
                 {"me", "/api/me/**", "me"},
                 {"metrics", "/api/metrics/**", "metrics"},
                 {"search", "/api/_search/**", "_search"},
+                {"composite-unique-constraints", "/api/_composite-unique-constraints/**", "_composite-unique-constraints"},
                 // Setup & customization
                 {"collections", "/api/collections/**", "collections"},
                 {"modules", "/api/modules/**", "modules"},

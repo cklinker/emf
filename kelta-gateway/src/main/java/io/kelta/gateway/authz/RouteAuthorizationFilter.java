@@ -237,6 +237,7 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         ObjectNode error = objectMapper.createObjectNode();
         error.put("status", "403");
         error.put("code", "FORBIDDEN");
+        error.put("title", "Forbidden");
         error.put("detail", message);
         ObjectNode meta = error.putObject("meta");
         meta.put("path", exchange.getRequest().getPath().value());
@@ -249,7 +250,8 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         try {
             errorBytes = objectMapper.writeValueAsBytes(root);
         } catch (Exception e) {
-            errorBytes = "{\"errors\":[{\"status\":\"403\",\"code\":\"FORBIDDEN\"}]}".getBytes(StandardCharsets.UTF_8);
+            errorBytes = ("{\"errors\":[{\"status\":\"403\",\"code\":\"FORBIDDEN\",\"title\":\"Forbidden\",\"detail\":\"Access denied\"}]}")
+                    .getBytes(StandardCharsets.UTF_8);
         }
 
         return exchange.getResponse().writeWith(

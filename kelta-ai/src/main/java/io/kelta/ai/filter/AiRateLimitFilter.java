@@ -55,7 +55,7 @@ public class AiRateLimitFilter extends OncePerRequestFilter {
             response.setHeader("Retry-After", String.valueOf(decision.retryAfterSeconds()));
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.getWriter().write("""
-                {"errors":[{"status":"429","code":"AI_RATE_LIMIT_EXCEEDED","title":"AI request rate limit reached for this tenant"}]}
+                {"errors":[{"status":"429","code":"AI_RATE_LIMIT_EXCEEDED","title":"Too Many Requests","detail":"AI request rate limit reached for this tenant; retry after the Retry-After interval"}]}
                 """);
             return;
         }

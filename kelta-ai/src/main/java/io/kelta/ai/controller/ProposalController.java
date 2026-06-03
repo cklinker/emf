@@ -46,14 +46,16 @@ public class ProposalController {
                     "errors", java.util.List.of(Map.of(
                             "status", "400",
                             "code", "INVALID_PROPOSAL",
-                            "title", e.getMessage()
+                            "title", "Invalid proposal",
+                            "detail", e.getMessage() != null ? e.getMessage() : "Proposal payload is invalid"
                     ))));
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of(
                     "errors", java.util.List.of(Map.of(
                             "status", "400",
                             "code", "PROPOSAL_ALREADY_APPLIED",
-                            "title", e.getMessage()
+                            "title", "Proposal already applied",
+                            "detail", e.getMessage() != null ? e.getMessage() : "This proposal has already been applied"
                     ))));
         } catch (Exception e) {
             log.error("Failed to apply proposal {}: {}", id, e.getMessage(), e);
@@ -62,7 +64,7 @@ public class ProposalController {
                             "status", "500",
                             "code", "APPLY_FAILED",
                             "title", "Failed to apply proposed changes",
-                            "detail", e.getMessage()
+                            "detail", e.getMessage() != null ? e.getMessage() : "An unexpected error occurred"
                     ))));
         }
     }

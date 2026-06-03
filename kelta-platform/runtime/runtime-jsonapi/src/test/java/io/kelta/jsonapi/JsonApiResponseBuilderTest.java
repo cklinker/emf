@@ -80,4 +80,33 @@ class JsonApiResponseBuilderTest {
         assertEquals("Missing field", errors.get(0).get("detail"));
         assertFalse(doc.containsKey("data"));
     }
+
+    @Test
+    void error_threeArg_alwaysPopulatesCode() {
+        Map<String, Object> doc = JsonApiResponseBuilder.error("400", "Bad Request", "Missing field");
+
+        List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
+        assertEquals("BAD_REQUEST", errors.get(0).get("code"));
+    }
+
+    @Test
+    void error_fourArg_usesExplicitCode() {
+        Map<String, Object> doc = JsonApiResponseBuilder.error(
+                "400", "INVALID_PAYLOAD", "Bad Request", "Body is not valid JSON");
+
+        List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
+        assertEquals(1, errors.size());
+        assertEquals("400", errors.get(0).get("status"));
+        assertEquals("INVALID_PAYLOAD", errors.get(0).get("code"));
+        assertEquals("Bad Request", errors.get(0).get("title"));
+        assertEquals("Body is not valid JSON", errors.get(0).get("detail"));
+    }
+
+    @Test
+    void error_blankTitle_defaultsCodeToError() {
+        Map<String, Object> doc = JsonApiResponseBuilder.error("500", "", "Server failure");
+
+        List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
+        assertEquals("ERROR", errors.get(0).get("code"));
+    }
 }

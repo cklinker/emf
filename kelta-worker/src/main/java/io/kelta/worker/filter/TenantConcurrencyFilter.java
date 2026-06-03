@@ -62,7 +62,7 @@ public class TenantConcurrencyFilter extends OncePerRequestFilter {
             response.setHeader("Retry-After", "1");
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.getWriter().write("""
-                {"errors":[{"status":"503","code":"TENANT_CONCURRENCY_LIMIT","title":"Too many concurrent requests for this tenant; retry shortly"}]}
+                {"errors":[{"status":"503","code":"TENANT_CONCURRENCY_LIMIT","title":"Service Unavailable","detail":"Too many concurrent requests for this tenant; retry shortly"}]}
                 """);
             return;
         }

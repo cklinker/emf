@@ -80,6 +80,9 @@ class ProposalControllerTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> errors = (List<Map<String, Object>>) response.getBody().get("errors");
         assertThat(errors.getFirst().get("code")).isEqualTo("INVALID_PROPOSAL");
+        assertThat(errors.getFirst().get("status")).isEqualTo("400");
+        assertThat(errors.getFirst().get("title")).isEqualTo("Invalid proposal");
+        assertThat(errors.getFirst().get("detail")).isEqualTo("Proposal not found");
     }
 
     @Test
@@ -96,6 +99,9 @@ class ProposalControllerTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> errors = (List<Map<String, Object>>) response.getBody().get("errors");
         assertThat(errors.getFirst().get("code")).isEqualTo("PROPOSAL_ALREADY_APPLIED");
+        assertThat(errors.getFirst().get("status")).isEqualTo("400");
+        assertThat(errors.getFirst().get("title")).isEqualTo("Proposal already applied");
+        assertThat(errors.getFirst().get("detail")).isEqualTo("Already applied");
     }
 
     @Test

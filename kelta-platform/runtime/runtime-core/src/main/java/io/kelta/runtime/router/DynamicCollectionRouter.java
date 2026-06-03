@@ -879,12 +879,13 @@ public class DynamicCollectionRouter {
      * @return a JSON:API error document
      */
     private Map<String, Object> toJsonApiErrorResponse(String message) {
-        Map<String, Object> error = new java.util.HashMap<>();
+        Map<String, Object> error = new java.util.LinkedHashMap<>();
         error.put("status", "403");
+        error.put("code", "FORBIDDEN");
         error.put("title", "Forbidden");
         error.put("detail", message);
 
-        Map<String, Object> response = new java.util.HashMap<>();
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
         response.put("errors", List.of(error));
         return response;
     }

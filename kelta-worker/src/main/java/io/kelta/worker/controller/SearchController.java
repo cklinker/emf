@@ -51,7 +51,8 @@ public class SearchController {
 
         if (tenantId == null || tenantId.isBlank()) {
             return ResponseEntity.badRequest().body(
-                    errorResponse("400", "Missing X-Tenant-ID header"));
+                    errorResponse("400", "MISSING_TENANT_HEADER", "Bad Request",
+                            "Missing X-Tenant-ID header"));
         }
 
         // Return empty results for short queries
@@ -94,7 +95,11 @@ public class SearchController {
         return response;
     }
 
-    private Map<String, Object> errorResponse(String status, String detail) {
-        return Map.of("errors", List.of(Map.of("status", status, "detail", detail)));
+    private Map<String, Object> errorResponse(String status, String code, String title, String detail) {
+        return Map.of("errors", List.of(Map.of(
+                "status", status,
+                "code", code,
+                "title", title,
+                "detail", detail)));
     }
 }

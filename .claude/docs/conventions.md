@@ -28,6 +28,29 @@
 - Custom exceptions extend from base types
 - No silent failures, graceful degradation on non-critical failures
 
+### JSON:API error envelope (all 4xx/5xx responses)
+
+Every error response must follow JSON:API and populate `errors[].{status, code, title, detail}`. Empty `{"errors":[{}]}` payloads are a bug — clients cannot distinguish failure modes without them.
+
+Each error object MUST include:
+- `status` — HTTP status as a string (`"400"`, `"404"`, `"409"`, ...)
+- `code` — machine-readable, `UPPER_SNAKE_CASE` (`INVALID_PAYLOAD`, `NOT_FOUND`, `VALIDATION_FAILED`, `MISSING_HEADER`, ...)
+- `title` — short human-readable label (typically the status reason phrase)
+- `detail` — human-readable description of the specific failure
+
+Optional but recommended:
+- `source.pointer` — JSON pointer to the offending attribute on field-level validation (e.g. `/data/attributes/email`)
+- `source.parameter` / `source.header` — for query-parameter / header errors
+- `meta.requestId` and `meta.path` — for traceability
+
+Construction:
+- Worker-side controllers: throw a runtime exception (`ValidationException`, `InvalidQueryException`, `ResponseStatusException`, ...) and let `io.kelta.runtime.router.GlobalExceptionHandler` (`@ControllerAdvice` in runtime-core) emit the envelope. The handler also covers Spring framework exceptions: `MethodArgumentNotValidException`, `ConstraintViolationException`, `HttpMessageNotReadableException`, `MissingServletRequestParameterException`, `MissingRequestHeaderException`, `MethodArgumentTypeMismatchException`, `NoHandlerFoundException`, `HttpRequestMethodNotSupportedException`, `HttpMediaTypeNotSupportedException`.
+- Filters (where you can't throw): write the JSON envelope directly with all four fields. Example: `kelta-worker/src/main/java/io/kelta/worker/filter/TenantConcurrencyFilter.java`.
+- Gateway-side: throw a `GatewayAuthenticationException` / `GatewayAuthorizationException` / `RouteNotFoundException` / `RateLimitExceededException` and let `io.kelta.gateway.error.GlobalErrorHandler` emit the envelope.
+- For ad-hoc construction prefer `io.kelta.jsonapi.JsonApiResponseBuilder.error(status, code, title, detail)`.
+
+When adding a new 4xx producer, add a test that asserts `errors[0]` carries non-empty `status`, `code`, `title`, and `detail` (see `kelta-platform/runtime/runtime-core/src/test/java/io/kelta/runtime/router/GlobalExceptionHandlerTest.java`).
+
 ### Javadoc
 - Required for public classes and methods
 - Include `@param`, `@returns`, `@throws`

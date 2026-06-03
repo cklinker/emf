@@ -229,7 +229,9 @@ class DynamicCollectionRouterSystemCollectionTest {
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.errors").isArray())
                     .andExpect(jsonPath("$.errors[0].status").value("403"))
-                    .andExpect(jsonPath("$.errors[0].title").value("Forbidden"));
+                    .andExpect(jsonPath("$.errors[0].code").value("FORBIDDEN"))
+                    .andExpect(jsonPath("$.errors[0].title").value("Forbidden"))
+                    .andExpect(jsonPath("$.errors[0].detail").isNotEmpty());
 
             // Verify the query engine was never called
             verify(queryEngine, never()).create(any(), any());

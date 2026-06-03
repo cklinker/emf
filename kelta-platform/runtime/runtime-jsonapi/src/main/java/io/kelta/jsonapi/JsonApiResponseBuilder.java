@@ -95,20 +95,44 @@ public final class JsonApiResponseBuilder {
     /**
      * Builds a JSON:API error response.
      *
+     * <p>Defaults {@code code} to the upper-cased {@code title} (or {@code "ERROR"} if blank)
+     * so the resulting envelope always carries a machine-readable code per JSON:API spec.
+     *
      * @param status HTTP status code (e.g. "400", "500")
      * @param title  short error title
      * @param detail detailed error message
      * @return a JSON:API document map with {@code errors} array
      */
     public static Map<String, Object> error(String status, String title, String detail) {
+        return error(status, defaultCode(title), title, detail);
+    }
+
+    /**
+     * Builds a JSON:API error response with an explicit machine-readable {@code code}.
+     *
+     * @param status HTTP status code (e.g. "400", "500")
+     * @param code   machine-readable error code (e.g. "INVALID_PAYLOAD", "NOT_FOUND")
+     * @param title  short error title
+     * @param detail detailed error message
+     * @return a JSON:API document map with {@code errors} array
+     */
+    public static Map<String, Object> error(String status, String code, String title, String detail) {
         Map<String, Object> errorObj = new LinkedHashMap<>();
         errorObj.put("status", status);
+        errorObj.put("code", code);
         errorObj.put("title", title);
         errorObj.put("detail", detail);
 
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("errors", List.of(errorObj));
         return document;
+    }
+
+    private static String defaultCode(String title) {
+        if (title == null || title.isBlank()) {
+            return "ERROR";
+        }
+        return title.trim().toUpperCase().replaceAll("[^A-Z0-9]+", "_");
     }
 
     /**

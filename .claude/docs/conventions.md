@@ -28,6 +28,39 @@
 - Custom exceptions extend from base types
 - No silent failures, graceful degradation on non-critical failures
 
+#### JSON:API error response shape (4xx)
+
+All 4xx responses returned from any Kelta service MUST use the JSON:API error envelope. Every object in the `errors[]` array carries at minimum `status`, `code`, `detail`, and (for field-level errors) `source.pointer`:
+
+```json
+{
+  "errors": [
+    {
+      "status": "400",
+      "code": "VALIDATION_FAILED",
+      "title": "Validation Error",
+      "detail": "name must not be blank",
+      "source": { "pointer": "/data/attributes/name" },
+      "meta": { "requestId": "abc12345" }
+    }
+  ]
+}
+```
+
+- `status` — HTTP status code as a string (`"400"`, `"404"`, …)
+- `code` — stable, machine-readable identifier in `UPPER_SNAKE_CASE` (`NOT_FOUND`, `INVALID_PAYLOAD`, `VALIDATION_FAILED`, `UNAUTHORIZED`, `RATE_LIMIT_EXCEEDED`, …). Clients branch on `code`, not `detail`.
+- `title` — short, human-readable category (`"Bad Request"`, `"Not Found"`, …)
+- `detail` — human-readable description of *this* failure. Never `null`, never empty.
+- `source.pointer` — JSON Pointer (RFC 6901) to the offending field on a request body — e.g. `/data/attributes/email`. For query / path parameters use `source.parameter` with the parameter name instead.
+
+Never emit an empty error object (`{}`). If you reach a path with no specific information, fall through to the generic handler so clients still get a populated envelope.
+
+Where errors are constructed:
+- `kelta-gateway/src/main/java/io/kelta/gateway/error/GlobalErrorHandler.java` — reactive (`ErrorWebExceptionHandler`) for all gateway-originating 4xx/5xx
+- `kelta-platform/runtime/runtime-core/src/main/java/io/kelta/runtime/router/GlobalExceptionHandler.java` — servlet (`@ControllerAdvice`) covering bean validation, malformed bodies, missing params, type mismatches, `NoResourceFoundException`/`NoHandlerFoundException`, `MethodNotAllowed`, `UnsupportedMediaType`, `ResponseStatusException`, plus the platform's own `ValidationException` / `InvalidQueryException` / `UniqueConstraintViolationException`
+- `io.kelta.jsonapi.JsonApiResponseBuilder.error(...)` — utility for one-off error documents in controllers; the 3-arg overload derives `code` from `title` so existing callers stay compliant
+- `io.kelta.jsonapi.JsonApiError` — POJO used by the handlers; `@JsonInclude(NON_NULL)` keeps absent fields out of the wire format
+
 ### Javadoc
 - Required for public classes and methods
 - Include `@param`, `@returns`, `@throws`

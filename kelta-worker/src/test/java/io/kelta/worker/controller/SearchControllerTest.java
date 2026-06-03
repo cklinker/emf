@@ -88,12 +88,24 @@ class SearchControllerTest {
         }
 
         @Test
-        @DisplayName("should return 400 for missing tenant ID")
+        @DisplayName("should return 400 with populated JSON:API error for missing tenant ID")
+        @SuppressWarnings("unchecked")
         void shouldReturn400ForMissingTenant() {
             ResponseEntity<Map<String, Object>> response =
                     controller.search("", "test", 20);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+            Map<String, Object> body = response.getBody();
+            assertThat(body).isNotNull();
+
+            List<Map<String, Object>> errors = (List<Map<String, Object>>) body.get("errors");
+            assertThat(errors).hasSize(1);
+            Map<String, Object> err = errors.get(0);
+            assertThat(err.get("status")).isEqualTo("400");
+            assertThat(err.get("code")).isEqualTo("MISSING_TENANT");
+            assertThat(err.get("title")).isEqualTo("Bad Request");
+            assertThat(err.get("detail")).isEqualTo("Missing X-Tenant-ID header");
         }
     }
 }

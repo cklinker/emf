@@ -8,12 +8,23 @@ import io.kelta.runtime.validation.RecordValidationException;
 import io.kelta.runtime.validation.ValidationException;
 import io.kelta.runtime.validation.ValidationResult;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,14 +67,19 @@ public class GlobalExceptionHandler {
         ValidationResult result = ex.getValidationResult();
         if (result != null && !result.errors().isEmpty()) {
             for (var fieldError : result.errors()) {
+                String code = fieldError.constraint() != null && !fieldError.constraint().isBlank()
+                    ? fieldError.constraint() : "VALIDATION_FAILED";
                 JsonApiError error = new JsonApiError(
-                    "400", fieldError.constraint(), "Validation Error", fieldError.message());
+                    "400", code, "Validation Error",
+                    fieldError.message() != null ? fieldError.message() : "Invalid value");
                 error.setSource(Map.of("pointer", "/data/attributes/" + fieldError.fieldName()));
                 error.setMeta(Map.of("requestId", requestId));
                 errors.add(error);
             }
         } else {
-            JsonApiError error = new JsonApiError("400", "validation", "Validation Error", ex.getMessage());
+            JsonApiError error = new JsonApiError(
+                "400", "VALIDATION_FAILED", "Validation Error",
+                ex.getMessage() != null ? ex.getMessage() : "Request validation failed");
             error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
             errors.add(error);
         }
@@ -86,7 +102,8 @@ public class GlobalExceptionHandler {
         for (var ruleError : ex.getErrors()) {
             String fieldName = ruleError.errorField() != null ? ruleError.errorField() : ruleError.ruleName();
             JsonApiError error = new JsonApiError(
-                "400", "validationRule", "Validation Error", ruleError.errorMessage());
+                "400", "VALIDATION_RULE", "Validation Error",
+                ruleError.errorMessage() != null ? ruleError.errorMessage() : "Validation rule failed");
             error.setSource(Map.of("pointer", "/data/attributes/" + fieldName));
             error.setMeta(Map.of("requestId", requestId));
             errors.add(error);
@@ -108,12 +125,16 @@ public class GlobalExceptionHandler {
 
         List<JsonApiError> errors = new ArrayList<>();
         if (ex.getFieldName() != null) {
-            JsonApiError error = new JsonApiError("400", "invalidQuery", "Bad Request", ex.getReason());
+            JsonApiError error = new JsonApiError(
+                "400", "INVALID_QUERY", "Bad Request",
+                ex.getReason() != null ? ex.getReason() : "Invalid query parameter");
             error.setSource(Map.of("pointer", "/data/attributes/" + ex.getFieldName()));
             error.setMeta(Map.of("requestId", requestId));
             errors.add(error);
         } else {
-            JsonApiError error = new JsonApiError("400", "invalidQuery", "Bad Request", ex.getMessage());
+            JsonApiError error = new JsonApiError(
+                "400", "INVALID_QUERY", "Bad Request",
+                ex.getMessage() != null ? ex.getMessage() : "Invalid query");
             error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
             errors.add(error);
         }
@@ -132,7 +153,9 @@ public class GlobalExceptionHandler {
         String requestId = generateRequestId();
         logger.warn("Unique constraint violation [requestId={}]: {}", requestId, ex.getMessage());
 
-        JsonApiError error = new JsonApiError("409", "unique", "Conflict", ex.getMessage());
+        JsonApiError error = new JsonApiError(
+            "409", "UNIQUE_VIOLATION", "Conflict",
+            ex.getMessage() != null ? ex.getMessage() : "Unique constraint violation");
         error.setSource(Map.of("pointer", "/data/attributes/" + ex.getFieldName()));
         error.setMeta(Map.of("requestId", requestId));
 
@@ -151,12 +174,223 @@ public class GlobalExceptionHandler {
         logger.error("Storage error [requestId={}]: {}", requestId, ex.getMessage(), ex);
 
         JsonApiError error = new JsonApiError(
-            "500", "storageError", "Internal Server Error",
+            "500", "STORAGE_ERROR", "Internal Server Error",
             "An error occurred while processing your request");
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(Map.of("errors", List.of(error)));
+    }
+
+    /**
+     * Handles bean-validation errors on {@code @Valid @RequestBody} arguments.
+     * Returns 400 Bad Request with one error per field violation.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Bean validation failed [requestId={}]: {}", requestId, ex.getMessage());
+
+        List<JsonApiError> errors = new ArrayList<>();
+        ex.getBindingResult().getFieldErrors().forEach(fe -> {
+            JsonApiError error = new JsonApiError(
+                "400", "VALIDATION_FAILED", "Validation Error",
+                fe.getDefaultMessage() != null ? fe.getDefaultMessage() : "Invalid value");
+            error.setSource(Map.of("pointer", "/data/attributes/" + fe.getField()));
+            error.setMeta(Map.of("requestId", requestId));
+            errors.add(error);
+        });
+        if (errors.isEmpty()) {
+            JsonApiError error = new JsonApiError(
+                "400", "VALIDATION_FAILED", "Validation Error", "Request validation failed");
+            error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+            errors.add(error);
+        }
+
+        return ResponseEntity.badRequest().body(Map.of("errors", errors));
+    }
+
+    /**
+     * Handles bean-validation errors on path / query parameters annotated with
+     * {@code @Validated} constraints (e.g. {@code @NotBlank String id}).
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(
+            ConstraintViolationException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Constraint violation [requestId={}]: {}", requestId, ex.getMessage());
+
+        List<JsonApiError> errors = new ArrayList<>();
+        for (ConstraintViolation<?> v : ex.getConstraintViolations()) {
+            JsonApiError error = new JsonApiError(
+                "400", "VALIDATION_FAILED", "Validation Error",
+                v.getMessage() != null ? v.getMessage() : "Invalid value");
+            String path = v.getPropertyPath() != null ? v.getPropertyPath().toString() : null;
+            if (path != null && !path.isBlank()) {
+                error.setSource(Map.of("parameter", path));
+            }
+            error.setMeta(Map.of("requestId", requestId));
+            errors.add(error);
+        }
+        if (errors.isEmpty()) {
+            JsonApiError error = new JsonApiError(
+                "400", "VALIDATION_FAILED", "Validation Error", "Request validation failed");
+            error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+            errors.add(error);
+        }
+
+        return ResponseEntity.badRequest().body(Map.of("errors", errors));
+    }
+
+    /**
+     * Handles malformed JSON request bodies.
+     * Returns 400 Bad Request in JSON:API format.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Malformed request body [requestId={}]: {}", requestId, ex.getMessage());
+
+        JsonApiError error = new JsonApiError(
+            "400", "INVALID_PAYLOAD", "Bad Request",
+            "Request body is missing or could not be parsed as JSON");
+        error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+
+        return ResponseEntity.badRequest().body(Map.of("errors", List.of(error)));
+    }
+
+    /**
+     * Handles missing required query / form parameters.
+     * Returns 400 Bad Request in JSON:API format.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingParameter(
+            MissingServletRequestParameterException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Missing parameter [requestId={}]: {}", requestId, ex.getMessage());
+
+        JsonApiError error = new JsonApiError(
+            "400", "MISSING_PARAMETER", "Bad Request",
+            "Required parameter '" + ex.getParameterName() + "' is missing");
+        error.setSource(Map.of("parameter", ex.getParameterName()));
+        error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+
+        return ResponseEntity.badRequest().body(Map.of("errors", List.of(error)));
+    }
+
+    /**
+     * Handles path / query parameter type mismatches (e.g. non-numeric value for a {@code Long} id).
+     * Returns 400 Bad Request in JSON:API format.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Parameter type mismatch [requestId={}]: {}", requestId, ex.getMessage());
+
+        String expected = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "expected type";
+        JsonApiError error = new JsonApiError(
+            "400", "INVALID_PARAMETER", "Bad Request",
+            "Parameter '" + ex.getName() + "' could not be converted to " + expected);
+        error.setSource(Map.of("parameter", ex.getName()));
+        error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+
+        return ResponseEntity.badRequest().body(Map.of("errors", List.of(error)));
+    }
+
+    /**
+     * Handles missing routes (no controller for the request path).
+     * Spring 6.1+ throws {@link NoResourceFoundException}; earlier versions threw
+     * {@link NoHandlerFoundException}. Both are mapped to a JSON:API 404 envelope.
+     */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<Map<String, Object>> handleNotFound(
+            Exception ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        String path = request.getRequestURI();
+        logger.warn("Route not found [requestId={}]: {} {}", requestId, request.getMethod(), path);
+
+        JsonApiError error = new JsonApiError(
+            "404", "NOT_FOUND", "Not Found",
+            "No handler for " + request.getMethod() + " " + path);
+        error.setMeta(Map.of("requestId", requestId, "path", path));
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("errors", List.of(error)));
+    }
+
+    /**
+     * Handles unsupported HTTP methods on an existing route.
+     * Returns 405 Method Not Allowed in JSON:API format.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotAllowed(
+            HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Method not allowed [requestId={}]: {}", requestId, ex.getMessage());
+
+        JsonApiError error = new JsonApiError(
+            "405", "METHOD_NOT_ALLOWED", "Method Not Allowed",
+            "Method " + ex.getMethod() + " is not supported for this endpoint");
+        error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+            .body(Map.of("errors", List.of(error)));
+    }
+
+    /**
+     * Handles requests with unsupported {@code Content-Type}.
+     * Returns 415 Unsupported Media Type in JSON:API format.
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Unsupported media type [requestId={}]: {}", requestId, ex.getMessage());
+
+        JsonApiError error = new JsonApiError(
+            "415", "UNSUPPORTED_MEDIA_TYPE", "Unsupported Media Type",
+            ex.getContentType() != null
+                ? "Content-Type '" + ex.getContentType() + "' is not supported"
+                : "Request Content-Type is not supported");
+        error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+            .body(Map.of("errors", List.of(error)));
+    }
+
+    /**
+     * Handles Spring's {@link ResponseStatusException} — used by controllers that throw
+     * an explicit HTTP status. Preserves the status and reason and wraps in JSON:API format.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(
+            ResponseStatusException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        logger.warn("ResponseStatusException [requestId={}, status={}]: {}",
+                requestId, status, ex.getReason());
+
+        String code = status.name();
+        String detail = ex.getReason() != null ? ex.getReason() : status.getReasonPhrase();
+        JsonApiError error = new JsonApiError(
+            String.valueOf(status.value()), code, status.getReasonPhrase(), detail);
+        error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+
+        return ResponseEntity.status(status).body(Map.of("errors", List.of(error)));
     }
 
     /**
@@ -171,7 +405,7 @@ public class GlobalExceptionHandler {
         logger.error("Unexpected error [requestId={}]: {}", requestId, ex.getMessage(), ex);
 
         JsonApiError error = new JsonApiError(
-            "500", "internalError", "Internal Server Error", "An unexpected error occurred");
+            "500", "INTERNAL_ERROR", "Internal Server Error", "An unexpected error occurred");
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

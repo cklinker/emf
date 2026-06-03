@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -165,19 +167,19 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         }
 
         String path = exchange.getRequest().getPath().value();
+        Map<String, Object> error = new LinkedHashMap<>();
+        error.put("status", "401");
+        error.put("code", "UNAUTHORIZED");
+        error.put("title", "Unauthorized");
+        error.put("detail", message != null ? message : "Authentication failed");
+        error.put("meta", Map.of("path", path));
+
         String errorJson;
         try {
-            errorJson = OBJECT_MAPPER.writeValueAsString(Map.of(
-                    "error", Map.of(
-                            "status", 401,
-                            "code", "UNAUTHORIZED",
-                            "message", message,
-                            "path", path
-                    )
-            ));
+            errorJson = OBJECT_MAPPER.writeValueAsString(Map.of("errors", List.of(error)));
         } catch (JacksonException e) {
             log.error("Failed to serialize error response", e);
-            errorJson = "{\"error\":{\"status\":401,\"code\":\"UNAUTHORIZED\"}}";
+            errorJson = "{\"errors\":[{\"status\":\"401\",\"code\":\"UNAUTHORIZED\",\"title\":\"Unauthorized\",\"detail\":\"Authentication failed\"}]}";
         }
 
         return exchange.getResponse().writeWith(

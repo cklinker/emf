@@ -93,22 +93,45 @@ public final class JsonApiResponseBuilder {
     }
 
     /**
-     * Builds a JSON:API error response.
+     * Builds a JSON:API error response with status, code, title, and detail.
      *
-     * @param status HTTP status code (e.g. "400", "500")
+     * @param status HTTP status code as string (e.g. "400", "500")
+     * @param code   machine-readable error code (e.g. "INVALID_PAYLOAD", "NOT_FOUND")
      * @param title  short error title
-     * @param detail detailed error message
+     * @param detail detailed human-readable error message
      * @return a JSON:API document map with {@code errors} array
      */
-    public static Map<String, Object> error(String status, String title, String detail) {
+    public static Map<String, Object> error(String status, String code, String title, String detail) {
         Map<String, Object> errorObj = new LinkedHashMap<>();
         errorObj.put("status", status);
+        errorObj.put("code", code);
         errorObj.put("title", title);
         errorObj.put("detail", detail);
 
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("errors", List.of(errorObj));
         return document;
+    }
+
+    /**
+     * Builds a JSON:API error response with status, title, and detail. The {@code code}
+     * is derived from the title (uppercased, spaces to underscores) so clients always
+     * receive a non-empty machine-readable code.
+     *
+     * @param status HTTP status code as string (e.g. "400", "500")
+     * @param title  short error title
+     * @param detail detailed human-readable error message
+     * @return a JSON:API document map with {@code errors} array
+     */
+    public static Map<String, Object> error(String status, String title, String detail) {
+        return error(status, deriveCode(title), title, detail);
+    }
+
+    private static String deriveCode(String title) {
+        if (title == null || title.isBlank()) {
+            return "ERROR";
+        }
+        return title.trim().toUpperCase().replace(' ', '_');
     }
 
     /**

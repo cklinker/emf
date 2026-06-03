@@ -1,4 +1,4 @@
-FROM alpine:3.19
+FROM harbor.rzware.com/dockerhub-cache/library/alpine:3.19
 RUN apk add --no-cache bash curl jq
 WORKDIR /scripts
 COPY seed.sh .

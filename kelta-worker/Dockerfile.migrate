@@ -76,7 +76,7 @@ RUN mvn package -DskipTests -B
 # =============================================================================
 # Stage 3: JRE runtime
 # =============================================================================
-FROM eclipse-temurin:25-jre
+FROM harbor.rzware.com/dockerhub-cache/library/eclipse-temurin:25-jre
 
 WORKDIR /app
 

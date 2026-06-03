@@ -3,7 +3,7 @@
 # =============================================================================
 # Stage 1: Build runtime-platform dependencies
 # =============================================================================
-FROM maven:3.9-eclipse-temurin-25 AS runtime-builder
+FROM harbor.rzware.com/dockerhub-cache/library/maven:3.9-eclipse-temurin-25 AS runtime-builder
 
 # Survive transient Maven Central 429 / 503 / connection resets — both the
 # legacy wagon HTTP transport and the newer Aether connector retry up to 10
@@ -47,7 +47,7 @@ RUN mvn clean install -DskipTests -B \
 # =============================================================================
 # Stage 2: Build the application
 # =============================================================================
-FROM maven:3.9-eclipse-temurin-25 AS builder
+FROM harbor.rzware.com/dockerhub-cache/library/maven:3.9-eclipse-temurin-25 AS builder
 
 ENV MAVEN_OPTS="-Dmaven.wagon.http.retryHandler.count=10 -Dmaven.wagon.http.retryHandler.requestSentEnabled=true -Daether.connector.http.retryHandler.count=10"
 
@@ -73,7 +73,7 @@ RUN mvn clean package -DskipTests -B && \
 # =============================================================================
 # Stage 3: Runtime image
 # =============================================================================
-FROM eclipse-temurin:25-jre
+FROM harbor.rzware.com/dockerhub-cache/library/eclipse-temurin:25-jre
 
 WORKDIR /app
 

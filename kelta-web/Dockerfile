@@ -4,7 +4,7 @@
 # =============================================================================
 # Stage 1: Install dependencies and build
 # =============================================================================
-FROM node:18-alpine AS builder
+FROM harbor.rzware.com/dockerhub-cache/library/node:18-alpine AS builder
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ RUN npm run build
 # =============================================================================
 # Stage 2: Runtime with Nginx
 # =============================================================================
-FROM nginx:1.25-alpine AS runtime
+FROM harbor.rzware.com/dockerhub-cache/library/nginx:1.25-alpine AS runtime
 
 LABEL org.opencontainers.image.title="Kelta Web UI"
 LABEL org.opencontainers.image.description="Admin UI for Kelta Platform"

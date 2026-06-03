@@ -166,6 +166,22 @@ controller after the mutation rather than via the BeforeSaveHook registry.
 | PlatformEvent<T> | NATS event envelope (tenantId, correlationId, userId) | `runtime-events/.../event/` |
 | TenantContext | ThreadLocal tenant isolation | `runtime-core/.../context/TenantContext.java` |
 | BootstrapConfig | Gateway startup config (collections, routes, limits) | `kelta-gateway/.../config/BootstrapConfig.java` |
+| CompositeUniqueConstraintService | Issues `CREATE UNIQUE INDEX` over multi-column tuples; constraint state lives in Postgres (no separate registry) | `runtime-core/.../storage/CompositeUniqueConstraintService.java` |
+
+### Unique constraints
+
+Single-column uniqueness is declared on `FieldDefinition.unique()` and emitted
+inline as a `UNIQUE` column in the table DDL. Composite (multi-column) unique
+constraints are issued separately at runtime via
+`POST /api/admin/collections/{name}/unique-constraints` (worker controller →
+`CompositeUniqueConstraintService` → `CREATE UNIQUE INDEX uniq_<table>_<cols>`).
+Index names are clamped to PostgreSQL's 63-char limit by
+`PhysicalTableStorageAdapter.buildBoundedIdentifier`. Duplicate inserts on the
+constrained tuple bubble up as `DuplicateKeyException` →
+`UniqueConstraintViolationException` → JSON:API 409 via `GlobalExceptionHandler`;
+the originating index name is parsed out of the Postgres error message so the
+409 payload identifies the violated composite. The `create_unique_constraint`
+MCP admin tool wraps the same endpoint.
 
 ### Field types and pgvector
 

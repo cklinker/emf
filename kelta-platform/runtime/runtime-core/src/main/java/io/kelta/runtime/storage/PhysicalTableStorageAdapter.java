@@ -705,7 +705,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param definition the collection definition
      * @return the base table name
      */
-    private String getBaseTableName(CollectionDefinition definition) {
+    static String getBaseTableName(CollectionDefinition definition) {
         if (definition.storageConfig() != null && definition.storageConfig().tableName() != null) {
             return definition.storageConfig().tableName();
         }
@@ -743,7 +743,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param identifier the identifier to sanitize
      * @return the sanitized identifier
      */
-    private String sanitizeIdentifier(String identifier) {
+    static String sanitizeIdentifier(String identifier) {
         if (identifier == null || identifier.isBlank()) {
             throw new IllegalArgumentException("Identifier cannot be null or blank");
         }
@@ -1318,6 +1318,14 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      */
     private String detectUniqueViolationField(CollectionDefinition definition, Map<String, Object> data,
             DuplicateKeyException e) {
+        // Composite unique indexes created by CompositeUniqueConstraintService use the
+        // "uniq_<table>_<col1>_<col2>" naming convention — surface that instead of
+        // pretending the duplicate belongs to a single field.
+        String compositeName = extractCompositeConstraintName(e);
+        if (compositeName != null) {
+            return compositeName;
+        }
+
         // Check each unique field to see which one has a duplicate
         for (FieldDefinition field : definition.fields()) {
             if (field.unique() && data.containsKey(field.name())) {
@@ -1333,5 +1341,32 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
 
         return "unknown";
+    }
+
+    /**
+     * Pulls a Kelta-managed composite-unique index name out of a Postgres
+     * duplicate-key error message. Returns null when the violation is not on a
+     * {@code uniq_*} index (e.g. it's a single-column {@code UNIQUE} column).
+     */
+    static String extractCompositeConstraintName(DuplicateKeyException e) {
+        Throwable cause = e;
+        while (cause != null) {
+            String msg = cause.getMessage();
+            if (msg != null) {
+                int idx = msg.indexOf("unique constraint \"");
+                if (idx >= 0) {
+                    int start = idx + "unique constraint \"".length();
+                    int end = msg.indexOf('"', start);
+                    if (end > start) {
+                        String name = msg.substring(start, end);
+                        if (name.startsWith(CompositeUniqueConstraintService.INDEX_PREFIX)) {
+                            return name;
+                        }
+                    }
+                }
+            }
+            cause = cause.getCause();
+        }
+        return null;
     }
 }

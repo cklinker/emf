@@ -29,7 +29,7 @@ public class FormulaParser {
     private FormulaAst parseOr() {
         FormulaAst left = parseAnd();
         skipWhitespace();
-        while (pos < input.length() && match("||")) {
+        while (pos < input.length() && (match("||") || matchKeyword("OR"))) {
             FormulaAst right = parseAnd();
             left = new FormulaAst.BinaryOp("||", left, right);
             skipWhitespace();
@@ -40,7 +40,7 @@ public class FormulaParser {
     private FormulaAst parseAnd() {
         FormulaAst left = parseComparison();
         skipWhitespace();
-        while (pos < input.length() && match("&&")) {
+        while (pos < input.length() && (match("&&") || matchKeyword("AND"))) {
             FormulaAst right = parseComparison();
             left = new FormulaAst.BinaryOp("&&", left, right);
             skipWhitespace();
@@ -117,6 +117,9 @@ public class FormulaParser {
             }
             if (input.charAt(pos) == '!') {
                 pos++;
+                return new FormulaAst.UnaryOp("!", parsePrimary());
+            }
+            if (matchKeyword("NOT")) {
                 return new FormulaAst.UnaryOp("!", parsePrimary());
             }
         }
@@ -238,6 +241,31 @@ public class FormulaParser {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Matches a case-insensitive keyword bounded by word boundaries — the
+     * character following the keyword must not be an identifier character.
+     * Prevents identifiers like {@code orderTotal}, {@code notes}, {@code andrew}
+     * from being consumed by the {@code OR}/{@code AND}/{@code NOT} keywords.
+     */
+    private boolean matchKeyword(String keyword) {
+        skipWhitespace();
+        int end = pos + keyword.length();
+        if (end > input.length()) {
+            return false;
+        }
+        if (!input.substring(pos, end).equalsIgnoreCase(keyword)) {
+            return false;
+        }
+        if (end < input.length()) {
+            char next = input.charAt(end);
+            if (Character.isLetterOrDigit(next) || next == '_') {
+                return false;
+            }
+        }
+        pos = end;
+        return true;
     }
 
     private void expect(char c) {

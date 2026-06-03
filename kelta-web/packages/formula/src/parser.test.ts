@@ -122,6 +122,53 @@ describe('FormulaParser', () => {
     });
   });
 
+  it('parses OR keyword as logical or', () => {
+    const ast = parser.parse('year < 1888 OR year > 2031');
+    expect(ast).toMatchObject({
+      kind: 'binaryOp',
+      operator: '||',
+      left: { kind: 'binaryOp', operator: '<' },
+      right: { kind: 'binaryOp', operator: '>' },
+    });
+  });
+
+  it('parses AND keyword as logical and', () => {
+    const ast = parser.parse('a > 0 AND b < 10');
+    expect(ast).toMatchObject({
+      kind: 'binaryOp',
+      operator: '&&',
+      left: { kind: 'binaryOp', operator: '>' },
+      right: { kind: 'binaryOp', operator: '<' },
+    });
+  });
+
+  it('parses NOT keyword as unary not', () => {
+    expect(parser.parse('NOT flag')).toEqual({
+      kind: 'unaryOp',
+      operator: '!',
+      operand: { kind: 'fieldRef', fieldName: 'flag' },
+    });
+  });
+
+  it('keywords are case-insensitive', () => {
+    const ast = parser.parse('x > 0 or y > 0');
+    expect(ast).toMatchObject({ kind: 'binaryOp', operator: '||' });
+  });
+
+  it('respects word boundaries: orderTotal is one identifier', () => {
+    expect(parser.parse('orderTotal')).toEqual({
+      kind: 'fieldRef',
+      fieldName: 'orderTotal',
+    });
+  });
+
+  it('respects word boundaries: notes parses as field, not NOT + es', () => {
+    expect(parser.parse('notes')).toEqual({
+      kind: 'fieldRef',
+      fieldName: 'notes',
+    });
+  });
+
   it('throws on empty', () => {
     expect(() => parser.parse('')).toThrow(FormulaException);
   });

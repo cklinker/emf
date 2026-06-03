@@ -100,6 +100,18 @@
     { "name": "nested_function_calls", "expression": "TRIM(UPPER(sku))", "context": { "sku": "  abc-123  " }, "expected": "ABC-123" },
     { "name": "if_with_blankvalue", "expression": "IF(ISBLANK(name), 'anonymous', name)", "context": { "name": null }, "expected": "anonymous" },
 
+    { "name": "or_keyword_low", "expression": "year < 1888 OR year > 2031", "context": { "year": 1500 }, "expected": true },
+    { "name": "or_keyword_high", "expression": "year < 1888 OR year > 2031", "context": { "year": 3000 }, "expected": true },
+    { "name": "or_keyword_in_range", "expression": "year < 1888 OR year > 2031", "context": { "year": 2000 }, "expected": false },
+    { "name": "and_keyword", "expression": "amount > 0 AND active == true", "context": { "amount": 5, "active": true }, "expected": true },
+    { "name": "and_keyword_one_false", "expression": "amount > 0 AND active == true", "context": { "amount": 5, "active": false }, "expected": false },
+    { "name": "not_keyword", "expression": "NOT (year < 1888 OR year > 2031)", "context": { "year": 2000 }, "expected": true },
+    { "name": "or_keyword_lowercase", "expression": "x > 0 or y > 0", "context": { "x": 1, "y": 0 }, "expected": true },
+    { "name": "and_keyword_mixed_case", "expression": "x > 0 And y > 0", "context": { "x": 1, "y": 1 }, "expected": true },
+    { "name": "identifier_starts_with_or_prefix", "expression": "orderTotal > 0", "context": { "orderTotal": 50 }, "expected": true },
+    { "name": "identifier_starts_with_not_prefix", "expression": "notes == 'hi'", "context": { "notes": "hi" }, "expected": true },
+    { "name": "identifier_starts_with_and_prefix", "expression": "andrew == 'Andrew'", "context": { "andrew": "Andrew" }, "expected": true },
+
     { "name": "unterminated_string_throws", "expression": "'broken", "context": {}, "throws": true },
     { "name": "unknown_function_throws", "expression": "BOGUS(1)", "context": {}, "throws": true },
     { "name": "trailing_garbage_throws", "expression": "1 + 2 garbage", "context": {}, "throws": true },

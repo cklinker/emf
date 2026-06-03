@@ -150,3 +150,81 @@ We considered transparently renaming reserved fields on storage (e.g. accepting 
 4. **One workaround is enough.** Prefixing with the entity name takes seconds at schema-authoring time and produces clearer JSON for every downstream consumer.
 
 **Decision:** reserved names stay rejected at field-create time. Schema authors are expected to prefix. This document is the canonical reference for that rule.
+
+## Formula language
+
+The same formula grammar is used by formula fields, validation rules, rollup summaries, and workflow filter criteria. The reference implementation is `FormulaParser` / `FormulaEvaluator` in `kelta-platform/runtime/runtime-core/src/main/java/io/kelta/runtime/formula/`, and the kelta-web preview parser in `kelta-web/packages/formula/src/parser.ts` MUST stay in lockstep with it.
+
+### Field references
+
+Bare identifiers reference the record's fields by API name:
+
+```
+year > 1888
+discountedPrice == basePrice - basePrice * discountPercent / 100
+```
+
+Identifiers are case-sensitive and follow the field's API name exactly (no quoting; no `${...}` interpolation). Unknown identifiers evaluate to `null`.
+
+### Literals
+
+| Form           | Examples              |
+|----------------|-----------------------|
+| Integer        | `0`, `42`, `-7`       |
+| Decimal        | `3.14`, `0.5`, `.5`   |
+| String         | `'abc'`, `"abc"`      |
+| Boolean        | `true`, `false`       |
+| Null           | `null`                |
+
+String escapes follow the `\<char>` form: `'don\'t'`. Literals are case-insensitive for `true`/`false`/`null`.
+
+### Operators
+
+Listed from lowest to highest precedence; all binary operators are left-associative.
+
+| Precedence | Operators                              | Notes                                                    |
+|-----------:|----------------------------------------|----------------------------------------------------------|
+| 1          | `\|\|`, `OR`                             | Logical OR — `OR` is a case-insensitive keyword synonym  |
+| 2          | `&&`, `AND`                            | Logical AND — `AND` is a case-insensitive keyword synonym|
+| 3          | `<`, `<=`, `>`, `>=`, `==`, `=`, `!=`, `<>` | Comparison; `=` and `==` are synonyms, `<>` and `!=` are synonyms |
+| 4          | `+`, `-`                               | Binary addition / subtraction (also string concat for `+`) |
+| 5          | `*`, `/`                               | Multiplication, division                                 |
+| 6          | unary `-`, unary `!`, `NOT`            | Negation, logical NOT (`!` and `NOT` are synonyms)       |
+
+**Keyword word boundaries.** `OR`, `AND`, and `NOT` only match as keywords when not followed by an identifier character. Identifiers like `orderTotal`, `notes`, and `andrew` are parsed as field references, not as keyword + suffix.
+
+### Built-in functions
+
+The function name is matched case-insensitively. See `BuiltInFunctions` for the canonical list; the most commonly used are:
+
+| Function                              | Returns                                                |
+|---------------------------------------|--------------------------------------------------------|
+| `NOW()`                               | Current timestamp                                      |
+| `TODAY()`                             | Current date (no time component)                       |
+| `ISBLANK(value)`                      | `true` if `value` is `null` or empty string            |
+| `BLANKVALUE(value, replacement)`      | `value` when non-blank, else `replacement`             |
+| `IF(condition, ifTrue, ifFalse)`      | Conditional                                            |
+| `AND(a, b, …)` / `OR(a, b, …)` / `NOT(x)` | Variadic logical (equivalent to the operators)     |
+| `LEN(string)`                         | String length                                          |
+| `CONTAINS(haystack, needle)`          | Substring test                                         |
+| `UPPER(s)`, `LOWER(s)`                | Case conversion                                        |
+| `ROUND(n, places)`                    | Rounded number                                         |
+
+### Null handling
+
+- Reading a missing field returns `null`.
+- Comparing `null` with any operator other than `==` / `!=` returns `false` (it never matches a range check).
+- Prefer `ISBLANK(field)` over `field == null` because `ISBLANK` also treats empty strings as blank.
+
+### Validation rules
+
+A validation rule fires when its `errorConditionFormula` evaluates to **truthy** — i.e. the formula describes the *invalid* state, not the valid one. Example: to require `year` to fall within `[1888, 2031]`, write the rule to detect values outside that range:
+
+```
+year < 1888 OR year > 2031
+```
+
+- `evaluateOn` — `CREATE`, `UPDATE`, or `CREATE_AND_UPDATE`. Rules that don't apply to the current operation are skipped.
+- `severity` — `ERROR` blocks the save with HTTP 422 (`VALIDATION_RULE_FAILED`); `WARNING` is logged at INFO level and the save proceeds. Severity defaults to `ERROR`.
+- `errorField` — when present, the 422 response sets `source.pointer` to `/data/attributes/<errorField>`. When absent, the rule name is used.
+- Rules that throw at parse or evaluation time are logged at WARN level and do not block the save. Use the schema-management endpoint's syntax check (`ValidationRuleEvaluator.validateFormulaSyntax`) at rule-create time so broken formulas don't reach runtime.

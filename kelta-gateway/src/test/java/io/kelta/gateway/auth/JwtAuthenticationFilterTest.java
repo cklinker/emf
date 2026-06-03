@@ -383,6 +383,28 @@ class JwtAuthenticationFilterTest {
         // but that requires more complex setup with DataBuffer handling
     }
     
+    @Test
+    void unauthorized_returnsJsonApiErrorsEnvelope() {
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/widgets").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        Mono<Void> result = filter.filter(exchange, filterChain);
+
+        StepVerifier.create(result).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        String body = exchange.getResponse().getBodyAsString().block();
+        assertThat(body).isNotNull();
+        // JSON:API spec: errors[] array, not singular error object
+        assertThat(body).contains("\"errors\"");
+        assertThat(body).doesNotContain("\"error\":{");
+        assertThat(body).contains("\"status\":\"401\"");
+        assertThat(body).contains("\"code\":\"UNAUTHORIZED\"");
+        assertThat(body).contains("\"title\":\"Unauthorized\"");
+        assertThat(body).contains("\"detail\":");
+        assertThat(body).contains("/api/widgets");
+    }
+
     /**
      * Helper method to create a mock JWT for testing.
      */

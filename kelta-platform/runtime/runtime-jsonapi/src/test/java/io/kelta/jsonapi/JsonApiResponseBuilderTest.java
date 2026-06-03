@@ -70,14 +70,35 @@ class JsonApiResponseBuilderTest {
     }
 
     @Test
-    void error_buildsErrorsArray() {
+    void error_buildsErrorsArrayWithDerivedCode() {
         Map<String, Object> doc = JsonApiResponseBuilder.error("400", "Bad Request", "Missing field");
 
         List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
         assertEquals(1, errors.size());
         assertEquals("400", errors.get(0).get("status"));
+        assertEquals("BAD_REQUEST", errors.get(0).get("code"));
         assertEquals("Bad Request", errors.get(0).get("title"));
         assertEquals("Missing field", errors.get(0).get("detail"));
         assertFalse(doc.containsKey("data"));
+    }
+
+    @Test
+    void error_withExplicitCode_includesAllFields() {
+        Map<String, Object> doc = JsonApiResponseBuilder.error(
+                "404", "NOT_FOUND", "Not Found", "Widget w-42 not found");
+
+        List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
+        assertEquals(1, errors.size());
+        assertEquals("404", errors.get(0).get("status"));
+        assertEquals("NOT_FOUND", errors.get(0).get("code"));
+        assertEquals("Not Found", errors.get(0).get("title"));
+        assertEquals("Widget w-42 not found", errors.get(0).get("detail"));
+    }
+
+    @Test
+    void error_nullTitle_derivesFallbackCode() {
+        Map<String, Object> doc = JsonApiResponseBuilder.error("500", null, "Internal");
+        List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
+        assertEquals("ERROR", errors.get(0).get("code"));
     }
 }

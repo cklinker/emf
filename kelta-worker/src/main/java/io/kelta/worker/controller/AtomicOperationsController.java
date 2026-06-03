@@ -57,7 +57,8 @@ public class AtomicOperationsController {
         Object opsObj = body.get("atomic:operations");
         if (opsObj == null) {
             return ResponseEntity.badRequest().body(errorResponse(
-                    "400", "Invalid request", "Missing 'atomic:operations' array", null));
+                    "400", "INVALID_PAYLOAD", "Invalid request",
+                    "Missing 'atomic:operations' array", null));
         }
 
         List<AtomicOperation> operations;
@@ -65,18 +66,19 @@ public class AtomicOperationsController {
             operations = parseOperations(opsObj);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(errorResponse(
-                    "400", "Parse error", e.getMessage(), null));
+                    "400", "PARSE_ERROR", "Parse error",
+                    e.getMessage() != null ? e.getMessage() : "Could not parse atomic:operations", null));
         }
 
         // Validate operation count
         if (operations.isEmpty()) {
             return ResponseEntity.badRequest().body(errorResponse(
-                    "400", "Empty batch", "No operations provided", null));
+                    "400", "EMPTY_BATCH", "Empty batch", "No operations provided", null));
         }
 
         if (operations.size() > maxOperations) {
             return ResponseEntity.unprocessableEntity().body(errorResponse(
-                    "422", "Too many operations",
+                    "422", "TOO_MANY_OPERATIONS", "Too many operations",
                     "Request contains " + operations.size() + " operations, maximum is " + maxOperations,
                     null));
         }
@@ -96,12 +98,14 @@ public class AtomicOperationsController {
                     e.getOperationType(), e.getOperationIndex(), e.getMessage());
 
             return ResponseEntity.unprocessableEntity().body(errorResponse(
-                    "422", "Operation failed", e.getMessage(),
+                    "422", "OPERATION_FAILED", "Operation failed",
+                    e.getMessage() != null ? e.getMessage() : "Atomic operation failed",
                     "/atomic:operations/" + e.getOperationIndex()));
         } catch (Exception e) {
             log.error("Unexpected error during atomic operations", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse(
-                    "500", "Internal error", "An unexpected error occurred", null));
+                    "500", "INTERNAL_ERROR", "Internal error",
+                    "An unexpected error occurred", null));
         }
     }
 
@@ -117,9 +121,10 @@ public class AtomicOperationsController {
                 .toList();
     }
 
-    private Map<String, Object> errorResponse(String status, String title, String detail, String pointer) {
+    private Map<String, Object> errorResponse(String status, String code, String title, String detail, String pointer) {
         var error = new java.util.LinkedHashMap<String, Object>();
         error.put("status", status);
+        error.put("code", code);
         error.put("title", title);
         error.put("detail", detail);
         if (pointer != null) {

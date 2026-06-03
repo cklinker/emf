@@ -27,3 +27,7 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-06-01
 
 - 2026-06-01 fix(e2e): point E2E workflow + `.env.example` at `app.kelta.io`/`api.kelta.io`/`auth.kelta.io` after the rzware.com cutover; the legacy hostnames no longer serve a valid cert so Playwright was failing every test with `ERR_CERT_AUTHORITY_INVALID` (BUG-2026-06-01-4324)
+
+## 2026-06-03
+
+- 2026-06-03 chore(mcp): add `delete_collection` admin tool that wraps `DELETE /api/collections/{id}` and resolves a name argument via `filter[name][EQ]` so stale collections can be removed without falling back to direct REST (CHORE-2026-06-02-0009)

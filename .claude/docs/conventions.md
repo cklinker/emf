@@ -104,3 +104,49 @@ Where errors are constructed:
 - Do not add a new shared list/table/filter/form component in `kelta-ui/app/src/components/` if one already exists for the same purpose in either `kelta-ui/app/` or `kelta-web/packages/components/`. Reuse or extend the existing one.
 - The unification target for these families (DataTable, FilterBuilder, FieldRenderer, ResourceForm, RelatedList) is the library variant under `@kelta/components`. App-side variants are being collapsed into thin re-exports — see `.claude/docs/ui-consolidation-plan.md` for the current state and migration order.
 - `@kelta/components` is a public plugin surface. Breaking changes to its exported props need a deprecation window (additive props, `legacy*` flags) — never a hard cutover.
+
+## Schema field naming (JSON:API reserved words)
+
+The platform serializes records as JSON:API resource objects, so a handful of attribute names collide with the document envelope and **cannot be used as schema field names**. Field-create requests that use a reserved name are rejected with HTTP 400 by `FieldLifecycleHook.beforeCreate` (`runtime-module-schema`).
+
+### Reserved field names
+
+The following names are reserved at the JSON:API document level and MUST NOT be used as schema field names:
+
+- `type` — collides with the JSON:API resource type discriminator (`data.type`)
+- `id` — collides with the JSON:API resource identifier (`data.id`)
+- `attributes` — collides with the JSON:API attributes container (`data.attributes`)
+- `relationships` — collides with the JSON:API relationships container (`data.relationships`)
+- `links` — reserved by JSON:API for hypermedia links (`data.links`)
+- `meta` — reserved by JSON:API for non-standard metadata (`data.meta`)
+
+In addition, the platform reserves these Kelta-internal column names that `BaseEntity` and tenancy infrastructure already populate:
+
+- `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `tenantId`
+
+The authoritative list lives in `FieldLifecycleHook.RESERVED_FIELD_NAMES` (`kelta-platform/runtime/runtime-module-schema/src/main/java/io/kelta/runtime/module/schema/hooks/FieldLifecycleHook.java`). Update both that constant and this document when expanding the list.
+
+### Workaround: prefix with the entity name
+
+When a schema needs a field whose natural name is reserved (most commonly `type` to discriminate variants of a record), prefix the field with the entity name in camelCase:
+
+| Entity   | Reserved name | Use instead    |
+|----------|---------------|----------------|
+| `Title`  | `type`        | `titleType`    |
+| `Alert`  | `type`        | `alertType`    |
+| `Asset`  | `type`        | `assetType`    |
+| `Event`  | `id`          | `eventId`      |
+| `Page`   | `links`       | `pageLinks`    |
+
+The entity prefix is preferred over generic alternatives (`kind`, `category`, `variant`) because it reads cleanly in JSON:API responses (`attributes.titleType: "h1"`) and avoids ambiguity when records are joined or denormalized.
+
+### Why we don't auto-mangle
+
+We considered transparently renaming reserved fields on storage (e.g. accepting `type` on the wire and persisting it as `_type`, or namespacing every user attribute under a dummy key) and rejected it for these reasons:
+
+1. **Round-trip surprise.** A field named `type` in the schema builder UI would not match what appears in API responses, breaking client code that consults the schema to drive serialization (the SDK's `ResourceClient<T>` and the JSON:API parser both walk attributes by exact name).
+2. **Search, filter, sort.** `filter[type]=foo` and `sort=type` would need to be silently rewritten in both the gateway query parser and the worker storage layer; the gap between the wire contract and the persisted column is exactly where bugs hide.
+3. **Plugin contract.** `@kelta/components` and the public plugin SDK expose field names directly to third-party code. A mangling layer would become a forever-compat surface.
+4. **One workaround is enough.** Prefixing with the entity name takes seconds at schema-authoring time and produces clearer JSON for every downstream consumer.
+
+**Decision:** reserved names stay rejected at field-create time. Schema authors are expected to prefix. This document is the canonical reference for that rule.

@@ -1,11 +1,18 @@
-import React from 'react'
+import React, { useCallback, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { ScheduledTriggerConfig } from '@/pages/FlowDesignerPage/types'
+import { useApi } from '@/context/ApiContext'
 
 interface ScheduledTriggerFormProps {
   config: Partial<ScheduledTriggerConfig>
   onChange: (config: Partial<ScheduledTriggerConfig>) => void
+}
+
+interface CronValidation {
+  valid: boolean
+  nextRunAt?: string
+  error?: string
 }
 
 const CRON_PRESETS = [
@@ -17,7 +24,53 @@ const CRON_PRESETS = [
 ]
 
 export function ScheduledTriggerForm({ config, onChange }: ScheduledTriggerFormProps) {
-  const isPreset = CRON_PRESETS.some((p) => p.value === config.cron)
+  const { apiClient } = useApi()
+  const [validation, setValidation] = useState<CronValidation | null>(null)
+  const [validating, setValidating] = useState(false)
+
+  const isPreset = CRON_PRESETS.some((p) => p.value === config.cron && p.value !== '')
+
+  const validateCron = useCallback(
+    async (expression: string, timezone?: string) => {
+      if (!expression.trim()) {
+        setValidation(null)
+        return
+      }
+      setValidating(true)
+      try {
+        const resp = await apiClient.fetch('/api/scheduled-jobs/validate-cron', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expression: expression.trim(), timezone: timezone || '' }),
+        })
+        const data = (await resp.json()) as { valid?: boolean; nextRunAt?: string; error?: string }
+        if (resp.ok) {
+          setValidation({ valid: true, nextRunAt: data.nextRunAt })
+        } else {
+          setValidation({ valid: false, error: data.error || 'Invalid cron expression' })
+        }
+      } catch {
+        setValidation({ valid: false, error: 'Could not validate cron expression' })
+      } finally {
+        setValidating(false)
+      }
+    },
+    [apiClient]
+  )
+
+  const handlePresetSelect = (value: string) => {
+    onChange({ ...config, cron: value })
+    if (value) validateCron(value, config.timezone)
+    else setValidation(null)
+  }
+
+  const handleCronBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    validateCron(e.target.value, config.timezone)
+  }
+
+  const handleTimezoneBlur = () => {
+    if (config.cron) validateCron(config.cron, config.timezone)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -36,11 +89,7 @@ export function ScheduledTriggerForm({ config, onChange }: ScheduledTriggerFormP
                 checked={
                   preset.value === '' ? !isPreset && !!config.cron : config.cron === preset.value
                 }
-                onChange={() => {
-                  if (preset.value) {
-                    onChange({ ...config, cron: preset.value })
-                  }
-                }}
+                onChange={() => handlePresetSelect(preset.value)}
               />
               <span className="text-sm">{preset.label}</span>
               {preset.value && (
@@ -61,7 +110,11 @@ export function ScheduledTriggerForm({ config, onChange }: ScheduledTriggerFormP
           <Input
             id="cron-expression"
             value={config.cron || ''}
-            onChange={(e) => onChange({ ...config, cron: e.target.value })}
+            onChange={(e) => {
+              onChange({ ...config, cron: e.target.value })
+              setValidation(null)
+            }}
+            onBlur={handleCronBlur}
             className="mt-1 font-mono"
             placeholder="0 */5 * * *"
           />
@@ -71,6 +124,23 @@ export function ScheduledTriggerForm({ config, onChange }: ScheduledTriggerFormP
         </div>
       )}
 
+      {validating && (
+        <p className="text-xs text-muted-foreground">Validating...</p>
+      )}
+      {!validating && validation && (
+        <p
+          className={
+            validation.valid
+              ? 'text-xs text-emerald-600 dark:text-emerald-400'
+              : 'text-xs text-destructive'
+          }
+        >
+          {validation.valid
+            ? `Next run: ${validation.nextRunAt ? new Date(validation.nextRunAt).toLocaleString() : 'unknown'}`
+            : validation.error}
+        </p>
+      )}
+
       <div>
         <Label htmlFor="timezone" className="text-sm">
           Timezone (optional)
@@ -78,10 +148,15 @@ export function ScheduledTriggerForm({ config, onChange }: ScheduledTriggerFormP
         <Input
           id="timezone"
           value={config.timezone || ''}
-          onChange={(e) => onChange({ ...config, timezone: e.target.value || undefined })}
+          onChange={(e) => {
+            onChange({ ...config, timezone: e.target.value || undefined })
+            setValidation(null)
+          }}
+          onBlur={handleTimezoneBlur}
           className="mt-1"
           placeholder="America/New_York"
         />
+        <p className="mt-1 text-xs text-muted-foreground">Defaults to UTC if blank</p>
       </div>
     </div>
   )

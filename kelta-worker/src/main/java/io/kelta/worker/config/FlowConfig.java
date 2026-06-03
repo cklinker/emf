@@ -20,6 +20,7 @@ import io.kelta.worker.flow.JdbcFlowStore;
 import io.kelta.worker.listener.CollectionConfigEventPublisher;
 import io.kelta.worker.listener.FieldConfigEventPublisher;
 import io.kelta.worker.listener.FlowConfigEventPublisher;
+import io.kelta.worker.listener.FlowScheduleSyncHook;
 import io.kelta.worker.listener.ApprovalProcessConfigHook;
 import io.kelta.worker.listener.ApprovalRecordLockHook;
 import io.kelta.worker.listener.CerbosPolicySyncHook;
@@ -313,6 +314,16 @@ public class FlowConfig {
                 new FlowConfigEventPublisher(eventPublisher);
         hookRegistry.register(publisher);
         return publisher;
+    }
+
+    @Bean
+    public FlowScheduleSyncHook flowScheduleSyncHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.repository.ScheduledJobRepository scheduledJobRepository,
+            ObjectMapper objectMapper) {
+        FlowScheduleSyncHook hook = new FlowScheduleSyncHook(scheduledJobRepository, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
     }
 
     // ---------------------------------------------------------------------------

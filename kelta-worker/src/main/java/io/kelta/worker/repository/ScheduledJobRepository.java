@@ -1,6 +1,7 @@
 package io.kelta.worker.repository;
 
-import tools.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Repository;
@@ -24,6 +25,8 @@ import java.util.UUID;
  */
 @Repository
 public class ScheduledJobRepository {
+
+    private static final Logger log = LoggerFactory.getLogger(ScheduledJobRepository.class);
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -165,5 +168,83 @@ public class ScheduledJobRepository {
                 jobId, tenantId
         );
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
+     * Finds the scheduled job for a specific flow (by job_reference_id).
+     */
+    public Optional<Map<String, Object>> findByFlowId(String flowId, String tenantId) {
+        var results = jdbcTemplate.queryForList(
+                "SELECT id, tenant_id, name, cron_expression, timezone, active FROM scheduled_job " +
+                        "WHERE job_reference_id = ? AND job_type = 'FLOW' AND tenant_id = ?",
+                flowId, tenantId
+        );
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
+     * Inserts a new scheduled_job row for a FLOW.
+     */
+    public void insertForFlow(String flowId, String tenantId, String name, String cronExpression,
+                               String timezone, boolean active, Instant nextRunAt, String createdBy) {
+        String id = UUID.randomUUID().toString();
+        jdbcTemplate.update(
+                "INSERT INTO scheduled_job (id, tenant_id, name, job_type, job_reference_id, " +
+                        "cron_expression, timezone, active, next_run_at, created_by) " +
+                        "VALUES (?, ?, ?, 'FLOW', ?, ?, ?, ?, ?, ?)",
+                id, tenantId,
+                name != null ? name : flowId,
+                flowId,
+                cronExpression,
+                timezone != null && !timezone.isBlank() ? timezone : "UTC",
+                active,
+                nextRunAt != null ? Timestamp.from(nextRunAt) : null,
+                createdBy
+        );
+        log.debug("Inserted scheduled_job {} for flow {}", id, flowId);
+    }
+
+    /**
+     * Updates an existing scheduled_job for a FLOW (cron, timezone, active, next_run_at, name).
+     */
+    public void updateForFlow(String jobId, String name, String cronExpression,
+                               String timezone, boolean active, Instant nextRunAt) {
+        jdbcTemplate.update(
+                "UPDATE scheduled_job SET name = ?, cron_expression = ?, timezone = ?, " +
+                        "active = ?, next_run_at = ?, updated_at = ? WHERE id = ?",
+                name,
+                cronExpression,
+                timezone != null && !timezone.isBlank() ? timezone : "UTC",
+                active,
+                nextRunAt != null ? Timestamp.from(nextRunAt) : null,
+                Timestamp.from(Instant.now()),
+                jobId
+        );
+        log.debug("Updated scheduled_job {} (cron={}, active={})", jobId, cronExpression, active);
+    }
+
+    /**
+     * Deletes all scheduled_job rows for a FLOW. Called when a SCHEDULED flow is deleted
+     * or its type changes away from SCHEDULED.
+     */
+    public void deleteForFlow(String flowId, String tenantId) {
+        int deleted = jdbcTemplate.update(
+                "DELETE FROM scheduled_job WHERE job_reference_id = ? AND job_type = 'FLOW' AND tenant_id = ?",
+                flowId, tenantId
+        );
+        if (deleted > 0) {
+            log.info("Deleted {} scheduled_job(s) for flow {}", deleted, flowId);
+        }
+    }
+
+    /**
+     * Looks up the created_by user ID from the flow table (fallback for hook context).
+     */
+    public Optional<String> findFlowCreatedBy(String flowId) {
+        var results = jdbcTemplate.queryForList(
+                "SELECT created_by FROM flow WHERE id = ?", flowId);
+        if (results.isEmpty()) return Optional.empty();
+        Object v = results.get(0).get("created_by");
+        return Optional.ofNullable(v != null ? v.toString() : null);
     }
 }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowLeft, Save, Code, CheckCircle, Play, Upload } from 'lucide-react'
+import { ArrowLeft, Save, Code, CheckCircle, Play, Upload, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 
@@ -17,6 +17,7 @@ interface FlowToolbarProps {
   onActivate?: () => void
   onTest?: () => void
   onPublish?: () => void
+  onGenerate?: () => void
 }
 
 const flowTypeLabels: Record<string, string> = {
@@ -41,6 +42,7 @@ export function FlowToolbar({
   onActivate,
   onTest,
   onPublish,
+  onGenerate,
 }: FlowToolbarProps) {
   const navigate = useNavigate()
 
@@ -77,6 +79,12 @@ export function FlowToolbar({
       </div>
 
       <div className="flex items-center gap-2">
+        {onGenerate && (
+          <Button variant="outline" size="sm" onClick={onGenerate}>
+            <Sparkles className="mr-1 h-3.5 w-3.5" />
+            Generate
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"

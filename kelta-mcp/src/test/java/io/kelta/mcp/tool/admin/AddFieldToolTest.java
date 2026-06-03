@@ -265,7 +265,11 @@ class AddFieldToolTest {
     }
 
     private void stubCollectionLookup() {
-        wm.stubFor(get(urlEqualTo(LOOKUP_FILTER))
+        stubCollectionLookup("projects");
+    }
+
+    private void stubCollectionLookup(String name) {
+        wm.stubFor(get(urlEqualTo("/api/collections?filter[name][eq]=" + name))
                 .willReturn(aResponse().withStatus(200)
                         .withBody("{\"data\":[{\"type\":\"collections\",\"id\":\"" + COLLECTION_ID + "\"}]}")));
     }
@@ -295,6 +299,7 @@ class AddFieldToolTest {
 
     @Test
     void postsDimensionInFieldTypeConfigForVector() {
+        stubCollectionLookup("titles");
         wm.stubFor(post(urlEqualTo("/api/fields"))
                 .willReturn(aResponse().withStatus(201).withBody("{\"data\":{\"id\":\"f1\"}}")));
 
@@ -307,7 +312,7 @@ class AddFieldToolTest {
 
         assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
-                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("vector")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("VECTOR")))
                 .withRequestBody(matchingJsonPath("$.data.attributes.fieldTypeConfig.dimension",
                         equalTo("1536"))));
     }
@@ -317,6 +322,7 @@ class AddFieldToolTest {
         // FieldLifecycleHook accepts "rich_text" but not "richText". MCP clients
         // sometimes default to camelCase; we normalize so admin UI feel parity
         // doesn't trip the gateway validation.
+        stubCollectionLookup("titles");
         wm.stubFor(post(urlEqualTo("/api/fields"))
                 .willReturn(aResponse().withStatus(201).withBody("{}")));
 
@@ -327,11 +333,12 @@ class AddFieldToolTest {
                         "type", "richText"), null));
 
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
-                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("rich_text"))));
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("RICH_TEXT"))));
     }
 
     @Test
-    void passesThroughPlainTextType() {
+    void mapsTextAliasToString() {
+        stubCollectionLookup("titles");
         wm.stubFor(post(urlEqualTo("/api/fields"))
                 .willReturn(aResponse().withStatus(201).withBody("{}")));
 
@@ -342,6 +349,6 @@ class AddFieldToolTest {
                         "type", "text"), null));
 
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
-                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("text"))));
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("STRING"))));
     }
 }

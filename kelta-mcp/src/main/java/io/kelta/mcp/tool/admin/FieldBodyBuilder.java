@@ -66,6 +66,9 @@ final class FieldBodyBuilder {
         } else if (isLookupType(nativeType)) {
             String err = applyReferenceRelationship(args, attrs, relationships);
             if (err != null) return Result.error(err);
+        } else if ("VECTOR".equals(nativeType)) {
+            String err = applyVectorConfig(args, attrs);
+            if (err != null) return Result.error(err);
         }
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -130,6 +133,30 @@ final class FieldBodyBuilder {
         return null;
     }
 
+    private String applyVectorConfig(Map<String, Object> args, Map<String, Object> attrs) {
+        Object raw = args.get("dimension");
+        if (raw == null) {
+            return "Vector fields require a \"dimension\" argument.";
+        }
+        int dim;
+        if (raw instanceof Number n) {
+            dim = n.intValue();
+        } else {
+            try {
+                dim = Integer.parseInt(raw.toString());
+            } catch (NumberFormatException e) {
+                return "\"dimension\" must be an integer.";
+            }
+        }
+        if (dim < 1 || dim > 16384) {
+            return "\"dimension\" must be between 1 and 16384.";
+        }
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("dimension", dim);
+        attrs.put("fieldTypeConfig", config);
+        return null;
+    }
+
     private String applyReferenceRelationship(Map<String, Object> args,
                                               Map<String, Object> attrs,
                                               Map<String, Object> relationships) {
@@ -186,6 +213,8 @@ final class FieldBodyBuilder {
                  "lookup", "Lookup", "LOOKUP" -> "LOOKUP";
             case "masterDetail", "master_detail", "MASTER_DETAIL" -> "MASTER_DETAIL";
             case "json", "Json", "JSON" -> "JSON";
+            case "richText", "rich_text", "RichText", "RICH_TEXT" -> "RICH_TEXT";
+            case "vector", "Vector", "VECTOR" -> "VECTOR";
             default -> null;
         };
     }

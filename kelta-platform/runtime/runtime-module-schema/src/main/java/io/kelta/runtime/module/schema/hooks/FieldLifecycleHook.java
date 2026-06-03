@@ -30,7 +30,8 @@ public class FieldLifecycleHook implements BeforeSaveHook {
             "reference", "array", "object", "json",
             "picklist", "multi_picklist", "currency", "percent",
             "auto_number", "phone", "email", "url",
-            "rich_text", "encrypted", "external_id",
+            "text", "rich_text", "vector",
+            "encrypted", "external_id",
             "geolocation", "lookup", "master_detail",
             "formula", "rollup_summary",
             // Uppercase (runtime / canonical types)
@@ -38,7 +39,8 @@ public class FieldLifecycleHook implements BeforeSaveHook {
             "DATE", "DATETIME", "JSON",
             "PICKLIST", "MULTI_PICKLIST", "CURRENCY", "PERCENT",
             "AUTO_NUMBER", "PHONE", "EMAIL", "URL",
-            "RICH_TEXT", "ENCRYPTED", "EXTERNAL_ID",
+            "TEXT", "RICH_TEXT", "VECTOR",
+            "ENCRYPTED", "EXTERNAL_ID",
             "GEOLOCATION", "LOOKUP", "MASTER_DETAIL",
             "FORMULA", "ROLLUP_SUMMARY", "REFERENCE", "ARRAY"
     );

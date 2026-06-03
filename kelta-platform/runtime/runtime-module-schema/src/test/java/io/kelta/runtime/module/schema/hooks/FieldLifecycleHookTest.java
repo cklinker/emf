@@ -177,6 +177,34 @@ class FieldLifecycleHookTest {
         }
 
         @Test
+        @DisplayName("Should accept lowercase 'text' and normalize to 'TEXT'")
+        void shouldAcceptText() {
+            Map<String, Object> record = new HashMap<>(Map.of("name", "synopsis", "type", "text"));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertEquals("TEXT", result.getFieldUpdates().get("type"));
+        }
+
+        @Test
+        @DisplayName("Should accept lowercase 'vector' and normalize to 'VECTOR'")
+        void shouldAcceptVector() {
+            Map<String, Object> record = new HashMap<>(Map.of("name", "embedding", "type", "vector"));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertEquals("VECTOR", result.getFieldUpdates().get("type"));
+        }
+
+        @Test
+        @DisplayName("Should accept canonical 'TEXT' unchanged")
+        void shouldAcceptCanonicalText() {
+            Map<String, Object> record = new HashMap<>(Map.of(
+                    "name", "synopsis", "type", "TEXT", "active", true));
+            BeforeSaveResult result = hook.beforeCreate(record, "t1");
+            assertTrue(result.isSuccess());
+            assertFalse(result.hasFieldUpdates());
+        }
+
+        @Test
         @DisplayName("Should leave already-canonical type unchanged")
         void shouldLeaveCanonicalTypeUnchanged() {
             Map<String, Object> record = new HashMap<>(Map.of(

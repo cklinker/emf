@@ -39,7 +39,9 @@ class FieldTypeTest {
         assertNotNull(FieldType.PHONE);
         assertNotNull(FieldType.EMAIL);
         assertNotNull(FieldType.URL);
+        assertNotNull(FieldType.TEXT);
         assertNotNull(FieldType.RICH_TEXT);
+        assertNotNull(FieldType.VECTOR);
         assertNotNull(FieldType.ENCRYPTED);
         assertNotNull(FieldType.EXTERNAL_ID);
         assertNotNull(FieldType.GEOLOCATION);
@@ -50,9 +52,9 @@ class FieldTypeTest {
     }
 
     @Test
-    @DisplayName("Should have exactly 26 field types")
-    void shouldHaveExactly26FieldTypes() {
-        assertEquals(26, FieldType.values().length);
+    @DisplayName("Should have exactly 28 field types")
+    void shouldHaveExactly28FieldTypes() {
+        assertEquals(28, FieldType.values().length);
     }
 
     @Test

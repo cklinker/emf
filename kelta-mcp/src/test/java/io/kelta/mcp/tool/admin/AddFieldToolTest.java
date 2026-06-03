@@ -87,4 +87,65 @@ class AddFieldToolTest {
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
                 .withRequestBody(matchingJsonPath("$.data.attributes.referenceCollection", equalTo("users"))));
     }
+
+    @Test
+    void includesDimensionForVectorType() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "embedding",
+                        "type", "vector",
+                        "dimension", 1536), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("vector")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.dimension", equalTo("1536"))));
+    }
+
+    @Test
+    void rejectsVectorWithoutDimension() {
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "embedding",
+                        "type", "vector"), null));
+
+        assertThat(result.isError()).isEqualTo(Boolean.TRUE);
+        wm.verify(0, WireMock.postRequestedFor(urlEqualTo("/api/fields")));
+    }
+
+    @Test
+    void acceptsTextType() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "synopsis",
+                        "type", "text"), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("text"))));
+    }
+
+    @Test
+    void rewritesRichTextAliasToCanonical() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "editorial",
+                        "fieldName", "description",
+                        "type", "richText"), null));
+
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("rich_text"))));
+    }
 }

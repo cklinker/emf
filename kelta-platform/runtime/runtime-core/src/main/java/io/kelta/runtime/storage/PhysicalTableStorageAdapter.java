@@ -158,7 +158,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 continue;
             }
 
-            String sqlType = mapFieldTypeToSql(field.type());
+            String sqlType = mapFieldTypeToSql(field);
             sql.append(", ");
             sql.append(sanitizeIdentifier(columnName)).append(" ").append(sqlType);
 
@@ -791,34 +791,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param type the field type
      * @return the SQL type string
      */
-    private String mapFieldTypeToSql(FieldType type) {
-        return switch (type) {
-            case STRING -> "TEXT";
-            case INTEGER -> "INTEGER";
-            case LONG -> "BIGINT";
-            case DOUBLE -> "DOUBLE PRECISION";
-            case BOOLEAN -> "BOOLEAN";
-            case DATE -> "DATE";
-            case DATETIME -> "TIMESTAMP";
-            case JSON -> "JSONB";
-            case REFERENCE -> "VARCHAR(36)";
-            case ARRAY -> "JSONB";
-            case PICKLIST -> "VARCHAR(255)";
-            case MULTI_PICKLIST -> "TEXT[]";
-            case CURRENCY -> "NUMERIC(18,2)";
-            case PERCENT -> "NUMERIC(8,4)";
-            case AUTO_NUMBER -> "VARCHAR(100)";
-            case PHONE -> "VARCHAR(40)";
-            case EMAIL -> "VARCHAR(320)";
-            case URL -> "VARCHAR(2048)";
-            case RICH_TEXT -> "TEXT";
-            case ENCRYPTED -> "BYTEA";
-            case EXTERNAL_ID -> "VARCHAR(255)";
-            case GEOLOCATION -> "DOUBLE PRECISION";
-            case LOOKUP -> "VARCHAR(36)";
-            case MASTER_DETAIL -> "VARCHAR(36)";
-            case FORMULA, ROLLUP_SUMMARY -> null;
-        };
+    private String mapFieldTypeToSql(FieldDefinition field) {
+        return FieldTypeSql.mapFieldTypeToSql(field);
     }
 
     /**
@@ -1077,6 +1051,29 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 // Value is Map with latitude/longitude; store latitude in primary column
                 if (value instanceof Map<?,?> geo) {
                     yield ((Number) geo.get("latitude")).doubleValue();
+                }
+                yield value;
+            }
+            case VECTOR -> {
+                // pgvector accepts the literal text form "[1,2,3]". Convert a
+                // List/array of numbers; pass strings through unchanged.
+                if (value instanceof List<?> list) {
+                    StringBuilder sb = new StringBuilder("[");
+                    for (int i = 0; i < list.size(); i++) {
+                        if (i > 0) sb.append(',');
+                        sb.append(((Number) list.get(i)).toString());
+                    }
+                    sb.append(']');
+                    yield sb.toString();
+                }
+                if (value instanceof double[] arr) {
+                    StringBuilder sb = new StringBuilder("[");
+                    for (int i = 0; i < arr.length; i++) {
+                        if (i > 0) sb.append(',');
+                        sb.append(arr[i]);
+                    }
+                    sb.append(']');
+                    yield sb.toString();
                 }
                 yield value;
             }

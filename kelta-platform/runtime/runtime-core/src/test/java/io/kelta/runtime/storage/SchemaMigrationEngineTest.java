@@ -95,7 +95,7 @@ class SchemaMigrationEngineTest {
     
     private String mapFieldTypeToSql(FieldType type) {
         return switch (type) {
-            case STRING, PHONE, EMAIL, URL, RICH_TEXT, EXTERNAL_ID, PICKLIST, AUTO_NUMBER -> "TEXT";
+            case STRING, TEXT, PHONE, EMAIL, URL, RICH_TEXT, EXTERNAL_ID, PICKLIST, AUTO_NUMBER -> "TEXT";
             case INTEGER -> "INTEGER";
             case LONG -> "BIGINT";
             case DOUBLE, CURRENCY, PERCENT -> "DOUBLE PRECISION";
@@ -105,6 +105,7 @@ class SchemaMigrationEngineTest {
             case JSON, ARRAY, MULTI_PICKLIST, GEOLOCATION -> "CLOB"; // H2 doesn't have JSONB, use CLOB
             case REFERENCE, LOOKUP, MASTER_DETAIL -> "VARCHAR(36)";
             case ENCRYPTED -> "BINARY(256)";
+            case VECTOR -> "VARBINARY(8192)"; // H2 has no pgvector; pretend it's an opaque blob
             case FORMULA, ROLLUP_SUMMARY -> null;
         };
     }

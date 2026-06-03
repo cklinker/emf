@@ -133,8 +133,12 @@ public class SchemaMigrationEngine {
             FieldType.EMAIL, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.URL, EnumSet.of(
             FieldType.URL, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.TEXT, EnumSet.of(
+            FieldType.TEXT, FieldType.RICH_TEXT, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.RICH_TEXT, EnumSet.of(
-            FieldType.RICH_TEXT, FieldType.STRING));
+            FieldType.RICH_TEXT, FieldType.TEXT, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.VECTOR, EnumSet.of(
+            FieldType.VECTOR));
         TYPE_COMPATIBILITY.put(FieldType.ENCRYPTED, EnumSet.of(
             FieldType.ENCRYPTED, FieldType.STRING));
         TYPE_COMPATIBILITY.put(FieldType.EXTERNAL_ID, EnumSet.of(
@@ -618,34 +622,8 @@ public class SchemaMigrationEngine {
         return identifier;
     }
     
-    private String mapFieldTypeToSql(FieldType type) {
-        return switch (type) {
-            case STRING -> "TEXT";
-            case INTEGER -> "INTEGER";
-            case LONG -> "BIGINT";
-            case DOUBLE -> "DOUBLE PRECISION";
-            case BOOLEAN -> "BOOLEAN";
-            case DATE -> "DATE";
-            case DATETIME -> "TIMESTAMP";
-            case JSON -> "JSONB";
-            case REFERENCE -> "VARCHAR(36)";
-            case ARRAY -> "JSONB";
-            case PICKLIST -> "VARCHAR(255)";
-            case MULTI_PICKLIST -> "TEXT[]";
-            case CURRENCY -> "NUMERIC(18,2)";
-            case PERCENT -> "NUMERIC(8,4)";
-            case AUTO_NUMBER -> "VARCHAR(100)";
-            case PHONE -> "VARCHAR(40)";
-            case EMAIL -> "VARCHAR(320)";
-            case URL -> "VARCHAR(2048)";
-            case RICH_TEXT -> "TEXT";
-            case ENCRYPTED -> "BYTEA";
-            case EXTERNAL_ID -> "VARCHAR(255)";
-            case GEOLOCATION -> "DOUBLE PRECISION";
-            case LOOKUP -> "VARCHAR(36)";
-            case MASTER_DETAIL -> "VARCHAR(36)";
-            case FORMULA, ROLLUP_SUMMARY -> null;
-        };
+    private String mapFieldTypeToSql(FieldDefinition field) {
+        return FieldTypeSql.mapFieldTypeToSql(field);
     }
     
     /**
@@ -670,7 +648,7 @@ public class SchemaMigrationEngine {
         sql.append(" ADD COLUMN IF NOT EXISTS ");
         sql.append(sanitizeIdentifier(columnName));
         sql.append(" ");
-        sql.append(mapFieldTypeToSql(field.type()));
+        sql.append(mapFieldTypeToSql(field));
 
         // Note: We don't add NOT NULL for new columns as existing rows would fail
         // The application layer handles nullability validation
@@ -720,7 +698,7 @@ public class SchemaMigrationEngine {
     private MigrationAction createAlterColumnTypeMigration(String tableIdentifier, CollectionDefinition definition,
             FieldDefinition oldField, FieldDefinition newField) {
         String columnName = resolvePhysicalColumnName(definition, newField);
-        String newSqlType = mapFieldTypeToSql(newField.type());
+        String newSqlType = mapFieldTypeToSql(newField);
 
         // PostgreSQL syntax for changing column type with USING clause for type conversion
         String sql = String.format(

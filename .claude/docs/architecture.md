@@ -71,6 +71,30 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 - **Flow Engine**: Flow execution, node processing, branching — `runtime-core/.../flow/`
 - **Modules**: Action handlers (CreateRecord, UpdateRecord, QueryRecords, DeleteRecord, TriggerFlow, Decision, LogMessage) — `runtime-module-core/.../module/core/`
 
+### Field Types
+
+`FieldType` (in `runtime-core/.../model/FieldType.java`) is the canonical enum;
+SQL mapping lives in `runtime-core/.../storage/FieldTypeSql.java` and is shared
+by `SchemaMigrationEngine` and `PhysicalTableStorageAdapter`. Adding a new type
+means touching: `FieldType`, `FieldTypeSql.mapFieldTypeToSql`,
+`SchemaMigrationEngine.TYPE_COMPATIBILITY`, `SystemCollectionSeeder.mapFieldType`,
+`DefaultValidationEngine.isValidType`, and
+`FieldLifecycleHook.VALID_FIELD_TYPES` (both the lowercase and uppercase set).
+
+Notable long-form / specialized types:
+
+- `TEXT` and `RICH_TEXT` both map to PostgreSQL `TEXT`. They are stored
+  identically but kept semantically distinct so the admin UI can pick a
+  rich-text editor for `RICH_TEXT` and a plain textarea for `TEXT`.
+- `VECTOR` maps to `vector(N)` and depends on the
+  [pgvector](https://github.com/pgvector/pgvector) extension being installed
+  in the tenant's PostgreSQL database (`CREATE EXTENSION vector;`).
+  Dimension is read from `FieldDefinition.fieldTypeConfig.dimension`
+  (default `1536`, range `1..16000`). VECTOR type changes are blocked —
+  changing dimension requires a data migration and is out of scope for the
+  runtime engine. Worker pods that boot against a database without pgvector
+  installed will fail the DDL on the first VECTOR field they encounter.
+
 ## Frontend Layers (kelta-ui/app/)
 
 - **Context Providers**: `src/context/` — AuthContext, ApiContext, TenantContext, CollectionStoreContext, ThemeContext, I18nContext, PluginContext

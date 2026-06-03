@@ -30,7 +30,10 @@ public class AddFieldTool implements AdminTool {
         properties.put("collectionName", Schemas.string("Collection the field belongs to."));
         properties.put("fieldName", Schemas.string("Field name (camelCase recommended)."));
         properties.put("type", Schemas.string(
-                "Field type: text, longText, number, integer, decimal, boolean, date, datetime, reference, picklist, multiPicklist, json, file, image."));
+                "Field type. Common: string, number, integer, decimal, boolean, date, datetime, "
+                        + "reference, picklist, multi_picklist, json. "
+                        + "Long-form: text (plain), rich_text (HTML). "
+                        + "Similarity search: vector (requires \"dimension\" arg, pgvector backend)."));
         properties.put("required", Schemas.bool("Whether the field is required (default false).", false));
         properties.put("unique", Schemas.bool("Whether values must be unique (default false).", false));
         properties.put("description", Schemas.string("Optional description shown in the admin UI."));
@@ -39,6 +42,9 @@ public class AddFieldTool implements AdminTool {
                 "Optional validation config (regex, min/max, etc.) — shape depends on the field type."));
         properties.put("referenceCollection", Schemas.string(
                 "For type=reference, the target collection name."));
+        properties.put("dimension", Schemas.integer(
+                "For type=vector, the embedding dimension (required, e.g. 1536 for OpenAI text-embedding-3-small).",
+                1, 16000));
 
         Tool tool = Tool.builder()
                 .name("add_field")
@@ -62,16 +68,33 @@ public class AddFieldTool implements AdminTool {
                         return error("Arguments \"collectionName\", \"fieldName\", and \"type\" are required.");
                     }
 
+                    // Accept the camelCase "richText" alias clients sometimes emit.
+                    String typeStr = t.toString();
+                    if ("richText".equals(typeStr)) {
+                        typeStr = "rich_text";
+                    }
+
+                    // VECTOR fields need an embedding dimension; reject early so the
+                    // gateway doesn't have to invent a default.
+                    Integer dimension = null;
+                    if (args.get("dimension") instanceof Number n) {
+                        dimension = n.intValue();
+                    }
+                    if ("vector".equalsIgnoreCase(typeStr) && dimension == null) {
+                        return error("Argument \"dimension\" is required for type=vector.");
+                    }
+
                     Map<String, Object> attrs = new LinkedHashMap<>();
                     attrs.put("collectionName", cn.toString());
                     attrs.put("fieldName", fn.toString());
-                    attrs.put("type", t.toString());
+                    attrs.put("type", typeStr);
                     if (args.get("required") instanceof Boolean b) attrs.put("required", b);
                     if (args.get("unique") instanceof Boolean b) attrs.put("unique", b);
                     if (args.get("description") instanceof String s && !s.isBlank()) attrs.put("description", s);
                     if (args.get("defaultValue") instanceof String s) attrs.put("defaultValue", s);
                     if (args.get("validation") instanceof Map<?, ?> v) attrs.put("validation", v);
                     if (args.get("referenceCollection") instanceof String s && !s.isBlank()) attrs.put("referenceCollection", s);
+                    if (dimension != null) attrs.put("dimension", dimension);
 
                     Map<String, Object> body = Map.of("data", Map.of(
                             "type", "fields",

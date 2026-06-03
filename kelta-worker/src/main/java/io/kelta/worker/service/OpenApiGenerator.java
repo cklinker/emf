@@ -102,8 +102,8 @@ public class OpenApiGenerator {
                 "description", col.description() != null ? col.description() : "",
                 "tags", List.of(col.displayName()),
                 "parameters", List.of(
-                        queryParam("page[number]", "integer", "Page number (1-based)"),
-                        queryParam("page[size]", "integer", "Page size (default 25)"),
+                        queryParam("page[number]", "integer", "Page number (1-based, default 1)"),
+                        queryParam("page[size]", "integer", "Page size (default 20, max 200)"),
                         queryParam("sort", "string", "Sort field (prefix with - for descending)"),
                         queryParam("include", "string", "Related resources to include (comma-separated)")
                 ),

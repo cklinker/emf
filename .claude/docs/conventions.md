@@ -65,6 +65,61 @@ Where errors are constructed:
 - Required for public classes and methods
 - Include `@param`, `@returns`, `@throws`
 
+## REST API: pagination
+
+Every paginated REST endpoint MUST use **JSON:API bracket syntax** — `page[number]` and `page[size]`. The flat forms `pageNumber` / `pageSize` are not honored and a request that sends them silently falls back to defaults.
+
+```
+GET /api/customers?page[number]=2&page[size]=50&sort=-createdAt
+```
+
+### Defaults and bounds
+
+| Param          | Default | Maximum | Behavior on over-cap                              |
+|----------------|---------|---------|---------------------------------------------------|
+| `page[number]` | 1       | —       | Negative / zero values clamp to 1                 |
+| `page[size]`   | 20      | 200     | Values above the cap silently clamp down to 200   |
+
+The constants live in `io.kelta.runtime.query.Pagination`:
+- `DEFAULT_PAGE_SIZE = 20`
+- `MAX_HTTP_PAGE_SIZE = 200` — clamp applied by `Pagination.fromParams`
+- `MAX_PAGE_SIZE = 1000` — absolute ceiling on the record itself; only reached when internal services (report export, include resolution, data export) build a `Pagination` directly
+
+Endpoints that need higher caps for internal batch fetches (e.g. report execution, CSV export) clamp against their own constant — they never expose that ceiling over HTTP.
+
+### Response shape
+
+Paginated list responses carry both `metadata` (numeric pagination state) and `links` (URLs for navigation):
+
+```json
+{
+  "data": [ { "type": "customers", "id": "…", "attributes": { … } } ],
+  "metadata": {
+    "totalCount": 100,
+    "currentPage": 2,
+    "pageSize": 20,
+    "totalPages": 5
+  },
+  "links": {
+    "self": "/api/customers?sort=-createdAt&page[number]=2&page[size]=20",
+    "prev": "/api/customers?sort=-createdAt&page[number]=1&page[size]=20",
+    "next": "/api/customers?sort=-createdAt&page[number]=3&page[size]=20"
+  }
+}
+```
+
+- `links.self` is always present.
+- `links.prev` is `null` when the response is on page 1.
+- `links.next` is `null` when the response is on (or past) the last page.
+- URLs are **relative** paths — they reuse the request URI so cached system-collection responses remain reusable across hosts and behind load balancers.
+- Non-pagination query parameters (`filter[…]`, `sort`, `fields`, `include`) are preserved verbatim in the generated links; only `page[number]` and `page[size]` are rewritten.
+
+Link generation lives in `io.kelta.jsonapi.PaginationLinks.build(...)`; the dynamic collection router calls it from `toJsonApiListResponse(...)`.
+
+### MCP tools
+
+MCP tools (`query_collection`, `list_picklists`, `list_approvals`) take flat `pageNumber` / `pageSize` arguments as an ergonomic affordance for LLM callers, and translate them to the bracket form when constructing the HTTP request to the gateway. The same `page[size]` cap (200) applies — the MCP tool's input schema declares `maximum: 200` and the call handler clamps defensively.
+
 ## TypeScript
 
 ### Naming

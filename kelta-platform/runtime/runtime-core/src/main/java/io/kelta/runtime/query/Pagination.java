@@ -11,9 +11,13 @@ import java.util.Map;
  * <h2>Query Parameter Format</h2>
  * <ul>
  *   <li>{@code page[number]} - The page number (1-indexed, default: 1)</li>
- *   <li>{@code page[size]} - The number of records per page (default: 20, max: 1000)</li>
+ *   <li>{@code page[size]} - The number of records per page (default: 20, max: 200)</li>
  * </ul>
- * 
+ *
+ * <p>{@link #fromParams(Map)} silently clamps an out-of-range {@code page[size]}
+ * value (e.g. {@code page[size]=500}) down to {@link #MAX_HTTP_PAGE_SIZE} so that
+ * paginated REST endpoints never silently fall back to the default page size.
+ *
  * @param pageNumber the page number (1-indexed, must be >= 1)
  * @param pageSize the number of records per page (must be between 1 and 1000)
  * 
@@ -29,9 +33,28 @@ public record Pagination(
     public static final int DEFAULT_PAGE_SIZE = 20;
     
     /**
-     * Maximum allowed page size.
+     * Absolute upper bound for the {@code pageSize} component of a Pagination
+     * record. Enforced by the compact constructor — internal callers (report
+     * execution, data export, include resolution) may construct values up to
+     * this ceiling for batch fetches.
+     *
+     * <p>HTTP requests are clamped by {@link #fromParams(Map)} to the stricter
+     * {@link #MAX_HTTP_PAGE_SIZE} so untrusted callers can't reach the full
+     * range.
      */
     public static final int MAX_PAGE_SIZE = 1000;
+
+    /**
+     * Maximum allowed {@code page[size]} for paginated REST endpoints.
+     *
+     * <p>Requests with {@code page[size]} above this value are silently clamped
+     * down by {@link #fromParams(Map)} so a runaway client can't exhaust memory
+     * or hold a connection for an unbounded result set. Internal services with
+     * a legitimate need for larger batches (report export, include resolution)
+     * construct {@link Pagination} directly and so clamp against
+     * {@link #MAX_PAGE_SIZE} instead.
+     */
+    public static final int MAX_HTTP_PAGE_SIZE = 200;
     
     /**
      * Compact constructor with validation.
@@ -57,11 +80,14 @@ public record Pagination(
     public static Pagination fromParams(Map<String, String> params) {
         int pageNumber = parseIntParam(params.get("page[number]"), 1);
         int pageSize = parseIntParam(params.get("page[size]"), DEFAULT_PAGE_SIZE);
-        
-        // Clamp values to valid ranges
+
+        // Clamp values to valid ranges. HTTP callers cap at MAX_HTTP_PAGE_SIZE
+        // so a runaway client can't ask for an unbounded result set; internal
+        // callers that construct Pagination directly may use the larger
+        // MAX_PAGE_SIZE.
         pageNumber = Math.max(1, pageNumber);
-        pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, pageSize));
-        
+        pageSize = Math.max(1, Math.min(MAX_HTTP_PAGE_SIZE, pageSize));
+
         return new Pagination(pageNumber, pageSize);
     }
     

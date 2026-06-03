@@ -122,11 +122,18 @@ class McpApplicationTest {
                 // schema admin (Phase 6)
                 "create_collection",
                 "update_collection",
+                "delete_collection",
                 "add_field",
                 "update_field",
                 "remove_field",
                 "create_validation_rule",
                 "create_picklist",
+                "list_picklists",
+                "get_picklist",
+                "delete_picklist",
+                "add_picklist_value",
+                "update_picklist_value",
+                "deactivate_picklist_value",
                 // UI admin (Phase 7)
                 "create_layout",
                 "update_layout",
@@ -185,12 +192,18 @@ class McpApplicationTest {
                     .as("user tool %s should be idempotent (read-only is always idempotent)", t.name())
                     .isTrue();
         }
-        // Shared admin-side reads.
+        // Admin-side reads: the shared browse tools plus the picklist read tools.
+        Set<String> adminReads = Set.of(
+                "list_collections", "get_collection_schema",
+                "list_picklists", "get_picklist");
         for (AdminTool at : adminTools) {
             Tool t = at.toSpecification().tool();
-            if (!Set.of("list_collections", "get_collection_schema").contains(t.name())) continue;
+            if (!adminReads.contains(t.name())) continue;
             assertThat(t.annotations().readOnlyHint())
                     .as("admin tool %s should be read-only", t.name())
+                    .isTrue();
+            assertThat(t.annotations().idempotentHint())
+                    .as("admin tool %s should be idempotent", t.name())
                     .isTrue();
         }
     }
@@ -202,8 +215,11 @@ class McpApplicationTest {
         // without flagging it here is a real safety regression — fail loud.
         Set<String> destructive = Set.of(
                 "update_record", "delete_record", "bulk_apply",
-                "update_collection", "update_field", "remove_field",
-                "update_layout", "delete_layout", "update_flow");
+                "update_collection", "delete_collection",
+                "update_field", "remove_field",
+                "update_layout", "delete_layout", "update_flow",
+                "delete_picklist",
+                "update_picklist_value", "deactivate_picklist_value");
         for (UserTool ut : userTools) {
             Tool t = ut.toSpecification().tool();
             if (!destructive.contains(t.name())) continue;

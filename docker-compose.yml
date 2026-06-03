@@ -6,10 +6,10 @@
 #   make seed     ← confirm health + print credentials
 #
 # Profiles:
-#   (none)        postgres, redis, nats, cerbos, kelta-auth, kelta-worker,
-#                 kelta-gateway, kelta-ui
+#   (none)        postgres, redis, nats, cerbos, mailpit, kelta-auth,
+#                 kelta-worker, kelta-gateway, kelta-ui
 #   ai            adds kelta-ai (requires ANTHROPIC_API_KEY in .env)
-#   tools         adds pgadmin, redis-commander, mailpit
+#   tools         adds pgadmin, redis-commander
 #   observability adds opensearch, jaeger
 #   seed          runs the one-shot kelta-bootstrap healthcheck/info container
 #
@@ -99,6 +99,21 @@ services:
     networks:
       - kelta-network
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: kelta-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kelta-network
+
   # ═══════════════════════════════════════════════════════════════════════════
   # Platform Services
   # ═══════════════════════════════════════════════════════════════════════════
@@ -178,8 +193,8 @@ services:
       # Cerbos
       CERBOS_HOST: cerbos
       CERBOS_GRPC_PORT: "3593"
-      # Email — disabled by default; enable mailpit profile for SMTP UI
-      EMAIL_ENABLED: "false"
+      # Email — enabled by default; mailpit catches outbound mail (UI on :8025)
+      EMAIL_ENABLED: "true"
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_AUTH: "false"
@@ -366,18 +381,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    networks:
-      - kelta-network
-    profiles:
-      - tools
-
-  mailpit:
-    image: axllent/mailpit:latest
-    container_name: kelta-mailpit
-    restart: unless-stopped
-    ports:
-      - "1025:1025"
-      - "8025:8025"
     networks:
       - kelta-network
     profiles:

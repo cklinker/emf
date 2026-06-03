@@ -34,13 +34,14 @@ spring:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
   mail:
+    # Defaults target mailpit (docker-compose / homelab); K8s/prod overrides via env.
     host: ${SMTP_HOST:localhost}
-    port: ${SMTP_PORT:587}
+    port: ${SMTP_PORT:1025}
     username: ${SMTP_USERNAME:}
     password: ${SMTP_PASSWORD:}
     properties:
-      mail.smtp.auth: ${SMTP_AUTH:true}
-      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
   lifecycle:
     timeout-per-shutdown-phase: 30s
 

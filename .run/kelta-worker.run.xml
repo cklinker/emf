@@ -21,8 +21,8 @@
       <!-- Cerbos (from compose stack) -->
       <env name="CERBOS_HOST" value="localhost" />
       <env name="CERBOS_GRPC_PORT" value="3593" />
-      <!-- Email — disabled for local dev (enable mailpit profile for SMTP UI) -->
-      <env name="EMAIL_ENABLED" value="false" />
+      <!-- Email — enabled by default; mailpit catches outbound mail (UI on :8025) -->
+      <env name="EMAIL_ENABLED" value="true" />
       <env name="SMTP_HOST" value="localhost" />
       <env name="SMTP_PORT" value="1025" />
       <env name="SMTP_AUTH" value="false" />

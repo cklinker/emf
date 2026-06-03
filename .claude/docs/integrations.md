@@ -75,7 +75,10 @@ Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/event/`
 | Redis | 6379 | default |
 | Keycloak | 8180 | default |
 | Cerbos | 3592/3593 | default |
+| Mailpit (SMTP + UI) | 1025 / 8025 | default |
 | Jaeger | 16686 | default |
 | OpenSearch | 9200 | default |
 | NATS Box | 8090 | tools |
 | Redis Commander | 8091 | tools |
+
+**Email defaults**: `kelta-worker` starts with `EMAIL_ENABLED=true` and `SMTP_HOST=mailpit:1025` (no auth, no STARTTLS), so platform-originated mail (verification, invites, alerts) lands in mailpit at <http://localhost:8025> instead of an external relay. `kelta-worker/application.yml` matches: defaults are `SMTP_HOST=localhost`, `SMTP_PORT=1025`, `SMTP_AUTH=false`, `SMTP_STARTTLS=false` — K8s deployments must override `SMTP_HOST`/`SMTP_PORT`/`SMTP_AUTH`/`SMTP_STARTTLS`/`SMTP_USERNAME`/`SMTP_PASSWORD` to point at the real relay. Tenant-configured SMTP (per `tenant_email_credential`) always takes precedence over the platform default.

@@ -122,11 +122,18 @@ class McpApplicationTest {
                 // schema admin (Phase 6)
                 "create_collection",
                 "update_collection",
+                "delete_collection",
                 "add_field",
                 "update_field",
                 "remove_field",
                 "create_validation_rule",
                 "create_picklist",
+                "list_picklists",
+                "get_picklist",
+                "delete_picklist",
+                "add_picklist_value",
+                "update_picklist_value",
+                "deactivate_picklist_value",
                 // UI admin (Phase 7)
                 "create_layout",
                 "update_layout",

@@ -75,7 +75,20 @@ Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/event/`
 | Redis | 6379 | default |
 | Keycloak | 8180 | default |
 | Cerbos | 3592/3593 | default |
+| Mailpit (SMTP / UI) | 1025 / 8025 | default |
 | Jaeger | 16686 | default |
 | OpenSearch | 9200 | default |
 | NATS Box | 8090 | tools |
 | Redis Commander | 8091 | tools |
+
+## Email (SMTP)
+
+Worker emails go out via `spring-boot-starter-mail`. The kelta-worker `application.yml`
+defaults target a local **mailpit** (`localhost:1025`, no auth, no TLS) so
+`docker compose up` and bare `mvn spring-boot:run` both work out of the box —
+mailpit captures every outbound message and serves them at <http://localhost:8025>.
+
+Toggle via `kelta.email.enabled` (`EMAIL_ENABLED` env, default `true`). Override
+the SMTP target in K8s via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+`SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS`. Per-tenant SMTP overrides live in
+`TenantEmailSettings` and take precedence over the platform-wide config.

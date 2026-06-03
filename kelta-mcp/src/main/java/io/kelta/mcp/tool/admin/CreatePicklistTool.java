@@ -10,6 +10,8 @@ import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,12 +24,16 @@ import java.util.Map;
  *
  * <p>Wraps:
  * <ol>
- *   <li>POST /api/globalPicklists — create the picklist</li>
- *   <li>POST /api/picklistValues (per value) — create each value</li>
+ *   <li>POST /api/global-picklists — create the picklist</li>
+ *   <li>POST /api/picklist-values (per value) — create each value, with
+ *       {@code picklistSourceType=GLOBAL} and {@code picklistSourceId}
+ *       set to the new picklist's UUID.</li>
  * </ol>
  */
 @Component
 public class CreatePicklistTool implements AdminTool {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final GatewayHttpClient gateway;
 
@@ -40,7 +46,8 @@ public class CreatePicklistTool implements AdminTool {
         Map<String, Object> valueItem = new LinkedHashMap<>();
         valueItem.put("type", "object");
         valueItem.put("description",
-                "{\"value\":\"...\",\"label\":\"...\",\"sortOrder\":number,\"active\":bool}");
+                "{\"value\":\"...\",\"label\":\"...\",\"sortOrder\":number,"
+                + "\"isActive\":bool,\"isDefault\":bool}");
         valueItem.put("additionalProperties", true);
 
         Map<String, Object> valuesArray = new LinkedHashMap<>();
@@ -56,7 +63,10 @@ public class CreatePicklistTool implements AdminTool {
         Tool tool = Tool.builder()
                 .name("create_picklist")
                 .title("Create Picklist")
-                .description("Create a global picklist with its initial values. The picklist is created first; each value is then POSTed to /api/picklistValues with picklistName backreference.")
+                .description("Create a global picklist with its initial values. "
+                        + "The picklist is created first at /api/global-picklists; each value is "
+                        + "then POSTed to /api/picklist-values with picklistSourceType=GLOBAL and "
+                        + "picklistSourceId set to the new picklist's UUID.")
                 .inputSchema(Schemas.object(properties, List.of("name", "values")))
                 .annotations(ToolHints.write(false, false))
                 .build();
@@ -80,17 +90,18 @@ public class CreatePicklistTool implements AdminTool {
                     if (args.get("description") instanceof String s && !s.isBlank()) attrs.put("description", s);
 
                     Map<String, Object> picklistBody = Map.of("data", Map.of(
-                            "type", "globalPicklists",
+                            "type", "global-picklists",
                             "attributes", attrs));
                     GatewayHttpClient.Response picklistRes;
                     try {
-                        picklistRes = gateway.post("/api/globalPicklists", picklistBody);
+                        picklistRes = gateway.post("/api/global-picklists", picklistBody);
                     } catch (RuntimeException e) {
                         return McpErrorMapper.fromException(e);
                     }
                     if (!picklistRes.isSuccess()) {
                         return McpErrorMapper.toResult(picklistRes);
                     }
+                    String picklistId = extractId(picklistRes.body());
 
                     List<Map<String, Object>> valueResults = new ArrayList<>();
                     for (int i = 0; i < values.size(); i++) {
@@ -103,15 +114,16 @@ public class CreatePicklistTool implements AdminTool {
                         for (Map.Entry<?, ?> e : vAttrs.entrySet()) {
                             vMap.put(String.valueOf(e.getKey()), e.getValue());
                         }
-                        vMap.putIfAbsent("picklistName", n.toString());
+                        vMap.put("picklistSourceType", "GLOBAL");
+                        if (picklistId != null) vMap.put("picklistSourceId", picklistId);
                         if (!vMap.containsKey("sortOrder")) vMap.put("sortOrder", i);
 
                         Map<String, Object> valueBody = Map.of("data", Map.of(
-                                "type", "picklistValues",
+                                "type", "picklist-values",
                                 "attributes", vMap));
                         GatewayHttpClient.Response vr;
                         try {
-                            vr = gateway.post("/api/picklistValues", valueBody);
+                            vr = gateway.post("/api/picklist-values", valueBody);
                         } catch (RuntimeException e) {
                             valueResults.add(Map.of("index", i, "error", e.getClass().getSimpleName()));
                             continue;
@@ -131,6 +143,17 @@ public class CreatePicklistTool implements AdminTool {
                             .build();
                 })
                 .build();
+    }
+
+    private static String extractId(String body) {
+        if (body == null) return null;
+        try {
+            JsonNode n = OBJECT_MAPPER.readTree(body);
+            JsonNode id = n.path("data").path("id");
+            return id.isMissingNode() || id.isNull() ? null : id.asString();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static CallToolResult error(String message) {

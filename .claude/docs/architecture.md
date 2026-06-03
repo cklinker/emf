@@ -178,6 +178,22 @@ that the gateway stamps into `fieldTypeConfig`. Until pgvector is
 provisioned on a tenant DB, `CREATE TABLE` / `ALTER TABLE` for a VECTOR
 column will fail at execution time — there is no startup probe.
 
+### Email template resolution — tenant override → system default
+
+System-level email templates are seeded under the sentinel `tenant_id = 'system'`
+(the schema's `tenant_id` column is `NOT NULL` with an FK to `tenant`, so a
+sentinel row is used instead of a real `NULL`). V133 seeds eight defaults
+addressable by the stable `template_key` column (`user.invite`,
+`user.password_reset`, …) and V141 seeds three more addressable by the
+human-friendly `name` column (`password_reset`, `user_invite`, `welcome`).
+
+`EmailRepository.findTemplateByKey(tenantId, key)` and
+`EmailRepository.findTemplateByName(tenantId, name)` both query
+`tenant_id IN (?, 'system')` and order tenant rows ahead of system rows, so a
+tenant override (a row the tenant inserted with the same key/name) wins; the
+system default is only returned when no tenant override exists. Callers don't
+branch on the source — the same row shape is returned in either case.
+
 ## Where to Add New Code
 
 | What | Where |

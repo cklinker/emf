@@ -174,6 +174,19 @@ kubectl describe pod -n kelta <pod-name>
 - **Auth**: JWT validation at gateway, Cerbos for fine-grained authorization
 - **Multi-tenancy**: TenantContext (ThreadLocal), per-tenant PostgreSQL schemas, tenant-aware NATS events
 
+### JSON:API error envelope ownership
+
+All 4xx/5xx responses must populate `errors[].{status, code, title, detail}` (and `source.pointer` / `source.parameter` / `source.header` where applicable). See [`.claude/docs/conventions.md`](conventions.md#json-api-error-envelope-all-4xx5xx-responses) for the field contract. Per-service owners of the envelope:
+
+| Service | Owner | Notes |
+|---------|-------|-------|
+| Gateway (reactive) | `kelta-gateway/.../error/GlobalErrorHandler` (`ErrorWebExceptionHandler`, order -2) | Auth/authz/rate-limit/route-not-found + `ResponseStatusException` pass-through |
+| Gateway (filter) | `kelta-gateway/.../authz/RouteAuthorizationFilter#forbidden` | Writes the envelope inline when Cerbos denies |
+| Worker / AI / Auth (servlet) | `kelta-platform/runtime/runtime-core/.../router/GlobalExceptionHandler` (`@ControllerAdvice`, scanned by `KeltaRuntimeAutoConfiguration`) | Domain exceptions (`Validation*`, `InvalidQuery`, `UniqueConstraintViolation`, `Storage*`) **and** Spring framework ones (`MethodArgumentNotValid`, `ConstraintViolation`, `HttpMessageNotReadable`, `MissingServletRequestParameter`, `MissingRequestHeader`, `MethodArgumentTypeMismatch`, `NoHandlerFound`, `HttpRequestMethodNotSupported`, `HttpMediaTypeNotSupported`, `ResponseStatusException`) |
+| Worker / AI (filters) | `kelta-worker/.../filter/TenantConcurrencyFilter`, `kelta-ai/.../filter/TokenLimitFilter`, `kelta-ai/.../filter/AiRateLimitFilter` | Write the envelope inline because filters can't throw past Spring's dispatcher |
+| Worker SCIM | `kelta-worker/.../scim/controller/ScimExceptionHandler` | Returns SCIM 2.0 format (`urn:ietf:params:scim:api:messages:2.0:Error`), not JSON:API — intentional |
+| Builder | `kelta-platform/runtime/runtime-jsonapi/.../JsonApiResponseBuilder#error` | Use for ad-hoc construction; the 4-arg overload takes explicit `code`, the 3-arg overload derives it from `title`
+
 ## Autopilot loop
 
 Two-machine pipeline that turns task briefs into merged PRs without human keystrokes. The **MacBook Pro** runs the planner agent (briefs → structured tasks) and the cockpit (`.claude/dispatcher/status.sh` refreshed every minute by launchd). **`worker-01`** (`craig@192.168.0.232`) runs the dispatcher (`.claude/dispatcher/dispatch.sh` under systemd) which claims work and spawns up to `MAX_PARALLEL` `claude -p` workers, each in its own `/var/lib/emf-wt/<id>` worktree + tmux session.

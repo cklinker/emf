@@ -1,5 +1,6 @@
 package io.kelta.runtime.router;
 
+import io.kelta.jsonapi.PaginationLinks;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
@@ -170,7 +171,8 @@ public class DynamicCollectionRouter {
 
             QueryResult result = queryEngine.executeQuery(definition, queryRequest);
 
-            Map<String, Object> response = toJsonApiListResponse(result, collectionName, definition);
+            Map<String, Object> response = toJsonApiListResponse(
+                    result, collectionName, definition, request.getRequestURI(), params);
 
             // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
             if (!includeNames.isEmpty() && !result.data().isEmpty()) {
@@ -519,7 +521,8 @@ public class DynamicCollectionRouter {
 
             QueryResult result = queryEngine.executeQuery(relation.childDef(), queryRequest);
 
-            return ResponseEntity.ok(toJsonApiListResponse(result, childName, relation.childDef()));
+            return ResponseEntity.ok(toJsonApiListResponse(
+                    result, childName, relation.childDef(), request.getRequestURI(), params));
         } finally {
             TenantContext.clear();
         }
@@ -1202,15 +1205,20 @@ public class DynamicCollectionRouter {
 
     /**
      * Converts a QueryResult into a JSON:API list response with proper
-     * relationship formatting and pagination metadata.
+     * relationship formatting, pagination metadata, and a {@code links} block
+     * carrying {@code self} / {@code prev} / {@code next} URLs.
      *
      * @param result the query result
      * @param type the resource type (collection name)
      * @param definition the collection definition
-     * @return the JSON:API document with {@code data} array and {@code metadata}
+     * @param requestPath the request URI (used as the {@code self}/{@code prev}/{@code next} URL base)
+     * @param params the original query parameters
+     * @return the JSON:API document with {@code data} array, {@code metadata}, and {@code links}
      */
     private Map<String, Object> toJsonApiListResponse(QueryResult result, String type,
-                                                       CollectionDefinition definition) {
+                                                       CollectionDefinition definition,
+                                                       String requestPath,
+                                                       Map<String, String> params) {
         List<Map<String, Object>> jsonApiData = new ArrayList<>();
         for (Map<String, Object> record : result.data()) {
             jsonApiData.add(toJsonApiResourceObject(record, type, definition));
@@ -1223,6 +1231,13 @@ public class DynamicCollectionRouter {
             "currentPage", result.metadata().currentPage(),
             "pageSize", result.metadata().pageSize(),
             "totalPages", result.metadata().totalPages()
+        ));
+        response.put("links", PaginationLinks.build(
+            requestPath,
+            params,
+            result.metadata().currentPage(),
+            result.metadata().pageSize(),
+            result.metadata().totalPages()
         ));
         return response;
     }

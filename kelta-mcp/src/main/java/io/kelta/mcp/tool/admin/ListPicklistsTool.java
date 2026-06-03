@@ -32,7 +32,7 @@ public class ListPicklistsTool implements AdminTool {
         properties.put("name", Schemas.string(
                 "Optional exact-match filter on picklist name. Omit to list all global picklists in the tenant."));
         properties.put("pageSize", Schemas.integer(
-                "Page size (default 200, max 500).", 1, 500));
+                "Page size (default 200, max 200).", 1, 200));
 
         Tool tool = Tool.builder()
                 .name("list_picklists")
@@ -50,7 +50,7 @@ public class ListPicklistsTool implements AdminTool {
                     StringBuilder path = new StringBuilder("/api/global-picklists?");
                     int pageSize = 200;
                     if (args.get("pageSize") instanceof Number n) {
-                        pageSize = Math.max(1, Math.min(500, n.intValue()));
+                        pageSize = Math.max(1, Math.min(200, n.intValue()));
                     }
                     path.append("page[size]=").append(pageSize);
                     if (args.get("name") instanceof String s && !s.isBlank()) {

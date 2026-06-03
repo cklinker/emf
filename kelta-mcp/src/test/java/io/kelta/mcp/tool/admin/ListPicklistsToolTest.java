@@ -73,13 +73,13 @@ class ListPicklistsToolTest {
 
     @Test
     void clampsPageSize() {
-        wm.stubFor(get(urlEqualTo("/api/global-picklists?page[size]=500"))
+        wm.stubFor(get(urlEqualTo("/api/global-picklists?page[size]=200"))
                 .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
 
         tool.toSpecification().callHandler().apply(
                 null, new CallToolRequest("list_picklists",
                         Map.of("pageSize", 9999), null));
 
-        wm.verify(WireMock.getRequestedFor(urlEqualTo("/api/global-picklists?page[size]=500")));
+        wm.verify(WireMock.getRequestedFor(urlEqualTo("/api/global-picklists?page[size]=200")));
     }
 }

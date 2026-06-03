@@ -26,7 +26,7 @@ services:
   # ═══════════════════════════════════════════════════════════════════════════
 
   postgres:
-    image: postgres:15-alpine
+    image: harbor.rzware.com/dockerhub-cache/library/postgres:15-alpine
     container_name: kelta-postgres
     restart: unless-stopped
     environment:
@@ -46,7 +46,7 @@ services:
       - kelta-network
 
   redis:
-    image: redis:7-alpine
+    image: harbor.rzware.com/dockerhub-cache/library/redis:7-alpine
     container_name: kelta-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
@@ -63,7 +63,7 @@ services:
       - kelta-network
 
   nats:
-    image: nats:2.10-alpine
+    image: harbor.rzware.com/dockerhub-cache/library/nats:2.10-alpine
     container_name: kelta-nats
     restart: unless-stopped
     command: ["--jetstream", "--store_dir", "/data/nats-server/jetstream", "-m", "8222"]
@@ -336,7 +336,7 @@ services:
   # ═══════════════════════════════════════════════════════════════════════════
 
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: harbor.rzware.com/dockerhub-cache/dpage/pgadmin4:latest
     container_name: kelta-pgadmin
     restart: unless-stopped
     environment:
@@ -356,7 +356,7 @@ services:
       - tools
 
   redis-commander:
-    image: rediscommander/redis-commander:latest
+    image: harbor.rzware.com/dockerhub-cache/rediscommander/redis-commander:latest
     container_name: kelta-redis-commander
     restart: unless-stopped
     environment:
@@ -372,7 +372,7 @@ services:
       - tools
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: harbor.rzware.com/dockerhub-cache/axllent/mailpit:latest
     container_name: kelta-mailpit
     restart: unless-stopped
     ports:
@@ -388,7 +388,7 @@ services:
   # ═══════════════════════════════════════════════════════════════════════════
 
   opensearch:
-    image: opensearchproject/opensearch:2.17.1
+    image: harbor.rzware.com/dockerhub-cache/opensearchproject/opensearch:2.17.1
     container_name: kelta-opensearch
     environment:
       discovery.type: single-node
@@ -411,7 +411,7 @@ services:
       - observability
 
   jaeger:
-    image: jaegertracing/jaeger:2
+    image: harbor.rzware.com/dockerhub-cache/jaegertracing/jaeger:2
     container_name: kelta-jaeger
     command: ["--config", "/etc/jaeger/config.yaml"]
     volumes:

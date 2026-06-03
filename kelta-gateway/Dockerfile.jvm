@@ -4,7 +4,7 @@
 # =============================================================================
 # Stage 1: Build runtime-platform dependencies
 # =============================================================================
-FROM maven:3.9-eclipse-temurin-25 AS runtime-builder
+FROM harbor.rzware.com/dockerhub-cache/library/maven:3.9-eclipse-temurin-25 AS runtime-builder
 
 WORKDIR /kelta-platform
 
@@ -40,7 +40,7 @@ RUN mvn clean install -DskipTests -B \
 # =============================================================================
 # Stage 2: Build the service jar
 # =============================================================================
-FROM maven:3.9-eclipse-temurin-25 AS builder
+FROM harbor.rzware.com/dockerhub-cache/library/maven:3.9-eclipse-temurin-25 AS builder
 
 WORKDIR /build
 
@@ -59,7 +59,7 @@ RUN mvn clean package -DskipTests -B && \
 # =============================================================================
 # Stage 3: Runtime
 # =============================================================================
-FROM eclipse-temurin:25-jre-alpine
+FROM harbor.rzware.com/dockerhub-cache/library/eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 

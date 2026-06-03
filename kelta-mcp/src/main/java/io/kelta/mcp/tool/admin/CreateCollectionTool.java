@@ -56,8 +56,10 @@ public class CreateCollectionTool implements AdminTool {
 
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("name", Schemas.string("Collection name (e.g. \"projects\"). Used as the URL slug — keep it kebab-cased or single-word."));
+        properties.put("displayName", Schemas.string(
+                "Optional human-readable label for the collection itself (e.g. \"Projects\"). Distinct from displayFieldName."));
         properties.put("displayFieldName", Schemas.string(
-                "Optional name of the field used as the human-readable label for a record (e.g. \"name\")."));
+                "Optional name of an existing field on this collection used as the per-record display label (e.g. \"name\"). Distinct from displayName."));
         properties.put("description", Schemas.string("Optional description shown in the admin UI."));
         properties.put("tenantScoped", Schemas.bool(
                 "Whether records are tenant-scoped (default true). Only set false for shared system data.", true));
@@ -83,6 +85,7 @@ public class CreateCollectionTool implements AdminTool {
 
                     Map<String, Object> attrs = new LinkedHashMap<>();
                     attrs.put("name", n.toString());
+                    if (args.get("displayName") instanceof String s && !s.isBlank()) attrs.put("displayName", s);
                     if (args.get("displayFieldName") instanceof String s && !s.isBlank()) attrs.put("displayFieldName", s);
                     if (args.get("description") instanceof String s && !s.isBlank()) attrs.put("description", s);
                     if (args.get("tenantScoped") instanceof Boolean b) attrs.put("tenantScoped", b);

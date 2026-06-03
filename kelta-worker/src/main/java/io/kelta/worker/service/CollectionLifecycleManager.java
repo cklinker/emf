@@ -581,13 +581,47 @@ public class CollectionLifecycleManager {
                 }
             }
 
+            Object parsedDefaultValue = parseJsonbValue(row.get("default_value"), fieldName, "default_value");
+
             FieldDefinition fieldDef = new FieldDefinition(
                     fieldName, fieldType, !required, immutable, unique,
-                    null, null, null, refConfig, parsedFieldTypeConfig, columnName);
+                    parsedDefaultValue, null, null, refConfig, parsedFieldTypeConfig, columnName);
             fields.add(fieldDef);
         }
 
         return fields;
+    }
+
+    /**
+     * Decodes a JSONB column value into a native Java object. PostgreSQL JDBC
+     * may return JSONB as {@code String}, {@code Map}, primitive (Boolean/Number),
+     * or {@code org.postgresql.util.PGobject}. Returns null for blank/null inputs.
+     */
+    private Object parseJsonbValue(Object raw, String fieldName, String columnLabel) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Boolean || raw instanceof Number || raw instanceof Map || raw instanceof List) {
+            return raw;
+        }
+        String text;
+        if (raw instanceof String s) {
+            text = s;
+        } else if ("org.postgresql.util.PGobject".equals(raw.getClass().getName())) {
+            text = raw.toString();
+        } else {
+            return raw;
+        }
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(text, Object.class);
+        } catch (Exception ex) {
+            log.warn("Failed to parse JSONB column '{}' for field '{}': {}",
+                    columnLabel, fieldName, ex.getMessage());
+            return text;
+        }
     }
 
     /**

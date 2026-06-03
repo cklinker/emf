@@ -321,8 +321,10 @@ public class DynamicCollectionRouter {
             // Evict system collection cache after write
             evictSystemCollectionCache(definition, request);
 
-            // Return in JSON:API format
-            return ResponseEntity.status(HttpStatus.CREATED).body(toJsonApiResponse(created, collectionName, definition));
+            // Return in JSON:API format, echoing caller-supplied relationships
+            Map<String, Object> response = toJsonApiResponse(created, collectionName, definition);
+            mergeRequestRelationships(response, extractRawRelationships(requestBody));
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } finally {
             TenantContext.clear();
         }
@@ -418,8 +420,13 @@ public class DynamicCollectionRouter {
                 evictSystemCollectionCache(definition, request);
             }
 
-            return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
-                          .orElse(ResponseEntity.notFound().build());
+            Map<String, Object> rawRels = extractRawRelationships(requestBody);
+            return updated.map(r -> {
+                        Map<String, Object> response = toJsonApiResponse(r, collectionName, definition);
+                        mergeRequestRelationships(response, rawRels);
+                        return ResponseEntity.ok(response);
+                    })
+                    .orElse(ResponseEntity.notFound().build());
         } finally {
             TenantContext.clear();
         }
@@ -612,8 +619,9 @@ public class DynamicCollectionRouter {
 
             evictSystemCollectionCache(relation.childDef(), request);
 
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(toJsonApiResponse(created, childName, relation.childDef()));
+            Map<String, Object> response = toJsonApiResponse(created, childName, relation.childDef());
+            mergeRequestRelationships(response, extractRawRelationships(requestBody));
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } finally {
             TenantContext.clear();
         }
@@ -706,8 +714,13 @@ public class DynamicCollectionRouter {
                 evictSystemCollectionCache(relation.childDef(), request);
             }
 
-            return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
-                          .orElse(ResponseEntity.notFound().build());
+            Map<String, Object> rawRels = extractRawRelationships(requestBody);
+            return updated.map(r -> {
+                        Map<String, Object> response = toJsonApiResponse(r, childName, relation.childDef());
+                        mergeRequestRelationships(response, rawRels);
+                        return ResponseEntity.ok(response);
+                    })
+                    .orElse(ResponseEntity.notFound().build());
         } finally {
             TenantContext.clear();
         }
@@ -1123,6 +1136,68 @@ public class DynamicCollectionRouter {
         Map<String, Object> response = new java.util.HashMap<>();
         response.put("data", toJsonApiResourceObject(record, type, definition));
         return response;
+    }
+
+    /**
+     * Returns the raw JSON:API {@code relationships} block from a request body,
+     * preserving each entry's {@code {data: {type, id}}} structure. Used to echo
+     * the caller's relationships back into create/update responses even when the
+     * collection's field metadata doesn't surface them automatically.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractRawRelationships(Map<String, Object> requestBody) {
+        if (requestBody == null) {
+            return Map.of();
+        }
+        Object dataObj = requestBody.get("data");
+        if (!(dataObj instanceof Map<?, ?> data)) {
+            return Map.of();
+        }
+        Object rels = ((Map<String, Object>) data).get("relationships");
+        if (!(rels instanceof Map<?, ?> relsMap) || relsMap.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> out = new java.util.HashMap<>();
+        for (Map.Entry<?, ?> e : relsMap.entrySet()) {
+            if (e.getKey() != null && e.getValue() != null) {
+                out.put(e.getKey().toString(), e.getValue());
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Merges the caller-supplied relationships from a request into a response
+     * document so that POST/PATCH responses always echo the relationships the
+     * caller asserted. Field-derived relationships (REFERENCE/LOOKUP/MASTER_DETAIL
+     * columns picked up by {@link #toJsonApiResourceObject}) already in the
+     * response are preserved and take precedence — request-supplied entries fill
+     * the gaps for relationship names that don't map to a REFERENCE-typed field.
+     */
+    @SuppressWarnings("unchecked")
+    private void mergeRequestRelationships(Map<String, Object> response,
+                                            Map<String, Object> requestRelationships) {
+        if (response == null || requestRelationships == null || requestRelationships.isEmpty()) {
+            return;
+        }
+        Object dataObj = response.get("data");
+        if (!(dataObj instanceof Map)) {
+            return;
+        }
+        Map<String, Object> data = (Map<String, Object>) dataObj;
+        Map<String, Object> relationships;
+        Object existing = data.get("relationships");
+        if (existing instanceof Map) {
+            relationships = (Map<String, Object>) existing;
+        } else {
+            relationships = new java.util.HashMap<>();
+        }
+        for (Map.Entry<String, Object> entry : requestRelationships.entrySet()) {
+            relationships.putIfAbsent(entry.getKey(), entry.getValue());
+        }
+        if (!relationships.isEmpty()) {
+            data.put("relationships", relationships);
+        }
     }
 
     /**

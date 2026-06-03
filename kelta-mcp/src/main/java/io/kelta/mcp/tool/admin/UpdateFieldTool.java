@@ -33,7 +33,8 @@ public class UpdateFieldTool implements AdminTool {
         properties.put("required", Schemas.bool("New required flag.", false));
         properties.put("unique", Schemas.bool("New unique flag.", false));
         properties.put("description", Schemas.string("New description."));
-        properties.put("defaultValue", Schemas.string("New default value."));
+        properties.put("defaultValue", Schemas.anyScalar(
+                "New default value. Pass it in the field's native JSON type — e.g. true for booleans, 360 for numbers, \"hello\" for strings."));
         properties.put("validation", Schemas.freeObject("New validation config."));
 
         Tool tool = Tool.builder()
@@ -57,7 +58,14 @@ public class UpdateFieldTool implements AdminTool {
                     if (args.get("required") instanceof Boolean b) attrs.put("required", b);
                     if (args.get("unique") instanceof Boolean b) attrs.put("unique", b);
                     if (args.get("description") instanceof String s) attrs.put("description", s);
-                    if (args.get("defaultValue") instanceof String s) attrs.put("defaultValue", s);
+                    if (args.containsKey("defaultValue")) {
+                        Object dv = args.get("defaultValue");
+                        if (dv instanceof String || dv instanceof Boolean || dv instanceof Number) {
+                            attrs.put("defaultValue", dv);
+                        } else if (dv == null) {
+                            attrs.put("defaultValue", null);
+                        }
+                    }
                     if (args.get("validation") instanceof Map<?, ?> v) attrs.put("validation", v);
                     if (attrs.isEmpty()) {
                         return error("Provide at least one of required, unique, description, defaultValue, validation.");

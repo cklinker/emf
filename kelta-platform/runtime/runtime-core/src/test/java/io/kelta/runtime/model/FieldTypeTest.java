@@ -50,9 +50,20 @@ class FieldTypeTest {
     }
 
     @Test
-    @DisplayName("Should have exactly 26 field types")
-    void shouldHaveExactly26FieldTypes() {
-        assertEquals(26, FieldType.values().length);
+    @DisplayName("Should have exactly 28 field types")
+    void shouldHaveExactly28FieldTypes() {
+        assertEquals(28, FieldType.values().length);
+    }
+
+    @Test
+    @DisplayName("Should have long-form text and vector types")
+    void shouldHaveLongFormTextAndVectorTypes() {
+        assertNotNull(FieldType.TEXT);
+        assertNotNull(FieldType.RICH_TEXT);
+        assertNotNull(FieldType.VECTOR);
+        assertTrue(FieldType.TEXT.hasPhysicalColumn());
+        assertTrue(FieldType.RICH_TEXT.hasPhysicalColumn());
+        assertTrue(FieldType.VECTOR.hasPhysicalColumn());
     }
 
     @Test

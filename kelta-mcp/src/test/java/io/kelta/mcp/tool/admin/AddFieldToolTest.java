@@ -132,4 +132,79 @@ class AddFieldToolTest {
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
                 .withRequestBody(matchingJsonPath("$.data.attributes.referenceCollection", equalTo("users"))));
     }
+
+    @Test
+    void rejectsVectorWithoutDimension() {
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "embedding",
+                        "type", "vector"), null));
+
+        assertThat(result.isError()).isEqualTo(Boolean.TRUE);
+    }
+
+    @Test
+    void rejectsVectorWithDimensionOutOfRange() {
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "embedding",
+                        "type", "vector",
+                        "dimension", 20000), null));
+
+        assertThat(result.isError()).isEqualTo(Boolean.TRUE);
+    }
+
+    @Test
+    void postsDimensionInFieldTypeConfigForVector() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{\"data\":{\"id\":\"f1\"}}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "embedding",
+                        "type", "vector",
+                        "dimension", 1536), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("vector")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.fieldTypeConfig.dimension",
+                        equalTo("1536"))));
+    }
+
+    @Test
+    void rewritesCamelCaseRichTextAliasToCanonicalSnakeCase() {
+        // FieldLifecycleHook accepts "rich_text" but not "richText". MCP clients
+        // sometimes default to camelCase; we normalize so admin UI feel parity
+        // doesn't trip the gateway validation.
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "synopsis",
+                        "type", "richText"), null));
+
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("rich_text"))));
+    }
+
+    @Test
+    void passesThroughPlainTextType() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "titles",
+                        "fieldName", "synopsis",
+                        "type", "text"), null));
+
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("text"))));
+    }
 }

@@ -63,7 +63,6 @@ class SystemCollectionSeederTest {
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.PHONE)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.EMAIL)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.URL)).isEqualTo("string");
-            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.RICH_TEXT)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.ENCRYPTED)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.EXTERNAL_ID)).isEqualTo("string");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.FORMULA)).isEqualTo("string");
@@ -106,6 +105,17 @@ class SystemCollectionSeederTest {
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.JSON)).isEqualTo("object");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.ARRAY)).isEqualTo("array");
             assertThat(SystemCollectionSeeder.mapFieldType(FieldType.MULTI_PICKLIST)).isEqualTo("array");
+        }
+
+        @Test
+        void shouldMapLongFormTextAndVectorToTheirOwnNames() {
+            // TEXT and RICH_TEXT share Postgres TEXT storage but stay distinct
+            // here so the admin UI can pick between plain textarea and rich-text
+            // editor. VECTOR stays distinct so the admin UI hides it from the
+            // generic value renderer.
+            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.TEXT)).isEqualTo("text");
+            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.RICH_TEXT)).isEqualTo("rich_text");
+            assertThat(SystemCollectionSeeder.mapFieldType(FieldType.VECTOR)).isEqualTo("vector");
         }
 
         @Test

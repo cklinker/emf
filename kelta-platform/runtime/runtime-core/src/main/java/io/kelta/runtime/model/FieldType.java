@@ -74,8 +74,19 @@ public enum FieldType {
     /** URL with format validation. Maps to VARCHAR(2048) in PostgreSQL. */
     URL,
 
+    /** Plain long-form text. Maps to TEXT in PostgreSQL. */
+    TEXT,
+
     /** Rich text / HTML content. Maps to TEXT in PostgreSQL. */
     RICH_TEXT,
+
+    /**
+     * Fixed-dimension vector for similarity search. Maps to {@code vector(N)} in
+     * PostgreSQL via the pgvector extension. {@code N} is read from
+     * {@link FieldDefinition#fieldTypeConfig()} as key {@code "dimension"};
+     * defaults to 1536 (OpenAI text-embedding-3 small) when omitted.
+     */
+    VECTOR,
 
     // --- New: Security & Identity ---
 

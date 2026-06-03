@@ -153,6 +153,31 @@ controller after the mutation rather than via the BeforeSaveHook registry.
 | TenantContext | ThreadLocal tenant isolation | `runtime-core/.../context/TenantContext.java` |
 | BootstrapConfig | Gateway startup config (collections, routes, limits) | `kelta-gateway/.../config/BootstrapConfig.java` |
 
+### Field types and pgvector
+
+`FieldType` (`runtime-core/.../model/FieldType.java`) is the canonical enum
+covering every column kind the platform emits. The DDL mapping lives in two
+parallel switches — `SchemaMigrationEngine.mapFieldTypeToSql` (ALTER-time)
+and `PhysicalTableStorageAdapter.mapFieldTypeToSql` (CREATE-time). Both
+overloads accept the surrounding `FieldDefinition` because some types are
+parameterized by `fieldTypeConfig`.
+
+Long-form text uses two distinct enum values that map to the same Postgres
+`TEXT` column but stay semantically separate so the admin UI can pick its
+editor: `TEXT` → plain textarea, `RICH_TEXT` → rich-text editor.
+`SystemCollectionSeeder.mapFieldType` stores them as `"text"` and
+`"rich_text"` in the `fields.type` column; `CollectionLifecycleManager.reverseMapFieldType`
+inverts those.
+
+`VECTOR` emits `vector(N)` and therefore requires the pgvector extension
+(`CREATE EXTENSION IF NOT EXISTS vector`) on every tenant database. `N`
+comes from `FieldDefinition.fieldTypeConfig` key `"dimension"` and is
+clamped to `1..16000`; the default is `1536` (OpenAI text-embedding-3
+small). The MCP `add_field` tool exposes a top-level `dimension` argument
+that the gateway stamps into `fieldTypeConfig`. Until pgvector is
+provisioned on a tenant DB, `CREATE TABLE` / `ALTER TABLE` for a VECTOR
+column will fail at execution time — there is no startup probe.
+
 ## Where to Add New Code
 
 | What | Where |

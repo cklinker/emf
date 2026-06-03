@@ -19,32 +19,54 @@ import java.util.Map;
 public class AddFieldTool implements AdminTool {
 
     private final GatewayHttpClient gateway;
+    private final FieldBodyBuilder bodyBuilder;
 
     public AddFieldTool(GatewayHttpClient gateway) {
         this.gateway = gateway;
+        this.bodyBuilder = new FieldBodyBuilder(gateway);
     }
 
     @Override
     public SyncToolSpecification toSpecification() {
         Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("collectionName", Schemas.string("Collection the field belongs to."));
+        properties.put("collectionName", Schemas.string(
+                "Collection the field belongs to. Resolved to collectionId via lookup unless collectionId is provided."));
+        properties.put("collectionId", Schemas.string(
+                "Optional UUID of the collection — bypasses the name lookup."));
         properties.put("fieldName", Schemas.string("Field name (camelCase recommended)."));
+        properties.put("displayName", Schemas.string("Optional human-readable label shown in the admin UI."));
         properties.put("type", Schemas.string(
-                "Field type: text, longText, number, integer, decimal, boolean, date, datetime, reference, picklist, multiPicklist, json, file, image."));
+                "Field type alias. Mapped to the native uppercase enum: "
+                + "text|string→STRING, longText→STRING, number|integer→INTEGER, decimal|double→DOUBLE, "
+                + "long→LONG, boolean→BOOLEAN, date→DATE, datetime→DATETIME, "
+                + "picklist→PICKLIST, multiPicklist→MULTI_PICKLIST, "
+                + "reference|lookup→LOOKUP, json→JSON. Uppercase enum values are also accepted."));
         properties.put("required", Schemas.bool("Whether the field is required (default false).", false));
-        properties.put("unique", Schemas.bool("Whether values must be unique (default false).", false));
+        properties.put("unique", Schemas.bool("Whether values must be unique (default false). Sent as uniqueConstraint.", false));
+        properties.put("indexed", Schemas.bool("Whether the column has a database index (default false).", false));
+        properties.put("searchable", Schemas.bool("Whether the field is indexed for full-text search (default false).", false));
         properties.put("description", Schemas.string("Optional description shown in the admin UI."));
         properties.put("defaultValue", Schemas.string("Optional default value as a string. Numeric/boolean values are still passed as strings here."));
         properties.put("validation", Schemas.freeObject(
                 "Optional validation config (regex, min/max, etc.) — shape depends on the field type."));
+        properties.put("referenceCollectionId", Schemas.string(
+                "UUID of the target collection for reference/lookup fields."));
         properties.put("referenceCollection", Schemas.string(
-                "For type=reference, the target collection name."));
+                "(Legacy) Target collection name for reference/lookup fields. Resolved via name lookup."));
+        properties.put("relationshipName", Schemas.string(
+                "Human-readable relationship name for reference/lookup fields."));
+        properties.put("relationshipType", Schemas.string(
+                "Relationship semantics for reference/lookup fields: \"LOOKUP\" (default) or \"MASTER_DETAIL\"."));
+        properties.put("picklistSourceId", Schemas.string(
+                "UUID of the source picklist for picklist/multiPicklist fields."));
+        properties.put("picklistSourceType", Schemas.string(
+                "Source of picklist values: \"GLOBAL\" (default) or \"FIELD\"."));
 
         Tool tool = Tool.builder()
                 .name("add_field")
                 .title("Add Field")
-                .description("Add a field to an existing collection. Wraps POST /api/fields with a JSON:API body.")
-                .inputSchema(Schemas.object(properties, List.of("collectionName", "fieldName", "type")))
+                .description("Add a field to an existing collection. Wraps POST /api/fields with a JSON:API body, translating friendly type aliases (text, number, picklist, …) into the native uppercase enum and assembling per-type payload (fieldTypeConfig for picklists, referenceCollectionId relationship + relationshipName for lookups).")
+                .inputSchema(Schemas.object(properties, List.of("fieldName", "type")))
                 .annotations(ToolHints.write(false, false))
                 .build();
 
@@ -53,31 +75,13 @@ public class AddFieldTool implements AdminTool {
                 .callHandler((context, request) -> {
                     Map<String, Object> args = request.arguments();
                     if (args == null) args = Map.of();
-                    Object cn = args.get("collectionName");
-                    Object fn = args.get("fieldName");
-                    Object t = args.get("type");
-                    if (cn == null || cn.toString().isBlank()
-                            || fn == null || fn.toString().isBlank()
-                            || t == null || t.toString().isBlank()) {
-                        return error("Arguments \"collectionName\", \"fieldName\", and \"type\" are required.");
+
+                    FieldBodyBuilder.Result result = bodyBuilder.build(args);
+                    if (result.isError()) {
+                        return error(result.errorMessage());
                     }
-
-                    Map<String, Object> attrs = new LinkedHashMap<>();
-                    attrs.put("collectionName", cn.toString());
-                    attrs.put("fieldName", fn.toString());
-                    attrs.put("type", t.toString());
-                    if (args.get("required") instanceof Boolean b) attrs.put("required", b);
-                    if (args.get("unique") instanceof Boolean b) attrs.put("unique", b);
-                    if (args.get("description") instanceof String s && !s.isBlank()) attrs.put("description", s);
-                    if (args.get("defaultValue") instanceof String s) attrs.put("defaultValue", s);
-                    if (args.get("validation") instanceof Map<?, ?> v) attrs.put("validation", v);
-                    if (args.get("referenceCollection") instanceof String s && !s.isBlank()) attrs.put("referenceCollection", s);
-
-                    Map<String, Object> body = Map.of("data", Map.of(
-                            "type", "fields",
-                            "attributes", attrs));
                     try {
-                        return McpErrorMapper.toResult(gateway.post("/api/fields", body));
+                        return McpErrorMapper.toResult(gateway.post("/api/fields", result.body()));
                     } catch (RuntimeException e) {
                         return McpErrorMapper.fromException(e);
                     }

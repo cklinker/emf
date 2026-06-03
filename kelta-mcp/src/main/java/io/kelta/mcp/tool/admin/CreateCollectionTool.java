@@ -35,9 +35,11 @@ import java.util.Map;
 public class CreateCollectionTool implements AdminTool {
 
     private final GatewayHttpClient gateway;
+    private final FieldBodyBuilder bodyBuilder;
 
     public CreateCollectionTool(GatewayHttpClient gateway) {
         this.gateway = gateway;
+        this.bodyBuilder = new FieldBodyBuilder(gateway);
     }
 
     @Override
@@ -108,6 +110,8 @@ public class CreateCollectionTool implements AdminTool {
                                 .build();
                     }
 
+                    String newCollectionId = FieldBodyBuilder.extractFirstId(collectionRes.body());
+
                     List<Map<String, Object>> fieldResults = new ArrayList<>();
                     for (int i = 0; i < fields.size(); i++) {
                         Object item = fields.get(i);
@@ -119,14 +123,24 @@ public class CreateCollectionTool implements AdminTool {
                         for (Map.Entry<?, ?> e : fieldAttrs.entrySet()) {
                             fAttrs.put(String.valueOf(e.getKey()), e.getValue());
                         }
-                        fAttrs.putIfAbsent("collectionName", n.toString());
+                        if (newCollectionId != null) {
+                            fAttrs.putIfAbsent("collectionId", newCollectionId);
+                        } else {
+                            fAttrs.putIfAbsent("collectionName", n.toString());
+                        }
 
-                        Map<String, Object> fieldBody = Map.of("data", Map.of(
-                                "type", "fields",
-                                "attributes", fAttrs));
+                        FieldBodyBuilder.Result built = bodyBuilder.build(fAttrs);
+                        if (built.isError()) {
+                            fieldResults.add(Map.of(
+                                    "index", i,
+                                    "fieldName", fAttrs.getOrDefault("fieldName", "?"),
+                                    "error", built.errorMessage()));
+                            continue;
+                        }
+
                         GatewayHttpClient.Response fr;
                         try {
-                            fr = gateway.post("/api/fields", fieldBody);
+                            fr = gateway.post("/api/fields", built.body());
                         } catch (RuntimeException e) {
                             fieldResults.add(Map.of("index", i, "error", e.getClass().getSimpleName()));
                             continue;

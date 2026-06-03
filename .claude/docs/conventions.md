@@ -71,3 +71,12 @@
 - Do not add a new shared list/table/filter/form component in `kelta-ui/app/src/components/` if one already exists for the same purpose in either `kelta-ui/app/` or `kelta-web/packages/components/`. Reuse or extend the existing one.
 - The unification target for these families (DataTable, FilterBuilder, FieldRenderer, ResourceForm, RelatedList) is the library variant under `@kelta/components`. App-side variants are being collapsed into thin re-exports — see `.claude/docs/ui-consolidation-plan.md` for the current state and migration order.
 - `@kelta/components` is a public plugin surface. Breaking changes to its exported props need a deprecation window (additive props, `legacy*` flags) — never a hard cutover.
+
+## MCP tools (kelta-mcp)
+
+### Friendly args → native JSON:API body
+MCP admin tools expose camelCase, lowercase-friendly argument names to LLM callers and translate them to the native worker payload before hitting the gateway. The worker is strict — uppercase enums, `name` (not `fieldName`), `collectionId` (not `collectionName`), `uniqueConstraint` (not `unique`) — so do the translation at the tool boundary, not in the prompt.
+
+- **Field types**: accept friendly aliases (`text`, `number`, `picklist`, `lookup`, …) and map to the uppercase `FieldType` enum the worker expects. Centralise the mapping in `FieldBodyBuilder.resolveNativeType` so `add_field` and `create_collection`'s nested field array stay in sync.
+- **Per-type payload**: picklist fields need `attributes.fieldTypeConfig = {picklistSourceType, picklistSourceId}`; reference/lookup fields need `relationships.referenceCollectionId.data.id` + `attributes.relationshipName` (and optional `relationshipType`). Build these in the same helper so the on-the-wire shape can be unit-tested with WireMock JSON path matchers.
+- **ID resolution**: accept either a UUID (`collectionId`, `referenceCollectionId`, `picklistSourceId`) or a friendly name (`collectionName`, `referenceCollection`) and resolve names via `GET /api/collections?filter[name][eq]=…`. UUIDs match `FieldBodyBuilder.UUID_PATTERN`; anything else triggers the lookup.

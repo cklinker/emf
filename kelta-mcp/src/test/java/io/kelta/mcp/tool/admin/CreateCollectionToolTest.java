@@ -74,11 +74,16 @@ class CreateCollectionToolTest {
 
     @Test
     void createsCollectionThenEachField() {
+        String newCollectionId = "44444444-4444-4444-4444-444444444444";
+        String usersId = "55555555-5555-5555-5555-555555555555";
         wm.stubFor(post(urlEqualTo("/api/collections"))
                 .willReturn(aResponse().withStatus(201)
-                        .withBody("{\"data\":{\"id\":\"c1\"}}")));
+                        .withBody("{\"data\":{\"id\":\"" + newCollectionId + "\"}}")));
         wm.stubFor(post(urlEqualTo("/api/fields"))
                 .willReturn(aResponse().withStatus(201).withBody("{\"data\":{\"id\":\"f\"}}")));
+        wm.stubFor(WireMock.get(WireMock.urlPathEqualTo("/api/collections"))
+                .willReturn(aResponse().withStatus(200)
+                        .withBody("{\"data\":[{\"type\":\"collections\",\"id\":\"" + usersId + "\"}]}")));
 
         CallToolResult result = tool.toSpecification().callHandler().apply(
                 null, new CallToolRequest("create_collection", Map.of(
@@ -86,15 +91,20 @@ class CreateCollectionToolTest {
                         "fields", List.of(
                                 Map.of("fieldName", "name", "type", "text", "required", true),
                                 Map.of("fieldName", "owner", "type", "reference",
-                                        "referenceCollection", "users"))), null));
+                                        "referenceCollection", "users",
+                                        "relationshipName", "Owner"))), null));
 
         assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
         String text = ((TextContent) result.content().get(0)).text();
         assertThat(text).contains("collection", "fields");
         wm.verify(2, WireMock.postRequestedFor(urlEqualTo("/api/fields")));
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
-                .withRequestBody(matchingJsonPath("$.data.attributes.fieldName", equalTo("name")))
-                .withRequestBody(matchingJsonPath("$.data.attributes.collectionName", equalTo("projects"))));
+                .withRequestBody(matchingJsonPath("$.data.attributes.name", equalTo("name")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("STRING")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.collectionId", equalTo(newCollectionId))));
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("LOOKUP")))
+                .withRequestBody(matchingJsonPath("$.data.relationships.referenceCollectionId.data.id", equalTo(usersId))));
     }
 
     @Test

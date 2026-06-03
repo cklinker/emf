@@ -120,6 +120,25 @@ Custom domains and tenant settings live in raw JDBC tables rather than
 system collections, so the publishers are invoked directly from the
 controller after the mutation rather than via the BeforeSaveHook registry.
 
+**Error responses (4xx / 5xx):**
+
+Every error response across gateway, worker, and AI services emits the JSON:API
+error envelope with `status`, `code`, `title`, and `detail` populated — plus
+`source.pointer` for field-level errors. Two central handlers own this:
+
+| Handler | Service | Covers |
+|---------|---------|--------|
+| `GlobalErrorHandler` (`kelta-gateway/.../error/`) | gateway | Auth (401), Cerbos (403), rate limit (429), route not found (404), proxied backend `ResponseStatusException`, fallback (500) |
+| `GlobalExceptionHandler` (`runtime-core/.../router/`) | worker (+ any servlet service that pulls in runtime-core) | Domain exceptions (`ValidationException`, `InvalidQueryException`, `RecordValidationException`, `UniqueConstraintViolationException`), the common Spring 4xx exceptions (`MethodArgumentNotValidException`, `HttpMessageNotReadableException`, `MissingServletRequestParameterException`, `MethodArgumentTypeMismatchException`, `HttpRequestMethodNotSupportedException`, `HttpMediaTypeNotSupportedException`, `NoResourceFoundException`/`NoHandlerFoundException`), `StorageException`, fallback (500) |
+
+Codes are UPPER_SNAKE machine identifiers (`VALIDATION_FAILED`, `NOT_FOUND`,
+`UNAUTHORIZED`, `INVALID_PAYLOAD`, `UNIQUE_CONSTRAINT_VIOLATION`) — clients
+branch on them. When a controller or servlet `Filter` must hand-build an error
+body (e.g. the per-tenant concurrency or AI quota filters), it uses
+`JsonApiResponseBuilder.error(status, code, title, detail, pointer)` from
+`runtime-jsonapi` rather than ad-hoc maps. See `.claude/docs/conventions.md`
+for the field-level contract.
+
 ## Key Abstractions
 
 | Abstraction | Purpose | Location |

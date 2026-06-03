@@ -6,10 +6,10 @@
 #   make seed     ← confirm health + print credentials
 #
 # Profiles:
-#   (none)        postgres, redis, nats, cerbos, kelta-auth, kelta-worker,
-#                 kelta-gateway, kelta-ui
+#   (none)        postgres, redis, nats, cerbos, mailpit, kelta-auth,
+#                 kelta-worker, kelta-gateway, kelta-ui
 #   ai            adds kelta-ai (requires ANTHROPIC_API_KEY in .env)
-#   tools         adds pgadmin, redis-commander, mailpit
+#   tools         adds pgadmin, redis-commander
 #   observability adds opensearch, jaeger
 #   seed          runs the one-shot kelta-bootstrap healthcheck/info container
 #
@@ -178,8 +178,8 @@ services:
       # Cerbos
       CERBOS_HOST: cerbos
       CERBOS_GRPC_PORT: "3593"
-      # Email — disabled by default; enable mailpit profile for SMTP UI
-      EMAIL_ENABLED: "false"
+      # Email — enabled by default; routed to the mailpit service (UI on :8025)
+      EMAIL_ENABLED: "true"
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_AUTH: "false"
@@ -196,6 +196,8 @@ services:
       nats:
         condition: service_healthy
       cerbos:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
@@ -371,6 +373,10 @@ services:
     profiles:
       - tools
 
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Mail capture (default profile) — SMTP on :1025, UI on :8025
+  # ═══════════════════════════════════════════════════════════════════════════
+
   mailpit:
     image: harbor.rzware.com/dockerhub-cache/axllent/mailpit:latest
     container_name: kelta-mailpit
@@ -378,10 +384,13 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - kelta-network
-    profiles:
-      - tools
 
   # ═══════════════════════════════════════════════════════════════════════════
   # Observability (profile: observability)

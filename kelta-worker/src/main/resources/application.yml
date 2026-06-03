@@ -34,13 +34,17 @@ spring:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
   mail:
+    # Defaults target a local mailpit (SMTP on :1025, no auth, no TLS) so a
+    # bare `mvn spring-boot:run` works against the docker-compose stack out of
+    # the box. K8s deployments override SMTP_HOST/PORT/USERNAME/PASSWORD/AUTH/
+    # STARTTLS via env.
     host: ${SMTP_HOST:localhost}
-    port: ${SMTP_PORT:587}
+    port: ${SMTP_PORT:1025}
     username: ${SMTP_USERNAME:}
     password: ${SMTP_PASSWORD:}
     properties:
-      mail.smtp.auth: ${SMTP_AUTH:true}
-      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
   lifecycle:
     timeout-per-shutdown-phase: 30s
 

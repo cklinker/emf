@@ -144,8 +144,8 @@ public class FlowGenerationService {
                 .system(systemPrompt)
                 .addMessage(MessageParam.builder()
                         .role(MessageParam.Role.USER)
-                        .content(ContentBlockParam.ofText(
-                                TextBlockParam.builder().text(description).build()))
+                        .contentOfBlockParams(List.of(ContentBlockParam.ofText(
+                                TextBlockParam.builder().text(description).build())))
                         .build())
                 .build();
 

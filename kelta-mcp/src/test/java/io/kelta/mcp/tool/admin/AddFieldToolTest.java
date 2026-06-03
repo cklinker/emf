@@ -16,6 +16,7 @@ import java.util.Map;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -70,6 +71,50 @@ class AddFieldToolTest {
                 .withRequestBody(matchingJsonPath("$.data.attributes.fieldName", equalTo("deadline")))
                 .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("datetime")))
                 .withRequestBody(matchingJsonPath("$.data.attributes.required", equalTo("true"))));
+    }
+
+    @Test
+    void acceptsBooleanDefaultValueWithoutStringification() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "events",
+                        "fieldName", "active",
+                        "type", "boolean",
+                        "defaultValue", true), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(equalToJson(
+                        "{\"data\":{\"type\":\"fields\",\"attributes\":{"
+                                + "\"collectionName\":\"events\","
+                                + "\"fieldName\":\"active\","
+                                + "\"type\":\"boolean\","
+                                + "\"defaultValue\":true}}}")));
+    }
+
+    @Test
+    void acceptsNumericDefaultValueWithoutStringification() {
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "events",
+                        "fieldName", "durationMinutes",
+                        "type", "integer",
+                        "defaultValue", 360), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(equalToJson(
+                        "{\"data\":{\"type\":\"fields\",\"attributes\":{"
+                                + "\"collectionName\":\"events\","
+                                + "\"fieldName\":\"durationMinutes\","
+                                + "\"type\":\"integer\","
+                                + "\"defaultValue\":360}}}")));
     }
 
     @Test

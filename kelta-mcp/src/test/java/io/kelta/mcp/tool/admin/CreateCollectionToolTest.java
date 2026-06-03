@@ -98,6 +98,24 @@ class CreateCollectionToolTest {
     }
 
     @Test
+    void passesDisplayNameAndDisplayFieldNameIndependently() {
+        wm.stubFor(post(urlEqualTo("/api/collections"))
+                .willReturn(aResponse().withStatus(201).withBody("{\"data\":{\"id\":\"c1\"}}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("create_collection", Map.of(
+                        "name", "events",
+                        "displayName", "Calendar Events",
+                        "displayFieldName", "title"), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/collections"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.name", equalTo("events")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.displayName", equalTo("Calendar Events")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.displayFieldName", equalTo("title"))));
+    }
+
+    @Test
     void shortCircuitsWhenCollectionCreationFails() {
         wm.stubFor(post(urlEqualTo("/api/collections"))
                 .willReturn(aResponse().withStatus(409).withBody(

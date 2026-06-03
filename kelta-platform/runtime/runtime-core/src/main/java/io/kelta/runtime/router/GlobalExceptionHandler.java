@@ -89,7 +89,8 @@ public class GlobalExceptionHandler {
 
     /**
      * Handles record validation rule exceptions (custom formula-based rules).
-     * Returns 400 Bad Request with validation rule error details in JSON:API format.
+     * Returns 422 Unprocessable Entity per JSON:API conventions for
+     * semantically invalid records that parsed correctly.
      */
     @ExceptionHandler(RecordValidationException.class)
     public ResponseEntity<Map<String, Object>> handleRecordValidationException(
@@ -102,14 +103,15 @@ public class GlobalExceptionHandler {
         for (var ruleError : ex.getErrors()) {
             String fieldName = ruleError.errorField() != null ? ruleError.errorField() : ruleError.ruleName();
             JsonApiError error = new JsonApiError(
-                "400", "VALIDATION_RULE", "Validation Error",
+                "422", "VALIDATION_RULE_FAILED", "Validation Error",
                 ruleError.errorMessage() != null ? ruleError.errorMessage() : "Validation rule failed");
             error.setSource(Map.of("pointer", "/data/attributes/" + fieldName));
             error.setMeta(Map.of("requestId", requestId));
             errors.add(error);
         }
 
-        return ResponseEntity.badRequest().body(Map.of("errors", errors));
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(Map.of("errors", errors));
     }
 
     /**

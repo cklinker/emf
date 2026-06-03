@@ -196,4 +196,47 @@ class CustomValidationRuleEngineTest {
             verifyNoInteractions(ruleEvaluator);
         }
     }
+
+    @Nested
+    @DisplayName("Severity")
+    class SeverityTests {
+
+        @Test
+        @DisplayName("WARNING-severity rule that matches does not throw")
+        void warningRuleDoesNotBlock() {
+            var rule = new ValidationRuleDefinition(
+                    "warn_rule", "x > 100", "Too high", "x",
+                    "CREATE_AND_UPDATE", true, "WARNING");
+            ruleRegistry.register("products", List.of(rule));
+
+            Map<String, Object> data = Map.of("x", 150);
+            when(ruleEvaluator.isInvalid("x > 100", data)).thenReturn(true);
+
+            assertDoesNotThrow(() ->
+                    engine.evaluate("products", data, OperationType.CREATE));
+        }
+
+        @Test
+        @DisplayName("WARNING and ERROR rules together — only ERROR blocks")
+        void warningAndErrorOnlyErrorBlocks() {
+            var warn = new ValidationRuleDefinition(
+                    "warn_rule", "x > 100", "warn", "x",
+                    "CREATE_AND_UPDATE", true, "WARNING");
+            var err = new ValidationRuleDefinition(
+                    "err_rule", "y > 100", "err", "y",
+                    "CREATE_AND_UPDATE", true, "ERROR");
+            ruleRegistry.register("products", List.of(warn, err));
+
+            Map<String, Object> data = Map.of("x", 150, "y", 200);
+            when(ruleEvaluator.isInvalid("x > 100", data)).thenReturn(true);
+            when(ruleEvaluator.isInvalid("y > 100", data)).thenReturn(true);
+
+            RecordValidationException ex = assertThrows(RecordValidationException.class, () ->
+                    engine.evaluate("products", data, OperationType.CREATE));
+
+            // Only the ERROR rule contributes to the response
+            assertEquals(1, ex.getErrors().size());
+            assertEquals("err_rule", ex.getErrors().get(0).ruleName());
+        }
+    }
 }

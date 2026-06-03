@@ -106,6 +106,54 @@ class FormulaEvaluatorTest {
             assertTrue(evaluator.evaluateBoolean("Amount > 100 || Priority = 'High'",
                 Map.of("Amount", 50.0, "Priority", "High")));
         }
+
+        @Test
+        void orKeyword() {
+            // Validation-rule grammar — year < 1888 OR year > 2031
+            assertTrue(evaluator.evaluateBoolean("year < 1888 OR year > 2031",
+                Map.of("year", 1500)));
+            assertTrue(evaluator.evaluateBoolean("year < 1888 OR year > 2031",
+                Map.of("year", 3000)));
+            assertFalse(evaluator.evaluateBoolean("year < 1888 OR year > 2031",
+                Map.of("year", 2000)));
+        }
+
+        @Test
+        void andKeyword() {
+            assertTrue(evaluator.evaluateBoolean("Amount > 0 AND Active = true",
+                Map.of("Amount", 100.0, "Active", true)));
+            assertFalse(evaluator.evaluateBoolean("Amount > 0 AND Active = true",
+                Map.of("Amount", 100.0, "Active", false)));
+        }
+
+        @Test
+        void notKeyword() {
+            assertTrue(evaluator.evaluateBoolean("NOT Active",
+                Map.of("Active", false)));
+            assertFalse(evaluator.evaluateBoolean("NOT (year < 1888 OR year > 2031)",
+                Map.of("year", 1500)));
+        }
+
+        @Test
+        void keywordsAreCaseInsensitive() {
+            assertTrue(evaluator.evaluateBoolean("x > 0 or y > 0",
+                Map.of("x", 1, "y", 0)));
+            assertTrue(evaluator.evaluateBoolean("x > 0 And y > 0",
+                Map.of("x", 1, "y", 1)));
+        }
+
+        @Test
+        void identifiersStartingWithKeywordPrefixesAreNotConsumed() {
+            // Ensure word-boundary check: 'orderTotal' must parse as one field reference
+            assertTrue(evaluator.evaluateBoolean("orderTotal > 0",
+                Map.of("orderTotal", 50.0)));
+            // 'notes' must parse as a field reference, not as 'NOT' + 'es'
+            assertTrue(evaluator.evaluateBoolean("ISBLANK(notes)",
+                Map.of()));
+            // 'andrew' must parse as a field reference, not as 'AND' + 'rew'
+            assertTrue(evaluator.evaluateBoolean("andrew = 'Andrew'",
+                Map.of("andrew", "Andrew")));
+        }
     }
 
     @Nested

@@ -58,12 +58,18 @@ public class CustomValidationRuleEngine {
 
             try {
                 if (ruleEvaluator.isInvalid(rule.errorConditionFormula(), recordData)) {
-                    errors.add(new ValidationError(
-                            rule.name(),
-                            rule.errorMessage(),
-                            rule.errorField()));
-                    log.debug("Validation rule '{}' failed for collection '{}'",
-                            rule.name(), collectionName);
+                    if (rule.isBlocking()) {
+                        errors.add(new ValidationError(
+                                rule.name(),
+                                rule.errorMessage(),
+                                rule.errorField()));
+                        log.debug("Validation rule '{}' failed for collection '{}'",
+                                rule.name(), collectionName);
+                    } else {
+                        // WARNING severity — logged only, does not block the save
+                        log.info("Validation warning '{}' triggered for collection '{}': {}",
+                                rule.name(), collectionName, rule.errorMessage());
+                    }
                 }
             } catch (Exception e) {
                 // Don't block saves for broken formulas — log and skip

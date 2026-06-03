@@ -90,7 +90,7 @@ public class CollectionLifecycleManager {
 
     private static final String SELECT_VALIDATION_RULES = """
             SELECT name, error_condition_formula, error_message, error_field,
-                   evaluate_on, active
+                   evaluate_on, active, severity
             FROM validation_rule WHERE collection_id = ? AND active = true
             """;
 
@@ -644,12 +644,14 @@ public class CollectionLifecycleManager {
                 String errorField = (String) row.get("error_field");
                 String evaluateOn = (String) row.get("evaluate_on");
                 boolean active = Boolean.TRUE.equals(row.get("active"));
+                String severity = (String) row.get("severity");
 
                 if (name != null && formula != null && errorMessage != null) {
                     rules.add(new ValidationRuleDefinition(
                             name, formula, errorMessage, errorField,
                             evaluateOn != null ? evaluateOn : "CREATE_AND_UPDATE",
-                            active));
+                            active,
+                            severity != null ? severity : ValidationRuleDefinition.SEVERITY_ERROR));
                 }
             }
 

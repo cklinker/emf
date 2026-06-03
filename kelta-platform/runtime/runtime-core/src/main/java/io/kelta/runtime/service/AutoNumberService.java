@@ -34,6 +34,18 @@ public class AutoNumberService {
     }
 
     /**
+     * Creates a sequence if one with that name does not already exist.
+     * Safe to call repeatedly — a no-op if the sequence is present.
+     */
+    public void ensureSequenceExists(String sequenceName, long startValue) {
+        jdbcTemplate.execute(
+            "CREATE SEQUENCE IF NOT EXISTS " + sanitize(sequenceName)
+            + " START WITH " + startValue
+            + " INCREMENT BY 1"
+        );
+    }
+
+    /**
      * Generates the next formatted auto-number value.
      *
      * @param sequenceName the PostgreSQL sequence name

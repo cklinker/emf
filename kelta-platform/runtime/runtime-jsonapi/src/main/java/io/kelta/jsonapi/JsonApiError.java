@@ -1,13 +1,10 @@
 package io.kelta.jsonapi;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.util.Map;
 
 /**
  * Represents a JSON:API error object.
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class JsonApiError {
     private String id;
     private String status;

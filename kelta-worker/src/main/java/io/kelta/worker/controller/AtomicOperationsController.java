@@ -3,6 +3,7 @@ package io.kelta.worker.controller;
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.jsonapi.AtomicOperation;
 import io.kelta.jsonapi.AtomicResult;
+import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
@@ -57,7 +58,8 @@ public class AtomicOperationsController {
         Object opsObj = body.get("atomic:operations");
         if (opsObj == null) {
             return ResponseEntity.badRequest().body(errorResponse(
-                    "400", "Invalid request", "Missing 'atomic:operations' array", null));
+                    "400", "INVALID_PAYLOAD", "Bad Request",
+                    "Missing 'atomic:operations' array", "/atomic:operations"));
         }
 
         List<AtomicOperation> operations;
@@ -65,20 +67,23 @@ public class AtomicOperationsController {
             operations = parseOperations(opsObj);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(errorResponse(
-                    "400", "Parse error", e.getMessage(), null));
+                    "400", "INVALID_PAYLOAD", "Bad Request",
+                    e.getMessage() != null ? e.getMessage() : "Failed to parse operations",
+                    "/atomic:operations"));
         }
 
         // Validate operation count
         if (operations.isEmpty()) {
             return ResponseEntity.badRequest().body(errorResponse(
-                    "400", "Empty batch", "No operations provided", null));
+                    "400", "INVALID_PAYLOAD", "Bad Request",
+                    "No operations provided", "/atomic:operations"));
         }
 
         if (operations.size() > maxOperations) {
             return ResponseEntity.unprocessableEntity().body(errorResponse(
-                    "422", "Too many operations",
+                    "422", "BATCH_TOO_LARGE", "Unprocessable Content",
                     "Request contains " + operations.size() + " operations, maximum is " + maxOperations,
-                    null));
+                    "/atomic:operations"));
         }
 
         // Execute within transaction
@@ -96,12 +101,14 @@ public class AtomicOperationsController {
                     e.getOperationType(), e.getOperationIndex(), e.getMessage());
 
             return ResponseEntity.unprocessableEntity().body(errorResponse(
-                    "422", "Operation failed", e.getMessage(),
+                    "422", "OPERATION_FAILED", "Unprocessable Content",
+                    e.getMessage() != null ? e.getMessage() : "Operation failed",
                     "/atomic:operations/" + e.getOperationIndex()));
         } catch (Exception e) {
             log.error("Unexpected error during atomic operations", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse(
-                    "500", "Internal error", "An unexpected error occurred", null));
+                    "500", "INTERNAL_ERROR", "Internal Server Error",
+                    "An unexpected error occurred", null));
         }
     }
 
@@ -117,14 +124,8 @@ public class AtomicOperationsController {
                 .toList();
     }
 
-    private Map<String, Object> errorResponse(String status, String title, String detail, String pointer) {
-        var error = new java.util.LinkedHashMap<String, Object>();
-        error.put("status", status);
-        error.put("title", title);
-        error.put("detail", detail);
-        if (pointer != null) {
-            error.put("source", Map.of("pointer", pointer));
-        }
-        return Map.of("errors", List.of(error));
+    private Map<String, Object> errorResponse(String status, String code, String title,
+                                              String detail, String pointer) {
+        return JsonApiResponseBuilder.error(status, code, title, detail, pointer);
     }
 }

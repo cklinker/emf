@@ -28,6 +28,58 @@
 - Custom exceptions extend from base types
 - No silent failures, graceful degradation on non-critical failures
 
+### JSON:API Error Responses (4xx and 5xx)
+
+Every error response — including ones written directly from a servlet filter or
+returned by a controller — MUST follow the JSON:API error shape and populate at
+minimum `status`, `code`, `title`, and `detail`. Empty error objects
+(`{"errors":[{}]}`) are a regression: clients cannot distinguish wrong path
+from wrong payload from auth failure without trial-and-error.
+
+```json
+{
+  "errors": [{
+    "status": "400",
+    "code": "INVALID_PAYLOAD",
+    "title": "Bad Request",
+    "detail": "Human-readable description of what went wrong",
+    "source": { "pointer": "/data/attributes/email" }
+  }]
+}
+```
+
+Field semantics:
+- `status` — HTTP status code as a string (`"400"`, `"404"`, `"422"`)
+- `code` — stable, machine-readable identifier in `UPPER_SNAKE_CASE`
+  (`NOT_FOUND`, `INVALID_PAYLOAD`, `UNAUTHORIZED`, `VALIDATION_FAILED`,
+  `UNIQUE_CONSTRAINT_VIOLATION`). Clients branch on this; it must not change
+  between releases for the same error condition.
+- `title` — short, stable, human-readable summary suitable for a UI headline
+  (`"Bad Request"`, `"Validation Error"`, `"Not Found"`). Distinct from `code`.
+- `detail` — specific message for this occurrence. Free-form, may include the
+  offending value when safe.
+- `source.pointer` — JSON Pointer to the offending field on field-level errors
+  (`/data/attributes/email`). Omit for non-field errors.
+- `source.parameter` — query / path parameter name for parameter-level errors.
+- `meta.requestId` / `meta.correlationId` — populated by the global handler for
+  trace correlation; controllers/filters do not need to set them.
+
+How to build error bodies:
+- Prefer the global exception handler: throw a typed exception
+  (`ValidationException`, `InvalidQueryException`, `UniqueConstraintViolationException`)
+  and let `GlobalExceptionHandler` produce the response. Common Spring
+  exceptions (`MethodArgumentNotValidException`, `HttpMessageNotReadableException`,
+  `MissingServletRequestParameterException`, `MethodArgumentTypeMismatchException`,
+  `HttpRequestMethodNotSupportedException`, `HttpMediaTypeNotSupportedException`,
+  `NoResourceFoundException`) are already mapped — do not reinvent them.
+- When a controller or filter must return an error body directly, use
+  `JsonApiResponseBuilder.error(status, code, title, detail, pointer)` from
+  `io.kelta.jsonapi`. The four-arg overload (no pointer) is fine when there is
+  no specific field.
+- For inline-JSON filters (servlet `Filter` + `response.getWriter().write(...)`),
+  hand-write the JSON but include all four required fields. Never emit
+  `{"error": "..."}` (singular) — that does not match the JSON:API envelope.
+
 ### Javadoc
 - Required for public classes and methods
 - Include `@param`, `@returns`, `@throws`

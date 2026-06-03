@@ -67,14 +67,17 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
         JsonApiError error;
         HttpStatus status;
 
-        // Handle different exception types
+        // Handle different exception types. JSON:API distinguishes `code`
+        // (machine-readable, stable, UPPER_SNAKE) from `title` (short, stable,
+        // human-readable). The two used to be identical strings, which left
+        // clients with nothing renderable to show end users.
         if (ex instanceof GatewayAuthenticationException || ex instanceof JwtException) {
             // Authentication errors (401)
             status = HttpStatus.UNAUTHORIZED;
             error = new JsonApiError(
                 String.valueOf(status.value()),
                 "UNAUTHORIZED",
-                "UNAUTHORIZED",
+                "Unauthorized",
                 ex.getMessage() != null ? ex.getMessage() : "Authentication failed"
             );
             log.warn("Authentication error for path: {}, correlationId: {}, message: {}",
@@ -86,7 +89,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             error = new JsonApiError(
                 String.valueOf(status.value()),
                 "FORBIDDEN",
-                "FORBIDDEN",
+                "Forbidden",
                 ex.getMessage() != null ? ex.getMessage() : "Access denied"
             );
             log.warn("Authorization error for path: {}, correlationId: {}, message: {}",
@@ -99,7 +102,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             error = new JsonApiError(
                 String.valueOf(status.value()),
                 "RATE_LIMIT_EXCEEDED",
-                "RATE_LIMIT_EXCEEDED",
+                "Too Many Requests",
                 ex.getMessage() != null ? ex.getMessage() : "Rate limit exceeded"
             );
 
@@ -117,7 +120,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             error = new JsonApiError(
                 String.valueOf(status.value()),
                 "NOT_FOUND",
-                "NOT_FOUND",
+                "Not Found",
                 ex.getMessage() != null ? ex.getMessage() : "Route not found"
             );
             log.warn("Route not found for path: {}, correlationId: {}", path, correlationId);
@@ -134,7 +137,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             error = new JsonApiError(
                 String.valueOf(status.value()),
                 code,
-                code,
+                status.getReasonPhrase(),
                 statusEx.getReason() != null ? statusEx.getReason() : status.getReasonPhrase()
             );
             log.warn("Response status exception for path: {}, correlationId: {}, status: {}, message: {}",
@@ -146,7 +149,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             error = new JsonApiError(
                 String.valueOf(status.value()),
                 "JSONAPI_PARSE_ERROR",
-                "JSONAPI_PARSE_ERROR",
+                "Internal Server Error",
                 "Failed to process JSON:API response"
             );
             log.error("JSON:API parse error for path: {}, correlationId: {}", path, correlationId, ex);
@@ -157,7 +160,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             error = new JsonApiError(
                 String.valueOf(status.value()),
                 "INTERNAL_ERROR",
-                "INTERNAL_ERROR",
+                "Internal Server Error",
                 "An unexpected error occurred"
             );
             log.error("Internal error for path: {}, correlationId: {}", path, correlationId, ex);

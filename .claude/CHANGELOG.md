@@ -27,3 +27,7 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-06-01
 
 - 2026-06-01 fix(e2e): point E2E workflow + `.env.example` at `app.kelta.io`/`api.kelta.io`/`auth.kelta.io` after the rzware.com cutover; the legacy hostnames no longer serve a valid cert so Playwright was failing every test with `ERR_CERT_AUTHORITY_INVALID` (BUG-2026-06-01-4324)
+
+## 2026-06-03
+
+- 2026-06-03 chore(runtime): populate JSON:API error payloads on all 4xx — `JsonApiResponseBuilder` gains `error(status, code, title, detail, pointer)` overloads, `GlobalExceptionHandler` adopts UPPER_SNAKE codes and maps common Spring exceptions (`MethodArgumentNotValidException`, `HttpMessageNotReadableException`, `MissingServletRequestParameterException`, `MethodArgumentTypeMismatchException`, `HttpRequestMethodNotSupportedException`, `HttpMediaTypeNotSupportedException`, `NoResourceFoundException`), and the gateway/worker/AI filter and controller error responses now always carry status+code+title+detail (CHORE-2026-06-02-0008)

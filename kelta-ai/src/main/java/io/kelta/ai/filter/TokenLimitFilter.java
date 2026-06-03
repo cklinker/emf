@@ -53,7 +53,7 @@ public class TokenLimitFilter extends OncePerRequestFilter {
             response.setStatus(403);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.getWriter().write("""
-                {"errors":[{"status":"403","code":"AI_DISABLED","title":"AI features are not enabled for this tenant"}]}
+                {"errors":[{"status":"403","code":"AI_DISABLED","title":"Forbidden","detail":"AI features are not enabled for this tenant"}]}
                 """);
             return;
         }
@@ -63,7 +63,7 @@ public class TokenLimitFilter extends OncePerRequestFilter {
             response.setStatus(429);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.getWriter().write("""
-                {"errors":[{"status":"429","code":"TOKEN_LIMIT_EXCEEDED","title":"Monthly AI token limit has been reached"}]}
+                {"errors":[{"status":"429","code":"TOKEN_LIMIT_EXCEEDED","title":"Too Many Requests","detail":"Monthly AI token limit has been reached for this tenant"}]}
                 """);
             return;
         }

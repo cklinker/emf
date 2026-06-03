@@ -78,6 +78,64 @@ class JsonApiResponseBuilderTest {
         assertEquals("400", errors.get(0).get("status"));
         assertEquals("Bad Request", errors.get(0).get("title"));
         assertEquals("Missing field", errors.get(0).get("detail"));
+        // Legacy 3-arg overload now derives an UPPER_SNAKE code from the title so
+        // every error object still satisfies the platform "status+code+detail" rule.
+        assertEquals("BAD_REQUEST", errors.get(0).get("code"));
         assertFalse(doc.containsKey("data"));
+    }
+
+    @Test
+    void error_withExplicitCode_populatesAllFields() {
+        Map<String, Object> doc = JsonApiResponseBuilder.error(
+                "404", "NOT_FOUND", "Not Found", "Collection 'widgets' does not exist");
+
+        List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
+        Map<String, Object> err = errors.get(0);
+        assertEquals("404", err.get("status"));
+        assertEquals("NOT_FOUND", err.get("code"));
+        assertEquals("Not Found", err.get("title"));
+        assertEquals("Collection 'widgets' does not exist", err.get("detail"));
+        assertFalse(err.containsKey("source"));
+    }
+
+    @Test
+    void error_withPointer_includesSourcePointer() {
+        Map<String, Object> doc = JsonApiResponseBuilder.error(
+                "400", "VALIDATION_FAILED", "Validation Error",
+                "email is required", "/data/attributes/email");
+
+        List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
+        Map<String, Object> err = errors.get(0);
+        assertEquals("VALIDATION_FAILED", err.get("code"));
+        Map<String, Object> source = (Map<String, Object>) err.get("source");
+        assertEquals("/data/attributes/email", source.get("pointer"));
+    }
+
+    @Test
+    void errorObject_blankPointer_omitsSource() {
+        Map<String, Object> err = JsonApiResponseBuilder.errorObject(
+                "400", "BAD_REQUEST", "Bad Request", "Bad input", "  ");
+        assertFalse(err.containsKey("source"));
+    }
+
+    @Test
+    void errors_wrapsMultipleErrorObjectsIntoOneDocument() {
+        Map<String, Object> e1 = JsonApiResponseBuilder.errorObject(
+                "400", "VALIDATION_FAILED", "Validation Error",
+                "name is required", "/data/attributes/name");
+        Map<String, Object> e2 = JsonApiResponseBuilder.errorObject(
+                "400", "VALIDATION_FAILED", "Validation Error",
+                "email is invalid", "/data/attributes/email");
+
+        Map<String, Object> doc = JsonApiResponseBuilder.errors(List.of(e1, e2));
+
+        List<Map<String, Object>> errors = (List<Map<String, Object>>) doc.get("errors");
+        assertEquals(2, errors.size());
+        // Every error object must carry the required fields; no empty {} objects.
+        for (Map<String, Object> err : errors) {
+            assertNotNull(err.get("status"));
+            assertNotNull(err.get("code"));
+            assertNotNull(err.get("detail"));
+        }
     }
 }

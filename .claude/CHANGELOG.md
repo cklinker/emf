@@ -27,3 +27,7 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-06-01
 
 - 2026-06-01 fix(e2e): point E2E workflow + `.env.example` at `app.kelta.io`/`api.kelta.io`/`auth.kelta.io` after the rzware.com cutover; the legacy hostnames no longer serve a valid cert so Playwright was failing every test with `ERR_CERT_AUTHORITY_INVALID` (BUG-2026-06-01-4324)
+
+## 2026-06-03
+
+- 2026-06-03 chore(mcp): map `add_field` friendly type aliases (text, number, picklist, …) to the native uppercase `FieldType` enum, translate `fieldName`/`collectionName`/`unique` to `name`/`collectionId`/`uniqueConstraint`, assemble picklist `fieldTypeConfig` and lookup `relationships.referenceCollectionId`, and expose `displayName`/`indexed`/`searchable` — fixes the 400-for-every-field-type regression on `POST /api/fields` (CHORE-2026-06-02-0003)

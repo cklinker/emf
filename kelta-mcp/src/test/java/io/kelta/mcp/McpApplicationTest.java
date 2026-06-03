@@ -122,6 +122,7 @@ class McpApplicationTest {
                 // schema admin (Phase 6)
                 "create_collection",
                 "update_collection",
+                "delete_collection",
                 "add_field",
                 "update_field",
                 "remove_field",

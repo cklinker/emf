@@ -54,10 +54,11 @@ class CreatePicklistToolTest {
     }
 
     @Test
-    void createsPicklistThenEachValueWithSortOrder() {
-        wm.stubFor(post(urlEqualTo("/api/globalPicklists"))
-                .willReturn(aResponse().withStatus(201).withBody("{\"data\":{\"id\":\"p1\"}}")));
-        wm.stubFor(post(urlEqualTo("/api/picklistValues"))
+    void createsPicklistThenEachValueWithFlatSourceAttributes() {
+        wm.stubFor(post(urlEqualTo("/api/global-picklists"))
+                .willReturn(aResponse().withStatus(201)
+                        .withBody("{\"data\":{\"id\":\"p-123\",\"type\":\"global-picklists\"}}")));
+        wm.stubFor(post(urlEqualTo("/api/picklist-values"))
                 .willReturn(aResponse().withStatus(201).withBody("{\"data\":{\"id\":\"pv\"}}")));
 
         CallToolResult result = tool.toSpecification().callHandler().apply(
@@ -68,11 +69,37 @@ class CreatePicklistToolTest {
                                 Map.of("value", "CLOSED", "label", "Closed"))), null));
 
         assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
-        wm.verify(2, WireMock.postRequestedFor(urlEqualTo("/api/picklistValues")));
-        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/picklistValues"))
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/global-picklists"))
                 .withHeader("Authorization", equalTo("Bearer klt_picklist_test"))
+                .withRequestBody(matchingJsonPath("$.data.type", equalTo("global-picklists")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.name", equalTo("stages"))));
+        wm.verify(2, WireMock.postRequestedFor(urlEqualTo("/api/picklist-values")));
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/picklist-values"))
+                .withRequestBody(matchingJsonPath("$.data.type", equalTo("picklist-values")))
                 .withRequestBody(matchingJsonPath("$.data.attributes.value", equalTo("OPEN")))
-                .withRequestBody(matchingJsonPath("$.data.attributes.picklistName", equalTo("stages")))
-                .withRequestBody(matchingJsonPath("$.data.attributes.sortOrder", equalTo("0"))));
+                .withRequestBody(matchingJsonPath("$.data.attributes.picklistSourceType", equalTo("GLOBAL")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.picklistSourceId", equalTo("p-123")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.sortOrder", equalTo("0")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.isActive", equalTo("true")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.isDefault", equalTo("false"))));
+    }
+
+    @Test
+    void normalizesLegacyActiveAttributeToIsActive() {
+        wm.stubFor(post(urlEqualTo("/api/global-picklists"))
+                .willReturn(aResponse().withStatus(201)
+                        .withBody("{\"data\":{\"id\":\"p-1\"}}")));
+        wm.stubFor(post(urlEqualTo("/api/picklist-values"))
+                .willReturn(aResponse().withStatus(201).withBody("{\"data\":{\"id\":\"pv\"}}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("create_picklist", Map.of(
+                        "name", "phases",
+                        "values", List.of(
+                                Map.of("value", "DONE", "label", "Done", "active", false))), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/picklist-values"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.isActive", equalTo("false"))));
     }
 }

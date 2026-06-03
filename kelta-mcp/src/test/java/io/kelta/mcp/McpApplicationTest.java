@@ -127,6 +127,7 @@ class McpApplicationTest {
                 "update_field",
                 "remove_field",
                 "create_validation_rule",
+                "create_unique_constraint",
                 "create_picklist",
                 "list_picklists",
                 "get_picklist",

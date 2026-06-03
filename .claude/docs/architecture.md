@@ -108,6 +108,20 @@ precedence; request-supplied entries fill the gaps. This keeps a stable
 "follow-up by id" shape for `create_record` / `update_record` callers so they
 don't need a second GET to discover related-record IDs.
 
+**Pagination contract** — every paginated REST endpoint uses JSON:API
+bracket syntax (`page[number]` / `page[size]`). Parsing lives in
+`runtime-core/.../query/Pagination.fromParams`, which clamps `page[size]`
+against `MAX_HTTP_PAGE_SIZE` (200) — separate from `MAX_PAGE_SIZE` (1000),
+the absolute constructor ceiling that internal services (report execution,
+data export, include resolution) build `Pagination` records against
+directly. List responses carry a `links` block (`self` / `prev` / `next`)
+built by `runtime-jsonapi/.../PaginationLinks#build`; URLs are relative
+paths so cached system-collection responses remain reusable across hosts
+and behind load balancers. MCP tools (`query_collection`, `list_picklists`,
+`list_approvals`) accept flat `pageNumber` / `pageSize` arguments and
+translate them to the bracket form at the MCP→gateway boundary. Bounds and
+response shape are documented in `.claude/docs/conventions.md`.
+
 **Error response ownership** — every 4xx/5xx is wrapped in the JSON:API
 `{"errors":[{status, code, title, detail, source?, meta?}]}` envelope. Three
 construction sites:

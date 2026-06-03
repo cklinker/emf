@@ -97,6 +97,17 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 9. PhysicalTableStorageAdapter queries PostgreSQL
 10. JSON:API response formatted via JsonApiResponseBuilder
 
+**Write-response relationships contract** — POST/PATCH responses on
+`/api/{collection}` (and the `/api/{parent}/{parentId}/{child}` sub-resource
+variants) always echo the caller's JSON:API `relationships` block back in the
+response document. `DynamicCollectionRouter#toJsonApiResourceObject` builds
+relationships from REFERENCE/LOOKUP/MASTER_DETAIL field metadata, and
+`mergeRequestRelationships` then fills in any caller-supplied relationship
+names that don't map to a REFERENCE-typed field. Field-derived entries take
+precedence; request-supplied entries fill the gaps. This keeps a stable
+"follow-up by id" shape for `create_record` / `update_record` callers so they
+don't need a second GET to discover related-record IDs.
+
 **Error response ownership** — every 4xx/5xx is wrapped in the JSON:API
 `{"errors":[{status, code, title, detail, source?, meta?}]}` envelope. Three
 construction sites:

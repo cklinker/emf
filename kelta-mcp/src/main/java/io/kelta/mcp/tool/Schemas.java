@@ -61,4 +61,16 @@ public final class Schemas {
         m.put("additionalProperties", true);
         return m;
     }
+
+    /**
+     * Convenience for a property that accepts any JSON scalar (string, number,
+     * boolean, or null). Used for parameters like {@code defaultValue} where
+     * the type depends on the field's declared type rather than a fixed schema.
+     */
+    public static Map<String, Object> anyScalar(String description) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("type", List.of("string", "number", "boolean", "null"));
+        m.put("description", description);
+        return m;
+    }
 }

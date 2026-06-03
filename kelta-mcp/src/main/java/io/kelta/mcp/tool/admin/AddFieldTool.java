@@ -34,7 +34,8 @@ public class AddFieldTool implements AdminTool {
         properties.put("required", Schemas.bool("Whether the field is required (default false).", false));
         properties.put("unique", Schemas.bool("Whether values must be unique (default false).", false));
         properties.put("description", Schemas.string("Optional description shown in the admin UI."));
-        properties.put("defaultValue", Schemas.string("Optional default value as a string. Numeric/boolean values are still passed as strings here."));
+        properties.put("defaultValue", Schemas.anyScalar(
+                "Optional default value. Pass it in the field's native JSON type — e.g. true for booleans, 360 for numbers, \"hello\" for strings. The platform coerces and stores it according to the field type."));
         properties.put("validation", Schemas.freeObject(
                 "Optional validation config (regex, min/max, etc.) — shape depends on the field type."));
         properties.put("referenceCollection", Schemas.string(
@@ -69,7 +70,14 @@ public class AddFieldTool implements AdminTool {
                     if (args.get("required") instanceof Boolean b) attrs.put("required", b);
                     if (args.get("unique") instanceof Boolean b) attrs.put("unique", b);
                     if (args.get("description") instanceof String s && !s.isBlank()) attrs.put("description", s);
-                    if (args.get("defaultValue") instanceof String s) attrs.put("defaultValue", s);
+                    if (args.containsKey("defaultValue")) {
+                        Object dv = args.get("defaultValue");
+                        if (dv instanceof String || dv instanceof Boolean || dv instanceof Number) {
+                            attrs.put("defaultValue", dv);
+                        } else if (dv == null) {
+                            attrs.put("defaultValue", null);
+                        }
+                    }
                     if (args.get("validation") instanceof Map<?, ?> v) attrs.put("validation", v);
                     if (args.get("referenceCollection") instanceof String s && !s.isBlank()) attrs.put("referenceCollection", s);
 

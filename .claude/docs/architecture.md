@@ -95,7 +95,7 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 7. DynamicCollectionRouter matches collection
 8. QueryEngine executes with pagination/filtering
 9. PhysicalTableStorageAdapter queries PostgreSQL
-10. JSON:API response formatted via JsonApiResponseBuilder
+10. JSON:API response formatted via JsonApiResponseBuilder. `DynamicCollectionRouter.toJsonApiResourceObject` projects each row against `CollectionDefinition.fields()`: keys that have no matching `FieldDefinition` and are not in the framework metadata allow-list (`createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `tenantId`, `recordTypeId`) or a live CURRENCY/GEOLOCATION companion suffix (`_currency_code`, `_longitude`, `_latitude`) are dropped, so orphan columns left behind by a deleted field never leak into `data.attributes` (TASK-2026-06-02-0005). `SchemaMigrationEngine` deprecates but does not `DROP COLUMN`, so the underlying column stays put.
 
 **NATS Event Flow (Schema Change):**
 1. Admin updates collection field via UI

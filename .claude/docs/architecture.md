@@ -97,6 +97,19 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 9. PhysicalTableStorageAdapter queries PostgreSQL
 10. JSON:API response formatted via JsonApiResponseBuilder
 
+**Error response ownership** — every 4xx/5xx is wrapped in the JSON:API
+`{"errors":[{status, code, title, detail, source?, meta?}]}` envelope. Three
+construction sites:
+
+| Layer | Class | Scope |
+|-------|-------|-------|
+| Gateway (reactive) | `kelta-gateway/.../error/GlobalErrorHandler` | auth (401), authz (403), rate-limit (429), missing-route (404), `ResponseStatusException`, generic (500) |
+| Worker / runtime (servlet) | `kelta-platform/runtime/runtime-core/.../router/GlobalExceptionHandler` | bean validation (400), `ConstraintViolationException`, malformed body (`HttpMessageNotReadableException`), missing/mismatched params, `NoHandlerFoundException` / `NoResourceFoundException` (404), method/media-type not supported (405/415), platform `ValidationException` / `InvalidQueryException` / `UniqueConstraintViolationException`, generic (500) |
+| Library | `kelta-platform/runtime/runtime-jsonapi/.../JsonApiResponseBuilder.error(...)` | helper for one-off error documents in controllers; the 3-arg overload derives `code` from `title` so older callers stay spec-compliant |
+
+`source.pointer` (RFC 6901, e.g. `/data/attributes/name`) carries field-level
+context; `source.parameter` is used for query/path-parameter errors.
+
 **NATS Event Flow (Schema Change):**
 1. Admin updates collection field via UI
 2. Worker publishes `collection-changed` to subject `kelta.config.collection.changed` via PlatformEventPublisher

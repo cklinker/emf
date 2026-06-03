@@ -86,7 +86,7 @@ RUN mvn -Pnative native:compile -DskipTests -B
 # =============================================================================
 # Stage 3: Minimal runtime (no JRE — binary is self-contained)
 # =============================================================================
-FROM debian:12-slim
+FROM harbor.rzware.com/dockerhub-cache/library/debian:12-slim
 
 WORKDIR /app
 

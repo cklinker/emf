@@ -135,6 +135,20 @@ construction sites:
 `source.pointer` (RFC 6901, e.g. `/data/attributes/name`) carries field-level
 context; `source.parameter` is used for query/path-parameter errors.
 
+**Orphan-column filtering on record reads/writes** —
+`SchemaMigrationEngine.createDeprecateColumnMigration` only marks a deleted
+field's column with a `DEPRECATED` comment; it never `ALTER TABLE ... DROP
+COLUMN`. `PhysicalTableStorageAdapter` then keeps returning the stale column
+via `SELECT *`. `DynamicCollectionRouter.toJsonApiResourceObject` is the gate
+that keeps the public payload in sync with the live field set: a key only
+reaches `data.attributes` if it has a live `FieldDefinition`, is one of the
+framework-metadata keys (`createdAt`, `updatedAt`, `createdBy`, `updatedBy`,
+`tenantId`, `recordTypeId`), or is a `_currency_code` / `_longitude` /
+`_latitude` companion of a still-live CURRENCY/GEOLOCATION field. Anything
+else is treated as an orphan column left behind by a deleted field and
+dropped. This is the projection layer for the deprecate-don't-drop schema
+strategy — preserving data on the disk while hiding it from the API.
+
 **NATS Event Flow (Schema Change):**
 1. Admin updates collection field via UI
 2. Worker publishes `collection-changed` to subject `kelta.config.collection.changed` via PlatformEventPublisher

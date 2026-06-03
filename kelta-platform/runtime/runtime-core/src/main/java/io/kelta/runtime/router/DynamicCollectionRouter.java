@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -76,7 +77,23 @@ public class DynamicCollectionRouter {
 
     private static final Pattern UUID_PATTERN = Pattern.compile(
             "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
-    
+
+    // Framework metadata keys that belong in every record's response envelope
+    // even though they have no FieldDefinition. Aligned with PhysicalTableStorageAdapter's
+    // PAYLOAD_SYSTEM_KEYS (minus "id", which is hoisted to the top level). Used by
+    // toJsonApiResourceObject to distinguish metadata from orphan columns left behind
+    // when a field is deleted.
+    private static final Set<String> SYSTEM_ATTRIBUTE_KEYS = Set.of(
+            "createdAt", "updatedAt", "createdBy", "updatedBy",
+            "tenantId", "recordTypeId");
+
+    // Suffixes appended to a primary field name to form companion column keys
+    // for CURRENCY and GEOLOCATION fields. Used to keep `<field>_currency_code`,
+    // `<field>_longitude`, `<field>_latitude` in the response envelope while
+    // still dropping the same suffixes when no live primary field exists.
+    private static final String[] COMPANION_SUFFIXES = {
+            "_currency_code", "_longitude", "_latitude"};
+
     private final CollectionRegistry registry;
     private final QueryEngine queryEngine;
 
@@ -1113,9 +1130,15 @@ public class DynamicCollectionRouter {
                     relationshipData.put("data", null);
                 }
                 relationships.put(key, relationshipData);
-            } else {
+            } else if (fieldDef != null || isSystemOrCompanionKey(key, definition)) {
                 attributes.put(key, value);
             }
+            // Else: drop. The key has no matching FieldDefinition and is neither
+            // framework metadata nor a companion of a still-live field. It's an
+            // orphan column left behind by a deleted field — SchemaMigrationEngine
+            // only marks deleted columns deprecated (no DROP COLUMN), and SELECT *
+            // still returns them. Filter here so the public response stays in sync
+            // with the live field set.
         }
 
         resourceObject.put("attributes", attributes);
@@ -1124,6 +1147,22 @@ public class DynamicCollectionRouter {
         }
 
         return resourceObject;
+    }
+
+    private boolean isSystemOrCompanionKey(String key, CollectionDefinition definition) {
+        if (SYSTEM_ATTRIBUTE_KEYS.contains(key)) {
+            return true;
+        }
+        for (String suffix : COMPANION_SUFFIXES) {
+            if (key.length() > suffix.length() && key.endsWith(suffix)) {
+                String primaryName = key.substring(0, key.length() - suffix.length());
+                FieldDefinition primary = definition.getField(primaryName);
+                if (primary != null && primary.type().hasCompanionColumns()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

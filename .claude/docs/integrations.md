@@ -10,6 +10,7 @@
 | Superset | Embedded analytics | REST API | `${SUPERSET_URL}` | `kelta-worker/.../service/SupersetApiClient.java`, `kelta-ui/app/` (`@superset-ui/embedded-sdk`) |
 | AWS S3 / Garage | Object storage | `aws-sdk-s3` 2.30.1 | `${KELTA_S3_ENDPOINT}` | `kelta-worker/.../service/S3StorageService.java` |
 | Keycloak | OIDC federation | Spring Security OAuth2 | Port 8180 (docker-compose) | `kelta-auth/.../federation/FederatedUserMapper.java` |
+| SMTP (mailpit dev / external prod) | Outbound email | `spring-boot-starter-mail` | `${SMTP_HOST:localhost}:${SMTP_PORT:1025}` (defaults target mailpit; tenant-level overrides via Email Settings) | `kelta-worker/.../service/email/SmtpEmailProvider.java`, `DefaultEmailService.java` |
 
 ## Data Storage
 
@@ -75,7 +76,10 @@ Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/event/`
 | Redis | 6379 | default |
 | Keycloak | 8180 | default |
 | Cerbos | 3592/3593 | default |
-| Jaeger | 16686 | default |
-| OpenSearch | 9200 | default |
-| NATS Box | 8090 | tools |
+| Mailpit (SMTP capture + UI) | 1025 (SMTP), 8025 (UI) | default |
+| Jaeger | 16686 | observability |
+| OpenSearch | 9200 | observability |
+| pgAdmin | 8092 | tools |
 | Redis Commander | 8091 | tools |
+
+Email is **on by default** in docker-compose (`EMAIL_ENABLED=true`) and the worker's `application.yml` defaults `spring.mail.host`/`spring.mail.port` to `localhost:1025` so that bare `mvn spring-boot:run` and the seeded compose stack both capture outbound mail into mailpit. Real SMTP credentials should be supplied via `SMTP_HOST`/`SMTP_PORT`/`SMTP_USERNAME`/`SMTP_PASSWORD`/`SMTP_AUTH`/`SMTP_STARTTLS` env in K8s, or per-tenant via the Email Settings admin UI (credentials stored in the credential vault).

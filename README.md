@@ -84,9 +84,9 @@ Default credentials (seeded by Flyway migrations):
 | PostgreSQL | :5432 | |
 | Redis | :6379 | |
 | NATS | :4222 | |
+| Mailpit (SMTP UI) | :8025 | Captures all outgoing dev mail; SMTP on :1025 |
 | pgAdmin | :8092 | `--profile tools` |
 | Redis Commander | :8091 | `--profile tools` |
-| Mailpit (SMTP UI) | :8025 | `--profile tools` |
 
 ### Useful Makefile targets
 

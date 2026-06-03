@@ -65,6 +65,25 @@ public class EmailRepository {
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
+    /**
+     * Resolves a template by its {@code name} column (e.g. "password_reset").
+     * Prefers the tenant's own override; falls back to the {@code 'system'} tenant's
+     * default seeded in V141. Returns empty when no template exists for the name in
+     * either scope.
+     */
+    public Optional<Map<String, Object>> findTemplateByName(String tenantId, String name) {
+        var rows = jdbcTemplate.queryForList(
+                "SELECT id, subject, body_html, body_text, tenant_id "
+                        + "FROM email_template "
+                        + "WHERE name = ? AND is_active = true "
+                        + "  AND tenant_id IN (?, 'system') "
+                        + "ORDER BY CASE WHEN tenant_id = ? THEN 0 ELSE 1 END "
+                        + "LIMIT 1",
+                name, tenantId, tenantId
+        );
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
     // -----------------------------------------------------------------------
     // Email Log
     // -----------------------------------------------------------------------

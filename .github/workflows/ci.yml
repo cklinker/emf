@@ -389,7 +389,9 @@ jobs:
         id: playwright
         run: |
           NETWORK="${COMPOSE_PROJECT_NAME}_kelta-network"
-          docker run --name kelta-e2e-run \
+          CONTAINER="${COMPOSE_PROJECT_NAME}_kelta-e2e-run"
+          docker rm -f "$CONTAINER" 2>/dev/null || true
+          docker run --name "$CONTAINER" \
             --network "$NETWORK" \
             -e CI=true \
             -e E2E_BASE_URL=http://kelta-ui:8080 \
@@ -405,10 +407,11 @@ jobs:
       - name: Copy Playwright reports out of container
         if: always() && steps.playwright.outcome != 'skipped'
         run: |
+          CONTAINER="${COMPOSE_PROJECT_NAME}_kelta-e2e-run"
           mkdir -p e2e-tests/playwright-report e2e-tests/test-results
-          docker cp kelta-e2e-run:/work/playwright-report/. e2e-tests/playwright-report/ 2>/dev/null || true
-          docker cp kelta-e2e-run:/work/test-results/. e2e-tests/test-results/ 2>/dev/null || true
-          docker rm -f kelta-e2e-run || true
+          docker cp "$CONTAINER":/work/playwright-report/. e2e-tests/playwright-report/ 2>/dev/null || true
+          docker cp "$CONTAINER":/work/test-results/. e2e-tests/test-results/ 2>/dev/null || true
+          docker rm -f "$CONTAINER" || true
 
       - name: Dump compose logs on failure
         if: failure()

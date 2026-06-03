@@ -337,18 +337,44 @@ jobs:
           MCP_CHANGED: ${{ needs.changes.outputs.mcp }}
           UI_CHANGED: ${{ needs.changes.outputs.ui }}
           WORKFLOWS_CHANGED: ${{ needs.changes.outputs.workflows }}
+          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
         run: |
           IMAGE_TAG="main-${{ steps.sha.outputs.short }}"
+
+          # Confirm the image:tag actually exists on Harbor before we write
+          # it into kustomization.yaml. Without this guard, a skipped or
+          # silently-failed Build & Push job would still bump the manifest,
+          # leaving ArgoCD trying to pull a tag that was never pushed
+          # (ImagePullBackOff, stuck PreSync Job hooks, etc.).
+          verify_image_exists() {
+            local img="$1"            # harbor.rzware.com/emf/emf-worker
+            local tag="$2"            # main-1234567
+            local repo="${img#harbor.rzware.com/}"
+            local code
+            code=$(curl -sk -o /dev/null -w "%{http_code}" \
+              -u "${HARBOR_USERNAME}:${HARBOR_PASSWORD}" \
+              -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+              -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+              -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+              -H "Accept: application/vnd.oci.image.index.v1+json" \
+              "https://harbor.rzware.com/v2/${repo}/manifests/${tag}")
+            [[ "$code" == "200" ]]
+          }
 
           bump() {
             local img="$1"
             local changed_flag="$2"
-            if [[ "$changed_flag" == "true" || "$WORKFLOWS_CHANGED" == "true" ]]; then
-              echo "Bumping ${img} → ${IMAGE_TAG}"
-              kustomize edit set image "${img}:${IMAGE_TAG}"
-            else
+            if [[ "$changed_flag" != "true" && "$WORKFLOWS_CHANGED" != "true" ]]; then
               echo "Skipping ${img} (no changes)"
+              return
             fi
+            if ! verify_image_exists "$img" "$IMAGE_TAG"; then
+              echo "::error::Refusing to bump ${img} → ${IMAGE_TAG}: tag not found on Harbor (build skipped or failed)."
+              return 1
+            fi
+            echo "Bumping ${img} → ${IMAGE_TAG}"
+            kustomize edit set image "${img}:${IMAGE_TAG}"
           }
 
           if [ -d emf ]; then

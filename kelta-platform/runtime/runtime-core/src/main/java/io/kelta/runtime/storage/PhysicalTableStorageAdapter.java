@@ -668,6 +668,221 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
     }
 
+    // ==================== Composite Unique Constraints ====================
+
+    /** Prefix for table constraints created by {@link #addCompositeUniqueConstraint}. */
+    static final String COMPOSITE_UNIQUE_PREFIX = "cuq_";
+
+    /**
+     * Adds a composite UNIQUE constraint covering the given fields. The constraint
+     * is named deterministically as {@code cuq_<table>_<crc>} where the CRC is
+     * computed over the sorted column names, so re-creating the same constraint
+     * is a no-op (uses {@code ADD CONSTRAINT IF NOT EXISTS} semantics on both
+     * PostgreSQL and H2-in-PostgreSQL-mode by catching the duplicate-name error).
+     *
+     * @param definition the collection definition
+     * @param fieldNames API field names to include in the constraint (2 or more)
+     * @return the constraint name that was created (or already existed)
+     * @throws IllegalArgumentException if fewer than 2 fields are given, or any
+     *     field is unknown or maps to a non-physical column
+     * @throws StorageException if the DDL fails for any other reason
+     */
+    public String addCompositeUniqueConstraint(CollectionDefinition definition, List<String> fieldNames) {
+        List<String> columns = resolveConstraintColumns(definition, fieldNames);
+        TableRef tableRef = getTableRef(definition);
+        String constraintName = buildCompositeUniqueName(definition, columns);
+
+        String columnList = columns.stream()
+                .map(this::sanitizeIdentifier)
+                .collect(Collectors.joining(", "));
+
+        // PostgreSQL doesn't support ADD CONSTRAINT IF NOT EXISTS until v17, and
+        // older PG versions on the platform may not have it. Use a DO block that
+        // checks pg_constraint first; H2 understands the same syntax in PG mode
+        // (the tests use plain H2, which we handle by catching the "already
+        // exists" error).
+        String addSql = "ALTER TABLE " + tableRef.toSql()
+                + " ADD CONSTRAINT " + sanitizeIdentifier(constraintName)
+                + " UNIQUE (" + columnList + ")";
+
+        try {
+            jdbcTemplate.execute(addSql);
+            log.info("Added composite unique constraint '{}' on '{}' covering {}",
+                    constraintName, tableRef.toSql(), columns);
+        } catch (DataAccessException e) {
+            // Already-exists is fine — make this method idempotent for the
+            // common case where the MCP admin tool replays the same call.
+            String msg = e.getMostSpecificCause() != null
+                    ? e.getMostSpecificCause().getMessage()
+                    : e.getMessage();
+            if (msg != null && (msg.contains("already exists") || msg.contains("ALREADY_EXISTS"))) {
+                log.debug("Composite unique constraint '{}' already exists on '{}'; treating as no-op",
+                        constraintName, tableRef.toSql());
+            } else {
+                throw new StorageException("Failed to add composite unique constraint "
+                        + constraintName + " on " + definition.name() + ": " + msg, e);
+            }
+        }
+        return constraintName;
+    }
+
+    /**
+     * Drops the composite UNIQUE constraint covering the given fields, if it
+     * exists. Returns {@code true} when a matching constraint was dropped.
+     */
+    public boolean dropCompositeUniqueConstraint(CollectionDefinition definition, List<String> fieldNames) {
+        List<String> columns = resolveConstraintColumns(definition, fieldNames);
+        TableRef tableRef = getTableRef(definition);
+        String constraintName = buildCompositeUniqueName(definition, columns);
+
+        // Check first so we can return whether anything was actually removed.
+        // ALTER TABLE ... DROP CONSTRAINT IF EXISTS would not tell us.
+        List<CompositeUniqueConstraint> existing = listCompositeUniqueConstraints(definition);
+        boolean found = existing.stream().anyMatch(c -> c.constraintName().equals(constraintName));
+        if (!found) {
+            return false;
+        }
+
+        String sql = "ALTER TABLE " + tableRef.toSql()
+                + " DROP CONSTRAINT " + sanitizeIdentifier(constraintName);
+        try {
+            jdbcTemplate.execute(sql);
+            log.info("Dropped composite unique constraint '{}' from '{}'", constraintName, tableRef.toSql());
+            return true;
+        } catch (DataAccessException e) {
+            throw new StorageException("Failed to drop composite unique constraint "
+                    + constraintName + " from " + definition.name(), e);
+        }
+    }
+
+    /**
+     * Lists every composite UNIQUE constraint on the collection's physical
+     * table whose name starts with the {@link #COMPOSITE_UNIQUE_PREFIX}, sorted
+     * by constraint name for stable output. Single-column UNIQUE constraints
+     * (those declared inline via {@code field.unique()}) are excluded.
+     */
+    public List<CompositeUniqueConstraint> listCompositeUniqueConstraints(CollectionDefinition definition) {
+        TableRef tableRef = getTableRef(definition);
+        String tableName = tableRef.tableName().toLowerCase();
+        String schemaName = tableRef.schema().toLowerCase();
+
+        // Use INFORMATION_SCHEMA — supported by both PostgreSQL and H2. Compare
+        // case-insensitively because PostgreSQL folds unquoted identifiers to
+        // lower-case while H2 (default mode) folds them to upper-case, and the
+        // same code path runs against both. The escape '!' is for the literal
+        // '_' in the cuq_ prefix so it isn't treated as a LIKE wildcard.
+        String sql = "SELECT tc.constraint_name AS cname, kcu.column_name AS colname, "
+                + "       kcu.ordinal_position AS pos "
+                + "FROM information_schema.table_constraints tc "
+                + "JOIN information_schema.key_column_usage kcu "
+                + "  ON kcu.constraint_name = tc.constraint_name "
+                + "  AND kcu.table_name = tc.table_name "
+                + "  AND kcu.table_schema = tc.table_schema "
+                + "WHERE LOWER(tc.table_name) = ? "
+                + "  AND LOWER(tc.table_schema) = ? "
+                + "  AND tc.constraint_type = 'UNIQUE' "
+                + "  AND LOWER(tc.constraint_name) LIKE '" + COMPOSITE_UNIQUE_PREFIX + "%' ESCAPE '!' "
+                + "ORDER BY tc.constraint_name, kcu.ordinal_position";
+
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbcTemplate.queryForList(sql, tableName, schemaName);
+        } catch (DataAccessException e) {
+            throw new StorageException("Failed to list composite unique constraints on "
+                    + definition.name(), e);
+        }
+
+        // Aggregate columns by constraint name, normalising to lower-case so the
+        // returned constraint names are consistent across PG and H2.
+        Map<String, List<String>> byName = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            String name = stringFromRow(row, "cname");
+            String col = stringFromRow(row, "colname");
+            if (name == null || col == null) continue;
+            byName.computeIfAbsent(name.toLowerCase(), k -> new ArrayList<>()).add(col.toLowerCase());
+        }
+
+        List<CompositeUniqueConstraint> result = new ArrayList<>();
+        for (Map.Entry<String, List<String>> e : byName.entrySet()) {
+            List<String> cols = e.getValue();
+            List<String> fields = cols.stream()
+                    .map(c -> reverseLookupFieldName(definition, c))
+                    .toList();
+            result.add(new CompositeUniqueConstraint(e.getKey(), fields));
+        }
+        return result;
+    }
+
+    private static String stringFromRow(Map<String, Object> row, String key) {
+        Object v = row.get(key);
+        if (v == null) v = row.get(key.toUpperCase());
+        return v == null ? null : v.toString();
+    }
+
+    /**
+     * Validates that every requested field maps to a physical column and
+     * returns the snake_case column list in the order the caller supplied
+     * (insertion order matters for the resulting index even though it does
+     * not affect uniqueness semantics).
+     */
+    private List<String> resolveConstraintColumns(CollectionDefinition definition, List<String> fieldNames) {
+        if (fieldNames == null || fieldNames.size() < 2) {
+            throw new IllegalArgumentException(
+                    "Composite unique constraint requires at least 2 fields; got "
+                            + (fieldNames == null ? 0 : fieldNames.size()));
+        }
+        Set<String> seen = new HashSet<>();
+        List<String> columns = new ArrayList<>();
+        for (String fieldName : fieldNames) {
+            if (fieldName == null || fieldName.isBlank()) {
+                throw new IllegalArgumentException("Field name in composite unique constraint cannot be blank");
+            }
+            FieldDefinition field = definition.getField(fieldName);
+            if (field == null) {
+                throw new IllegalArgumentException("Field '" + fieldName + "' is not defined on collection '"
+                        + definition.name() + "'");
+            }
+            if (!field.type().hasPhysicalColumn()) {
+                throw new IllegalArgumentException("Field '" + fieldName + "' has no physical column ("
+                        + field.type() + ") and cannot be part of a composite unique constraint");
+            }
+            String columnName = getColumnName(definition, field);
+            if (!seen.add(columnName)) {
+                throw new IllegalArgumentException("Duplicate field '" + fieldName
+                        + "' in composite unique constraint");
+            }
+            columns.add(columnName);
+        }
+        return columns;
+    }
+
+    /**
+     * Looks a snake_case column back up to its API field name. Falls through to
+     * the raw column name when no field maps to it (e.g. a hand-rolled SQL
+     * column on a system table).
+     */
+    private String reverseLookupFieldName(CollectionDefinition definition, String columnName) {
+        for (FieldDefinition field : definition.fields()) {
+            if (!field.type().hasPhysicalColumn()) continue;
+            if (getColumnName(definition, field).equalsIgnoreCase(columnName)) {
+                return field.name();
+            }
+        }
+        return columnName;
+    }
+
+    /** Builds a deterministic constraint name: {@code cuq_<base>_<crc-of-sorted-columns>}. */
+    String buildCompositeUniqueName(CollectionDefinition definition, List<String> columns) {
+        String baseName = sanitizeIdentifier(getBaseTableName(definition));
+        List<String> sorted = new ArrayList<>(columns);
+        java.util.Collections.sort(sorted);
+        String joined = String.join(",", sorted);
+        CRC32 crc = new CRC32();
+        crc.update(joined.getBytes(StandardCharsets.UTF_8));
+        String suffix = String.format("%08x", crc.getValue());
+        return buildBoundedIdentifier(COMPOSITE_UNIQUE_PREFIX, baseName, suffix);
+    }
+
     // ==================== Helper Methods ====================
 
     /**
@@ -1279,6 +1494,12 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     /**
      * Attempts to detect which field caused a unique constraint violation.
      *
+     * <p>If the database error message references a composite-unique
+     * constraint (prefix {@code cuq_}), every field that composes that
+     * constraint is reported as a comma-joined tuple so the API surface can
+     * point to all of them at once instead of pretending it was a
+     * single-field violation.
+     *
      * @param definition the collection definition
      * @param data the data that was being inserted/updated
      * @param e the exception
@@ -1286,6 +1507,19 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      */
     private String detectUniqueViolationField(CollectionDefinition definition, Map<String, Object> data,
             DuplicateKeyException e) {
+        // Composite unique constraints surface as a `cuq_<base>_<crc>`
+        // identifier in the JDBC driver's error message. Recover the full
+        // field list from INFORMATION_SCHEMA so the 409 response names every
+        // field that participates instead of leaving the caller to guess.
+        String compositeName = extractCompositeConstraintName(e);
+        if (compositeName != null) {
+            for (CompositeUniqueConstraint c : listCompositeUniqueConstraints(definition)) {
+                if (compositeName.equals(c.constraintName())) {
+                    return String.join(",", c.fieldNames());
+                }
+            }
+        }
+
         // Check each unique field to see which one has a duplicate
         for (FieldDefinition field : definition.fields()) {
             if (field.unique() && data.containsKey(field.name())) {
@@ -1301,5 +1535,40 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
 
         return "unknown";
+    }
+
+    /**
+     * Returns the {@code cuq_*} identifier embedded in a duplicate-key error,
+     * lower-cased so callers can compare it directly with the names returned
+     * by {@link #listCompositeUniqueConstraints}. PG emits the constraint
+     * name in lower-case; H2 emits it in upper-case — normalising on this end
+     * keeps the comparison code-path simple.
+     */
+    static String extractCompositeConstraintName(DuplicateKeyException e) {
+        if (e == null) return null;
+        // Walk the cause chain — PostgreSQL surfaces the constraint name in
+        // SQLException.getMessage(), but H2 buries it in a wrapped cause.
+        Throwable t = e;
+        while (t != null) {
+            String tm = t.getMessage();
+            if (tm != null) {
+                String lower = tm.toLowerCase();
+                int idx = lower.indexOf(COMPOSITE_UNIQUE_PREFIX);
+                if (idx >= 0) {
+                    int end = idx;
+                    while (end < lower.length()) {
+                        char ch = lower.charAt(end);
+                        if (Character.isLetterOrDigit(ch) || ch == '_') {
+                            end++;
+                        } else {
+                            break;
+                        }
+                    }
+                    return lower.substring(idx, end);
+                }
+            }
+            t = t.getCause();
+        }
+        return null;
     }
 }

@@ -67,7 +67,7 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 
 - **Model**: CollectionDefinition, FieldDefinition, FieldType, ReferenceConfig, ValidationRules — `runtime-core/.../model/`
 - **Query Engine**: DefaultQueryEngine — pagination, sorting, filtering, field selection, virtual fields — `runtime-core/.../query/`
-- **Storage**: PhysicalTableStorageAdapter — PostgreSQL with dynamic schema — `runtime-core/.../storage/`
+- **Storage**: PhysicalTableStorageAdapter — PostgreSQL with dynamic schema — `runtime-core/.../storage/`. Single-column UNIQUE is declared inline via `FieldDefinition.unique=true`; multi-column UNIQUE is added separately via `addCompositeUniqueConstraint(...)` (deterministic constraint name `cuq_<table>_<crc>`, exposed at `POST /api/_composite-unique-constraints` and the `create_unique_constraint` MCP admin tool).
 - **Flow Engine**: Flow execution, node processing, branching — `runtime-core/.../flow/`
 - **Modules**: Action handlers (CreateRecord, UpdateRecord, QueryRecords, DeleteRecord, TriggerFlow, Decision, LogMessage) — `runtime-module-core/.../module/core/`
 

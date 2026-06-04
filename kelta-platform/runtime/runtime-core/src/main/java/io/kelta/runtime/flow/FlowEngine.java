@@ -201,8 +201,14 @@ public class FlowEngine {
     public Map<String, Object> executeSubFlow(FlowDefinition subFlow,
                                                Map<String, Object> input,
                                                FlowExecutionContext parent) {
+        // Sub-flows reuse the parent's executionId so their step rows fit the
+        // flow_step_log.execution_id VARCHAR(36) FK to flow_execution(id). The
+        // parent execution row already exists; sub-step rows simply attach to
+        // it (their state_id and own row id disambiguate). Synthesizing a
+        // longer id ("<parent>-sub-<uuid>") used to overflow the column and
+        // would also FK-violate because no matching flow_execution row exists.
         FlowExecutionContext subContext = new FlowExecutionContext(
-            parent.executionId() + "-sub-" + UUID.randomUUID().toString().substring(0, 8),
+            parent.executionId(),
             parent.tenantId(), parent.flowId(), parent.userId(),
             subFlow, input);
 

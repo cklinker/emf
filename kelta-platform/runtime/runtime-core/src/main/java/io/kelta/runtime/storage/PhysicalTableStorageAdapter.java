@@ -918,14 +918,26 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             value = TypeCoercionService.coerceValue(value, fieldDef.type());
         }
 
+        // Detect array-backed columns (Postgres TEXT[]) so we emit ANY(...) /
+        // <> ALL(...) / unnest+ILIKE instead of scalar operators that 500 the
+        // gateway on JSONB-coerced arrays. Currently only MULTI_PICKLIST maps
+        // to TEXT[]; the legacy FieldType.ARRAY value lands in JSONB so it is
+        // intentionally NOT included here.
+        boolean isArrayColumn = fieldDef != null
+            && fieldDef.type() == FieldType.MULTI_PICKLIST;
+
         return switch (operator) {
             case EQ -> {
                 params.add(value);
-                yield fieldName + " = ?";
+                yield isArrayColumn
+                    ? "? = ANY(" + fieldName + ")"
+                    : fieldName + " = ?";
             }
             case NEQ -> {
                 params.add(value);
-                yield fieldName + " != ?";
+                yield isArrayColumn
+                    ? "? <> ALL(" + fieldName + ")"
+                    : fieldName + " != ?";
             }
             case GT -> {
                 params.add(value);
@@ -949,6 +961,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 yield isNull ? fieldName + " IS NULL" : fieldName + " IS NOT NULL";
             }
             case CONTAINS -> {
+                if (isArrayColumn) {
+                    // Array-contains: exact element match. Use ANY() so the
+                    // index on the array column can be considered. For
+                    // substring search across elements, use ICONTAINS.
+                    params.add(value);
+                    yield "? = ANY(" + fieldName + ")";
+                }
                 params.add("%" + value + "%");
                 yield fieldName + " LIKE ?";
             }
@@ -961,6 +980,12 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 yield fieldName + " LIKE ?";
             }
             case ICONTAINS -> {
+                if (isArrayColumn) {
+                    // Case-insensitive element match across the array.
+                    params.add(value.toString().toLowerCase());
+                    yield "EXISTS (SELECT 1 FROM unnest(" + fieldName
+                        + ") AS elt WHERE LOWER(elt) = ?)";
+                }
                 params.add("%" + value.toString().toLowerCase() + "%");
                 yield "LOWER(" + fieldName + ") LIKE ?";
             }

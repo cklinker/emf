@@ -1,6 +1,7 @@
 package io.kelta.runtime.module.core.handlers;
 
 import io.kelta.runtime.model.CollectionDefinition;
+import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.workflow.ActionContext;
 import io.kelta.runtime.workflow.ActionResult;
@@ -8,9 +9,11 @@ import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @DisplayName("CreateRecordActionHandler")
@@ -18,7 +21,17 @@ class CreateRecordActionHandlerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final CollectionRegistry registry = mock(CollectionRegistry.class);
-    private final CreateRecordActionHandler handler = new CreateRecordActionHandler(objectMapper, registry);
+    private final QueryEngine queryEngine = mock(QueryEngine.class);
+    private final CreateRecordActionHandler handler =
+        new CreateRecordActionHandler(objectMapper, registry, queryEngine);
+
+    {
+        when(queryEngine.create(any(), any())).thenAnswer(inv -> {
+            Map<String, Object> created = new HashMap<>((Map<String, Object>) inv.getArgument(1));
+            created.put("id", "test-id-001");
+            return created;
+        });
+    }
 
     @Test
     @DisplayName("Should have correct action type key")

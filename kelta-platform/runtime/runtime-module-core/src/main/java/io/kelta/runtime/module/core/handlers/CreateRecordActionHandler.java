@@ -1,6 +1,7 @@
 package io.kelta.runtime.module.core.handlers;
 
 import io.kelta.runtime.model.CollectionDefinition;
+import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.workflow.ActionContext;
 import io.kelta.runtime.workflow.ActionHandler;
@@ -39,10 +40,14 @@ public class CreateRecordActionHandler implements ActionHandler {
 
     private final ObjectMapper objectMapper;
     private final CollectionRegistry collectionRegistry;
+    private final QueryEngine queryEngine;
 
-    public CreateRecordActionHandler(ObjectMapper objectMapper, CollectionRegistry collectionRegistry) {
+    public CreateRecordActionHandler(ObjectMapper objectMapper,
+                                     CollectionRegistry collectionRegistry,
+                                     QueryEngine queryEngine) {
         this.objectMapper = objectMapper;
         this.collectionRegistry = collectionRegistry;
+        this.queryEngine = queryEngine;
     }
 
     @Override
@@ -92,10 +97,16 @@ public class CreateRecordActionHandler implements ActionHandler {
             log.info("Create record action: targetCollection={}, fields={}",
                 targetCollectionName, recordData.keySet());
 
-            return ActionResult.success(Map.of(
-                "targetCollectionName", targetCollectionName,
-                "recordData", recordData
-            ));
+            Map<String, Object> created = queryEngine.create(targetCollection, recordData);
+            Object createdId = created != null ? created.get("id") : null;
+
+            Map<String, Object> output = new HashMap<>();
+            output.put("targetCollectionName", targetCollectionName);
+            output.put("recordData", recordData);
+            output.put("record", created);
+            output.put("id", createdId);
+            output.put("recordId", createdId);
+            return ActionResult.success(output);
         } catch (Exception e) {
             log.error("Failed to execute create record action: {}", e.getMessage(), e);
             return ActionResult.failure(e);

@@ -62,7 +62,7 @@ public class CoreActionsModule implements KeltaModule {
         handlers.add(new TriggerFlowActionHandler(objectMapper));
 
         // Handlers needing CollectionRegistry
-        handlers.add(new CreateRecordActionHandler(objectMapper, collectionRegistry));
+        handlers.add(new CreateRecordActionHandler(objectMapper, collectionRegistry, queryEngine));
         handlers.add(new UpdateRecordActionHandler(objectMapper, collectionRegistry, queryEngine));
         handlers.add(new DeleteRecordActionHandler(objectMapper, collectionRegistry));
 

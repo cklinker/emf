@@ -50,13 +50,22 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
   const resource = (data.resource as string) || ''
   const { apiClient } = useApi()
 
-  const { data: modules } = useQuery({
+  const { data: modulesResponse } = useQuery({
     queryKey: ['modules'],
-    queryFn: () => apiClient.get<TenantModule[]>('/api/modules'),
+    queryFn: () => apiClient.get<unknown>('/api/modules'),
     staleTime: 30_000,
   })
 
-  const activeModules = (modules ?? []).filter(
+  const modules: TenantModule[] = React.useMemo(() => {
+    if (Array.isArray(modulesResponse)) return modulesResponse as TenantModule[]
+    if (modulesResponse && typeof modulesResponse === 'object') {
+      const envelope = modulesResponse as { data?: unknown }
+      if (Array.isArray(envelope.data)) return envelope.data as TenantModule[]
+    }
+    return []
+  }, [modulesResponse])
+
+  const activeModules = modules.filter(
     (m) => m.status === 'ACTIVE' && m.actions.length > 0
   )
 

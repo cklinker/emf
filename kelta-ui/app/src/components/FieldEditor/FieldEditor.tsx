@@ -393,7 +393,7 @@ const errorInputClasses = 'border-destructive focus:border-destructive focus:rin
  */
 export function FieldEditor({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  collectionId,
+  collectionId: _collectionId,
   collectionName,
   field,
   collections = [],

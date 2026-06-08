@@ -1,4 +1,3 @@
-import React from 'react'
 import { FieldLabel } from '@/components/kelta'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'

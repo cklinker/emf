@@ -1,4 +1,3 @@
-import React from 'react'
 import { FieldLabel } from '@/components/kelta'
 import type { RetryRule, CatchRule } from '../../types'
 import { DataPathFields } from './DataPathFields'

@@ -36,4 +36,5 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 
 ## 2026-06-08
 
-- 2026-06-08 chore(web): make `kelta-web` root `build` reliable so `@kelta/*` dist folders are produced — replaced `npm run build --workspaces` (parallel, raced and left plugin-sdk's `rollupTypes` unable to follow `KeltaClient` from un-built sdk) with sequential `formula`+`sdk` → `plugin-sdk`+`components`. Running this once before `kelta-ui/app`'s `npm install`/`npm run build` resolves all 46 `TS2307` errors (CHORE-2026-06-08-0002)
+- 2026-06-08 chore(ui): remove unused React imports and rename/mark unused locals across `kelta-ui/app` to clear all 86 TS6133 errors (CHORE-2026-06-08-0001)
+- 2026-06-08 chore(ui): remove unused React imports and rename/mark unused locals across `kelta-ui/app` to clear all 86 TS6133 errors (CHORE-2026-06-08-0001)

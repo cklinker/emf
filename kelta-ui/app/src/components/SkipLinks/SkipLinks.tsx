@@ -69,7 +69,7 @@ export function SkipLinks({ targets = DEFAULT_TARGETS }: SkipLinksProps): React.
    * Handle click on skip link
    * Focuses the target element after navigation
    */
-  const handleClick = (event: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+  const handleClick = (_event: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     const targetElement = document.getElementById(targetId)
 
     if (targetElement) {

@@ -81,6 +81,17 @@ Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/event/`
 | NATS Box | 8090 | tools |
 | Redis Commander | 8091 | tools |
 
+## Frontend workspace build (`kelta-web` → `kelta-ui/app`)
+
+`kelta-ui/app` consumes the four `@kelta/*` packages in `kelta-web/packages/*` as `file:` deps — `npm install` symlinks them but does **not** build them, so the `dist/` outputs that `package.json`'s `main`/`module`/`types` point at must exist before `tsc -b` can resolve any of them (otherwise: 46 `TS2307` "Cannot find module" errors).
+
+Build order matters because `plugin-sdk` and `components` use `vite-plugin-dts` with `rollupTypes: true`, which resolves re-exported symbols (e.g. `KeltaClient`) from `@kelta/sdk`'s rolled-up `.d.ts` — that file must already exist. `kelta-web`'s root `build` script and `kelta-ui/Dockerfile` both run:
+
+1. `formula` + `sdk` (no internal deps)
+2. `plugin-sdk` + `components` (depend on `formula`/`sdk`)
+
+Local dev: `cd kelta-web && npm install && npm run build` once before `cd kelta-ui/app && npm install && npm run build`.
+
 ## Email (SMTP)
 
 Worker emails go out via `spring-boot-starter-mail`. The kelta-worker `application.yml`

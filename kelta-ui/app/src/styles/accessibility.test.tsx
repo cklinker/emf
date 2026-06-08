@@ -14,7 +14,6 @@
  * - 14.8: Provide alt text for all non-text content
  */
 
-import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 

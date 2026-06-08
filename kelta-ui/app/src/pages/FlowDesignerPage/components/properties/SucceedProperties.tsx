@@ -1,5 +1,3 @@
-import React from 'react'
-
 export function SucceedProperties() {
   return (
     <div className="rounded-md border border-border bg-muted/50 p-3 text-xs text-muted-foreground">

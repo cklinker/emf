@@ -204,7 +204,7 @@ function approvalStatusToEntryType(status: string): TimelineEntryType {
 export function ActivityTimeline({
   collectionId,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  collectionName,
+  collectionName: _collectionName,
   recordId,
   recordCreatedAt,
   recordUpdatedAt,

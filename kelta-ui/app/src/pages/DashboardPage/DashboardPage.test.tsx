@@ -22,7 +22,6 @@
  * - 13.7: Dashboard displays health alerts when services are unhealthy
  */
 
-import React from 'react'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {

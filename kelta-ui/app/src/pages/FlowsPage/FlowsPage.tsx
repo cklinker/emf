@@ -59,7 +59,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [flowToDelete, setFlowToDelete] = useState<Flow | null>(null)
   const [execItemId, setExecItemId] = useState<string | null>(null)
-  const [execItemName, setExecItemName] = useState('')
+  const [_execItemName, setExecItemName] = useState('')
   const [runDialogOpen, setRunDialogOpen] = useState(false)
   const [runFlowTarget, setRunFlowTarget] = useState<Flow | null>(null)
 
@@ -228,6 +228,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
         ) : null,
     },
   ]
+  void execColumns
 
   const handleDeleteClick = useCallback((flow: Flow) => {
     setFlowToDelete(flow)
@@ -426,7 +427,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
       {execItemId && (
         <ExecutionLogModal<FlowExecutionLog>
           title={t('flows.flowExecutionHistory')}
-          subtitle={execItemName}
+          subtitle={_execItemName}
           columns={execColumns}
           data={executions ?? []}
           isLoading={execLoading}

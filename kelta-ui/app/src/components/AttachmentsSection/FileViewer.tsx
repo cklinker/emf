@@ -6,7 +6,6 @@
  * files without any additional dependencies.
  */
 
-import React from 'react'
 import { Download } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { Button } from '@/components/ui/button'

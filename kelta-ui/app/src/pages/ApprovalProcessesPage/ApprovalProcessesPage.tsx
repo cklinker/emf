@@ -513,7 +513,7 @@ export function ApprovalProcessesPage({
     null
   )
   const [instancesItemId, setInstancesItemId] = useState<string | null>(null)
-  const [instancesItemName, setInstancesItemName] = useState('')
+  const [_instancesItemName, setInstancesItemName] = useState('')
 
   const {
     data: approvalProcesses,
@@ -575,8 +575,8 @@ export function ApprovalProcessesPage({
   // Instances query — fetches from JSON:API endpoint
   const {
     data: allInstances,
-    isLoading: instancesLoading,
-    error: instancesError,
+    isLoading: _instancesLoading,
+    error: _instancesError,
   } = useQuery({
     queryKey: ['approval-instances'],
     queryFn: () => keltaClient.admin.approvals.listInstances(''),
@@ -586,6 +586,7 @@ export function ApprovalProcessesPage({
   const filteredInstances = (allInstances ?? []).filter(
     (i) => i.approvalProcessId === instancesItemId
   )
+  void filteredInstances
 
   // Approve mutation — graceful degradation (action endpoint not available in JSON:API)
   const approveMutation = useMutation({
@@ -750,6 +751,7 @@ export function ApprovalProcessesPage({
       },
     },
   ]
+  void instanceColumns
 
   const handleCreate = useCallback(() => {
     setEditingApprovalProcess(undefined)
@@ -1014,11 +1016,11 @@ export function ApprovalProcessesPage({
       {instancesItemId && (
         <ExecutionLogModal<ApprovalInstance>
           title={t('approvals.approvalInstances')}
-          subtitle={instancesItemName}
+          subtitle={_instancesItemName}
           columns={instanceColumns}
           data={filteredInstances}
-          isLoading={instancesLoading}
-          error={instancesError instanceof Error ? instancesError : null}
+          isLoading={_instancesLoading}
+          error={_instancesError instanceof Error ? _instancesError : null}
           onClose={() => setInstancesItemId(null)}
           emptyMessage={t('approvals.noInstances')}
         />

@@ -363,7 +363,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [scriptToDelete, setScriptToDelete] = useState<Script | null>(null)
   const [logsItemId, setLogsItemId] = useState<string | null>(null)
-  const [logsItemName, setLogsItemName] = useState('')
+  const [_logsItemName, setLogsItemName] = useState('')
 
   const {
     data: logs,
@@ -414,6 +414,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
           : '-',
     },
   ]
+  void logColumns
 
   const {
     data: scripts,
@@ -702,7 +703,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
       {logsItemId && (
         <ExecutionLogModal<ScriptExecutionLog>
           title="Script Execution Logs"
-          subtitle={logsItemName}
+          subtitle={_logsItemName}
           columns={logColumns}
           data={logs ?? []}
           isLoading={logsLoading}

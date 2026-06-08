@@ -1,4 +1,3 @@
-import React from 'react'
 import { Outlet, NavLink, Navigate, useLocation, useParams } from 'react-router-dom'
 import { useI18n } from '../../context/I18nContext'
 import { cn } from '@/lib/utils'

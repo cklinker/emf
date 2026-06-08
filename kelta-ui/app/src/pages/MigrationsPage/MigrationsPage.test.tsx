@@ -17,7 +17,6 @@
  * - 10.8: Display status, duration, and step details for each run
  */
 
-import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   createTestWrapper,

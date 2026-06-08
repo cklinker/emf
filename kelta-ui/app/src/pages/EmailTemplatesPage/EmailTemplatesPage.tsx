@@ -685,12 +685,12 @@ export function EmailTemplatesPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [templateToDelete, setTemplateToDelete] = useState<EmailTemplate | null>(null)
   const [logsItemId, setLogsItemId] = useState<string | null>(null)
-  const [logsItemName, setLogsItemName] = useState('')
+  const [_logsItemName, setLogsItemName] = useState('')
 
   const {
     data: allEmailLogs,
-    isLoading: logsLoading,
-    error: logsError,
+    isLoading: _logsLoading,
+    error: _logsError,
   } = useQuery({
     queryKey: ['email-template-logs', logsItemId],
     queryFn: () => keltaClient.admin.emailTemplates.listLogs(),
@@ -698,6 +698,7 @@ export function EmailTemplatesPage({
   })
 
   const filteredLogs = (allEmailLogs ?? []).filter((log) => log.templateId === logsItemId)
+  void filteredLogs
 
   const logColumns: LogColumn<EmailLog>[] = [
     { key: 'status', header: 'Status' },
@@ -720,6 +721,7 @@ export function EmailTemplatesPage({
           : '-',
     },
   ]
+  void logColumns
 
   const {
     data: templates,
@@ -978,11 +980,11 @@ export function EmailTemplatesPage({
       {logsItemId && (
         <ExecutionLogModal<EmailLog>
           title="Email Logs"
-          subtitle={logsItemName}
+          subtitle={_logsItemName}
           columns={logColumns}
           data={filteredLogs}
-          isLoading={logsLoading}
-          error={logsError instanceof Error ? logsError : null}
+          isLoading={_logsLoading}
+          error={_logsError instanceof Error ? _logsError : null}
           onClose={() => setLogsItemId(null)}
           emptyMessage="No email logs found."
         />

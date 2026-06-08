@@ -1,4 +1,3 @@
-import React from 'react'
 import type { Node } from '@xyflow/react'
 import { X } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'

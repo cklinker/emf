@@ -392,7 +392,7 @@ export function ScheduledJobsPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [scheduledJobToDelete, setScheduledJobToDelete] = useState<ScheduledJob | null>(null)
   const [logsItemId, setLogsItemId] = useState<string | null>(null)
-  const [logsItemName, setLogsItemName] = useState('')
+  const [_logsItemName, setLogsItemName] = useState('')
 
   const {
     data: logs,
@@ -442,6 +442,7 @@ export function ScheduledJobsPage({
           : '-',
     },
   ]
+  void logColumns
 
   const {
     data: scheduledJobs,
@@ -787,7 +788,7 @@ export function ScheduledJobsPage({
       {logsItemId && (
         <ExecutionLogModal<JobExecutionLog>
           title="Scheduled Job Logs"
-          subtitle={logsItemName}
+          subtitle={_logsItemName}
           columns={logColumns}
           data={logs ?? []}
           isLoading={logsLoading}

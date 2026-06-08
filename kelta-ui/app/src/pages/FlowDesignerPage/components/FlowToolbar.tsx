@@ -1,4 +1,3 @@
-import React from 'react'
 import { ArrowLeft, Save, Code, CheckCircle, Play, Upload, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'

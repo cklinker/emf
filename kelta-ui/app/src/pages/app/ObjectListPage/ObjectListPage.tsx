@@ -49,6 +49,7 @@ import type { SortState, FilterCondition, CollectionRecord } from '@/hooks/useCo
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
 import { ListViewToolbar } from '@/components/ListViewToolbar'
+import { CsvImportDialog } from '@/components/CsvImportDialog/CsvImportDialog'
 import { FilterBar } from '@/components/FilterBar'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { QuickActionsMenu } from '@/components/QuickActions'
@@ -168,6 +169,9 @@ export function ObjectListPage(): React.ReactElement {
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<CollectionRecord | null>(null)
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
+
+  // Import dialog state
+  const [showImportDialog, setShowImportDialog] = useState(false)
 
   // Fetch collection schema
   const {
@@ -491,6 +495,7 @@ export function ObjectListPage(): React.ReactElement {
         onBulkDelete={handleBulkDeleteClick}
         onExportCsv={handleExportCsv}
         onExportJson={handleExportJson}
+        onImportCsv={permissions.canCreate ? () => setShowImportDialog(true) : undefined}
         onClearSelection={handleClearSelection}
         canCreate={permissions.canCreate}
         canDelete={permissions.canDelete}
@@ -545,6 +550,14 @@ export function ObjectListPage(): React.ReactElement {
           onPageSizeChange={handlePageSizeChange}
         />
       )}
+
+      {/* CSV import dialog */}
+      <CsvImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        collectionName={collectionName || ''}
+        onImported={refetch}
+      />
 
       {/* Single delete confirmation */}
       <AlertDialog

@@ -126,7 +126,7 @@ function buildZodSchema(fields: FieldDefinition[]): z.ZodObject<Record<string, z
     if (field.validation && !isNumericType) {
       fieldSchema = applyValidationRules(
         fieldSchema,
-        field.validation as Record<string, unknown>,
+        field.validation,
         field.type
       );
     } else if (field.validation && isNumericType) {

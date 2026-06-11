@@ -9,7 +9,7 @@
  */
 
 import React from 'react'
-import { Plus, Download, Trash2, ChevronDown } from 'lucide-react'
+import { Plus, Download, Upload, Trash2, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -34,6 +34,8 @@ export interface ListViewToolbarProps {
   onExportCsv?: () => void
   /** Callback for JSON export */
   onExportJson?: () => void
+  /** Callback for CSV import */
+  onImportCsv?: () => void
   /** Callback to clear selection */
   onClearSelection?: () => void
   /** Whether the user can create records (controls New button visibility) */
@@ -52,6 +54,7 @@ export function ListViewToolbar({
   onBulkDelete,
   onExportCsv,
   onExportJson,
+  onImportCsv,
   onClearSelection,
   canCreate = true,
   canDelete = true,
@@ -95,7 +98,15 @@ export function ListViewToolbar({
                   Export as JSON
                 </DropdownMenuItem>
               )}
-              {(onExportCsv || onExportJson) && onBulkDelete && <DropdownMenuSeparator />}
+              {onImportCsv && (
+                <DropdownMenuItem onClick={onImportCsv}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import CSV
+                </DropdownMenuItem>
+              )}
+              {(onExportCsv || onExportJson || onImportCsv) && onBulkDelete && (
+                <DropdownMenuSeparator />
+              )}
               {canDelete && onBulkDelete && selectedCount > 0 && (
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"

@@ -28,4 +28,7 @@ npm-debug.log*
 .env.*.local
 
 # Package manager
-package-lock.json
+# package-lock.json is intentionally committed so CI builds are
+# reproducible and survive broken upstream releases (e.g. Vue 3.5.36
+# was published with @vue/compiler-dom pinned to a missing
+# @vue/shared@3.5.36, breaking every fresh npm install).

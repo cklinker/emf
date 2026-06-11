@@ -274,7 +274,14 @@ jobs:
           fi
           psql --version
 
+      # Disabled: the kelta-ci-db pool path was timing out under load. Leaving
+      # CI_DB_JDBC_URL unset makes the harness fall back to per-test
+      # testcontainers-managed postgres (the "Local dev" branch), which is
+      # what integration tests have effectively been running on for months
+      # (the checkout step was silently failing and the eval swallowed the
+      # error). Re-enable once the pool is reliable enough.
       - name: Checkout CI DB schema
+        if: false
         run: |
           eval "$(scripts/ci/checkout-db.sh)"
           echo "::add-mask::$CI_DB_PASSWORD"
@@ -317,7 +324,7 @@ jobs:
           retention-days: 7
 
       - name: Release CI DB schema
-        if: always()
+        if: false
         run: scripts/ci/release-db.sh
 
   # ===========================================================================

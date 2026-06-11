@@ -46,7 +46,12 @@ else
   ord=$(( RANDOM % CI_DB_POOL_SIZE ))
 fi
 
-host="${CI_DB_SVC}-${ord}.${CI_DB_SVC}.${CI_DB_NAMESPACE}.svc"
+# Use the fully qualified .svc.cluster.local form. The bare ".svc" works
+# inside k8s pods (DNS search domains + ndots:5) but the JDBC URL below is
+# also consumed by service containers spawned via the host docker daemon,
+# whose embedded resolver uses ndots:0 → no search-domain expansion. Without
+# the .cluster.local suffix those containers fail with UnknownHostException.
+host="${CI_DB_SVC}-${ord}.${CI_DB_SVC}.${CI_DB_NAMESPACE}.svc.cluster.local"
 port=5432
 
 # Unique schema per run. GITHUB_RUN_ID + GITHUB_RUN_ATTEMPT is unique within

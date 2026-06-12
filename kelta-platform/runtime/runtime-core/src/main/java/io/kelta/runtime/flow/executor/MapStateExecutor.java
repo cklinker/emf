@@ -10,12 +10,23 @@ import java.util.concurrent.*;
 /**
  * Executes Map states by iterating over an array in the state data
  * and executing a sub-flow for each item.
+ * <p>
+ * Iterations commonly use {@code Catch: [{ ErrorEquals: [States.ALL], Next: Done }]}
+ * so one bad item does not abort the whole batch. Historically those catches made
+ * per-iteration failures disappear: the Map state returned a list of "successful"
+ * iteration results indistinguishable from a clean run. This executor now records
+ * every iteration whose sub-flow caught an error and surfaces aggregate counts
+ * plus a capped sample of errors in the Map state's result, so callers — and the
+ * top-level execution summary — see exactly how many items failed.
  *
  * @since 1.0.0
  */
 public class MapStateExecutor implements StateExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(MapStateExecutor.class);
+
+    /** Maximum number of per-iteration errors retained on the Map result. */
+    public static final int MAX_ERROR_SAMPLES = 10;
 
     private final StateDataResolver dataResolver;
     private final ExecutorService executorService;
@@ -59,7 +70,7 @@ public class MapStateExecutor implements StateExecutor {
         Semaphore semaphore = new Semaphore(maxConcurrency);
 
         // Execute sub-flow for each item
-        List<Future<Map<String, Object>>> futures = new ArrayList<>();
+        List<Future<SubFlowResult>> futures = new ArrayList<>();
         for (Object item : items) {
             Map<String, Object> itemInput;
             if (item instanceof Map) {
@@ -79,11 +90,29 @@ public class MapStateExecutor implements StateExecutor {
             }));
         }
 
-        // Collect results
-        List<Map<String, Object>> results = new ArrayList<>();
+        // Collect per-iteration results, separating clean iterations from those
+        // whose sub-flow caught an error.
+        List<Map<String, Object>> itemResults = new ArrayList<>();
+        List<Map<String, Object>> errorSamples = new ArrayList<>();
+        int succeeded = 0;
+        int failed = 0;
+
         for (int i = 0; i < futures.size(); i++) {
             try {
-                results.add(futures.get(i).get());
+                SubFlowResult itemResult = futures.get(i).get();
+                itemResults.add(itemResult.stateData());
+
+                if (itemResult.hadCaughtError()) {
+                    failed++;
+                    if (errorSamples.size() < MAX_ERROR_SAMPLES) {
+                        errorSamples.add(buildErrorSample(i, itemResult.caughtErrors()));
+                    }
+                    log.warn("Map '{}' iteration {} caught {} error(s) — first: {}",
+                        map.name(), i, itemResult.caughtErrors().size(),
+                        itemResult.caughtErrors().get(0).errorCode());
+                } else {
+                    succeeded++;
+                }
             } catch (ExecutionException e) {
                 log.error("Map item {} failed", i, e.getCause());
                 return StateExecutionResult.failure("MapItemFailed",
@@ -96,9 +125,38 @@ public class MapStateExecutor implements StateExecutor {
             }
         }
 
+        // Aggregate iteration outcomes into a single result payload. The items
+        // list is preserved (so downstream states can still read the per-item
+        // data) and joined by succeeded/failed/errors so callers can detect
+        // partial failure without having to introspect each item.
+        Map<String, Object> aggregated = new LinkedHashMap<>();
+        aggregated.put("succeeded", succeeded);
+        aggregated.put("failed", failed);
+        aggregated.put("errors", errorSamples);
+        aggregated.put("items", itemResults);
+
+        // Propagate failedCount up to the parent execution so the top-level
+        // execution summary reflects it even when the Map state passes.
+        if (failed > 0) {
+            context.addFailedCount(failed);
+        }
+
+        // failOnPartial: convert any caught iteration into a state failure so
+        // the run cannot silently report success.
+        if (map.failOnPartial() && failed > 0) {
+            String message = failed + " of " + items.size()
+                + " iteration(s) caught errors; failOnPartial=true";
+            log.warn("Map '{}' failing: {}", map.name(), message);
+            // Preserve the aggregate at the configured ResultPath so the
+            // failure record still carries the per-iteration sample.
+            Map<String, Object> failureData = dataResolver.applyResultPath(
+                context.stateData(), aggregated, map.resultPath());
+            return StateExecutionResult.failure("MapPartialFailure", message, failureData);
+        }
+
         // Apply ResultPath
         Map<String, Object> afterResult = dataResolver.applyResultPath(
-            context.stateData(), results, map.resultPath());
+            context.stateData(), aggregated, map.resultPath());
         Map<String, Object> output = dataResolver.applyOutputPath(afterResult, map.outputPath());
 
         if (map.end()) {
@@ -107,9 +165,29 @@ public class MapStateExecutor implements StateExecutor {
         return StateExecutionResult.success(map.next(), output);
     }
 
+    private Map<String, Object> buildErrorSample(int index,
+                                                 List<FlowExecutionContext.CaughtError> caughtErrors) {
+        Map<String, Object> sample = new LinkedHashMap<>();
+        sample.put("index", index);
+        FlowExecutionContext.CaughtError first = caughtErrors.get(0);
+        sample.put("stateId", first.stateId());
+        sample.put("error", first.errorCode());
+        sample.put("cause", first.errorMessage());
+        if (caughtErrors.size() > 1) {
+            sample.put("additionalCatches", caughtErrors.size() - 1);
+        }
+        return sample;
+    }
+
     private StateExecutionResult handleNoItems(StateDefinition.MapState map, FlowExecutionContext context) {
+        Map<String, Object> aggregated = new LinkedHashMap<>();
+        aggregated.put("succeeded", 0);
+        aggregated.put("failed", 0);
+        aggregated.put("errors", List.of());
+        aggregated.put("items", List.of());
+
         Map<String, Object> afterResult = dataResolver.applyResultPath(
-            context.stateData(), List.of(), map.resultPath());
+            context.stateData(), aggregated, map.resultPath());
         Map<String, Object> output = dataResolver.applyOutputPath(afterResult, map.outputPath());
         if (map.end()) {
             return StateExecutionResult.terminalSuccess(output);

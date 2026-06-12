@@ -1,7 +1,9 @@
 package io.kelta.runtime.flow;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,10 +20,12 @@ public class FlowExecutionContext {
     private final String userId;
     private final FlowDefinition definition;
     private final Instant startedAt;
+    private final List<CaughtError> caughtErrors = new ArrayList<>();
 
     private Map<String, Object> stateData;
     private String currentStateId;
     private int stepCount;
+    private int failedCount;
     private boolean cancelled;
     private boolean completed;
     private String finalStatus;
@@ -92,4 +96,38 @@ public class FlowExecutionContext {
     public int elapsedMs() {
         return (int) (System.currentTimeMillis() - startedAt.toEpochMilli());
     }
+
+    /**
+     * Records an error that was caught by a Catch policy. The execution still
+     * proceeds to the catch's next state, but the swallowed error is preserved
+     * so callers (e.g. Map state) can detect that an iteration had a failure
+     * even though it was recovered from.
+     */
+    public void recordCaughtError(String stateId, String errorCode, String errorMessage) {
+        caughtErrors.add(new CaughtError(stateId, errorCode, errorMessage));
+    }
+
+    /**
+     * Returns the list of errors caught during this execution context's lifetime.
+     */
+    public List<CaughtError> caughtErrors() {
+        return caughtErrors;
+    }
+
+    /**
+     * Returns the running count of failed iterations attributed to this context
+     * (incremented by states such as Map when their sub-flows record caught errors).
+     */
+    public int failedCount() {
+        return failedCount;
+    }
+
+    public void addFailedCount(int n) {
+        this.failedCount += n;
+    }
+
+    /**
+     * Describes an error that a Catch policy intercepted.
+     */
+    public record CaughtError(String stateId, String errorCode, String errorMessage) {}
 }

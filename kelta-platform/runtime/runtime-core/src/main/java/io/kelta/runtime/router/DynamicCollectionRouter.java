@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -155,7 +156,7 @@ public class DynamicCollectionRouter {
     @GetMapping("/{collectionName}")
     public ResponseEntity<Map<String, Object>> list(
             @PathVariable("collectionName") String collectionName,
-            @RequestParam(required = false) Map<String, String> params,
+            @RequestParam(required = false) MultiValueMap<String, String> params,
             HttpServletRequest request) {
 
         logger.debug("List request for collection '{}' with params: {}", collectionName, params);
@@ -227,7 +228,7 @@ public class DynamicCollectionRouter {
     public ResponseEntity<Map<String, Object>> get(
             @PathVariable("collectionName") String collectionName,
             @PathVariable("id") String id,
-            @RequestParam(required = false) Map<String, String> params,
+            @RequestParam(required = false) MultiValueMap<String, String> params,
             HttpServletRequest request) {
 
         logger.debug("Get request for collection '{}', id '{}'", collectionName, id);
@@ -520,7 +521,7 @@ public class DynamicCollectionRouter {
             @PathVariable("parentName") String parentName,
             @PathVariable("parentId") String parentId,
             @PathVariable("childName") String childName,
-            @RequestParam(required = false) Map<String, String> params,
+            @RequestParam(required = false) MultiValueMap<String, String> params,
             HttpServletRequest request) {
 
         logger.debug("List children request: parent='{}', parentId='{}', child='{}'",
@@ -1264,7 +1265,7 @@ public class DynamicCollectionRouter {
     private Map<String, Object> toJsonApiListResponse(QueryResult result, String type,
                                                        CollectionDefinition definition,
                                                        String requestPath,
-                                                       Map<String, String> params) {
+                                                       MultiValueMap<String, String> params) {
         List<Map<String, Object>> jsonApiData = new ArrayList<>();
         for (Map<String, Object> record : result.data()) {
             jsonApiData.add(toJsonApiResourceObject(record, type, definition));
@@ -1296,7 +1297,7 @@ public class DynamicCollectionRouter {
         response.put("metadata", metadata);
         response.put("links", PaginationLinks.build(
             requestPath,
-            params,
+            params != null ? params.toSingleValueMap() : null,
             result.metadata().currentPage(),
             effectivePageSize,
             result.metadata().totalPages()
@@ -1310,11 +1311,11 @@ public class DynamicCollectionRouter {
      * {@link Pagination#fromParams(Map)} clamped the caller's value so the
      * response can echo what was originally requested.
      */
-    private Integer parseRequestedPageSize(Map<String, String> params) {
+    private Integer parseRequestedPageSize(MultiValueMap<String, String> params) {
         if (params == null) {
             return null;
         }
-        String raw = params.get("page[size]");
+        String raw = params.getFirst("page[size]");
         if (raw == null || raw.isBlank()) {
             return null;
         }
@@ -1333,11 +1334,11 @@ public class DynamicCollectionRouter {
      * @param params the query parameters
      * @return list of include names, or empty list if not present
      */
-    private List<String> parseIncludeParam(Map<String, String> params) {
+    private List<String> parseIncludeParam(MultiValueMap<String, String> params) {
         if (params == null) {
             return List.of();
         }
-        String includeParam = params.get("include");
+        String includeParam = params.getFirst("include");
         if (includeParam == null || includeParam.isBlank()) {
             return List.of();
         }

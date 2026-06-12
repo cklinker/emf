@@ -3,10 +3,10 @@ package io.kelta.worker.controller;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.ScheduledJobRepository;
 import io.kelta.worker.service.ScheduledJobExecutorService;
+import io.kelta.worker.util.CronExpressions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -68,11 +68,11 @@ public class ScheduledJobActionsController {
         String cronExpression = (String) job.get("cron_expression");
         String timezone = (String) job.get("timezone");
 
-        // Validate cron is still valid
+        // Validate cron is still valid (accept 5-field as well as 6-field)
         try {
-            CronExpression.parse(cronExpression);
+            CronExpressions.normalize(cronExpression);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid cron expression: " + cronExpression));
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid cron expression: " + e.getMessage()));
         }
 
         Instant nextRunAt = ScheduledJobRepository.calculateNextRunAt(cronExpression, timezone);
@@ -119,7 +119,7 @@ public class ScheduledJobActionsController {
         }
 
         try {
-            CronExpression.parse(expression);
+            CronExpressions.normalize(expression);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid cron expression: " + e.getMessage()));
         }

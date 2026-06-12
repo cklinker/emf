@@ -1,23 +1,36 @@
 package io.kelta.worker.listener;
 
 import io.kelta.runtime.workflow.BeforeSaveHook;
+import io.kelta.runtime.workflow.BeforeSaveResult;
 import io.kelta.worker.repository.ScheduledJobRepository;
+import io.kelta.worker.util.CronExpressions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.support.CronExpression;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Keeps the {@code scheduled_job} table in sync with SCHEDULED flow configurations.
+ * Keeps the {@code scheduled_job} table in sync with SCHEDULED flow configurations,
+ * and validates the cron expression up-front so misconfigured flows fail loudly
+ * instead of silently never running.
  *
- * <p>When a flow with {@code flowType = SCHEDULED} is created or updated, this hook
- * upserts the corresponding {@code scheduled_job} row using the cron expression from
- * {@code triggerConfig}. On flow deletion (or type change away from SCHEDULED), the job
- * is removed.
+ * <p>When a flow with {@code flowType = SCHEDULED} is created or updated, this hook:
+ * <ul>
+ *   <li>{@link #beforeCreate}/{@link #beforeUpdate} — validates
+ *       {@code triggerConfig.cron} via {@link CronExpressions#normalize}. A 5-field
+ *       expression is normalized to 6-field (prepending {@code "0 "} for seconds);
+ *       anything still unparseable returns a {@link BeforeSaveResult} error that
+ *       the query engine translates into a 400 response. Previously the parse
+ *       failure was caught in {@code afterCreate} and logged at warn, so the flow
+ *       persisted but no {@code scheduled_job} row was ever created.</li>
+ *   <li>{@link #afterCreate}/{@link #afterUpdate} — upserts the corresponding
+ *       {@code scheduled_job} row using the normalized cron expression.</li>
+ *   <li>{@link #afterDelete} (or type change away from SCHEDULED) — removes the row.</li>
+ * </ul>
  *
  * <p>This bridges the gap between saving a flow's trigger configuration in the UI and
  * the scheduler executor picking it up — the executor reads from {@code scheduled_job},
@@ -46,6 +59,50 @@ public class FlowScheduleSyncHook implements BeforeSaveHook {
     public int getOrder() {
         // Run after FlowConfigEventPublisher (100) — job sync is a side effect, not a guard
         return 150;
+    }
+
+    @Override
+    public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+        return validateAndNormalize(record);
+    }
+
+    @Override
+    public BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
+                                          Map<String, Object> previous, String tenantId) {
+        return validateAndNormalize(record);
+    }
+
+    /**
+     * Validates {@code triggerConfig.cron} for SCHEDULED flows and rewrites it to
+     * the canonical 6-field form. Non-SCHEDULED flows, or SCHEDULED flows whose
+     * payload does not include {@code triggerConfig} (e.g., a partial update that
+     * only changes {@code active}), are passed through untouched.
+     */
+    private BeforeSaveResult validateAndNormalize(Map<String, Object> record) {
+        if (!"SCHEDULED".equals(asString(record.get("flowType")))) {
+            return BeforeSaveResult.ok();
+        }
+        Map<String, Object> triggerConfig = extractTriggerConfig(record);
+        if (triggerConfig == null || triggerConfig.isEmpty()) {
+            return BeforeSaveResult.ok();
+        }
+        Object cronRaw = triggerConfig.get("cron");
+        if (cronRaw == null || cronRaw.toString().isBlank()) {
+            return BeforeSaveResult.ok();
+        }
+        String cron = cronRaw.toString();
+        String normalized;
+        try {
+            normalized = CronExpressions.normalize(cron);
+        } catch (IllegalArgumentException e) {
+            return BeforeSaveResult.error("triggerConfig.cron", e.getMessage());
+        }
+        if (normalized.equals(cron)) {
+            return BeforeSaveResult.ok();
+        }
+        Map<String, Object> updatedTriggerConfig = new LinkedHashMap<>(triggerConfig);
+        updatedTriggerConfig.put("cron", normalized);
+        return BeforeSaveResult.withFieldUpdates(Map.of("triggerConfig", updatedTriggerConfig));
     }
 
     @Override
@@ -92,14 +149,19 @@ public class FlowScheduleSyncHook implements BeforeSaveHook {
             return;
         }
 
+        // beforeCreate/beforeUpdate validates and normalizes; this is defense-in-depth
+        // for any caller that bypasses the lifecycle hooks (e.g., direct repository writes
+        // during seed-data ingestion).
+        String normalized;
         try {
-            CronExpression.parse(cron);
+            normalized = CronExpressions.normalize(cron);
         } catch (IllegalArgumentException e) {
-            log.warn("SCHEDULED flow {} has invalid cron '{}' — skipping job sync: {}", flowId, cron, e.getMessage());
+            log.warn("SCHEDULED flow {} has invalid cron '{}' — skipping job sync: {}",
+                    flowId, cron, e.getMessage());
             return;
         }
 
-        Instant nextRunAt = active ? ScheduledJobRepository.calculateNextRunAt(cron, timezone) : null;
+        Instant nextRunAt = active ? ScheduledJobRepository.calculateNextRunAt(normalized, timezone) : null;
 
         Optional<Map<String, Object>> existing = scheduledJobRepository.findByFlowId(flowId, tenantId);
         if (existing.isEmpty()) {
@@ -108,10 +170,10 @@ public class FlowScheduleSyncHook implements BeforeSaveHook {
                 log.warn("Cannot create scheduled_job for flow {} — could not resolve createdBy", flowId);
                 return;
             }
-            scheduledJobRepository.insertForFlow(flowId, tenantId, flowName, cron, timezone, active, nextRunAt, createdBy);
+            scheduledJobRepository.insertForFlow(flowId, tenantId, flowName, normalized, timezone, active, nextRunAt, createdBy);
         } else {
             String jobId = asString(existing.get().get("id"));
-            scheduledJobRepository.updateForFlow(jobId, flowName, cron, timezone, active, nextRunAt);
+            scheduledJobRepository.updateForFlow(jobId, flowName, normalized, timezone, active, nextRunAt);
         }
     }
 

@@ -198,6 +198,57 @@ public class ScheduledJobRepository {
     }
 
     /**
+     * Loads the full schedule state for a flow's job — including last/next run tracking —
+     * so the UI can render whether the schedule is healthy.
+     */
+    public Optional<Map<String, Object>> findScheduleByFlowId(String flowId, String tenantId) {
+        var results = jdbcTemplate.queryForList(
+                "SELECT id, tenant_id, name, cron_expression, timezone, active, " +
+                        "last_run_at, last_status, next_run_at " +
+                        "FROM scheduled_job " +
+                        "WHERE job_reference_id = ? AND job_type = 'FLOW' AND tenant_id = ?",
+                flowId, tenantId
+        );
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
+     * Returns the most recent {@code job_execution_log} rows for a flow's scheduled job,
+     * newest first. Returns an empty list if the flow has no scheduled_job row yet —
+     * callers must not infer "no runs" from this without first checking
+     * {@link #findScheduleByFlowId}, which would distinguish UNSYNCED from "registered
+     * but never fired."
+     */
+    public List<Map<String, Object>> findRecentRunsForFlow(String flowId, String tenantId, int limit) {
+        int capped = Math.max(1, Math.min(limit, 200));
+        return jdbcTemplate.queryForList(
+                "SELECT l.id, l.job_id, l.status, l.error_message, " +
+                        "l.started_at, l.completed_at, l.duration_ms " +
+                        "FROM job_execution_log l " +
+                        "JOIN scheduled_job j ON j.id = l.job_id " +
+                        "WHERE j.job_reference_id = ? AND j.job_type = 'FLOW' AND j.tenant_id = ? " +
+                        "ORDER BY l.started_at DESC " +
+                        "LIMIT ?",
+                flowId, tenantId, capped
+        );
+    }
+
+    /**
+     * Returns the flow_type for a flow scoped to a tenant, or empty if the flow does
+     * not exist for that tenant. Used to decide whether to expose schedule status at
+     * all (only SCHEDULED flows can be "unsynced").
+     */
+    public Optional<String> findFlowType(String flowId, String tenantId) {
+        var results = jdbcTemplate.queryForList(
+                "SELECT flow_type FROM flow WHERE id = ? AND tenant_id = ?",
+                flowId, tenantId
+        );
+        if (results.isEmpty()) return Optional.empty();
+        Object v = results.get(0).get("flow_type");
+        return Optional.ofNullable(v != null ? v.toString() : null);
+    }
+
+    /**
      * Inserts a new scheduled_job row for a FLOW.
      */
     public void insertForFlow(String flowId, String tenantId, String name, String cronExpression,

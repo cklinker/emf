@@ -20,6 +20,7 @@ import io.kelta.worker.flow.JdbcFlowStore;
 import io.kelta.worker.listener.CollectionConfigEventPublisher;
 import io.kelta.worker.listener.FieldConfigEventPublisher;
 import io.kelta.worker.listener.FlowConfigEventPublisher;
+import io.kelta.worker.listener.FlowDefinitionValidationHook;
 import io.kelta.worker.listener.FlowScheduleSyncHook;
 import io.kelta.worker.listener.ApprovalProcessConfigHook;
 import io.kelta.worker.listener.ApprovalRecordLockHook;
@@ -314,6 +315,15 @@ public class FlowConfig {
                 new FlowConfigEventPublisher(eventPublisher);
         hookRegistry.register(publisher);
         return publisher;
+    }
+
+    @Bean
+    public FlowDefinitionValidationHook flowDefinitionValidationHook(
+            BeforeSaveHookRegistry hookRegistry,
+            ObjectMapper objectMapper) {
+        FlowDefinitionValidationHook hook = new FlowDefinitionValidationHook(objectMapper);
+        hookRegistry.register(hook);
+        return hook;
     }
 
     @Bean

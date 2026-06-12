@@ -96,8 +96,11 @@ public enum FilterOperator {
     /**
      * In a set of values.
      * <p>The filter value should be a {@link java.util.Collection} of values.
-     * <p>Usage (internal): created programmatically via
-     * {@code new FilterCondition("field", FilterOperator.IN, listOfValues)}
+     * <p>HTTP usage: {@code filter[field][in]=v1,v2,v3} (alias {@code any}).
+     * Comma-separated list parsed by
+     * {@link FilterCondition#fromParams(java.util.Map)} into a {@code List<String>};
+     * list size capped at {@link FilterCondition#MAX_IN_LIST_SIZE} (400 Bad
+     * Request otherwise).
      */
     IN
 }

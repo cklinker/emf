@@ -317,6 +317,17 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.FlowDefinitionValidationHook flowDefinitionValidationHook(
+            BeforeSaveHookRegistry hookRegistry,
+            ObjectMapper objectMapper) {
+        FlowDefinitionValidator validator = new FlowDefinitionValidator(objectMapper);
+        io.kelta.worker.listener.FlowDefinitionValidationHook hook =
+                new io.kelta.worker.listener.FlowDefinitionValidationHook(validator, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public FlowScheduleSyncHook flowScheduleSyncHook(
             BeforeSaveHookRegistry hookRegistry,
             io.kelta.worker.repository.ScheduledJobRepository scheduledJobRepository,

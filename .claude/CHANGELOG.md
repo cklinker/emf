@@ -42,3 +42,4 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-06-12
 
 - 2026-06-12 chore(mcp): `create_flow` tool writes `flowType` (the real `flows` collection field) instead of the dead `triggerType` column; legacy `triggerType` argument is still accepted and remapped to `flowType` for back-compat (CHORE-2026-06-12-0001)
+- 2026-06-12 feat(flow): validate flow definitions on save — new `FlowDefinitionValidator` runs the parser plus a graph check (dangling `Next`/`Default`/Choice rule/`Catch.Next` targets, `StartAt` resolution, Map states missing `Iterator`), wired through `FlowDefinitionValidationHook` on the `flows` collection so authors get a 400 listing every problem at write time instead of a runtime crash (TASK-2026-06-12-0002)

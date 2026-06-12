@@ -29,10 +29,12 @@ public class CreateFlowTool implements AdminTool {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("name", Schemas.string("Flow name (unique within tenant)."));
         properties.put("description", Schemas.string("Optional description."));
-        properties.put("triggerType", Schemas.string(
-                "Trigger type: manual, recordCreated, recordUpdated, scheduled, webhook, etc."));
+        properties.put("flowType", Schemas.string(
+                "Flow type: RECORD_TRIGGERED, SCHEDULED, AUTOLAUNCHED, or SCREEN. "
+                        + "Legacy alias \"triggerType\" is also accepted."));
         properties.put("triggerConfig", Schemas.freeObject(
-                "Trigger-specific config (e.g. {\"collectionName\":\"orders\"} for recordCreated)."));
+                "Trigger-specific config (e.g. {\"collectionName\":\"orders\"} for RECORD_TRIGGERED, "
+                        + "{\"cron\":\"0 * * * *\"} for SCHEDULED)."));
         properties.put("definition", Schemas.freeObject(
                 "Flow JSON definition: nodes, edges, conditions, actions. Shape is flow-engine specific."));
         properties.put("active", Schemas.bool("Whether the flow is active on creation (default false).", false));
@@ -41,7 +43,7 @@ public class CreateFlowTool implements AdminTool {
                 .name("create_flow")
                 .title("Create Flow")
                 .description("Create a new automation flow. Wraps POST /api/flows. The definition payload is opaque to this tool — pass the flow-engine JSON directly.")
-                .inputSchema(Schemas.object(properties, List.of("name", "triggerType", "definition")))
+                .inputSchema(Schemas.object(properties, List.of("name", "flowType", "definition")))
                 .annotations(ToolHints.write(false, false))
                 .build();
 
@@ -51,21 +53,24 @@ public class CreateFlowTool implements AdminTool {
                     Map<String, Object> args = request.arguments();
                     if (args == null) args = Map.of();
                     Object name = args.get("name");
-                    Object trigger = args.get("triggerType");
+                    Object flowType = args.get("flowType");
+                    if (flowType == null || flowType.toString().isBlank()) {
+                        flowType = args.get("triggerType");
+                    }
                     Object def = args.get("definition");
                     if (name == null || name.toString().isBlank()
-                            || trigger == null || trigger.toString().isBlank()
+                            || flowType == null || flowType.toString().isBlank()
                             || !(def instanceof Map<?, ?> definition) || definition.isEmpty()) {
                         return CallToolResult.builder()
                                 .isError(true)
                                 .content(List.of(new TextContent(
-                                        "Arguments \"name\", \"triggerType\", and a non-empty \"definition\" are required.")))
+                                        "Arguments \"name\", \"flowType\", and a non-empty \"definition\" are required.")))
                                 .build();
                     }
 
                     Map<String, Object> attrs = new LinkedHashMap<>();
                     attrs.put("name", name.toString());
-                    attrs.put("triggerType", trigger.toString());
+                    attrs.put("flowType", flowType.toString());
                     attrs.put("definition", definition);
                     if (args.get("description") instanceof String s && !s.isBlank()) attrs.put("description", s);
                     if (args.get("triggerConfig") instanceof Map<?, ?> tc) attrs.put("triggerConfig", tc);

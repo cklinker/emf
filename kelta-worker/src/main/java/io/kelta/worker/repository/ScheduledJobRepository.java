@@ -10,6 +10,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,13 +52,26 @@ public class ScheduledJobRepository {
 
     /**
      * Loads the flow definition for a scheduled job.
+     *
+     * <p>The {@code definition} and {@code trigger_config} columns are {@code jsonb},
+     * which the JDBC driver returns as {@code PGobject}. Normalize them to their JSON
+     * string form so callers can parse them directly — otherwise
+     * {@code objectMapper.writeValueAsString(pgObject)} would serialize the wrapper
+     * ({@code {"type":"jsonb","value":...}}) and the flow definition's {@code StartAt}
+     * would appear missing. Mirrors {@link FlowRepository#findFlowById}.
      */
     public Optional<Map<String, Object>> findFlowById(String flowId) {
         var results = jdbcTemplate.queryForList(
                 "SELECT id, tenant_id, definition, trigger_config, active FROM flow WHERE id = ?",
                 flowId
         );
-        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+        if (results.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<String, Object> row = new LinkedHashMap<>(results.get(0));
+        row.computeIfPresent("definition", (k, v) -> v.toString());
+        row.computeIfPresent("trigger_config", (k, v) -> v.toString());
+        return Optional.of(row);
     }
 
     /**

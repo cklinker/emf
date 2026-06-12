@@ -92,6 +92,87 @@ Build order matters because `plugin-sdk` and `components` use `vite-plugin-dts` 
 
 Local dev: `cd kelta-web && npm install && npm run build` once before `cd kelta-ui/app && npm install && npm run build`.
 
+## Flows
+
+### Initial state shape
+
+Every flow execution starts with a canonical state envelope, built by
+`InitialStateBuilder` (`kelta-platform/runtime/runtime-core/.../flow/InitialStateBuilder.java`):
+
+```jsonc
+{
+  "trigger": { "type": "API_INVOCATION" | "SCHEDULED" | "RECORD_CHANGE" | "WEBHOOK", ... },
+  "input":   { ...source data... },   // present for API_INVOCATION / SCHEDULED / WEBHOOK
+  "record":  { ...record data... },   // present for RECORD_CHANGE only
+  "context": { "tenantId": "...", "flowId": "...", "executionId": "...", "userId": "..." }
+}
+```
+
+JSONPath expressions inside a flow definition (`inputPath`, `outputPath`, condition
+expressions) are evaluated against this envelope. **Always read inputs as `$.input.<key>`**
+— never `$.<key>`. Reading the bare key skips the envelope, JSONPath silently returns
+no value, and the downstream task fails with whatever generic error comes out of its
+own input resolution (often a misleading `"Provider … does not exist"` for FETCH-style
+tasks, not a clear "missing input" message).
+
+### Manual / MCP / HTTP invocation — the double-wrap rule
+
+`POST /api/flows/{flowId}/execute` (in `FlowExecutionController.executeFlow`) reads its
+input from `body.input` and passes it through to `buildFromApiInvocation`, which then
+puts it under `state.input`. So the request body itself must already be wrapped under
+`input` — the controller does **not** treat the whole body as input.
+
+That means callers double-wrap: the outer wrap is the HTTP request shape, the inner
+wrap is the value that ends up at `$.input`.
+
+HTTP:
+```bash
+curl -X POST $GW/api/flows/$FLOW_ID/execute \
+  -H 'Content-Type: application/json' \
+  -d '{ "input": { "slug": "acme" } }'
+# ⇒ state.input == { "slug": "acme" }, flow reads $.input.slug
+```
+
+MCP (`execute_flow` tool — the MCP layer passes the tool's `input` argument straight
+through as the HTTP body, so the same double-wrap applies):
+```jsonc
+execute_flow({
+  "flowId": "flow-123",
+  "input": { "input": { "slug": "acme" } }   // double wrap: outer = HTTP body, inner = $.input
+})
+```
+
+A single wrap (`input: { "slug": "acme" }`) sends `{ "slug": "acme" }` as the body,
+the controller looks for `body.input` (absent), `$.input` becomes `{}`, and every
+`$.input.slug` read returns no value.
+
+Escape hatches in the controller:
+- `body.state` — if present, the controller treats it as a pre-built initial state envelope (only `context` is auto-filled). Use this when you need to seed `record`/`headers` keys that `buildFromApiInvocation` doesn't produce.
+- `body.test: true` — runs the flow in test mode (`isTest=true`); does not change how `input` is resolved.
+
+### Scheduled (cron) invocation — `triggerConfig.inputData`
+
+For SCHEDULED flows there is no per-run HTTP body, so the static payload lives on the
+flow definition itself. `ScheduledJobExecutorService` reads the flow's `trigger_config`
+column and hands it to `InitialStateBuilder.buildFromSchedule`, which copies
+`triggerConfig.inputData` into `state.input`:
+
+```jsonc
+// flow.trigger_config (stored on the flows row)
+{
+  "type":    "SCHEDULED",
+  "cron":    "0 */15 * * * *",
+  "timezone":"UTC",
+  "inputData": { "slug": "acme", "mode": "full" }
+}
+// ⇒ state.input == { "slug": "acme", "mode": "full" }, flow reads $.input.slug
+```
+
+This is the SCHEDULED-equivalent of the inner wrap in `execute_flow`: the same flow
+definition can be driven by cron or by `execute_flow` as long as the static
+`triggerConfig.inputData` and the caller-supplied `body.input` produce the same
+shape under `$.input`.
+
 ## Email (SMTP)
 
 Worker emails go out via `spring-boot-starter-mail`. The kelta-worker `application.yml`

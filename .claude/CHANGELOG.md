@@ -38,3 +38,7 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 
 - 2026-06-08 chore(ui): remove unused React imports and rename/mark unused locals across `kelta-ui/app` to clear all 86 TS6133 errors (CHORE-2026-06-08-0001)
 - 2026-06-08 chore(ui): remove unused React imports and rename/mark unused locals across `kelta-ui/app` to clear all 86 TS6133 errors (CHORE-2026-06-08-0001)
+
+## 2026-06-12
+
+- 2026-06-12 feat(gateway): surface page[size] clamp in JSON:API metadata — `DynamicCollectionRouter.toJsonApiListResponse` now adds `metadata.requestedPageSize` + `metadata.pageSizeClamped=true` whenever the caller's `page[size]` exceeded `MAX_HTTP_PAGE_SIZE`, so an over-cap request no longer looks like a silent-empty-data response (TASK-2026-06-12-0004)

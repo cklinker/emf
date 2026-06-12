@@ -114,13 +114,20 @@ bracket syntax (`page[number]` / `page[size]`). Parsing lives in
 against `MAX_HTTP_PAGE_SIZE` (200) — separate from `MAX_PAGE_SIZE` (1000),
 the absolute constructor ceiling that internal services (report execution,
 data export, include resolution) build `Pagination` records against
-directly. List responses carry a `links` block (`self` / `prev` / `next`)
-built by `runtime-jsonapi/.../PaginationLinks#build`; URLs are relative
-paths so cached system-collection responses remain reusable across hosts
-and behind load balancers. MCP tools (`query_collection`, `list_picklists`,
-`list_approvals`) accept flat `pageNumber` / `pageSize` arguments and
-translate them to the bracket form at the MCP→gateway boundary. Bounds and
-response shape are documented in `.claude/docs/conventions.md`.
+directly. When the caller's `page[size]` exceeds the cap,
+`DynamicCollectionRouter.toJsonApiListResponse` echoes the modification in
+the response as `metadata.requestedPageSize=<caller value>` +
+`metadata.pageSizeClamped=true` so clients can detect the clamp without
+inferring it from `data.length` vs. `metadata.pageSize` — preventing the
+"200 + populated `totalCount` + empty `data`" misread that previously cost
+debugging time. List responses also carry a `links` block (`self` /
+`prev` / `next`) built by `runtime-jsonapi/.../PaginationLinks#build`;
+URLs are relative paths so cached system-collection responses remain
+reusable across hosts and behind load balancers. MCP tools
+(`query_collection`, `list_picklists`, `list_approvals`) accept flat
+`pageNumber` / `pageSize` arguments and translate them to the bracket
+form at the MCP→gateway boundary. Bounds and response shape are
+documented in `.claude/docs/conventions.md`.
 
 **Error response ownership** — every 4xx/5xx is wrapped in the JSON:API
 `{"errors":[{status, code, title, detail, source?, meta?}]}` envelope. Three

@@ -912,10 +912,22 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         FilterOperator operator = filter.operator();
         Object value = filter.value();
 
-        // Coerce string filter values to match the field's database type (e.g., "false" → Boolean.FALSE)
+        // Coerce string filter values to match the field's database type (e.g., "false" → Boolean.FALSE).
+        // For IN/ANY the value is a Collection<String>; coerce each element so UUID columns receive
+        // java.util.UUID rather than the raw string.
         FieldDefinition fieldDef = definition.getField(filter.fieldName());
-        if (fieldDef != null && value instanceof String) {
-            value = TypeCoercionService.coerceValue(value, fieldDef.type());
+        if (fieldDef != null) {
+            if (value instanceof String) {
+                value = TypeCoercionService.coerceValue(value, fieldDef.type());
+            } else if (value instanceof Collection<?> coll) {
+                List<Object> coerced = new ArrayList<>(coll.size());
+                for (Object element : coll) {
+                    coerced.add(element instanceof String s
+                            ? TypeCoercionService.coerceValue(s, fieldDef.type())
+                            : element);
+                }
+                value = coerced;
+            }
         }
 
         // Detect array-backed columns (Postgres TEXT[]) so we emit ANY(...) /

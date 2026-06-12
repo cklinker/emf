@@ -678,12 +678,75 @@ class PhysicalTableStorageAdapterTest {
             );
             
             QueryResult result = adapter.query(testCollection, request);
-            
+
             // Apple (1.99, active), Date (5.99, active)
             assertEquals(2, result.data().size());
         }
+
+        @Test
+        @DisplayName("Should filter with IN operator returning all matches in one query")
+        void shouldFilterWithInOperator() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("name", FilterOperator.IN,
+                        List.of("Apple", "Cherry", "Elderberry")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(3, result.data().size());
+            assertEquals(3L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN with a single value matches one row")
+        void inSingleValue() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("name", FilterOperator.IN, List.of("Banana")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+            assertEquals(1, result.data().size());
+            assertEquals("Banana", result.data().get(0).get("NAME"));
+        }
+
+        @Test
+        @DisplayName("IN with an empty list yields zero rows (1=0 short-circuit)")
+        void inEmptyList() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("name", FilterOperator.IN, List.of()))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+            assertEquals(0, result.data().size());
+            assertEquals(0L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN on integer field coerces string elements to integers")
+        void inCoercesNumericElements() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("quantity", FilterOperator.IN,
+                        List.of("100", "30")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+            // Apple (100) and Date (30)
+            assertEquals(2, result.data().size());
+        }
     }
-    
+
     @Nested
     @DisplayName("Uniqueness Tests")
     class UniquenessTests {

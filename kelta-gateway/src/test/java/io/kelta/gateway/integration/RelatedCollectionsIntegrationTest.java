@@ -509,7 +509,87 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         List<String> returnedIds = data.stream()
             .map(item -> (String) item.get("id"))
             .toList();
-        
+
         assertThat(returnedIds).contains(task1Id, task2Id);
+    }
+
+    /**
+     * Multi-id lookup via the {@code in} operator: a single GET returns every
+     * matching task, replacing what used to be N sequential get-by-id calls.
+     *
+     * <p>Validates: {@code filter[id][in]=u1,u2,u3} parameterizes the value
+     * list and {@code metadata.totalCount} reflects the matched rows.
+     */
+    @Test
+    void testQueryByIdInOperator() {
+        String projectId = testDataHelper.createProject(
+            "IN Op Project", "Project for IN operator testing", "ACTIVE");
+        createdProjectIds.add(projectId);
+
+        String task1Id = testDataHelper.createTask("IN Task 1", "first", projectId);
+        String task2Id = testDataHelper.createTask("IN Task 2", "second", projectId);
+        String task3Id = testDataHelper.createTask("IN Task 3", "third", projectId);
+        createdTaskIds.add(task1Id);
+        createdTaskIds.add(task2Id);
+        createdTaskIds.add(task3Id);
+
+        // Untargeted task to confirm the IN filter is exclusive
+        String untargeted = testDataHelper.createTask("Untargeted", "skipped", projectId);
+        createdTaskIds.add(untargeted);
+
+        String token = authHelper.getAdminToken();
+        HttpEntity<Void> request = new HttpEntity<>(authHelper.createAuthHeaders(token));
+
+        String url = GATEWAY_URL + "/api/tasks?filter[id][in]="
+                + task1Id + "," + task2Id + "," + task3Id;
+        ResponseEntity<Map> response = restTemplate.exchange(
+            url, HttpMethod.GET, request, Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+
+        List<Map<String, Object>> data =
+                (List<Map<String, Object>>) response.getBody().get("data");
+        assertThat(data).hasSize(3);
+
+        List<String> returnedIds = data.stream()
+                .map(item -> (String) item.get("id"))
+                .toList();
+        assertThat(returnedIds).containsExactlyInAnyOrder(task1Id, task2Id, task3Id);
+
+        Map<String, Object> meta = (Map<String, Object>) response.getBody().get("metadata");
+        assertThat(meta).isNotNull();
+        assertThat(((Number) meta.get("totalCount")).intValue()).isEqualTo(3);
+    }
+
+    /**
+     * An {@code in} list above {@link io.kelta.runtime.query.FilterCondition#MAX_IN_LIST_SIZE}
+     * must surface as HTTP 400 from the gateway rather than be silently capped.
+     */
+    @Test
+    void testInOperatorOverCapReturns400() {
+        String token = authHelper.getAdminToken();
+        HttpEntity<Void> request = new HttpEntity<>(authHelper.createAuthHeaders(token));
+
+        StringBuilder csv = new StringBuilder();
+        for (int i = 0; i < 201; i++) {
+            if (i > 0) csv.append(',');
+            csv.append(java.util.UUID.randomUUID());
+        }
+
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                GATEWAY_URL + "/api/tasks?filter[id][in]=" + csv,
+                HttpMethod.GET,
+                request,
+                Map.class
+            );
+            // Some HTTP clients deliver 4xx as a returned body rather than an
+            // exception — accept either path.
+            assertThat(response.getStatusCode().value())
+                    .isEqualTo(HttpStatus.BAD_REQUEST.value());
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 }

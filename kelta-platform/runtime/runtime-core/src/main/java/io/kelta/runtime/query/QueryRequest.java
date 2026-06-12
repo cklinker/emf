@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.springframework.util.MultiValueMap;
+
 /**
  * Represents a query request with pagination, sorting, field selection, and filtering.
  * 
@@ -69,6 +71,26 @@ public record QueryRequest(
         Pagination pagination = Pagination.fromParams(params);
         List<SortField> sorting = SortField.fromParams(params.get("sort"));
         List<String> fields = parseFields(resolveFieldsParam(params));
+        List<FilterCondition> filters = FilterCondition.fromParams(params);
+
+        return new QueryRequest(pagination, sorting, fields, filters);
+    }
+
+    /**
+     * Variant of {@link #fromParams(Map)} that preserves repeated query
+     * parameters — needed so {@code filter[id][in]=a&filter[id][in]=b} is read
+     * as a list rather than collapsing to the last value. Scalar parameters
+     * (page, sort, fields, include) read the first value via
+     * {@link MultiValueMap#getFirst(Object)}.
+     *
+     * @param params the HTTP query parameters as a multi-value map
+     * @return a new QueryRequest parsed from the parameters
+     */
+    public static QueryRequest fromParams(MultiValueMap<String, String> params) {
+        Map<String, String> single = params != null ? params.toSingleValueMap() : Map.of();
+        Pagination pagination = Pagination.fromParams(single);
+        List<SortField> sorting = SortField.fromParams(single.get("sort"));
+        List<String> fields = parseFields(resolveFieldsParam(single));
         List<FilterCondition> filters = FilterCondition.fromParams(params);
 
         return new QueryRequest(pagination, sorting, fields, filters);

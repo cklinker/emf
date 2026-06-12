@@ -283,6 +283,19 @@ that user-facing config to the `scheduled_job` table (which the
   endpoints route through the same `CronExpressions.normalize`, so legacy
   5-field rows in `scheduled_job` resume cleanly and the UI's pre-save
   validation endpoint accepts the same input as the write path.
+- **Per-flow visibility**: `FlowScheduleController` exposes the executor's view
+  of a flow so the UI does not have to `psql scheduled_job` /
+  `job_execution_log` to debug "scheduled but never running" flows.
+  `GET /api/flows/{id}/schedule` returns
+  `{ cron, timezone, active, lastRunAt, lastStatus, nextRunAt, scheduleStatus }`
+  and `GET /api/flows/{id}/runs` returns recent execution-log rows
+  (`status`, `startedAt`, `completedAt`, `durationMs`, `errorMessage`), joined
+  through `scheduled_job` so the lookup stays tenant-scoped via
+  `TenantContext`. `scheduleStatus` is derived: `SYNCED` when a
+  `scheduled_job` row exists with a non-null `next_run_at`; `UNSYNCED` (plus
+  a `reason`) when `flow_type = SCHEDULED` but no row is registered or its
+  `next_run_at` is null — the failure mode `FlowScheduleSyncHook` is supposed
+  to prevent on the write path; `NOT_SCHEDULED` for non-SCHEDULED flow types.
 
 ## Where to Add New Code
 

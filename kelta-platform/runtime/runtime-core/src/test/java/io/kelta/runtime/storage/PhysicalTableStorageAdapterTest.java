@@ -665,6 +665,86 @@ class PhysicalTableStorageAdapterTest {
         }
 
         @Test
+        @DisplayName("Should filter with IN operator: returns matching rows in one query")
+        void shouldFilterWithInOperator() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("id", FilterOperator.IN, List.of("1", "3", "5")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(3, result.data().size());
+            assertEquals(3L, result.metadata().totalCount(),
+                "totalCount should reflect the IN filter, not the full table");
+        }
+
+        @Test
+        @DisplayName("IN with a single value returns just that row")
+        void shouldFilterWithInOperatorSingleValue() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("id", FilterOperator.IN, List.of("2")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(1, result.data().size());
+            assertEquals("Banana", result.data().get(0).get("NAME"));
+            assertEquals(1L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN with no matches returns empty result with totalCount=0")
+        void shouldFilterWithInOperatorNoMatches() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("id", FilterOperator.IN, List.of("does-not-exist")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(0, result.data().size());
+            assertEquals(0L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN with an empty list yields no rows (1=0)")
+        void shouldFilterWithInOperatorEmptyList() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("id", FilterOperator.IN, List.of()))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(0, result.data().size());
+            assertEquals(0L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN parsed from URL query params returns the matching rows")
+        void shouldFilterWithInOperatorFromUrlParams() {
+            Map<String, String> urlParams = new HashMap<>();
+            urlParams.put("filter[id][in]", "1,3,5");
+            QueryRequest request = QueryRequest.defaults()
+                .withFilters(io.kelta.runtime.query.FilterCondition.fromParams(urlParams));
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(3, result.data().size());
+            assertEquals(3L, result.metadata().totalCount());
+        }
+
+        @Test
         @DisplayName("Should combine multiple filters with AND logic")
         void shouldCombineMultipleFiltersWithAndLogic() {
             QueryRequest request = new QueryRequest(

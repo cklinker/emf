@@ -95,7 +95,14 @@ public enum FilterOperator {
 
     /**
      * In a set of values.
-     * <p>The filter value should be a {@link java.util.Collection} of values.
+     * <p>The filter value should be a {@link java.util.Collection} of values, or a
+     * comma-separated string when parsed from URL query parameters.
+     * <p>Usage (URL): {@code filter[field][in]=a,b,c} (alias: {@code filter[field][any]=a,b,c}).
+     * <p>The list is capped at {@link FilterCondition#MAX_IN_LIST_SIZE}; over-cap requests
+     * raise {@link InvalidQueryException} (HTTP 400).
+     * <p>Note: comma-separated values are only multi-value for {@code IN}/{@code ANY}.
+     * {@code EQ} remains a literal-string match — {@code filter[field][eq]=a,b,c} looks
+     * for the literal value {@code "a,b,c"}, not three values.
      * <p>Usage (internal): created programmatically via
      * {@code new FilterCondition("field", FilterOperator.IN, listOfValues)}
      */

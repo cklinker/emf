@@ -1,11 +1,13 @@
 package io.kelta.runtime.query;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Represents a filter condition for query filtering.
@@ -29,6 +31,9 @@ import java.util.regex.Pattern;
  *   <li>{@code istarts} - starts with (case-insensitive)</li>
  *   <li>{@code iends} - ends with (case-insensitive)</li>
  *   <li>{@code ieq} - equals (case-insensitive)</li>
+ *   <li>{@code in} (alias {@code any}) - field value is in the comma-separated list
+ *       (e.g. {@code filter[id][in]=a,b,c}); list is capped at
+ *       {@value #MAX_IN_LIST_SIZE}</li>
  * </ul>
  * 
  * <h2>Examples</h2>
@@ -54,6 +59,13 @@ public record FilterCondition(
      * Pattern to match filter parameters: filter[fieldName][operator]
      */
     private static final Pattern FILTER_PATTERN = Pattern.compile("filter\\[([^\\]]+)\\]\\[([^\\]]+)\\]");
+
+    /**
+     * Maximum number of values accepted for the {@code IN}/{@code ANY} operator
+     * when parsed from URL query parameters. Over-cap requests raise
+     * {@link InvalidQueryException} so the gateway returns HTTP 400.
+     */
+    public static final int MAX_IN_LIST_SIZE = 200;
     
     /**
      * Compact constructor with validation.
@@ -165,14 +177,22 @@ public record FilterCondition(
                 String fieldName = matcher.group(1);
                 String operatorStr = matcher.group(2).toUpperCase();
                 String value = entry.getValue();
-                
+
+                // ANY is an alias for IN so callers can write either
+                // filter[id][in]=… or filter[id][any]=… interchangeably.
+                if ("ANY".equals(operatorStr)) {
+                    operatorStr = "IN";
+                }
+
+                FilterOperator operator;
                 try {
-                    FilterOperator operator = FilterOperator.valueOf(operatorStr);
-                    Object parsedValue = parseValue(value, operator);
-                    filters.add(new FilterCondition(fieldName, operator, parsedValue));
+                    operator = FilterOperator.valueOf(operatorStr);
                 } catch (IllegalArgumentException e) {
                     // Unknown operator, skip this filter
+                    continue;
                 }
+                Object parsedValue = parseValue(fieldName, value, operator);
+                filters.add(new FilterCondition(fieldName, operator, parsedValue));
             }
         }
         
@@ -181,15 +201,39 @@ public record FilterCondition(
     
     /**
      * Parses the filter value based on the operator.
-     * 
+     *
+     * @param fieldName the field being filtered (used for error messages)
      * @param value the string value
      * @param operator the filter operator
      * @return the parsed value
+     * @throws InvalidQueryException if an IN list exceeds {@link #MAX_IN_LIST_SIZE}
      */
-    private static Object parseValue(String value, FilterOperator operator) {
+    private static Object parseValue(String fieldName, String value, FilterOperator operator) {
         if (operator == FilterOperator.ISNULL) {
             return Boolean.parseBoolean(value);
         }
+        if (operator == FilterOperator.IN) {
+            return parseInList(fieldName, value);
+        }
         return value;
+    }
+
+    /**
+     * Parses a comma-separated IN list into a list of trimmed, non-blank
+     * string values. Enforces {@link #MAX_IN_LIST_SIZE}.
+     */
+    private static List<String> parseInList(String fieldName, String value) {
+        if (value == null || value.isEmpty()) {
+            return List.of();
+        }
+        List<String> values = Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toCollection(ArrayList::new));
+        if (values.size() > MAX_IN_LIST_SIZE) {
+            throw new InvalidQueryException(fieldName,
+                "IN list size " + values.size() + " exceeds maximum of " + MAX_IN_LIST_SIZE);
+        }
+        return List.copyOf(values);
     }
 }

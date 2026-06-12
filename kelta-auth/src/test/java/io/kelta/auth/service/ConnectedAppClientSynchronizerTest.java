@@ -8,10 +8,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+
+import io.kelta.auth.config.AuthorizationServerConfig;
 
 import java.util.List;
 import java.util.Map;
@@ -142,5 +146,58 @@ class ConnectedAppClientSynchronizerTest {
         synchronizer.synchronizeClients();
 
         verify(clientRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("stored connected-app secret authenticates with the production password encoder (no invalid_client)")
+    void connectedAppSecretMatchesProductionEncoder() {
+        // The connected_app table stores a pre-computed bcrypt hash of the secret.
+        String plaintextSecret = "s3cr3t-client-secret";
+        String bcryptHash = new BCryptPasswordEncoder().encode(plaintextSecret);
+
+        Map<String, Object> app = Map.of(
+                "id", "app-1",
+                "client_id", "couchpicks-web",
+                "client_secret_hash", bcryptHash,
+                "name", "CouchPicks Web",
+                "redirect_uris", "[\"https://couchpicks.example.com/callback\"]",
+                "scopes", "[\"api\"]",
+                "grant_types", "[\"authorization_code\"]",
+                "require_pkce", false,
+                "consent_required", false
+        );
+
+        when(jdbcTemplate.queryForList(anyString())).thenReturn(List.of(app));
+        when(clientRepository.findByClientId("couchpicks-web")).thenReturn(null);
+
+        synchronizer.synchronizeClients();
+
+        ArgumentCaptor<RegisteredClient> captor = ArgumentCaptor.forClass(RegisteredClient.class);
+        verify(clientRepository).save(captor.capture());
+        RegisteredClient registered = captor.getValue();
+
+        // Synchronizer stores the secret with a {bcrypt} prefix for the delegating encoder.
+        assertThat(registered.getClientSecret()).startsWith("{bcrypt}");
+
+        // The production password encoder must accept the plaintext secret against the
+        // stored value; otherwise CLIENT_SECRET_BASIC/POST auth fails with invalid_client.
+        PasswordEncoder encoder = new AuthorizationServerConfig().passwordEncoder();
+        assertThat(encoder.matches(plaintextSecret, registered.getClientSecret())).isTrue();
+        assertThat(encoder.matches("wrong-secret", registered.getClientSecret())).isFalse();
+    }
+
+    @Test
+    @DisplayName("production password encoder still matches legacy bare-bcrypt secrets (Superset/internal back-compat)")
+    void productionEncoderMatchesBareBcryptSecret() {
+        // ConnectedAppRegistrar stores Superset/internal secrets via passwordEncoder.encode(),
+        // which historically produced a BARE bcrypt hash (no {bcrypt} prefix). Those rows must
+        // keep authenticating after switching to the delegating encoder.
+        String plaintextSecret = "superset-secret";
+        String bareBcrypt = new BCryptPasswordEncoder().encode(plaintextSecret);
+        assertThat(bareBcrypt).doesNotStartWith("{");
+
+        PasswordEncoder encoder = new AuthorizationServerConfig().passwordEncoder();
+        assertThat(encoder.matches(plaintextSecret, bareBcrypt)).isTrue();
+        assertThat(encoder.matches("wrong-secret", bareBcrypt)).isFalse();
     }
 }

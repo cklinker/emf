@@ -676,11 +676,76 @@ class PhysicalTableStorageAdapterTest {
                     new FilterCondition("active", FilterOperator.EQ, true)
                 )
             );
-            
+
             QueryResult result = adapter.query(testCollection, request);
-            
+
             // Apple (1.99, active), Date (5.99, active)
             assertEquals(2, result.data().size());
+        }
+
+        @Test
+        @DisplayName("Should filter with IN operator on string field")
+        void shouldFilterWithInOperator() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(FilterCondition.in("name", List.of("Apple", "Cherry", "Date")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(3, result.data().size());
+            assertEquals(3L, result.metadata().totalCount(),
+                    "totalCount must reflect rows matched by IN, not the full table");
+        }
+
+        @Test
+        @DisplayName("IN with a single value behaves like EQ")
+        void shouldFilterWithInOperatorSingleValue() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(FilterCondition.in("name", List.of("Apple")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(1, result.data().size());
+            assertEquals("Apple", result.data().get(0).get("NAME"));
+        }
+
+        @Test
+        @DisplayName("IN with no matches returns an empty page (no error)")
+        void shouldFilterWithInOperatorNoMatches() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(FilterCondition.in("name", List.of("Fig", "Grape")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(0, result.data().size());
+            assertEquals(0L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN with an empty list folds to an always-false predicate")
+        void shouldFilterWithEmptyInList() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(FilterCondition.in("name", List.of()))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(0, result.data().size());
+            assertEquals(0L, result.metadata().totalCount());
         }
     }
     

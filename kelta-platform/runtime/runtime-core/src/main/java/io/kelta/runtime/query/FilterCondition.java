@@ -1,6 +1,7 @@
 package io.kelta.runtime.query;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,14 +30,20 @@ import java.util.regex.Pattern;
  *   <li>{@code istarts} - starts with (case-insensitive)</li>
  *   <li>{@code iends} - ends with (case-insensitive)</li>
  *   <li>{@code ieq} - equals (case-insensitive)</li>
+ *   <li>{@code in} (alias {@code any}) - field value is in a comma-separated list</li>
  * </ul>
- * 
+ *
  * <h2>Examples</h2>
  * <ul>
  *   <li>{@code filter[status][eq]=active} - status equals "active"</li>
  *   <li>{@code filter[price][gte]=100} - price >= 100</li>
  *   <li>{@code filter[name][icontains]=john} - name contains "john" (case-insensitive)</li>
+ *   <li>{@code filter[id][in]=uuid1,uuid2,uuid3} - id is one of the listed values</li>
  * </ul>
+ *
+ * <p><b>Multi-value note:</b> only the {@code in} / {@code any} operator splits on
+ * commas. {@code filter[id][eq]=a,b,c} matches the literal string {@code "a,b,c"};
+ * use {@code filter[id][in]=a,b,c} for a multi-value match.
  * 
  * @param fieldName the name of the field to filter on
  * @param operator the filter operator
@@ -54,6 +61,14 @@ public record FilterCondition(
      * Pattern to match filter parameters: filter[fieldName][operator]
      */
     private static final Pattern FILTER_PATTERN = Pattern.compile("filter\\[([^\\]]+)\\]\\[([^\\]]+)\\]");
+
+    /**
+     * Maximum number of values accepted in a single {@code filter[field][in]=...} list
+     * parsed from the URL. Lists larger than this raise {@link InvalidQueryException}
+     * so the gateway returns HTTP 400 rather than building an unbounded SQL parameter
+     * list.
+     */
+    public static final int MAX_IN_LIST_SIZE = 200;
     
     /**
      * Compact constructor with validation.
@@ -143,7 +158,19 @@ public record FilterCondition(
     public static FilterCondition icontains(String fieldName, String value) {
         return new FilterCondition(fieldName, FilterOperator.ICONTAINS, value);
     }
-    
+
+    /**
+     * Creates a filter condition for matching one of a set of values.
+     *
+     * @param fieldName the field name
+     * @param values the values to match against; the resulting condition matches
+     *               any row whose field equals at least one entry
+     * @return a new FilterCondition with IN operator
+     */
+    public static FilterCondition in(String fieldName, Collection<?> values) {
+        return new FilterCondition(fieldName, FilterOperator.IN, List.copyOf(values));
+    }
+
     /**
      * Parses filter conditions from HTTP query parameters.
      * 
@@ -158,38 +185,88 @@ public record FilterCondition(
         }
         
         List<FilterCondition> filters = new ArrayList<>();
-        
+
         for (Map.Entry<String, String> entry : params.entrySet()) {
             Matcher matcher = FILTER_PATTERN.matcher(entry.getKey());
             if (matcher.matches()) {
                 String fieldName = matcher.group(1);
                 String operatorStr = matcher.group(2).toUpperCase();
                 String value = entry.getValue();
-                
-                try {
-                    FilterOperator operator = FilterOperator.valueOf(operatorStr);
-                    Object parsedValue = parseValue(value, operator);
-                    filters.add(new FilterCondition(fieldName, operator, parsedValue));
-                } catch (IllegalArgumentException e) {
-                    // Unknown operator, skip this filter
+
+                FilterOperator operator = resolveOperator(operatorStr);
+                if (operator == null) {
+                    continue;
                 }
+                Object parsedValue = parseValue(value, operator, fieldName);
+                filters.add(new FilterCondition(fieldName, operator, parsedValue));
             }
         }
-        
+
         return List.copyOf(filters);
     }
-    
+
     /**
-     * Parses the filter value based on the operator.
-     * 
+     * Resolves an uppercased operator token from the URL grammar to a
+     * {@link FilterOperator}. Accepts {@code ANY} as an alias for {@code IN}.
+     *
+     * @param operatorStr the uppercased operator token
+     * @return the operator, or {@code null} if unknown (skipped silently for
+     *         backward compatibility — multi-value EQ remains a literal match)
+     */
+    private static FilterOperator resolveOperator(String operatorStr) {
+        if ("ANY".equals(operatorStr)) {
+            return FilterOperator.IN;
+        }
+        try {
+            return FilterOperator.valueOf(operatorStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Parses the filter value based on the operator. For {@link FilterOperator#IN}
+     * the raw string is split on commas, trimmed, and capped at
+     * {@link #MAX_IN_LIST_SIZE}; over-cap lists raise
+     * {@link InvalidQueryException}.
+     *
      * @param value the string value
      * @param operator the filter operator
+     * @param fieldName the field name (used in error reporting)
      * @return the parsed value
      */
-    private static Object parseValue(String value, FilterOperator operator) {
+    private static Object parseValue(String value, FilterOperator operator, String fieldName) {
         if (operator == FilterOperator.ISNULL) {
             return Boolean.parseBoolean(value);
         }
+        if (operator == FilterOperator.IN) {
+            return parseInList(value, fieldName);
+        }
         return value;
+    }
+
+    /**
+     * Splits a comma-separated {@code in} list, trimming each entry and dropping
+     * empties. An empty list (e.g. {@code filter[id][in]=}) yields an empty
+     * collection; the SQL builder folds this into a always-false predicate so
+     * the response is a clean zero-row page.
+     */
+    private static List<String> parseInList(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        String[] parts = value.split(",", -1);
+        List<String> out = new ArrayList<>(Math.min(parts.length, MAX_IN_LIST_SIZE + 1));
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                out.add(trimmed);
+            }
+            if (out.size() > MAX_IN_LIST_SIZE) {
+                throw new InvalidQueryException(fieldName,
+                    "IN list exceeds maximum of " + MAX_IN_LIST_SIZE + " values");
+            }
+        }
+        return List.copyOf(out);
     }
 }

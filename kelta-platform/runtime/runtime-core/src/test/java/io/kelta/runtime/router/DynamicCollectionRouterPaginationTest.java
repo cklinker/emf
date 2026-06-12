@@ -159,6 +159,92 @@ class DynamicCollectionRouterPaginationTest {
     }
 
     @Test
+    void list_pageSizeAboveHttpCap_echoesClampedFlagInMeta() throws Exception {
+        // Regression: page[size]=500 used to look like a silent-empty-data
+        // response (positive totalCount, empty data). The router now clamps to
+        // 200 AND surfaces the clamp in `metadata.pageSizeClamped` +
+        // `requestedPageSize` so the caller can detect their request was
+        // modified.
+        CollectionDefinition def = buildCustomersCollection();
+        when(registry.get("customers")).thenReturn(def);
+
+        QueryResult result = new QueryResult(
+                List.of(record("c1", "Acme"), record("c2", "Beta")),
+                new PaginationMetadata(9999, 1, 200, 50));
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(result);
+
+        MvcResult mvcResult = mockMvc.perform(get("/api/customers")
+                        .param("page[size]", "500"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Map<String, Object> response = objectMapper.readValue(
+                mvcResult.getResponse().getContentAsString(), Map.class);
+
+        List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+        assertFalse(data.isEmpty(),
+                "data must not be empty when totalCount is positive — that was the bug");
+
+        Map<String, Object> metadata = (Map<String, Object>) response.get("metadata");
+        assertEquals(9999, ((Number) metadata.get("totalCount")).intValue());
+        assertEquals(200, ((Number) metadata.get("pageSize")).intValue(),
+                "effective pageSize must be the clamped value (200)");
+        assertEquals(500, ((Number) metadata.get("requestedPageSize")).intValue(),
+                "requestedPageSize must echo what the caller asked for");
+        assertEquals(Boolean.TRUE, metadata.get("pageSizeClamped"),
+                "pageSizeClamped must be true when the request was clamped");
+    }
+
+    @Test
+    void list_pageSizeAtCap_doesNotEmitClampedFlag() throws Exception {
+        // Boundary: page[size]=200 equals the cap, so the clamp indicators must
+        // be absent from metadata.
+        CollectionDefinition def = buildCustomersCollection();
+        when(registry.get("customers")).thenReturn(def);
+
+        QueryResult result = new QueryResult(
+                List.of(record("c1", "Acme")),
+                new PaginationMetadata(50, 1, 200, 1));
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(result);
+
+        MvcResult mvcResult = mockMvc.perform(get("/api/customers")
+                        .param("page[size]", "200"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Map<String, Object> response = objectMapper.readValue(
+                mvcResult.getResponse().getContentAsString(), Map.class);
+        Map<String, Object> metadata = (Map<String, Object>) response.get("metadata");
+        assertEquals(200, ((Number) metadata.get("pageSize")).intValue());
+        assertFalse(metadata.containsKey("pageSizeClamped"),
+                "pageSizeClamped must be absent when page[size] equals the cap");
+        assertFalse(metadata.containsKey("requestedPageSize"),
+                "requestedPageSize must be absent when no clamping occurred");
+    }
+
+    @Test
+    void list_pageSizeBelowCap_doesNotEmitClampedFlag() throws Exception {
+        CollectionDefinition def = buildCustomersCollection();
+        when(registry.get("customers")).thenReturn(def);
+
+        QueryResult result = new QueryResult(
+                List.of(record("c1", "Acme")),
+                new PaginationMetadata(50, 1, 25, 2));
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(result);
+
+        MvcResult mvcResult = mockMvc.perform(get("/api/customers")
+                        .param("page[size]", "25"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Map<String, Object> response = objectMapper.readValue(
+                mvcResult.getResponse().getContentAsString(), Map.class);
+        Map<String, Object> metadata = (Map<String, Object>) response.get("metadata");
+        assertFalse(metadata.containsKey("pageSizeClamped"));
+        assertFalse(metadata.containsKey("requestedPageSize"));
+    }
+
+    @Test
     void list_linksPreserveNonPaginationQueryParams() throws Exception {
         CollectionDefinition def = buildCustomersCollection();
         when(registry.get("customers")).thenReturn(def);

@@ -14,9 +14,14 @@ import java.util.Map;
  *   <li>{@code page[size]} - The number of records per page (default: 20, max: 200)</li>
  * </ul>
  *
- * <p>{@link #fromParams(Map)} silently clamps an out-of-range {@code page[size]}
- * value (e.g. {@code page[size]=500}) down to {@link #MAX_HTTP_PAGE_SIZE} so that
+ * <p>{@link #fromParams(Map)} clamps an out-of-range {@code page[size]} value
+ * (e.g. {@code page[size]=500}) down to {@link #MAX_HTTP_PAGE_SIZE} so that
  * paginated REST endpoints never silently fall back to the default page size.
+ * The clamp is surfaced in the JSON:API response by
+ * {@code DynamicCollectionRouter} as {@code metadata.pageSizeClamped=true} and
+ * {@code metadata.requestedPageSize=<caller value>}, so callers can detect a
+ * modified request rather than inferring it from {@code data.length} vs.
+ * {@code metadata.pageSize}.
  *
  * @param pageNumber the page number (1-indexed, must be >= 1)
  * @param pageSize the number of records per page (must be between 1 and 1000)

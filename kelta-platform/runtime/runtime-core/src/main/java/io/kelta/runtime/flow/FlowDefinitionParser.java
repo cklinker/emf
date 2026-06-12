@@ -85,6 +85,7 @@ public class FlowDefinitionParser {
             case "Map" -> parseMapState(name, comment, node);
             case "Wait" -> parseWaitState(name, comment, node);
             case "Pass" -> parsePassState(name, comment, node);
+            case "InvokeFlow" -> parseInvokeFlowState(name, comment, node);
             case "Succeed" -> new StateDefinition.SucceedState(name, comment);
             case "Fail" -> new StateDefinition.FailState(
                 name, comment,
@@ -187,6 +188,35 @@ public class FlowDefinitionParser {
             textOrNull(node, "EventName"),
             textOrNull(node, "Next"),
             boolOrFalse(node, "End")
+        );
+    }
+
+    private StateDefinition.InvokeFlowState parseInvokeFlowState(String name, String comment, JsonNode node) {
+        String flowId = textOrNull(node, "FlowId");
+        String flowName = textOrNull(node, "FlowName");
+        if ((flowId == null || flowId.isBlank()) && (flowName == null || flowName.isBlank())) {
+            throw new FlowDefinitionException(
+                "InvokeFlow state '" + name + "' must specify either 'FlowId' or 'FlowName'");
+        }
+
+        Map<String, Object> input = null;
+        JsonNode inputNode = node.get("Input");
+        if (inputNode != null && inputNode.isObject()) {
+            input = objectMapper.convertValue(inputNode, new TypeReference<>() {});
+        }
+
+        return new StateDefinition.InvokeFlowState(
+            name, comment,
+            flowId,
+            flowName,
+            input,
+            textOrNull(node, "InputPath"),
+            textOrNull(node, "OutputPath"),
+            textOrNull(node, "ResultPath"),
+            textOrNull(node, "Next"),
+            boolOrFalse(node, "End"),
+            parseRetryPolicies(node.get("Retry")),
+            parseCatchPolicies(node.get("Catch"))
         );
     }
 

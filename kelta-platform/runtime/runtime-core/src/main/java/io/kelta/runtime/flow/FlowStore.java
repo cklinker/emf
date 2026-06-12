@@ -121,6 +121,38 @@ public interface FlowStore {
     List<FlowStepLogData> loadStepLogs(String executionId);
 
     // -------------------------------------------------------------------------
+    // Flow Definition Lookup
+    // -------------------------------------------------------------------------
+
+    /**
+     * Loads a flow's published definition JSON by flow ID, scoped to the tenant.
+     * <p>
+     * Used by the {@code InvokeFlow} state to fetch a target flow at runtime.
+     * Returns the raw definition JSON string (the same format that
+     * {@link FlowDefinitionParser} consumes). Tenant scoping prevents one
+     * tenant's flow from invoking another tenant's flow.
+     *
+     * @param tenantId the tenant ID to scope the lookup to
+     * @param flowId   the flow ID
+     * @return the definition JSON, or empty if the flow does not exist in this tenant
+     */
+    Optional<String> findFlowDefinitionById(String tenantId, String flowId);
+
+    /**
+     * Loads a flow's published definition JSON by name, scoped to the tenant.
+     * <p>
+     * Flow names are unique within a tenant (enforced by {@code uq_flow}
+     * UNIQUE constraint), so this returns at most one definition. Use this
+     * variant when the invoking flow references the target by human-readable
+     * name rather than UUID.
+     *
+     * @param tenantId the tenant ID to scope the lookup to
+     * @param flowName the flow name
+     * @return the definition JSON, or empty if no flow with this name exists in the tenant
+     */
+    Optional<String> findFlowDefinitionByName(String tenantId, String flowName);
+
+    // -------------------------------------------------------------------------
     // Execution Queries
     // -------------------------------------------------------------------------
 

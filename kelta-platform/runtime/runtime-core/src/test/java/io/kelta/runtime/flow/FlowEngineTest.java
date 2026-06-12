@@ -575,6 +575,239 @@ class FlowEngineTest {
     }
 
     @Nested
+    @DisplayName("InvokeFlow")
+    class InvokeFlowTests {
+
+        /** A "worker" sub-flow that echoes its input under an {@code echoed} key. */
+        private static final String WORKER_FLOW = """
+            {
+                "StartAt": "DoWork",
+                "States": {
+                    "DoWork": {
+                        "Type": "Task",
+                        "Resource": "ECHO",
+                        "ResultPath": "$.echoed",
+                        "End": true
+                    }
+                }
+            }
+            """;
+
+        @Test
+        @DisplayName("direct InvokeFlow merges sub-flow result at ResultPath")
+        @SuppressWarnings("unchecked")
+        void directInvokeMergesResult() {
+            flowStore.registerFlow("t1", "worker-1", "Worker", WORKER_FLOW);
+
+            String dispatcher = """
+                {
+                    "StartAt": "Call",
+                    "States": {
+                        "Call": {
+                            "Type": "InvokeFlow",
+                            "FlowId": "worker-1",
+                            "Input": { "slug": "tubi" },
+                            "ResultPath": "$.workerResult",
+                            "Next": "Done"
+                        },
+                        "Done": { "Type": "Succeed" }
+                    }
+                }
+                """;
+
+            Map<String, Object> result = engine.executeSynchronous(
+                "t1", "f1", dispatcher, Map.of(), "u1");
+
+            Map<String, Object> workerResult = (Map<String, Object>) result.get("workerResult");
+            assertNotNull(workerResult, "Sub-flow output should be placed at $.workerResult");
+            // The worker stores its input echo at $.echoed
+            assertNotNull(workerResult.get("echoed"));
+            // The dispatcher's original input was passed through to the worker
+            Map<String, Object> echoed = (Map<String, Object>) workerResult.get("echoed");
+            assertEquals("tubi", echoed.get("slug"));
+
+            FlowExecutionData execution = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_COMPLETED, execution.status());
+        }
+
+        @Test
+        @DisplayName("InvokeFlow by name resolves the target flow")
+        @SuppressWarnings("unchecked")
+        void invokeByName() {
+            flowStore.registerFlow("t1", "worker-1", "Worker", WORKER_FLOW);
+
+            String dispatcher = """
+                {
+                    "StartAt": "Call",
+                    "States": {
+                        "Call": {
+                            "Type": "InvokeFlow",
+                            "FlowName": "Worker",
+                            "Input": { "slug": "${$.slug}" },
+                            "ResultPath": "$.workerResult",
+                            "End": true
+                        }
+                    }
+                }
+                """;
+
+            Map<String, Object> result = engine.executeSynchronous(
+                "t1", "f1", dispatcher, Map.of("slug", "pluto"), "u1");
+
+            Map<String, Object> workerResult = (Map<String, Object>) result.get("workerResult");
+            Map<String, Object> echoed = (Map<String, Object>) workerResult.get("echoed");
+            assertEquals("pluto", echoed.get("slug"));
+        }
+
+        @Test
+        @DisplayName("missing target flow surfaces FlowNotFound and fails the execution")
+        void missingTargetFails() {
+            String dispatcher = """
+                {
+                    "StartAt": "Call",
+                    "States": {
+                        "Call": {
+                            "Type": "InvokeFlow",
+                            "FlowId": "does-not-exist",
+                            "End": true
+                        }
+                    }
+                }
+                """;
+
+            engine.executeSynchronous("t1", "f1", dispatcher, Map.of(), "u1");
+
+            FlowExecutionData execution = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_FAILED, execution.status());
+            assertTrue(execution.errorMessage().contains("does-not-exist"),
+                "Error message should name the missing flow");
+        }
+
+        @Test
+        @DisplayName("missing flow is recoverable via Catch")
+        @SuppressWarnings("unchecked")
+        void missingFlowCaughtByCatch() {
+            String dispatcher = """
+                {
+                    "StartAt": "Call",
+                    "States": {
+                        "Call": {
+                            "Type": "InvokeFlow",
+                            "FlowId": "does-not-exist",
+                            "Next": "ShouldNotReach",
+                            "Catch": [
+                                {
+                                    "ErrorEquals": ["States.ALL"],
+                                    "Next": "Recovered",
+                                    "ResultPath": "$.error"
+                                }
+                            ]
+                        },
+                        "ShouldNotReach": {
+                            "Type": "Fail",
+                            "Error": "ShouldNotReach"
+                        },
+                        "Recovered": { "Type": "Succeed" }
+                    }
+                }
+                """;
+
+            Map<String, Object> result = engine.executeSynchronous(
+                "t1", "f1", dispatcher, Map.of(), "u1");
+
+            FlowExecutionData execution = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_COMPLETED, execution.status());
+            Map<String, Object> error = (Map<String, Object>) result.get("error");
+            assertNotNull(error);
+            assertEquals("FlowNotFound", error.get("Error"));
+        }
+
+        @Test
+        @DisplayName("InvokeFlow inside Map dispatches sub-flow per item")
+        @SuppressWarnings("unchecked")
+        void invokeInsideMap() {
+            flowStore.registerFlow("t1", "worker-1", "Worker", WORKER_FLOW);
+
+            // Dispatcher Maps over a list of {slug} items and invokes the
+            // shared worker flow once per item with MaxConcurrency:1 — the
+            // exact pattern the brief calls out (5 providers, 1 ingest flow).
+            String dispatcher = """
+                {
+                    "StartAt": "Fanout",
+                    "States": {
+                        "Fanout": {
+                            "Type": "Map",
+                            "ItemsPath": "$.providers",
+                            "MaxConcurrency": 1,
+                            "ResultPath": "$.summary",
+                            "Iterator": {
+                                "StartAt": "RunPerSlug",
+                                "States": {
+                                    "RunPerSlug": {
+                                        "Type": "InvokeFlow",
+                                        "FlowName": "Worker",
+                                        "Input": { "slug": "${$.slug}" },
+                                        "ResultPath": "$.workerResult",
+                                        "End": true
+                                    }
+                                }
+                            },
+                            "End": true
+                        }
+                    }
+                }
+                """;
+
+            Map<String, Object> input = Map.of("providers", List.of(
+                Map.of("slug", "tubi"),
+                Map.of("slug", "pluto"),
+                Map.of("slug", "roku")
+            ));
+
+            Map<String, Object> result = engine.executeSynchronous(
+                "t1", "f1", dispatcher, input, "u1");
+
+            Map<String, Object> summary = (Map<String, Object>) result.get("summary");
+            assertEquals(3, ((Number) summary.get("succeeded")).intValue());
+            assertEquals(0, ((Number) summary.get("failed")).intValue());
+
+            List<Map<String, Object>> items = (List<Map<String, Object>>) summary.get("items");
+            assertEquals(3, items.size());
+            // Each iteration's state contains a workerResult.echoed.slug
+            Map<String, Object> firstEcho = (Map<String, Object>)
+                ((Map<String, Object>) items.get(0).get("workerResult")).get("echoed");
+            assertEquals("tubi", firstEcho.get("slug"));
+        }
+
+        @Test
+        @DisplayName("recursion past MAX_INVOKE_DEPTH fails with FlowDepthExceeded")
+        void depthGuardStopsRecursion() {
+            // Self-invoking flow: each invocation calls itself again.
+            // Without the depth guard this would blow the stack.
+            String selfInvoker = """
+                {
+                    "StartAt": "Recurse",
+                    "States": {
+                        "Recurse": {
+                            "Type": "InvokeFlow",
+                            "FlowName": "Recurser",
+                            "End": true
+                        }
+                    }
+                }
+                """;
+            flowStore.registerFlow("t1", "recurser-1", "Recurser", selfInvoker);
+
+            engine.executeSynchronous("t1", "recurser-1", selfInvoker, Map.of(), "u1");
+
+            FlowExecutionData execution = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_FAILED, execution.status());
+            assertTrue(execution.errorMessage().contains("MAX_INVOKE_DEPTH"),
+                "Error message should reference the depth cap; got: " + execution.errorMessage());
+        }
+    }
+
+    @Nested
     @DisplayName("Async Execution")
     class AsyncExecution {
 
@@ -615,6 +848,30 @@ class FlowEngineTest {
         private final Map<String, FlowExecutionData> executions = new ConcurrentHashMap<>();
         private final Map<String, List<FlowStepLogData>> stepLogs = new ConcurrentHashMap<>();
         private final Map<String, Map<String, Object>> pendingResumes = new ConcurrentHashMap<>();
+
+        // Tenant-scoped flow definitions for InvokeFlow tests.
+        // Key: tenantId + "::" + flowId (or flowName); Value: definition JSON
+        private final Map<String, String> flowsById = new ConcurrentHashMap<>();
+        private final Map<String, String> flowsByName = new ConcurrentHashMap<>();
+
+        void registerFlow(String tenantId, String flowId, String flowName, String definitionJson) {
+            if (flowId != null) {
+                flowsById.put(tenantId + "::" + flowId, definitionJson);
+            }
+            if (flowName != null) {
+                flowsByName.put(tenantId + "::" + flowName, definitionJson);
+            }
+        }
+
+        @Override
+        public Optional<String> findFlowDefinitionById(String tenantId, String flowId) {
+            return Optional.ofNullable(flowsById.get(tenantId + "::" + flowId));
+        }
+
+        @Override
+        public Optional<String> findFlowDefinitionByName(String tenantId, String flowName) {
+            return Optional.ofNullable(flowsByName.get(tenantId + "::" + flowName));
+        }
 
         @Override
         public String createExecution(String tenantId, String flowId, String startedBy,

@@ -33,6 +33,15 @@ public class FlowEngine {
     /** Maximum steps per execution to prevent infinite loops. */
     private static final int MAX_STEPS = 500;
 
+    /**
+     * Maximum nesting depth for {@code InvokeFlow} sub-executions. A flow that
+     * invokes another flow that invokes another flow… is allowed up to this
+     * many levels deep. Direct or transitive self-recursion is the main
+     * scenario this bounds — without a cap, a flow that invokes itself would
+     * spin until the JVM stack overflows.
+     */
+    public static final int MAX_INVOKE_DEPTH = 10;
+
     private final FlowStore flowStore;
     private final FlowDefinitionParser parser;
     private final StateDataResolver dataResolver;
@@ -70,6 +79,7 @@ public class FlowEngine {
         registerExecutor(new FailStateExecutor());
         registerExecutor(new ParallelStateExecutor(dataResolver, threadPool, this));
         registerExecutor(new MapStateExecutor(dataResolver, threadPool, this));
+        registerExecutor(new InvokeFlowStateExecutor(flowStore, parser, dataResolver, this));
     }
 
     private void registerExecutor(StateExecutor executor) {
@@ -211,10 +221,56 @@ public class FlowEngine {
         FlowExecutionContext subContext = new FlowExecutionContext(
             parent.executionId(),
             parent.tenantId(), parent.flowId(), parent.userId(),
-            subFlow, input);
+            subFlow, input, parent.invokeDepth());
 
         Map<String, Object> finalData = runStateLoop(subContext);
+        return buildSubFlowResult(finalData, subContext);
+    }
+
+    /**
+     * Executes a target flow synchronously as an {@code InvokeFlow} step.
+     * <p>
+     * Behaves like {@link #executeSubFlow}, but increments the parent's
+     * {@code invokeDepth} so transitive {@code InvokeFlow} chains can be
+     * bounded by {@link #MAX_INVOKE_DEPTH}. The state log rows still attach
+     * to the parent's execution id — sub-executions don't get their own
+     * {@code flow_execution} row.
+     */
+    public SubFlowResult executeInvokedFlow(FlowDefinition targetFlow,
+                                             Map<String, Object> input,
+                                             FlowExecutionContext parent) {
+        FlowExecutionContext invokedContext = new FlowExecutionContext(
+            parent.executionId(),
+            parent.tenantId(), parent.flowId(), parent.userId(),
+            targetFlow, input, parent.invokeDepth() + 1);
+
+        Map<String, Object> finalData = runStateLoop(invokedContext);
+        return buildSubFlowResult(finalData, invokedContext);
+    }
+
+    /**
+     * Builds a {@link SubFlowResult} from a finished sub-context. Carries
+     * caught errors and, when the sub-flow uncaught-failed, the terminal
+     * error code/message so the parent state can propagate it.
+     */
+    private SubFlowResult buildSubFlowResult(Map<String, Object> finalData,
+                                              FlowExecutionContext subContext) {
+        if (subContext.isCompleted()
+                && FlowExecutionData.STATUS_FAILED.equals(subContext.finalStatus())) {
+            return new SubFlowResult(finalData, List.copyOf(subContext.caughtErrors()),
+                subContext.finalErrorCode() != null ? subContext.finalErrorCode() : "SubFlowFailed",
+                subContext.finalErrorMessage());
+        }
         return new SubFlowResult(finalData, List.copyOf(subContext.caughtErrors()));
+    }
+
+    /**
+     * Returns the parser used by the engine. Exposed so executors can parse
+     * definition JSON loaded from the {@link FlowStore} at runtime (currently
+     * only {@code InvokeFlow}).
+     */
+    public FlowDefinitionParser parser() {
+        return parser;
     }
 
     /**
@@ -293,7 +349,8 @@ public class FlowEngine {
                     FlowExecutionData.STATUS_FAILED, annotateWithFailedCount(context.stateData(), context),
                     "State '" + context.currentStateId() + "' not found",
                     context.elapsedMs(), context.stepCount());
-                context.markCompleted(FlowExecutionData.STATUS_FAILED);
+                context.markCompleted(FlowExecutionData.STATUS_FAILED,
+                    "StateNotFound", "State '" + context.currentStateId() + "' not found");
                 return context.stateData();
             }
 
@@ -301,11 +358,11 @@ public class FlowEngine {
             StateExecutor executor = executors.get(stateType);
             if (executor == null) {
                 log.error("No executor for state type '{}'", stateType);
+                String missingMsg = "No executor for state type: " + stateType;
                 flowStore.completeExecution(context.executionId(),
                     FlowExecutionData.STATUS_FAILED, annotateWithFailedCount(context.stateData(), context),
-                    "No executor for state type: " + stateType,
-                    context.elapsedMs(), context.stepCount());
-                context.markCompleted(FlowExecutionData.STATUS_FAILED);
+                    missingMsg, context.elapsedMs(), context.stepCount());
+                context.markCompleted(FlowExecutionData.STATUS_FAILED, "ExecutorNotFound", missingMsg);
                 return context.stateData();
             }
 
@@ -350,7 +407,8 @@ public class FlowEngine {
                         FlowExecutionData.STATUS_FAILED,
                         annotateWithFailedCount(result.updatedData(), context),
                         result.errorMessage(), context.elapsedMs(), context.stepCount());
-                    context.markCompleted(FlowExecutionData.STATUS_FAILED);
+                    context.markCompleted(FlowExecutionData.STATUS_FAILED,
+                        result.errorCode(), result.errorMessage());
                 }
                 return result.updatedData();
             }
@@ -361,7 +419,8 @@ public class FlowEngine {
                     FlowExecutionData.STATUS_FAILED,
                     annotateWithFailedCount(result.updatedData(), context),
                     result.errorMessage(), context.elapsedMs(), context.stepCount());
-                context.markCompleted(FlowExecutionData.STATUS_FAILED);
+                context.markCompleted(FlowExecutionData.STATUS_FAILED,
+                    result.errorCode(), result.errorMessage());
                 return result.updatedData();
             }
 
@@ -377,11 +436,11 @@ public class FlowEngine {
         // Step limit exceeded
         if (context.stepCount() >= MAX_STEPS) {
             log.error("Execution {} exceeded max step limit ({})", context.executionId(), MAX_STEPS);
+            String stepMsg = "Execution exceeded maximum step limit (" + MAX_STEPS + ")";
             flowStore.completeExecution(context.executionId(),
                 FlowExecutionData.STATUS_FAILED, annotateWithFailedCount(context.stateData(), context),
-                "Execution exceeded maximum step limit (" + MAX_STEPS + ")",
-                context.elapsedMs(), context.stepCount());
-            context.markCompleted(FlowExecutionData.STATUS_FAILED);
+                stepMsg, context.elapsedMs(), context.stepCount());
+            context.markCompleted(FlowExecutionData.STATUS_FAILED, "StepLimitExceeded", stepMsg);
         }
 
         return context.stateData();

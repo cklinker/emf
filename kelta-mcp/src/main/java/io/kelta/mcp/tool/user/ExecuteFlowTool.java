@@ -31,12 +31,17 @@ public class ExecuteFlowTool implements UserTool {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("flowId", Schemas.string("Flow id (UUID) or name. Wraps POST /api/flows/{flowId}/execute."));
         properties.put("input", Schemas.freeObject(
-                "Optional input payload passed to the flow as the initial context. Shape is flow-specific."));
+                "Optional HTTP request body. Must double-wrap the flow's input under an \"input\" key: "
+                + "pass {\"input\": {\"slug\": \"x\"}} so the engine's state envelope sets $.input = {\"slug\": \"x\"} "
+                + "and the flow can read $.input.slug. Single-wrapping (e.g. {\"slug\": \"x\"}) leaves $.input empty "
+                + "and downstream tasks fail with confusing errors."));
 
         Tool tool = Tool.builder()
                 .name("execute_flow")
                 .title("Execute Flow")
-                .description("Trigger a flow execution. Returns the execution id; use get_flow_run to poll status.")
+                .description("Trigger a flow execution. Returns the execution id; use get_flow_run to poll status. "
+                        + "Inputs must be double-wrapped: execute_flow(flowId, input={\"input\": {\"slug\": \"x\"}}) "
+                        + "so the flow can read $.input.slug. See integrations.md \"Flows\" for the state envelope.")
                 .inputSchema(Schemas.object(properties, List.of("flowId")))
                 .annotations(ToolHints.write(false, false))
                 .build();

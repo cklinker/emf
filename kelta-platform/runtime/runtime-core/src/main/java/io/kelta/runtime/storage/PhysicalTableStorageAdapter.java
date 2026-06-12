@@ -1006,9 +1006,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                     if (coll.isEmpty()) {
                         yield "1 = 0"; // always false for empty IN list
                     }
+                    FieldType elementType = fieldDef != null ? fieldDef.type() : null;
                     String ph = coll.stream()
                             .map(v -> {
-                                params.add(v);
+                                Object elt = (elementType != null && v instanceof String)
+                                    ? TypeCoercionService.coerceValue(v, elementType)
+                                    : v;
+                                params.add(elt);
                                 return "?";
                             })
                             .collect(Collectors.joining(", "));

@@ -665,6 +665,74 @@ class PhysicalTableStorageAdapterTest {
         }
 
         @Test
+        @DisplayName("Should filter with IN operator (collection of values) in a single query")
+        void shouldFilterWithInOperator() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(FilterCondition.in("id", List.of("1", "3", "5")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(3, result.data().size());
+            // totalCount must reflect IN-filtered rows, not the full table
+            assertEquals(3L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN with one value matches just that row")
+        void shouldFilterWithInOperatorSingleValue() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(FilterCondition.in("id", List.of("2")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(1, result.data().size());
+            assertEquals(1L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN with an empty list matches no rows")
+        void shouldFilterWithInOperatorEmptyList() {
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("id", FilterOperator.IN, List.of()))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(0, result.data().size());
+            assertEquals(0L, result.metadata().totalCount());
+        }
+
+        @Test
+        @DisplayName("IN against a numeric field coerces element types from strings")
+        void shouldFilterWithInOperatorCoercesNumericElements() {
+            // Mirrors the HTTP path: filter[quantity][in]=100,200 arrives as
+            // List.of("100", "200") of strings; the storage layer must coerce
+            // each element to INTEGER so the WHERE clause matches.
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("quantity", FilterOperator.IN, List.of("100", "200")))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            assertEquals(2, result.data().size());
+            assertEquals(2L, result.metadata().totalCount());
+        }
+
+        @Test
         @DisplayName("Should combine multiple filters with AND logic")
         void shouldCombineMultipleFiltersWithAndLogic() {
             QueryRequest request = new QueryRequest(

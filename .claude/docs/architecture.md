@@ -108,6 +108,26 @@ precedence; request-supplied entries fill the gaps. This keeps a stable
 "follow-up by id" shape for `create_record` / `update_record` callers so they
 don't need a second GET to discover related-record IDs.
 
+**Read-side include resolution** — `GET /api/{collection}[/{id}]?include=<name>`
+on `DynamicCollectionRouter#resolveIncludes` follows three resolution paths
+per include name, in order: (1) collection-name has-many — the named
+collection has an FK pointing to the primary; (2) collection-name belongs-to —
+the primary has FK(s) pointing to the named collection (covers `created_by` /
+`updated_by` → `users`); (3) **field-name lookup** — the include name is a
+field on the primary collection with a non-null `referenceConfig`. The
+field-name path covers both LOOKUP-typed fields and the legacy
+"STRING-with-refConfig" form where the FK UUID is stored on `attributes`
+(e.g. `availability.attributes.title`); it injects `relationships.<field>.data
+= { type, id }` on each primary resource and hydrates the referenced rows
+into top-level `included[]`. The raw UUID stays on `attributes` for
+back-compat. FK values are deduplicated before the single `id IN (…)` query
+to the target collection. A separate **transitive pass** then resolves
+grandchild includes via already-resolved direct children (e.g.
+`page-layouts ?include=layout-sections,layout-fields` queries `layout-fields`
+by `sectionId IN (section ids)` after `layout-sections` resolves directly).
+Includes are skipped silently when the target is unresolvable — `200` with
+no `included` entry — never `5xx`.
+
 **Pagination contract** — every paginated REST endpoint uses JSON:API
 bracket syntax (`page[number]` / `page[size]`). Parsing lives in
 `runtime-core/.../query/Pagination.fromParams`, which clamps `page[size]`

@@ -198,6 +198,41 @@ public class ScheduledJobRepository {
     }
 
     /**
+     * Returns the scheduled-job snapshot for a flow including execution-tracking columns
+     * ({@code last_run_at}, {@code last_status}, {@code next_run_at}) — the read-side
+     * counterpart of {@link #findByFlowId}.
+     */
+    public Optional<Map<String, Object>> findScheduleForFlow(String flowId, String tenantId) {
+        var results = jdbcTemplate.queryForList(
+                "SELECT id, cron_expression, timezone, active, " +
+                        "last_run_at, last_status, next_run_at " +
+                        "FROM scheduled_job " +
+                        "WHERE job_reference_id = ? AND job_type = 'FLOW' AND tenant_id = ?",
+                flowId, tenantId
+        );
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    /**
+     * Returns the most recent {@code job_execution_log} entries for a flow, newest first.
+     * Joined through {@code scheduled_job} so the lookup is tenant-scoped without needing
+     * the caller to know the {@code job_id}.
+     */
+    public List<Map<String, Object>> findRecentRunsForFlow(String flowId, String tenantId, int limit) {
+        return jdbcTemplate.queryForList(
+                "SELECT log.id, log.status, log.error_message, " +
+                        "log.started_at, log.completed_at, log.duration_ms " +
+                        "FROM job_execution_log log " +
+                        "JOIN scheduled_job job ON job.id = log.job_id " +
+                        "WHERE job.job_reference_id = ? AND job.job_type = 'FLOW' " +
+                        "AND job.tenant_id = ? " +
+                        "ORDER BY log.started_at DESC " +
+                        "LIMIT ?",
+                flowId, tenantId, limit
+        );
+    }
+
+    /**
      * Inserts a new scheduled_job row for a FLOW.
      */
     public void insertForFlow(String flowId, String tenantId, String name, String cronExpression,

@@ -23,6 +23,10 @@ public class FlowRepository {
             FROM flow WHERE id = ?
             """;
 
+    private static final String SELECT_FLOW_TYPE_BY_ID_AND_TENANT = """
+            SELECT id, flow_type, active FROM flow WHERE id = ? AND tenant_id = ?
+            """;
+
     private static final String SELECT_MAX_VERSION_NUMBER = """
             SELECT COALESCE(MAX(version_number), 0) FROM flow_version WHERE flow_id = ?
             """;
@@ -68,6 +72,17 @@ public class FlowRepository {
         row.computeIfPresent("definition", (k, v) -> v != null ? v.toString() : null);
         row.computeIfPresent("trigger_config", (k, v) -> v != null ? v.toString() : null);
         return Optional.of(row);
+    }
+
+    /**
+     * Tenant-scoped lookup of a flow's type (and active flag), used by read endpoints
+     * that need to check whether a flow exists in the caller's tenant and what its
+     * {@code flow_type} is — without loading the (potentially large) JSONB definition.
+     */
+    public Optional<Map<String, Object>> findFlowTypeForTenant(String flowId, String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                SELECT_FLOW_TYPE_BY_ID_AND_TENANT, flowId, tenantId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
     public int getMaxVersionNumber(String flowId) {

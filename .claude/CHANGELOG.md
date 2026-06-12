@@ -38,3 +38,7 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 
 - 2026-06-08 chore(ui): remove unused React imports and rename/mark unused locals across `kelta-ui/app` to clear all 86 TS6133 errors (CHORE-2026-06-08-0001)
 - 2026-06-08 chore(ui): remove unused React imports and rename/mark unused locals across `kelta-ui/app` to clear all 86 TS6133 errors (CHORE-2026-06-08-0001)
+
+## 2026-06-12
+
+- 2026-06-12 chore(mcp): `create_flow` tool writes `flowType` (the real `flows` collection field) instead of the dead `triggerType` column; legacy `triggerType` argument is still accepted and remapped to `flowType` for back-compat (CHORE-2026-06-12-0001)

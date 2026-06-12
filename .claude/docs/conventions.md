@@ -89,11 +89,17 @@ Endpoints that need higher caps for internal batch fetches (e.g. report executio
 
 ### Response shape
 
-Paginated list responses carry both `metadata` (numeric pagination state) and `links` (URLs for navigation):
+Paginated list responses carry pagination state under both `meta` (the JSON:API standard key) and `metadata` (legacy alias), plus a `links` block (URLs for navigation):
 
 ```json
 {
   "data": [ { "type": "customers", "id": "…", "attributes": { … } } ],
+  "meta": {
+    "totalCount": 100,
+    "currentPage": 2,
+    "pageSize": 20,
+    "totalPages": 5
+  },
   "metadata": {
     "totalCount": 100,
     "currentPage": 2,
@@ -108,6 +114,7 @@ Paginated list responses carry both `metadata` (numeric pagination state) and `l
 }
 ```
 
+- `meta` and `metadata` carry **identical content** and reference the same underlying map. New clients should read `meta` (JSON:API spec). `metadata` is **deprecated** — kept for backward compatibility with existing integrations and will be removed in a future major version.
 - `links.self` is always present.
 - `links.prev` is `null` when the response is on page 1.
 - `links.next` is `null` when the response is on (or past) the last page.

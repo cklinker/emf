@@ -1288,6 +1288,11 @@ public class DynamicCollectionRouter {
 
         Map<String, Object> response = new java.util.HashMap<>();
         response.put("data", jsonApiData);
+        // Emit the JSON:API standard `meta` key, plus the legacy `metadata`
+        // alias for backward compatibility. `metadata` is deprecated — new
+        // clients should read `meta`. Both maps share the same instance so
+        // they are guaranteed to stay in sync.
+        response.put("meta", metadata);
         response.put("metadata", metadata);
         response.put("links", PaginationLinks.build(
             requestPath,

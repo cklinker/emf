@@ -136,10 +136,12 @@ the absolute constructor ceiling that internal services (report execution,
 data export, include resolution) build `Pagination` records against
 directly. When the caller's `page[size]` exceeds the cap,
 `DynamicCollectionRouter.toJsonApiListResponse` echoes the modification as
-`metadata.requestedPageSize=<caller value>` and `metadata.pageSizeClamped=true`
+`meta.requestedPageSize=<caller value>` and `meta.pageSizeClamped=true`
 so clients can detect the clamp without inferring it from `data.length`
-vs. `metadata.pageSize` — preventing the "200 + populated `totalCount` +
-empty `data`" misread that previously cost debugging time. List responses
+vs. `meta.pageSize` — preventing the "200 + populated `totalCount` +
+empty `data`" misread that previously cost debugging time. The same map
+is also emitted under the legacy top-level `metadata` key (deprecated
+alias retained for backward compatibility with pre-`meta` clients). List responses
 also carry a `links` block (`self` / `prev` / `next`) built by
 `runtime-jsonapi/.../PaginationLinks#build`; URLs are relative paths so
 cached system-collection responses remain reusable across hosts and behind

@@ -1263,22 +1263,56 @@ public class DynamicCollectionRouter {
             jsonApiData.add(toJsonApiResourceObject(record, type, definition));
         }
 
+        int effectivePageSize = result.metadata().pageSize();
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("totalCount", result.metadata().totalCount());
+        metadata.put("currentPage", result.metadata().currentPage());
+        metadata.put("pageSize", effectivePageSize);
+        metadata.put("totalPages", result.metadata().totalPages());
+
+        // Surface page[size] clamping so callers don't get a populated totalCount
+        // alongside surprise-truncated data. Pagination.fromParams silently caps
+        // an over-cap page[size] (e.g. 500) down to MAX_HTTP_PAGE_SIZE — without
+        // this echo the only public signal of the modification is the
+        // metadata.pageSize value, which is easy to miss.
+        Integer requestedPageSize = parseRequestedPageSize(params);
+        if (requestedPageSize != null && requestedPageSize > effectivePageSize) {
+            metadata.put("requestedPageSize", requestedPageSize);
+            metadata.put("pageSizeClamped", true);
+        }
+
         Map<String, Object> response = new java.util.HashMap<>();
         response.put("data", jsonApiData);
-        response.put("metadata", Map.of(
-            "totalCount", result.metadata().totalCount(),
-            "currentPage", result.metadata().currentPage(),
-            "pageSize", result.metadata().pageSize(),
-            "totalPages", result.metadata().totalPages()
-        ));
+        response.put("metadata", metadata);
         response.put("links", PaginationLinks.build(
             requestPath,
             params,
             result.metadata().currentPage(),
-            result.metadata().pageSize(),
+            effectivePageSize,
             result.metadata().totalPages()
         ));
         return response;
+    }
+
+    /**
+     * Returns the raw {@code page[size]} value from the request params, or
+     * {@code null} if it was absent, blank, or non-numeric. Used to detect when
+     * {@link Pagination#fromParams(Map)} clamped the caller's value so the
+     * response can echo what was requested.
+     */
+    private Integer parseRequestedPageSize(Map<String, String> params) {
+        if (params == null) {
+            return null;
+        }
+        String raw = params.get("page[size]");
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     // ==================== Include Resolution ====================

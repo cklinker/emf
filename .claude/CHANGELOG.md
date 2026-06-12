@@ -41,4 +41,5 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 
 ## 2026-06-12
 
-- 2026-06-12 chore(mcp): `create_flow` tool writes `flowType` (the real `flows` collection field) instead of the dead `triggerType` column; legacy `triggerType` argument is still accepted and remapped to `flowType` for back-compat (CHORE-2026-06-12-0001)
+- 2026-06-12 feat(gateway): surface page[size] clamp in JSON:API metadata — `DynamicCollectionRouter.toJsonApiListResponse` now adds `metadata.requestedPageSize` + `metadata.pageSizeClamped=true` whenever the caller's `page[size]` exceeded `MAX_HTTP_PAGE_SIZE`, so an over-cap request no longer looks like a silent-empty-data response (TASK-2026-06-12-0004)
+- 2026-06-12 feat(gateway): surface page[size] clamp in JSON:API metadata — `DynamicCollectionRouter.toJsonApiListResponse` now adds `metadata.requestedPageSize` + `metadata.pageSizeClamped=true` whenever the caller's `page[size]` exceeded `MAX_HTTP_PAGE_SIZE`, so an over-cap request no longer looks like a silent-empty-data response (TASK-2026-06-12-0004)

@@ -251,6 +251,39 @@ the rest of the email pipeline. `kelta-auth`'s `WorkerClient.sendInviteEmail`
 calls this endpoint after a federated user is newly JIT-provisioned, so SSO
 sign-ups receive a notification email in addition to their existing session.
 
+### Scheduled flow cron handling
+
+SCHEDULED flows carry their schedule in `triggerConfig.cron`. The worker bridges
+that user-facing config to the `scheduled_job` table (which the
+`ScheduledJobExecutorService` polls) through `FlowScheduleSyncHook` — a
+`BeforeSaveHook` on the `flows` collection.
+
+- **Format**: Spring's `CronExpression.parse` requires a 6-field expression
+  (`seconds minutes hours dom month dow`). Users almost universally write the
+  standard 5-field form (`0 */4 * * *`).
+- **Normalization & validation (write path)**: `FlowScheduleSyncHook.beforeCreate`
+  / `beforeUpdate` route `triggerConfig.cron` through `worker/util/CronExpressions`.
+  A 5-field expression is normalized to 6-field by prepending `0 ` (seconds) and
+  the rewritten value is returned as a `BeforeSaveResult.withFieldUpdates` so the
+  stored `triggerConfig.cron` is always canonical. Anything still unparseable
+  produces a `BeforeSaveResult.error("triggerConfig.cron", …)` which
+  `DefaultQueryEngine` raises as a `ValidationException` → JSON:API 400 with
+  `cron must be a 6-field Spring expression (with seconds); got '…'`. Silent
+  drop is forbidden — historically the parse failure was swallowed in
+  `afterCreate` and SCHEDULED flows with 5-field crons persisted with no
+  `scheduled_job` row, which masked broken provider-refresh and ingest flows
+  for hours.
+- **Sync (read path)**: `afterCreate`/`afterUpdate` upsert the
+  `scheduled_job` row using the normalized cron; `afterDelete` (or a flow type
+  change away from SCHEDULED) removes it. The hook also normalizes defensively
+  here so callers that bypass the lifecycle (seed-data ingestion writing
+  directly to storage) still land valid rows.
+- **Read-time call sites**: `ScheduledJobRepository.calculateNextRunAt` and the
+  `/api/scheduled-jobs/{id}/resume` + `/api/scheduled-jobs/validate-cron`
+  endpoints route through the same `CronExpressions.normalize`, so legacy
+  5-field rows in `scheduled_job` resume cleanly and the UI's pre-save
+  validation endpoint accepts the same input as the write path.
+
 ## Where to Add New Code
 
 | What | Where |

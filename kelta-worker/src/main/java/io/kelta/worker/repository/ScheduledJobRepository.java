@@ -2,6 +2,7 @@ package io.kelta.worker.repository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.kelta.worker.util.CronExpressions;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Repository;
@@ -108,7 +109,7 @@ public class ScheduledJobRepository {
      * Always calculates from NOW to prevent burst-fire after downtime.
      */
     public static Instant calculateNextRunAt(String cronExpression, String timezone) {
-        CronExpression cron = CronExpression.parse(cronExpression);
+        CronExpression cron = CronExpressions.parse(cronExpression);
         ZoneId zone = (timezone != null && !timezone.isBlank()) ? ZoneId.of(timezone) : ZoneId.of("UTC");
         ZonedDateTime next = cron.next(ZonedDateTime.now(zone));
         return next != null ? next.toInstant() : null;

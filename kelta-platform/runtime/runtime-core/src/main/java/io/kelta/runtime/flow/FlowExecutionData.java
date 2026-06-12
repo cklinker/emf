@@ -57,11 +57,34 @@ public record FlowExecutionData(
     public static final String STATUS_CANCELLED = "CANCELLED";
 
     /**
+     * Reserved key written into {@code stateData} by the engine to surface the
+     * total count of iterations that a Map state caught and aggregated. Visible
+     * even when {@link #status} is COMPLETED — that is the whole point: catches
+     * inside a Map iterator no longer make the failures vanish.
+     */
+    public static final String FAILED_COUNT_KEY = "_failedCount";
+
+    /**
      * Returns true if the execution has reached a terminal state.
      */
     public boolean isTerminal() {
         return STATUS_COMPLETED.equals(status)
             || STATUS_FAILED.equals(status)
             || STATUS_CANCELLED.equals(status);
+    }
+
+    /**
+     * Returns the aggregate count of caught iteration failures recorded by Map
+     * states during this execution, or 0 if none were recorded.
+     */
+    public int failedCount() {
+        if (stateData == null) {
+            return 0;
+        }
+        Object value = stateData.get(FAILED_COUNT_KEY);
+        if (value instanceof Number n) {
+            return n.intValue();
+        }
+        return 0;
     }
 }

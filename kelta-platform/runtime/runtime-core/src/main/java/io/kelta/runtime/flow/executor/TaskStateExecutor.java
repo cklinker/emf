@@ -150,6 +150,7 @@ public class TaskStateExecutor implements StateExecutor {
 
                 log.debug("Task '{}' caught error '{}' — transitioning to '{}'",
                     task.name(), errorCode, catchPolicy.next());
+                context.recordCaughtError(task.name(), errorCode, errorMessage);
                 return StateExecutionResult.success(catchPolicy.next(), stateAfterCatch);
             }
         }

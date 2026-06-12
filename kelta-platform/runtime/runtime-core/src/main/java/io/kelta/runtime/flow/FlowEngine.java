@@ -191,16 +191,17 @@ public class FlowEngine {
 
     /**
      * Executes a sub-flow (used by Parallel and Map state executors).
-     * Runs the sub-flow from startAt to terminal state and returns the final state data.
+     * Runs the sub-flow from startAt to terminal state and returns the final
+     * state data along with any errors that were intercepted by Catch policies.
      *
      * @param subFlow   the sub-flow definition
      * @param input     the input state data for the sub-flow
      * @param parent    the parent execution context (for tenant/user info)
-     * @return the final state data
+     * @return the sub-flow's final state data plus its list of caught errors
      */
-    public Map<String, Object> executeSubFlow(FlowDefinition subFlow,
-                                               Map<String, Object> input,
-                                               FlowExecutionContext parent) {
+    public SubFlowResult executeSubFlow(FlowDefinition subFlow,
+                                         Map<String, Object> input,
+                                         FlowExecutionContext parent) {
         // Sub-flows reuse the parent's executionId so their step rows fit the
         // flow_step_log.execution_id VARCHAR(36) FK to flow_execution(id). The
         // parent execution row already exists; sub-step rows simply attach to
@@ -212,7 +213,8 @@ public class FlowEngine {
             parent.tenantId(), parent.flowId(), parent.userId(),
             subFlow, input);
 
-        return runStateLoop(subContext);
+        Map<String, Object> finalData = runStateLoop(subContext);
+        return new SubFlowResult(finalData, List.copyOf(subContext.caughtErrors()));
     }
 
     /**
@@ -251,17 +253,35 @@ public class FlowEngine {
                 ? FlowExecutionData.STATUS_CANCELLED
                 : FlowExecutionData.STATUS_COMPLETED;
 
+            finalData = annotateWithFailedCount(finalData, context);
             flowStore.completeExecution(executionId, status, finalData, null,
                 context.elapsedMs(), context.stepCount());
 
-            log.info("Flow execution {} completed with status {} ({} steps, {}ms)",
-                executionId, status, context.stepCount(), context.elapsedMs());
+            log.info("Flow execution {} completed with status {} (failedCount={}, {} steps, {}ms)",
+                executionId, status, context.failedCount(), context.stepCount(), context.elapsedMs());
         } else {
-            log.info("Flow execution {} finished with status {} ({} steps, {}ms)",
-                executionId, context.finalStatus(), context.stepCount(), context.elapsedMs());
+            log.info("Flow execution {} finished with status {} (failedCount={}, {} steps, {}ms)",
+                executionId, context.finalStatus(), context.failedCount(),
+                context.stepCount(), context.elapsedMs());
         }
 
         return finalData;
+    }
+
+    /**
+     * Embeds the context's failedCount into the final state data under
+     * {@link FlowExecutionData#FAILED_COUNT_KEY} so consumers reading the
+     * execution row can see how many iterations were caught even when the
+     * run is marked COMPLETED.
+     */
+    private Map<String, Object> annotateWithFailedCount(Map<String, Object> data,
+                                                        FlowExecutionContext context) {
+        if (context.failedCount() <= 0) {
+            return data;
+        }
+        Map<String, Object> annotated = data != null ? new LinkedHashMap<>(data) : new LinkedHashMap<>();
+        annotated.put(FlowExecutionData.FAILED_COUNT_KEY, context.failedCount());
+        return annotated;
     }
 
     private Map<String, Object> runStateLoop(FlowExecutionContext context) {
@@ -270,7 +290,7 @@ public class FlowEngine {
             if (currentState == null) {
                 log.error("State '{}' not found in flow definition", context.currentStateId());
                 flowStore.completeExecution(context.executionId(),
-                    FlowExecutionData.STATUS_FAILED, context.stateData(),
+                    FlowExecutionData.STATUS_FAILED, annotateWithFailedCount(context.stateData(), context),
                     "State '" + context.currentStateId() + "' not found",
                     context.elapsedMs(), context.stepCount());
                 context.markCompleted(FlowExecutionData.STATUS_FAILED);
@@ -282,7 +302,7 @@ public class FlowEngine {
             if (executor == null) {
                 log.error("No executor for state type '{}'", stateType);
                 flowStore.completeExecution(context.executionId(),
-                    FlowExecutionData.STATUS_FAILED, context.stateData(),
+                    FlowExecutionData.STATUS_FAILED, annotateWithFailedCount(context.stateData(), context),
                     "No executor for state type: " + stateType,
                     context.elapsedMs(), context.stepCount());
                 context.markCompleted(FlowExecutionData.STATUS_FAILED);
@@ -327,7 +347,8 @@ public class FlowEngine {
                 context.setStateData(result.updatedData());
                 if ("FAILED".equals(result.status())) {
                     flowStore.completeExecution(context.executionId(),
-                        FlowExecutionData.STATUS_FAILED, result.updatedData(),
+                        FlowExecutionData.STATUS_FAILED,
+                        annotateWithFailedCount(result.updatedData(), context),
                         result.errorMessage(), context.elapsedMs(), context.stepCount());
                     context.markCompleted(FlowExecutionData.STATUS_FAILED);
                 }
@@ -337,7 +358,8 @@ public class FlowEngine {
             if ("FAILED".equals(result.status())) {
                 // Uncaught failure
                 flowStore.completeExecution(context.executionId(),
-                    FlowExecutionData.STATUS_FAILED, result.updatedData(),
+                    FlowExecutionData.STATUS_FAILED,
+                    annotateWithFailedCount(result.updatedData(), context),
                     result.errorMessage(), context.elapsedMs(), context.stepCount());
                 context.markCompleted(FlowExecutionData.STATUS_FAILED);
                 return result.updatedData();
@@ -356,7 +378,7 @@ public class FlowEngine {
         if (context.stepCount() >= MAX_STEPS) {
             log.error("Execution {} exceeded max step limit ({})", context.executionId(), MAX_STEPS);
             flowStore.completeExecution(context.executionId(),
-                FlowExecutionData.STATUS_FAILED, context.stateData(),
+                FlowExecutionData.STATUS_FAILED, annotateWithFailedCount(context.stateData(), context),
                 "Execution exceeded maximum step limit (" + MAX_STEPS + ")",
                 context.elapsedMs(), context.stepCount());
             context.markCompleted(FlowExecutionData.STATUS_FAILED);

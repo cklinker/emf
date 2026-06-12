@@ -48,7 +48,7 @@ public class ParallelStateExecutor implements StateExecutor {
         }
 
         // Submit each branch for concurrent execution
-        List<Future<Map<String, Object>>> futures = new ArrayList<>();
+        List<Future<SubFlowResult>> futures = new ArrayList<>();
         for (FlowDefinition branch : branches) {
             futures.add(executorService.submit(() ->
                 engine.executeSubFlow(branch, input, context)));
@@ -61,7 +61,13 @@ public class ParallelStateExecutor implements StateExecutor {
 
         for (int i = 0; i < futures.size(); i++) {
             try {
-                branchResults.add(futures.get(i).get());
+                SubFlowResult branchResult = futures.get(i).get();
+                branchResults.add(branchResult.stateData());
+                // Propagate any catches from the branch up to the parent so the
+                // top-level execution can surface them via failedCount/log.
+                for (FlowExecutionContext.CaughtError ce : branchResult.caughtErrors()) {
+                    context.recordCaughtError(ce.stateId(), ce.errorCode(), ce.errorMessage());
+                }
             } catch (ExecutionException e) {
                 errorCode = "ParallelBranchFailed";
                 errorMessage = "Branch " + i + " failed: " + e.getCause().getMessage();
@@ -99,6 +105,7 @@ public class ParallelStateExecutor implements StateExecutor {
                 errorData.put("Cause", errorMessage);
                 Map<String, Object> stateAfterCatch = dataResolver.applyResultPath(
                     context.stateData(), errorData, catchPolicy.resultPath());
+                context.recordCaughtError(parallel.name(), errorCode, errorMessage);
                 return StateExecutionResult.success(catchPolicy.next(), stateAfterCatch);
             }
         }

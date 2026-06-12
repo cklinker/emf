@@ -89,6 +89,12 @@ public sealed interface StateDefinition {
 
     /**
      * Iterates over an array in the state data and executes a sub-flow for each item.
+     * <p>
+     * When {@code failOnPartial} is true, any iteration whose sub-flow caught an
+     * error via its own Catch policy causes the Map state to return a failure
+     * (the run is marked FAILED). When false (default), the state still succeeds
+     * but its result records aggregate counts and sample errors so partial
+     * failures cannot be silently swallowed.
      */
     record MapState(
         String name,
@@ -100,7 +106,8 @@ public sealed interface StateDefinition {
         String outputPath,
         String resultPath,
         String next,
-        boolean end
+        boolean end,
+        boolean failOnPartial
     ) implements StateDefinition {
         @Override
         public String type() { return "Map"; }

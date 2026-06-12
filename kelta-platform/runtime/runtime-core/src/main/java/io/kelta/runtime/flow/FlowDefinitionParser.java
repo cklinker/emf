@@ -173,7 +173,8 @@ public class FlowDefinitionParser {
             textOrNull(node, "OutputPath"),
             textOrNull(node, "ResultPath"),
             textOrNull(node, "Next"),
-            boolOrFalse(node, "End")
+            boolOrFalse(node, "End"),
+            boolOrFalse(node, "FailOnPartial")
         );
     }
 

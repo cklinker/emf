@@ -59,6 +59,24 @@ class FlowEngineTest {
             }
         });
 
+        // Fails for items whose 'shouldFail' field is true; succeeds otherwise.
+        // Used by Map error-aggregation tests so the same handler is hit per
+        // item with different outcomes — closer to a real partial-failure case
+        // than wiring two separate handlers.
+        handlerRegistry.register(new ActionHandler() {
+            @Override
+            public String getActionTypeKey() { return "CONDITIONAL_FAIL"; }
+
+            @Override
+            public ActionResult execute(ActionContext context) {
+                Object shouldFail = context.data() != null ? context.data().get("shouldFail") : null;
+                if (Boolean.TRUE.equals(shouldFail)) {
+                    return ActionResult.failure("Item flagged shouldFail=true");
+                }
+                return ActionResult.success(Map.of("processed", true));
+            }
+        });
+
         engine = new FlowEngine(flowStore, handlerRegistry, objectMapper, 2);
     }
 
@@ -402,6 +420,157 @@ class FlowEngineTest {
             List<FlowStepLogData> steps = flowStore.loadStepLogs(execId);
 
             assertEquals(3, steps.size());
+        }
+    }
+
+    @Nested
+    @DisplayName("Map Error Aggregation")
+    class MapErrorAggregation {
+
+        // Map iterator that processes each item via CONDITIONAL_FAIL and
+        // catches any error so the iteration completes "successfully". This is
+        // the pattern the task focuses on: catches that previously swallowed
+        // per-iteration failures and reported overall success.
+        private String mapFlow(boolean failOnPartial) {
+            return """
+                {
+                    "StartAt": "Process",
+                    "States": {
+                        "Process": {
+                            "Type": "Map",
+                            "ItemsPath": "$.items",
+                            "ResultPath": "$.result",
+                            %s
+                            "Iterator": {
+                                "StartAt": "Do",
+                                "States": {
+                                    "Do": {
+                                        "Type": "Task",
+                                        "Resource": "CONDITIONAL_FAIL",
+                                        "End": true,
+                                        "Catch": [
+                                            {
+                                                "ErrorEquals": ["States.ALL"],
+                                                "Next": "Recovered",
+                                                "ResultPath": "$.error"
+                                            }
+                                        ]
+                                    },
+                                    "Recovered": { "Type": "Succeed" }
+                                }
+                            },
+                            "End": true
+                        }
+                    }
+                }
+                """.formatted(failOnPartial ? "\"FailOnPartial\": true," : "");
+        }
+
+        @Test
+        @DisplayName("all-success Map reports failed=0 and preserves items")
+        @SuppressWarnings("unchecked")
+        void allSuccessReportsZeroFailed() {
+            Map<String, Object> input = Map.of("items", List.of(
+                Map.of("id", "a", "shouldFail", false),
+                Map.of("id", "b", "shouldFail", false)
+            ));
+
+            Map<String, Object> result = engine.executeSynchronous(
+                "t1", "f1", mapFlow(false), input, "u1");
+
+            Map<String, Object> aggregate = (Map<String, Object>) result.get("result");
+            assertNotNull(aggregate, "Map result should be at $.result");
+            assertEquals(2, ((Number) aggregate.get("succeeded")).intValue());
+            assertEquals(0, ((Number) aggregate.get("failed")).intValue());
+            assertTrue(((List<?>) aggregate.get("errors")).isEmpty());
+            assertEquals(2, ((List<?>) aggregate.get("items")).size());
+
+            FlowExecutionData execution = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_COMPLETED, execution.status());
+            assertEquals(0, execution.failedCount(),
+                "No partial failures → no _failedCount on the execution summary");
+        }
+
+        @Test
+        @DisplayName("partial-failure Map surfaces caught errors with sample and failedCount")
+        @SuppressWarnings("unchecked")
+        void partialFailureSurfacesCaughtErrors() {
+            Map<String, Object> input = Map.of("items", List.of(
+                Map.of("id", "a", "shouldFail", false),
+                Map.of("id", "b", "shouldFail", true),
+                Map.of("id", "c", "shouldFail", false),
+                Map.of("id", "d", "shouldFail", true)
+            ));
+
+            Map<String, Object> result = engine.executeSynchronous(
+                "t1", "f1", mapFlow(false), input, "u1");
+
+            Map<String, Object> aggregate = (Map<String, Object>) result.get("result");
+            assertEquals(2, ((Number) aggregate.get("succeeded")).intValue());
+            assertEquals(2, ((Number) aggregate.get("failed")).intValue());
+
+            List<Map<String, Object>> errors =
+                (List<Map<String, Object>>) aggregate.get("errors");
+            assertEquals(2, errors.size(), "Both caught errors should be sampled");
+            // Index ordering preserves iteration order — items 1 and 3.
+            assertEquals(1, ((Number) errors.get(0).get("index")).intValue());
+            assertEquals(3, ((Number) errors.get(1).get("index")).intValue());
+            // The catch fired from the Do task with an ActionFailed code.
+            assertEquals("Do", errors.get(0).get("stateId"));
+            assertEquals("ActionFailed", errors.get(0).get("error"));
+
+            FlowExecutionData execution = flowStore.getAllExecutions().get(0);
+            // Default failOnPartial=false → status still COMPLETED, but the
+            // execution summary now carries the failedCount so the truth is
+            // not lost.
+            assertEquals(FlowExecutionData.STATUS_COMPLETED, execution.status());
+            assertEquals(2, execution.failedCount());
+        }
+
+        @Test
+        @DisplayName("failOnPartial=true marks run FAILED when any iteration caught an error")
+        @SuppressWarnings("unchecked")
+        void failOnPartialMarksRunFailed() {
+            Map<String, Object> input = Map.of("items", List.of(
+                Map.of("id", "a", "shouldFail", false),
+                Map.of("id", "b", "shouldFail", true)
+            ));
+
+            Map<String, Object> result = engine.executeSynchronous(
+                "t1", "f1", mapFlow(true), input, "u1");
+
+            FlowExecutionData execution = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_FAILED, execution.status());
+            assertEquals(1, execution.failedCount());
+            assertTrue(execution.errorMessage().contains("failOnPartial"),
+                "Error message should reference the failOnPartial policy");
+
+            // The aggregate is preserved at the configured ResultPath even when
+            // the state fails, so callers can inspect the per-item sample.
+            Map<String, Object> aggregate = (Map<String, Object>) result.get("result");
+            assertNotNull(aggregate);
+            assertEquals(1, ((Number) aggregate.get("failed")).intValue());
+            assertEquals(1, ((Number) aggregate.get("succeeded")).intValue());
+        }
+
+        @Test
+        @DisplayName("error sample is capped at MAX_ERROR_SAMPLES")
+        @SuppressWarnings("unchecked")
+        void errorSampleIsCapped() {
+            // 12 failing items > MAX_ERROR_SAMPLES (10).
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (int i = 0; i < 12; i++) {
+                items.add(Map.of("id", "x" + i, "shouldFail", true));
+            }
+
+            Map<String, Object> result = engine.executeSynchronous(
+                "t1", "f1", mapFlow(false), Map.of("items", items), "u1");
+
+            Map<String, Object> aggregate = (Map<String, Object>) result.get("result");
+            assertEquals(12, ((Number) aggregate.get("failed")).intValue());
+            List<?> errors = (List<?>) aggregate.get("errors");
+            assertEquals(io.kelta.runtime.flow.executor.MapStateExecutor.MAX_ERROR_SAMPLES,
+                errors.size(), "errors list must not exceed the configured cap");
         }
     }
 

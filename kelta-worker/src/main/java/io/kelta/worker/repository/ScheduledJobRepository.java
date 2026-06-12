@@ -106,12 +106,35 @@ public class ScheduledJobRepository {
     /**
      * Calculates the next run time from NOW for a given cron expression and timezone.
      * Always calculates from NOW to prevent burst-fire after downtime.
+     *
+     * <p>Accepts both standard 5-field crons ({@code min hour dom month dow}) and
+     * Spring's 6-field form (with a leading seconds field) — see
+     * {@link #normalizeCron(String)}.
      */
     public static Instant calculateNextRunAt(String cronExpression, String timezone) {
-        CronExpression cron = CronExpression.parse(cronExpression);
+        CronExpression cron = CronExpression.parse(normalizeCron(cronExpression));
         ZoneId zone = (timezone != null && !timezone.isBlank()) ? ZoneId.of(timezone) : ZoneId.of("UTC");
         ZonedDateTime next = cron.next(ZonedDateTime.now(zone));
         return next != null ? next.toInstant() : null;
+    }
+
+    /**
+     * Normalizes a cron expression to the 6-field form Spring's {@link CronExpression}
+     * requires. Standard Unix 5-field crons (minute hour dom month dow) get a leading
+     * {@code "0 "} prepended for the seconds field; Spring macros ({@code "@hourly"},
+     * etc.) and already-6-field expressions pass through unchanged.
+     *
+     * <p>Returns null/blank input unchanged so callers can decide how to handle
+     * missing crons. Throws nothing — invalid syntax is still surfaced by the
+     * subsequent {@link CronExpression#parse(String)} call.
+     */
+    public static String normalizeCron(String cronExpression) {
+        if (cronExpression == null) return null;
+        String trimmed = cronExpression.trim();
+        if (trimmed.isEmpty() || trimmed.startsWith("@")) return trimmed;
+        // Whitespace-delimited fields; CronExpression itself splits on any whitespace.
+        int fieldCount = trimmed.split("\\s+").length;
+        return fieldCount == 5 ? "0 " + trimmed : trimmed;
     }
 
     /**

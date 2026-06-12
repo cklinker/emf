@@ -86,4 +86,50 @@ class ScheduledJobRepositoryTest {
         assertThat(result).isPresent();
         assertThat(result.get().get("definition")).isNull();
     }
+
+    @Nested
+    @DisplayName("normalizeCron")
+    class NormalizeCron {
+
+        @Test
+        @DisplayName("prepends seconds for a 5-field Unix cron so Spring CronExpression accepts it")
+        void normalizesFiveFieldUnixCron() {
+            assertThat(ScheduledJobRepository.normalizeCron("0 */4 * * *"))
+                    .isEqualTo("0 0 */4 * * *");
+        }
+
+        @Test
+        @DisplayName("passes a 6-field Spring cron through unchanged")
+        void passesSixFieldCronThrough() {
+            assertThat(ScheduledJobRepository.normalizeCron("30 0 */4 * * *"))
+                    .isEqualTo("30 0 */4 * * *");
+        }
+
+        @Test
+        @DisplayName("trims surrounding whitespace before counting fields")
+        void trimsWhitespace() {
+            assertThat(ScheduledJobRepository.normalizeCron("  0 */4 * * *  "))
+                    .isEqualTo("0 0 */4 * * *");
+        }
+
+        @Test
+        @DisplayName("passes Spring macros through unchanged")
+        void passesMacrosThrough() {
+            assertThat(ScheduledJobRepository.normalizeCron("@hourly")).isEqualTo("@hourly");
+            assertThat(ScheduledJobRepository.normalizeCron("@daily")).isEqualTo("@daily");
+        }
+
+        @Test
+        @DisplayName("returns null for null input")
+        void returnsNullForNull() {
+            assertThat(ScheduledJobRepository.normalizeCron(null)).isNull();
+        }
+
+        @Test
+        @DisplayName("leaves obviously-invalid (wrong field count) input alone for the caller to reject")
+        void leavesUnknownLengthForCallerToReject() {
+            assertThat(ScheduledJobRepository.normalizeCron("not a cron"))
+                    .isEqualTo("not a cron");
+        }
+    }
 }

@@ -38,3 +38,7 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 
 - 2026-06-08 chore(ui): remove unused React imports and rename/mark unused locals across `kelta-ui/app` to clear all 86 TS6133 errors (CHORE-2026-06-08-0001)
 - 2026-06-08 chore(ui): remove unused React imports and rename/mark unused locals across `kelta-ui/app` to clear all 86 TS6133 errors (CHORE-2026-06-08-0001)
+
+## 2026-06-12
+
+- 2026-06-12 feat(worker): accept 5-field crons on SCHEDULED flow save by normalizing to Spring's 6-field form, and reject unparseable crons with a 400 from `FlowScheduleSyncHook#beforeCreate`/`beforeUpdate` instead of silently dropping them in the after-hook (TASK-2026-06-12-0001)

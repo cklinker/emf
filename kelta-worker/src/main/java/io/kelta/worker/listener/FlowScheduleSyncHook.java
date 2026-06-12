@@ -1,6 +1,7 @@
 package io.kelta.worker.listener;
 
 import io.kelta.runtime.workflow.BeforeSaveHook;
+import io.kelta.runtime.workflow.BeforeSaveResult;
 import io.kelta.worker.repository.ScheduledJobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,24 @@ public class FlowScheduleSyncHook implements BeforeSaveHook {
         return 150;
     }
 
+    /**
+     * Reject SCHEDULED-flow saves with an unparseable cron BEFORE the row hits the
+     * database, so the user sees a clear 400 instead of the previous silent skip
+     * in {@link #syncScheduledJob}. The 5-field/6-field divergence is the most
+     * common cause — {@link ScheduledJobRepository#normalizeCron} handles that,
+     * and anything still invalid here is genuinely wrong.
+     */
+    @Override
+    public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+        return validateCron(record);
+    }
+
+    @Override
+    public BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
+                                          Map<String, Object> previous, String tenantId) {
+        return validateCron(record);
+    }
+
     @Override
     public void afterCreate(Map<String, Object> record, String tenantId) {
         if (!"SCHEDULED".equals(record.get("flowType"))) return;
@@ -72,6 +91,28 @@ public class FlowScheduleSyncHook implements BeforeSaveHook {
         scheduledJobRepository.deleteForFlow(id, tenantId);
     }
 
+    private BeforeSaveResult validateCron(Map<String, Object> record) {
+        if (!"SCHEDULED".equals(asString(record.get("flowType")))) {
+            return BeforeSaveResult.ok();
+        }
+        Map<String, Object> triggerConfig = extractTriggerConfig(record);
+        if (triggerConfig == null || triggerConfig.isEmpty()) {
+            return BeforeSaveResult.ok();
+        }
+        String cron = asString(triggerConfig.get("cron"));
+        if (cron == null || cron.isBlank()) {
+            return BeforeSaveResult.ok();
+        }
+        try {
+            CronExpression.parse(ScheduledJobRepository.normalizeCron(cron));
+        } catch (IllegalArgumentException e) {
+            return BeforeSaveResult.error("triggerConfig.cron",
+                    "cron must be a 5- or 6-field Spring expression (with seconds); got '"
+                            + cron + "'");
+        }
+        return BeforeSaveResult.ok();
+    }
+
     private void syncScheduledJob(Map<String, Object> record, String tenantId) {
         String flowId = asString(record.get("id"));
         String flowName = asString(record.get("name"));
@@ -84,22 +125,27 @@ public class FlowScheduleSyncHook implements BeforeSaveHook {
             return;
         }
 
-        String cron = asString(triggerConfig.get("cron"));
+        String rawCron = asString(triggerConfig.get("cron"));
         String timezone = asString(triggerConfig.get("timezone"));
 
-        if (cron == null || cron.isBlank()) {
+        if (rawCron == null || rawCron.isBlank()) {
             log.debug("SCHEDULED flow {} triggerConfig has no cron — skipping job sync", flowId);
             return;
         }
 
+        // beforeCreate/beforeUpdate already rejected invalid crons with a 400, so a
+        // parse failure here means the row reached us by another path (legacy data,
+        // direct DB write). Log and skip rather than throw — the after-hook can't
+        // surface a user-visible error.
+        String normalizedCron = ScheduledJobRepository.normalizeCron(rawCron);
         try {
-            CronExpression.parse(cron);
+            CronExpression.parse(normalizedCron);
         } catch (IllegalArgumentException e) {
-            log.warn("SCHEDULED flow {} has invalid cron '{}' — skipping job sync: {}", flowId, cron, e.getMessage());
+            log.warn("SCHEDULED flow {} has invalid cron '{}' — skipping job sync: {}", flowId, rawCron, e.getMessage());
             return;
         }
 
-        Instant nextRunAt = active ? ScheduledJobRepository.calculateNextRunAt(cron, timezone) : null;
+        Instant nextRunAt = active ? ScheduledJobRepository.calculateNextRunAt(normalizedCron, timezone) : null;
 
         Optional<Map<String, Object>> existing = scheduledJobRepository.findByFlowId(flowId, tenantId);
         if (existing.isEmpty()) {
@@ -108,10 +154,10 @@ public class FlowScheduleSyncHook implements BeforeSaveHook {
                 log.warn("Cannot create scheduled_job for flow {} — could not resolve createdBy", flowId);
                 return;
             }
-            scheduledJobRepository.insertForFlow(flowId, tenantId, flowName, cron, timezone, active, nextRunAt, createdBy);
+            scheduledJobRepository.insertForFlow(flowId, tenantId, flowName, normalizedCron, timezone, active, nextRunAt, createdBy);
         } else {
             String jobId = asString(existing.get().get("id"));
-            scheduledJobRepository.updateForFlow(jobId, flowName, cron, timezone, active, nextRunAt);
+            scheduledJobRepository.updateForFlow(jobId, flowName, normalizedCron, timezone, active, nextRunAt);
         }
     }
 

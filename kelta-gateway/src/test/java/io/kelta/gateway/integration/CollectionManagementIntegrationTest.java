@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Tests the complete collection management lifecycle:
  * - Creating collections via the control plane
  * - Verifying collections are stored in the database
- * - Verifying collection change events are published to Kafka
+ * - Verifying collection change events are published to NATS
  * - Verifying the gateway creates routes for collections
  * - Querying collections via the gateway
  * - Validating invalid collection definitions are rejected
@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * This test class validates that:
  * - Collections can be created with custom field definitions
  * - Collections are persisted to the database
- * - Collection change events are published to Kafka
+ * - Collection change events are published to NATS
  * - The gateway receives and processes collection change events
  * - The gateway creates routes for new collections
  * - Requests are correctly routed to backend services

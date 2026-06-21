@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Kafka listener that consumes record change events and updates the full-text search index.
+ * NATS listener that consumes record change events and updates the full-text search index.
  *
  * <p>Listens on the {@code kelta.record.changed} topic with consumer group
  * {@code kelta-worker-search-index}. For each event, builds search content from
@@ -49,7 +49,7 @@ public class SearchIndexListener {
     /**
      * Handles record change events by updating the search index.
      *
-     * @param message the raw JSON Kafka message
+     * @param message the raw JSON NATS message
      */
     public void handleRecordChanged(String message) {
         try {

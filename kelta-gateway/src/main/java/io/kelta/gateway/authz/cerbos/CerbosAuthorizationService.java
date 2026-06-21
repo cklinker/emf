@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * and a circuit breaker to prevent thread-pool exhaustion.
  *
  * <p>Authorization results are cached in-memory (Caffeine) and invalidated
- * via Kafka events when Cerbos policies change. A safety-net TTL of 10 minutes
+ * via NATS events when Cerbos policies change. A safety-net TTL of 10 minutes
  * handles edge cases like missed events.
  *
  * <h3>Fail-closed design</h3>

@@ -20,7 +20,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Kafka listener that consumes record change events and evaluates flow triggers.
+ * NATS listener that consumes record change events and evaluates flow triggers.
  * <p>
  * Listens on the {@code kelta.record.changed} topic with consumer group
  * {@code kelta-worker-flows}. For each event, finds active RECORD_TRIGGERED flows
@@ -77,7 +77,7 @@ public class FlowEventListener {
     /**
      * Handles record change events by evaluating flow triggers.
      *
-     * @param message the raw JSON Kafka message
+     * @param message the raw JSON NATS message
      */
     public void handleRecordChanged(String message) {
         try {

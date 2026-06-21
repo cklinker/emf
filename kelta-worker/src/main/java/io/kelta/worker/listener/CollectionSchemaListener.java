@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Kafka listener for collection schema change events from the control plane.
+ * NATS listener for collection schema change events from the control plane.
  *
  * <p>When fields are added, removed, or modified on a collection, the control plane
  * publishes a {@code collection-changed} event. This listener picks up those events
@@ -52,7 +52,7 @@ public class CollectionSchemaListener {
      *   <li>The refresh triggers schema migration (ALTER TABLE) for any new fields</li>
      * </ol>
      *
-     * @param message the raw JSON message from Kafka
+     * @param message the raw JSON message from NATS
      */
     public void handleCollectionChanged(String message) {
         log.debug("Received collection changed event: {}", message);
@@ -141,7 +141,7 @@ public class CollectionSchemaListener {
     }
 
     /**
-     * Parses the CollectionChangedPayload from the raw Kafka message.
+     * Parses the CollectionChangedPayload from the raw NATS message.
      * Handles both PlatformEvent wrapper format and flat JSON format.
      */
     private CollectionChangedPayload parsePayload(String message) {

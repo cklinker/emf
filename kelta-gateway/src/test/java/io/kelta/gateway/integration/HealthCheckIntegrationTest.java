@@ -13,7 +13,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * Tests:
  * - Overall health endpoint returns status
  * - Redis health indicator is included
- * - Kafka health indicator is included
+ * - NATS health indicator is included
  * - Worker health indicator is included
  * - Health endpoint is accessible without authentication
  * - Individual component health can be checked
@@ -67,16 +67,16 @@ class HealthCheckIntegrationTest {
     }
 
     @Test
-    void testHealthEndpoint_IncludesKafkaStatus() {
-        // Act & Assert - health response should include Kafka status
+    void testHealthEndpoint_IncludesNatsStatus() {
+        // Act & Assert - health response should include NATS status
         webTestClient.get()
                 .uri("/actuator/health")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.components.kafka").exists();
+                .jsonPath("$.components.nats").exists();
 
-        // Kafka status will be UP if Kafka is available, DOWN otherwise
+        // NATS status will be UP if NATS is available, DOWN otherwise
         // Both are valid - the important thing is that the component is checked
     }
 
@@ -104,7 +104,7 @@ class HealthCheckIntegrationTest {
                 .expectBody()
                 .jsonPath("$.components").exists()
                 .jsonPath("$.components.redis.status").exists()
-                .jsonPath("$.components.kafka.status").exists()
+                .jsonPath("$.components.nats.status").exists()
                 .jsonPath("$.components.worker.status").exists();
     }
 
@@ -162,9 +162,9 @@ class HealthCheckIntegrationTest {
                 .expectBody()
                 .jsonPath("$.status").exists();
 
-        // Kafka health
+        // NATS health
         webTestClient.get()
-                .uri("/actuator/health/kafka")
+                .uri("/actuator/health/nats")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()

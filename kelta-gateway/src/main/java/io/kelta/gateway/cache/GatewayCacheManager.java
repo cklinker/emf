@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
  *       Populated on startup and refreshed periodically from the worker's
  *       {@code /internal/tenants/slug-map} endpoint. Expires after 10 minutes.</li>
  *   <li><strong>Governor limit cache</strong> — maps tenant IDs to daily API call limits.
- *       Populated from bootstrap configuration on startup and updated via Kafka when
+ *       Populated from bootstrap configuration on startup and updated via NATS when
  *       tenant governor limits change. No time-based expiration — entries persist until
  *       explicitly invalidated.</li>
  * </ul>
@@ -229,7 +229,7 @@ public class GatewayCacheManager {
     /**
      * Refreshes the governor limit cache from the worker service.
      *
-     * <p>Called when a tenant record change event is received via Kafka
+     * <p>Called when a tenant record change event is received via NATS
      * (e.g., governor limits updated via the admin UI). Fetches the
      * lightweight governor-limits map from the worker's
      * {@code /internal/governor-limits} endpoint and updates the cache.

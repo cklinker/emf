@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for ConfigEventListener.
  *
- * Tests the Kafka event listener that updates gateway configuration in real-time.
+ * Tests the NATS event listener that updates gateway configuration in real-time.
  * The listener now accepts raw JSON strings and manually deserializes them.
  */
 @ExtendWith(MockitoExtension.class)

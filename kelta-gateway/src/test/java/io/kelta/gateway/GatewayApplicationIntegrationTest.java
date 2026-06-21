@@ -7,7 +7,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Integration test to verify the gateway application starts correctly with full context.
- * Requires Docker services (worker, Keycloak, Redis, Kafka) to be running.
+ * Requires Docker services (worker, Keycloak, Redis, NATS) to be running.
  */
 @SpringBootTest
 @ActiveProfiles("test")

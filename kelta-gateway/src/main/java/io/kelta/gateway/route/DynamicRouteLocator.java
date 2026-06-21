@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
  * 
  * Routes are loaded dynamically from the RouteRegistry, which is updated through:
  * - Initial bootstrap from the worker service
- * - Real-time Kafka events for configuration changes
+ * - Real-time NATS events for configuration changes
  * 
  * Validates: Requirements 1.3
  */

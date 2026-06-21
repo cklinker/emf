@@ -95,7 +95,7 @@ public class FormulaEvaluator {
      * Clears all cached compiled formulas.
      * <p>
      * Called when workflow rules are bulk-invalidated (e.g., on live reload
-     * via Kafka event).
+     * via NATS event).
      */
     public void clearCache() {
         compilationCache.clear();

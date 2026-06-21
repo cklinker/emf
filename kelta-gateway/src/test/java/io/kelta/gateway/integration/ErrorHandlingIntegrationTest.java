@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * - Missing required fields return HTTP 400 with error details
  * - Invalid field types return HTTP 400 with error details
  * - Backend service errors are propagated correctly
- * - Infrastructure failures (database, Redis, Kafka) are handled gracefully
+ * - Infrastructure failures (database, Redis, NATS) are handled gracefully
  * - Error responses follow JSON:API error format
  * 
  * This test class validates that:
@@ -428,7 +428,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
     }
     
     /**
-     * Test that Kafka connection failures are handled gracefully.
+     * Test that NATS connection failures are handled gracefully.
      * 
      * Note: Similar to other infrastructure failure tests, this requires
      * infrastructure manipulation. The expected behavior is:
@@ -438,11 +438,11 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
      * - Service continues operating with stale configuration
      * 
      * Validates:
-     * - Requirement 13.7: Kafka connection failures are handled gracefully
+     * - Requirement 13.7: NATS connection failures are handled gracefully
      */
     @Test
-    void testKafkaFailureHandling() {
-        // This test documents expected behavior for Kafka failures.
+    void testNatsFailureHandling() {
+        // This test documents expected behavior for NATS failures.
         // 
         // Expected behavior:
         // - Configuration updates: Use last known good configuration
@@ -451,14 +451,14 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // - Service continues operating with potentially stale configuration
         
         // For actual testing, you would need to:
-        // 1. Stop the Kafka container
+        // 1. Stop the NATS container
         // 2. Attempt to update configuration in control plane
         // 3. Verify gateway continues using existing configuration
         // 4. Verify errors are logged
-        // 5. Restart Kafka container
+        // 5. Restart NATS container
         // 6. Verify configuration updates resume
         
-        assertThat(true).as("Kafka failure handling documented").isTrue();
+        assertThat(true).as("NATS failure handling documented").isTrue();
     }
     
     /**

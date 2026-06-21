@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  * and a circuit breaker to prevent thread-pool exhaustion.
  *
  * <p>Field access results are cached in-memory (Caffeine) and invalidated
- * via Kafka events when Cerbos policies change. Record access checks are
+ * via NATS events when Cerbos policies change. Record access checks are
  * NOT cached because they depend on record attributes (ABAC/CEL rules).
  *
  * <h3>Fail-closed design</h3>

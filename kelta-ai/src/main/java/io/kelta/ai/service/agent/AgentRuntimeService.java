@@ -1,6 +1,7 @@
 package io.kelta.ai.service.agent;
 
 import io.kelta.ai.model.AgentDefinition;
+import io.kelta.ai.model.AgentExecution;
 import io.kelta.ai.service.TokenTrackingService;
 import io.kelta.ai.service.tools.DispatchResult;
 import io.kelta.ai.service.tools.ToolDispatcher;
@@ -9,12 +10,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Runs a governed {@link AgentDefinition}: a bounded tool-use loop that calls the model
@@ -42,22 +45,29 @@ public class AgentRuntimeService {
     private final AgentModelClient modelClient;
     private final ToolDispatcher toolDispatcher;
     private final TokenTrackingService tokenTrackingService;
+    private final AgentExecutionService executionService;
     private final ObjectMapper objectMapper;
 
     public AgentRuntimeService(AgentModelClient modelClient, ToolDispatcher toolDispatcher,
-                               TokenTrackingService tokenTrackingService, ObjectMapper objectMapper) {
+                               TokenTrackingService tokenTrackingService,
+                               AgentExecutionService executionService, ObjectMapper objectMapper) {
         this.modelClient = modelClient;
         this.toolDispatcher = toolDispatcher;
         this.tokenTrackingService = tokenTrackingService;
+        this.executionService = executionService;
         this.objectMapper = objectMapper;
     }
 
     public AgentRunResult run(String tenantId, String userId, AgentDefinition agent, String userInput) {
         if (!agent.enabled()) {
+            audit(tenantId, agent.id(), userId, userInput, "refused_disabled",
+                    List.of(), 0, 0, 0, null, "Agent is disabled");
             throw new AgentExecutionException(AgentExecutionException.Reason.AGENT_DISABLED,
                     "Agent '" + agent.name() + "' is disabled");
         }
         if (tokenTrackingService.isTokenLimitExceeded(tenantId)) {
+            audit(tenantId, agent.id(), userId, userInput, "refused_token_limit",
+                    List.of(), 0, 0, 0, null, "Monthly AI token limit reached");
             throw new AgentExecutionException(AgentExecutionException.Reason.TOKEN_LIMIT_EXCEEDED,
                     "Monthly AI token limit reached for this tenant");
         }
@@ -75,6 +85,7 @@ public class AgentRuntimeService {
         boolean completed = false;
         boolean budgetExceeded = false;
 
+      try {
         for (int i = 0; i < MAX_ITERATIONS; i++) {
             iterations++;
             AgentTurn turn = modelClient.nextTurn(new AgentTurnRequest(
@@ -122,8 +133,31 @@ public class AgentRuntimeService {
         }
 
         boolean maxIterationsReached = !completed && !budgetExceeded;
+        String status = budgetExceeded ? "budget_exceeded"
+                : (maxIterationsReached ? "max_iterations" : "completed");
+        audit(tenantId, agent.id(), userId, userInput, status, traces, totalIn, totalOut,
+                iterations, finalText, null);
         return new AgentRunResult(finalText, traces, totalIn, totalOut, iterations,
                 stopReason, budgetExceeded, maxIterationsReached);
+      } catch (RuntimeException e) {
+        log.error("Agent '{}' run failed: {}", agent.name(), e.getMessage(), e);
+        audit(tenantId, agent.id(), userId, userInput, "error", traces, totalIn, totalOut,
+                iterations, finalText, e.getMessage());
+        throw e;
+      }
+    }
+
+    private void audit(String tenantId, UUID agentId, String userId, String input, String status,
+                       List<AgentToolTrace> traces, int inputTokens, int outputTokens, int iterations,
+                       String finalText, String error) {
+        try {
+            executionService.record(new AgentExecution(UUID.randomUUID(), tenantId, agentId, userId,
+                    input, status, List.copyOf(traces), inputTokens, outputTokens, iterations,
+                    finalText, error, Instant.now()));
+        } catch (RuntimeException e) {
+            // Auditing must never break a run; log and continue.
+            log.error("Failed to persist agent execution audit row: {}", e.getMessage());
+        }
     }
 
     private List<Map<String, Object>> assistantBlocks(AgentTurn turn) {

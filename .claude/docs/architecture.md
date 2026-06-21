@@ -326,6 +326,16 @@ that the gateway stamps into `fieldTypeConfig`. Until pgvector is
 provisioned on a tenant DB, `CREATE TABLE` / `ALTER TABLE` for a VECTOR
 column will fail at execution time — there is no startup probe.
 
+**Governed agent runtime authz + audit.** `AgentRuntimeService` (kelta-ai) runs an
+agent as a bounded tool-use loop. Authorization is layered: the agent definition
+fixes the *allowed tool subset* (the loop offers only those and refuses any other
+even if requested); each tool then calls the worker carrying the **invoking user's**
+`X-User-Id` (runs require it), so the worker's per-record Cerbos + FLS advice applies
+downstream — the agent never exceeds its caller's permissions. Every run, including
+refusals (disabled agent, exhausted monthly quota), is written to `ai_agent_execution`
+with its tool-call trace, token usage and status, surfaced at
+`GET /api/ai/agents/{id}/executions`.
+
 **Embed-on-write.** A VECTOR field may also carry `fieldTypeConfig` key
 `"embeddingSource"` naming a text field on the same collection. The wildcard
 `EmbeddingOnWriteHook` (worker, before-save, order 120) then auto-populates the

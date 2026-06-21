@@ -1,9 +1,11 @@
 package io.kelta.ai.controller;
 
 import io.kelta.ai.model.AgentDefinition;
+import io.kelta.ai.model.AgentExecution;
 import io.kelta.ai.service.AgentService;
 import io.kelta.ai.service.AgentUpsertRequest;
 import io.kelta.ai.service.agent.AgentExecutionException;
+import io.kelta.ai.service.agent.AgentExecutionService;
 import io.kelta.ai.service.agent.AgentRunRequest;
 import io.kelta.ai.service.agent.AgentRunResult;
 import io.kelta.ai.service.agent.AgentRuntimeService;
@@ -31,10 +33,13 @@ public class AgentController {
 
     private final AgentService agentService;
     private final AgentRuntimeService agentRuntimeService;
+    private final AgentExecutionService agentExecutionService;
 
-    public AgentController(AgentService agentService, AgentRuntimeService agentRuntimeService) {
+    public AgentController(AgentService agentService, AgentRuntimeService agentRuntimeService,
+                           AgentExecutionService agentExecutionService) {
         this.agentService = agentService;
         this.agentRuntimeService = agentRuntimeService;
+        this.agentExecutionService = agentExecutionService;
     }
 
     @GetMapping
@@ -85,6 +90,11 @@ public class AgentController {
         if (request == null || request.input() == null || request.input().isBlank()) {
             throw new IllegalArgumentException("'input' is required");
         }
+        // A run executes tools as this user, so the worker's per-record Cerbos checks have a
+        // principal — never let an agent act without one.
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("'X-User-Id' is required to run an agent");
+        }
         AgentDefinition agent = agentService.get(tenantId, id).orElse(null);
         if (agent == null) {
             return ResponseEntity.notFound().build();
@@ -93,6 +103,16 @@ public class AgentController {
         log.info("Ran agent '{}' ({}) for tenant {}: {} iterations, {} tool calls",
                 agent.name(), id, tenantId, result.iterations(), result.toolCalls().size());
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{id}/executions")
+    public ResponseEntity<List<AgentExecution>> executions(@RequestHeader("X-Tenant-ID") String tenantId,
+                                                           @PathVariable UUID id,
+                                                           @RequestParam(value = "limit", required = false) Integer limit) {
+        if (agentService.get(tenantId, id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(agentExecutionService.list(tenantId, id, limit));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

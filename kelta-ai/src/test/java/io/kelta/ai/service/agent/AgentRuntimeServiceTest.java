@@ -1,12 +1,14 @@
 package io.kelta.ai.service.agent;
 
 import io.kelta.ai.model.AgentDefinition;
+import io.kelta.ai.model.AgentExecution;
 import io.kelta.ai.service.TokenTrackingService;
 import io.kelta.ai.service.tools.DispatchResult;
 import io.kelta.ai.service.tools.ToolDispatcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
@@ -42,9 +44,12 @@ class AgentRuntimeServiceTest {
     @Mock
     private TokenTrackingService tokenTrackingService;
 
+    @Mock
+    private AgentExecutionService executionService;
+
     private AgentRuntimeService service() {
         return new AgentRuntimeService(modelClient, toolDispatcher, tokenTrackingService,
-                JsonMapper.builder().build());
+                executionService, JsonMapper.builder().build());
     }
 
     private static AgentDefinition agent(List<String> tools) {
@@ -59,6 +64,12 @@ class AgentRuntimeServiceTest {
     private static AgentTurn toolTurn(String tool, int in, int out) {
         return new AgentTurn("", List.of(new AgentToolCall("t1", tool, Map.of("q", "x"))),
                 "tool_use", in, out);
+    }
+
+    private AgentExecution recordedExecution() {
+        ArgumentCaptor<AgentExecution> captor = ArgumentCaptor.forClass(AgentExecution.class);
+        verify(executionService).record(captor.capture());
+        return captor.getValue();
     }
 
     @Test
@@ -78,6 +89,11 @@ class AgentRuntimeServiceTest {
         assertThat(result.maxIterationsReached()).isFalse();
         verify(tokenTrackingService).recordUsage(TENANT, 5, 7);
         verifyNoInteractions(toolDispatcher);
+
+        AgentExecution audit = recordedExecution();
+        assertThat(audit.status()).isEqualTo("completed");
+        assertThat(audit.inputTokens()).isEqualTo(5);
+        assertThat(audit.finalText()).isEqualTo("Hello");
     }
 
     @Test
@@ -138,6 +154,7 @@ class AgentRuntimeServiceTest {
         assertThat(result.budgetExceeded()).isFalse();
         verify(toolDispatcher, times(AgentRuntimeService.MAX_ITERATIONS))
                 .dispatch(eq(TENANT), eq(USER), eq("t1"), eq("search"), any());
+        assertThat(recordedExecution().status()).isEqualTo("max_iterations");
     }
 
     @Test
@@ -154,6 +171,7 @@ class AgentRuntimeServiceTest {
         assertThat(result.maxIterationsReached()).isFalse();
         assertThat(result.iterations()).isEqualTo(1);
         verify(toolDispatcher, times(1)).dispatch(eq(TENANT), eq(USER), eq("t1"), eq("search"), any());
+        assertThat(recordedExecution().status()).isEqualTo("budget_exceeded");
     }
 
     @Test
@@ -167,6 +185,7 @@ class AgentRuntimeServiceTest {
                 .satisfies(e -> assertThat(((AgentExecutionException) e).reason())
                         .isEqualTo(AgentExecutionException.Reason.AGENT_DISABLED));
         verifyNoInteractions(modelClient);
+        assertThat(recordedExecution().status()).isEqualTo("refused_disabled");
     }
 
     @Test
@@ -180,5 +199,6 @@ class AgentRuntimeServiceTest {
                         .isEqualTo(AgentExecutionException.Reason.TOKEN_LIMIT_EXCEEDED));
         verifyNoInteractions(modelClient);
         verify(tokenTrackingService, never()).recordUsage(anyString(), anyInt(), anyInt());
+        assertThat(recordedExecution().status()).isEqualTo("refused_token_limit");
     }
 }

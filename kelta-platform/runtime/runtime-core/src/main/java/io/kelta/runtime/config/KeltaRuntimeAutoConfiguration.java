@@ -3,6 +3,8 @@ package io.kelta.runtime.config;
 import io.kelta.runtime.credential.CredentialTemplateRegistry;
 import io.kelta.runtime.credential.CredentialType;
 import io.kelta.runtime.credential.CredentialTypeRegistry;
+import io.kelta.runtime.embedding.EmbeddingService;
+import io.kelta.runtime.embedding.HashingEmbeddingService;
 import io.kelta.runtime.events.RecordEventPublisher;
 import io.kelta.runtime.query.DefaultQueryEngine;
 import io.kelta.runtime.query.QueryEngine;
@@ -63,6 +65,17 @@ public class KeltaRuntimeAutoConfiguration {
     @ConditionalOnMissingBean
     public CollectionRegistry collectionRegistry() {
         return new ConcurrentCollectionRegistry();
+    }
+
+    /**
+     * Default text-embedding provider for semantic search over {@code VECTOR} fields. A deployment
+     * can register its own {@link EmbeddingService} bean (e.g. an external embedding API) and this
+     * dependency-free default backs off.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public EmbeddingService embeddingService() {
+        return new HashingEmbeddingService();
     }
     
     /**

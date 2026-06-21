@@ -488,6 +488,17 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.AttachmentCleanupHook attachmentCleanupHook(
+            BeforeSaveHookRegistry hookRegistry,
+            JdbcTemplate jdbcTemplate,
+            io.kelta.worker.service.S3StorageService storageService) {
+        io.kelta.worker.listener.AttachmentCleanupHook hook =
+                new io.kelta.worker.listener.AttachmentCleanupHook(jdbcTemplate, storageService);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public RecordTypeEnforcementHook recordTypeEnforcementHook(
             BeforeSaveHookRegistry hookRegistry,
             JdbcTemplate jdbcTemplate,

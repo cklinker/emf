@@ -427,17 +427,18 @@ Support for collection subtypes with type-specific picklist values and page layo
 
 ---
 
-### Notes & Attachments | Partial
+### Notes & Attachments | Full
 
 Attach notes and files to any record in the system.
 
 **Working:**
 - Notes: Full CRUD via standard collection API
-- Attachments: S3 presigned download URLs generated via `S3Presigner`, automatically enriched in JSON:API responses via `@ControllerAdvice`
+- Attachments — full lifecycle:
+  - **Upload**: presigned PUT flow — `POST /api/attachments/upload-url` (validates type/size, enforces the per-tenant storage governor, returns a presigned `S3Presigner` PUT URL) → client PUTs to S3 → `POST /api/attachments/{id}/finalize`
+  - **List / read**: `attachments` is a system collection, so list/get/filter come from `DynamicCollectionRouter` (e.g. `GET /api/attachments?filter[collectionId][eq]=…&filter[recordId][eq]=…`); presigned download URLs are auto-injected by `AttachmentUrlEnricher` (`@ControllerAdvice`)
+  - **Delete**: `DELETE /api/attachments/{id}` (dedicated handler that overrides the generic router delete) removes the S3 object **and** the metadata row, so storage is never orphaned
+  - **Cascade cleanup**: `AttachmentCleanupHook` (wildcard after-delete) removes a record's attachments (rows + S3 objects) when the parent record is deleted
 - Relationship includes: `?include=attachments` and `?include=notes` supported
-
-> **TODO**
-> - No upload endpoint: `S3StorageService` only generates presigned download URLs — no presigned PUT URL or multipart upload handler
 
 ---
 
@@ -570,7 +571,7 @@ What SMB and larger enterprises need from an application platform, and where Kel
 | **Report Execution** | Full UI built, config stored | Query engine to execute report definitions, export to CSV/PDF |
 | **OAuth Server (Connected Apps)** | Client credentials flow working | Full authorization code flow for third-party apps |
 | **Server-Side Scripting** | SPI defined, no-op implementation | GraalVM or equivalent script engine |
-| **File Uploads** | S3 download URLs + direct file serving work | Presigned PUT URL generation, upload endpoint |
+| **File Uploads** | Full lifecycle: presigned PUT upload + finalize, list/download (router + enricher), delete with S3 cleanup, cascade cleanup on record delete | Optional: virus scanning, multipart fallback |
 | **Configuration Packages** | Full UI built | Backend export/import/preview/history endpoints |
 | **Record Type Enforcement** | Data model and UI exist | Runtime picklist restriction and layout association |
 | **Push Notifications** | SPI + device registration working | Wire FCM, APNs, or other push provider |
@@ -603,7 +604,7 @@ What SMB and larger enterprises need from an application platform, and where Kel
 ### Medium Priority — Integration & Data Gaps
 
 - [ ] **Script execution**: Implement a real `ScriptExecutor` (GraalVM or similar) to replace the no-op logging stub
-- [ ] **Attachment uploads**: Add presigned PUT URL generation to `S3StorageService` and expose an upload endpoint
+- [x] **Attachment lifecycle**: Presigned PUT upload + finalize, list/download (router + `AttachmentUrlEnricher`), `DELETE /api/attachments/{id}` with S3 object cleanup, and `AttachmentCleanupHook` cascade cleanup on parent-record delete
 - [ ] **Configuration packages backend**: Implement `PackageController` and `PackageService` with export, import preview, import, and history endpoints
 - [ ] **Scheduled job runner (general)**: Build a dispatcher for SCRIPT and REPORT_EXPORT job types in the `scheduled_jobs` table (flow-type scheduling already works)
 - [ ] **Page Builder fields**: Add `slug` and `published` fields to the `ui-pages` system collection definition

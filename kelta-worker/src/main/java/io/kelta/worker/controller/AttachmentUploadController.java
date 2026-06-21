@@ -63,6 +63,10 @@ public class AttachmentUploadController {
             FROM file_attachment WHERE id = ? AND tenant_id = ?
             """;
 
+    private static final String DELETE_ATTACHMENT = """
+            DELETE FROM file_attachment WHERE id = ? AND tenant_id = ?
+            """;
+
     private final S3StorageService storageService;
     private final GovernorLimitsRepository governorLimitsRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -256,6 +260,56 @@ public class AttachmentUploadController {
         attributes.put("uploadedAt", OffsetDateTime.now().toString());
 
         return ResponseEntity.ok(JsonApiResponseBuilder.single("attachments", id, attributes));
+    }
+
+    /**
+     * Deletes an attachment: removes the underlying S3 object (if any) and the
+     * attachment metadata record.
+     *
+     * <p>This handler intentionally overrides the generic
+     * {@code DELETE /api/{collection}/{id}} route in {@code DynamicCollectionRouter}
+     * for the {@code attachments} collection. A literal path segment
+     * ({@code /api/attachments/{id}}) is more specific than the router's
+     * {@code /api/{collectionName}/{id}}, so Spring dispatches here. The generic
+     * router delete would drop the database row but orphan the S3 object; this
+     * handler cleans up storage too.
+     *
+     * <p>S3 deletion is best-effort: a storage failure is logged but never blocks
+     * the metadata delete (the row is the source of truth for what the user sees).
+     *
+     * @param id        the attachment ID
+     * @param tenantId  the tenant ID from gateway header
+     * @param userEmail the authenticated user's email
+     * @return 204 No Content on success, 404 if the attachment does not exist
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteAttachment(
+            @PathVariable String id,
+            @RequestHeader("X-Tenant-ID") String tenantId,
+            @RequestHeader("X-User-Email") String userEmail) {
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_ATTACHMENT, id, tenantId);
+        if (rows.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String storageKey = (String) rows.get(0).get("storage_key");
+
+        if (storageService.isEnabled() && storageKey != null && !storageKey.isBlank()) {
+            try {
+                storageService.deleteObject(storageKey);
+            } catch (Exception e) {
+                log.warn("Failed to delete S3 object '{}' for attachment {}: {}",
+                        storageKey, id, e.getMessage());
+            }
+        }
+
+        jdbcTemplate.update(DELETE_ATTACHMENT, id, tenantId);
+
+        securityLog.info("security_event=ATTACHMENT_DELETED user={} tenant={} attachment={} storageKey={}",
+                userEmail, tenantId, id, storageKey);
+
+        return ResponseEntity.noContent().build();
     }
 
     private static String sanitizeFileName(String fileName) {

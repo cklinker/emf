@@ -128,6 +128,20 @@ by `sectionId IN (section ids)` after `layout-sections` resolves directly).
 Includes are skipped silently when the target is unresolvable — `200` with
 no `included` entry — never `5xx`.
 
+**Read-side field-level security** — `CerbosFieldSecurityAdvice`
+(`@ControllerAdvice`, order 10, after record-level authz) strips fields the
+caller cannot `read` from outgoing JSON:API responses. For the primary `data`
+and every `included[]` resource (grouped by type — JSON:API flattens all
+include depths into one array, so one batched Cerbos check per type covers
+them), it removes denied keys from **both** `attributes` and **to-one
+`relationships`** (lookup / master-detail fields are serialized into
+`relationships.<field>.data = { type, id }`, so an attributes-only strip would
+leak a hidden FK's id). Has-many inverse relationships (`data` is a list) are
+not collection fields and are preserved. System audit fields (`createdAt`,
+`updatedAt`, `createdBy`, `updatedBy`) are never stripped; `meta` (pagination)
+is untouched. Metadata/admin paths (`/api/collections`, `/api/admin/**`, etc.)
+are skipped. Gated by `kelta.gateway.security.permissions-enabled`.
+
 **Pagination contract** — every paginated REST endpoint uses JSON:API
 bracket syntax (`page[number]` / `page[size]`). Parsing lives in
 `runtime-core/.../query/Pagination.fromParams`, which clamps `page[size]`

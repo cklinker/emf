@@ -58,18 +58,20 @@ io.kelta.mcp/
 ## Key Patterns
 
 ### MCP server wiring
-Each profile is wired with its own `HttpServletStreamableServerTransportProvider` (from `io.modelcontextprotocol.sdk:mcp`) and its own `McpSyncServer`. Tools are added to the server in `@Bean` methods so registration is static and visible.
-
-```java
-McpSyncServer server = McpServer.sync(transport)
-    .serverInfo("kelta-mcp-user", "1.0.0")
-    .capabilities(ServerCapabilities.builder().tools(true).build())
-    .build();
-server.addTool(new ListCollectionsTool().toSpecification(...));
-```
+`config/McpServerConfig` builds the two stateless servers. It autowires `List<UserTool>`
+and `List<AdminTool>` (every tool is a `@Component`), calls each tool's `toSpecification()`,
+wraps it (`wrap(...)` adds PAT/slug propagation), and registers it. Registration is
+**automatic** — do **not** hand-write `server.addTool(...)`.
 
 ### Tool definition
-Each tool is a class that produces a `McpServerFeatures.SyncToolSpecification`. The call handler builds an HTTP request, forwards through `GatewayHttpClient` (PAT pulled from `PatSessionStore` via the MCP session id), and shapes the JSON:API response into MCP `TextContent` / `JsonContent`.
+Each tool implements the marker interface **`UserTool`** or **`AdminTool`** (`@Component`)
+and returns an `io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification`
+from `toSpecification()`. Build the input schema with `Schemas`; annotate behaviour with
+`ToolHints`. The call handler builds an HTTP request, forwards through `GatewayHttpClient`
+(PAT/slug from `RequestPatHolder` / `RequestSlugHolder`), shapes the JSON:API response into
+MCP content, and maps gateway 4xx/5xx via `McpErrorMapper`. Translate friendly camelCase
+args → native JSON:API at this boundary (see `.claude/docs/conventions.md`). Full recipe:
+`.claude/docs/playbooks.md` → "Add an MCP tool".
 
 ### No DB
 kelta-mcp is stateless. The runtime-core auto-configurations (`KeltaRuntimeAutoConfiguration`, `EncryptionAutoConfiguration`) are excluded in `McpApplication`. Component scan is restricted to `io.kelta.mcp` so we only depend on runtime-core for type definitions (CollectionDefinition, FieldDefinition, FieldType).
@@ -103,6 +105,7 @@ claude mcp add kelta-local --transport http \
 # In a Claude Code session, ask: "use the kelta-local MCP server to call ping"
 ```
 
-## Plan
+## Status
 
-Full plan and phases live in `~/.claude/plans/i-would-like-to-kind-rivest.md`.
+kelta-mcp is shipped and live. It has no separate plan doc; this file is the source of
+truth for the module.

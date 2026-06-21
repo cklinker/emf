@@ -1,14 +1,16 @@
 # Kelta Web
 
-TypeScript monorepo containing the SDK, React component library, and plugin SDK for building Kelta applications.
+TypeScript monorepo containing the SDK, React component library, plugin SDK, CLI, and formula engine for building Kelta applications.
 
 ## Packages
 
 ```
 kelta-web/packages/
-├── sdk/            # @kelta/sdk        — Type-safe Kelta API client
+├── sdk/            # @kelta/sdk         — Type-safe Kelta API client
 ├── components/     # @kelta/components  — Reusable React components
-└── plugin-sdk/     # @kelta/plugin-sdk  — Plugin development toolkit
+├── plugin-sdk/     # @kelta/plugin-sdk  — Plugin development toolkit
+├── cli/            # @kelta/cli         — Command-line tool built on Commander.js
+└── formula/        # @kelta/formula     — Formula/expression evaluation for validation + computed fields
 ```
 
 ### @kelta/sdk
@@ -98,7 +100,7 @@ npm run test:coverage    # Coverage report (80% branch/function/line/statement t
 
 ## Tech Stack
 
-- TypeScript 5.3.3, React 18.2.0, Vite 5.1.4, Vitest 1.3.1
+- TypeScript 5.3.3, React 19.2.0, Vite 5.1.4, Vitest 1.3.1
 - Axios 1.6.7, Zod 3.22.4
 - TanStack React Query 5.24.1, React Hook Form 7.51.0
 - React Router DOM 6.22.2

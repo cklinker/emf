@@ -7,14 +7,27 @@ Spring Cloud Gateway service that serves as the main ingress point for the Kelta
 ```
 Client Request
   │
-  ├─ TenantSlugExtractionFilter (-300)   Strip tenant slug from URL
+  ├─ CustomDomainFilter (-310)            Map custom domain → tenant
+  ├─ TenantSlugExtractionFilter (-300)    Strip tenant slug from URL
+  ├─ TenantResolutionFilter (-200)        Resolve slug → tenant ID
+  ├─ IpRateLimitFilter (-150)             Per-IP rate limiting
   ├─ JwtAuthenticationFilter (-100)       Validate JWT, extract principal
-  ├─ RateLimitFilter (-50)                Per-tenant rate limiting (Redis)
-  ├─ RouteAuthorizationFilter (0)         Object-level permission checks
-  ├─ Request forwarded to worker
-  ├─ FieldAuthorizationFilter             Filter response fields by permissions
-  └─ IncludeResolutionFilter (10200)      Resolve JSON:API ?include= params
+  ├─ PatAuthenticationFilter (-99)        Validate PAT (klt_) as JWT alternative
+  ├─ RateLimitFilter / UserIdentityResolutionFilter (-50)   Per-tenant rate limit; user identity
+  ├─ RouteAuthorizationFilter (0)         Cerbos object-level permission check
+  ├─ Request forwarded to worker via DynamicRouteLocator (RouteRegistry)
+  ├─ HeaderTransformationFilter (50)      Inject X-Tenant-* headers for worker
+  ├─ SecurityHeadersFilter (100)          Add response security headers
+  └─ SecurityAuditFilter (200)            Record final response status
 ```
+
+Order values are the live `getOrder()` returns from each filter (lower runs first).
+Cross-cutting filters not on the main path: `ObservabilityContextFilter (-90)`,
+`HttpBodyCaptureFilter (-80)`, `SystemCollectionResponseCacheFilter (-10)`,
+`RequestLoggingFilter (Integer.MAX_VALUE)`. JSON:API `?include=` resolution is done by
+`IncludeResolver` (`jsonapi` package) during response processing — it is **not** a numbered
+filter. Response field-level security (stripping HIDDEN fields) is enforced in the
+**worker** (`CerbosFieldSecurityAdvice`), not the gateway.
 
 ## Key Packages
 
@@ -119,11 +132,19 @@ mvn verify -f kelta-gateway/pom.xml -B
 
 ## Docker
 
-Multi-stage build: `maven:3.9-eclipse-temurin-21` (build) -> `eclipse-temurin:21-jre` (runtime). Runs as non-root user `kelta` on port 8080 with G1GC and 75% RAM allocation.
+**Production** (`Dockerfile`): multi-stage **GraalVM CE 25 native-image** build
+(`ghcr.io/graalvm/native-image-community:25-ol9` builder, `mvn -Pnative native:compile`)
+→ `debian:12-slim` runtime — **no JRE**, self-contained binary, ~50 ms startup. Runs as
+non-root `kelta` on port 8080; OTLP is exported directly by Spring Boot's native
+OpenTelemetry starter (no Java agent).
+
+**CI / e2e** (`Dockerfile.jvm`): faster JVM build (`maven:3.9-eclipse-temurin-25` →
+`eclipse-temurin:25-jre-alpine`, `-XX:MaxRAMPercentage=75`). Used only for CI speed, never
+in production.
 
 ## Dependencies
 
-- Java 21, Spring Boot 3.2.2, Spring Cloud 2023.0.0
+- Java 25, Spring Boot 4.0.5, Spring Cloud 2025.1.1
 - `runtime-events`, `runtime-jsonapi` (Kelta platform modules)
 - Spring Cloud Gateway, Spring WebFlux (reactive)
 - Spring Security OAuth2 Resource Server

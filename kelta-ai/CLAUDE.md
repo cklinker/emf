@@ -9,10 +9,14 @@ io.kelta.ai/
   config/          ← AiConfigProperties (record), AnthropicConfig, WebConfig
   controller/      ← ChatController (SSE), ChatHistoryController, ProposalController, AiConfigController, AiUsageController
   filter/          ← TenantContextFilter, TokenLimitFilter
-  model/           ← Records: Conversation, ChatMessage, AiProposal
-  repository/      ← JPA repositories: ConversationRepository, ChatMessageRepository, AiConfigRepository, TokenUsageRepository
-  service/         ← AnthropicService, ChatService, ProposalService, SystemPromptService, TokenTrackingService, WorkerApiClient
+  model/           ← Records: Conversation, ChatMessage, AiProposal, AgentDefinition
+  repository/      ← JdbcTemplate repositories (NOT JPA): ConversationRepository, ChatMessageRepository, AiConfigRepository, TokenUsageRepository, AgentDefinitionRepository
+  controller/      ← ChatController (SSE), …, AgentController (CRUD + POST /{id}/run)
+  service/         ← AnthropicService, ChatService, ProposalService, SystemPromptService, TokenTrackingService, WorkerApiClient, AgentService
+  service/agent/   ← Governed agent runtime: AgentRuntimeService (bounded tool-use loop), AgentModelClient (SDK seam) + AnthropicAgentModelClient
 ```
+
+> **Persistence note:** repositories here are `@Repository` classes using `JdbcTemplate` with hand-written SQL (records, not JPA), matching the platform-wide rule. Tenant isolation is by explicit `WHERE tenant_id = ?` on every query (kelta-ai connects as the table owner, so RLS is defense-in-depth, not the boundary).
 
 ## Key Patterns
 

@@ -21,7 +21,7 @@ Examples: `feature/a1-field-type-migration`, `feature/b5-picklist-service`
 - All new JPA repositories extend `JpaRepository`
 - All new REST controllers follow existing `@RestController` patterns with `@RequestMapping`
 - Flyway migrations numbered sequentially (check `kelta-worker/src/main/resources/db/migration/` for next number)
-- Kafka events use `ConfigEventPublisher` pattern
+- NATS events use `ConfigEventPublisher` pattern
 - Java: No unused imports, no raw types, no unchecked casts
 - TypeScript: Must pass ESLint and Prettier checks
 

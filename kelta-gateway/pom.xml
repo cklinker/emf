@@ -27,7 +27,7 @@
     </properties>
 
     <dependencies>
-        <!-- Kelta Platform Runtime Events (Shared Kafka Events) -->
+        <!-- Kelta Platform Runtime Events (Shared NATS Events) -->
         <dependency>
             <groupId>io.kelta</groupId>
             <artifactId>runtime-events</artifactId>

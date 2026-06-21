@@ -16,7 +16,7 @@
 - Import order: (1) `io.kelta.*`, (2) external libs (`com.fasterxml.*`, `org.*`), (3) Java stdlib (`java.*`, `javax.*`)
 - Constructor injection preferred over field injection
 - `@Component` for beans, `@Service` for business logic, `@Repository` for data access
-- `@KafkaListener` with explicit topics and group IDs
+- NATS subscriptions registered explicitly via `NatsSubscriptionManager` (no annotation-based listeners)
 
 ### Logging
 - `private static final Logger logger = LoggerFactory.getLogger(ClassName.class)`

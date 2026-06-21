@@ -42,7 +42,7 @@ Files attach to any record via the `attachments` system collection (backed by `f
 | `kelta.record.changed` | Record CRUD events |
 
 Event envelope: `PlatformEvent<T>` with `eventId`, `eventType`, `tenantId`, `correlationId`, `timestamp`, `payload`
-Publishing: `PlatformEventPublisher` (replaces former KafkaTemplate usage)
+Publishing: `PlatformEventPublisher` (replaces former PlatformEventPublisher usage)
 Subscriptions: `NatsSubscriptionConfig` registration (broadcast consumers for config changes, queue groups for load-balanced work)
 Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/event/`
 

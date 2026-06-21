@@ -7,7 +7,7 @@ Shared runtime libraries for the Kelta platform. These modules provide the core 
 ```
 kelta-platform/runtime/
 ├── runtime-core                 # Core runtime library
-├── runtime-events               # Shared Kafka event classes
+├── runtime-events               # Shared NATS event classes
 ├── runtime-jsonapi              # JSON:API model classes
 ├── runtime-module-core          # Workflow action handlers (CRUD, tasks, decisions)
 ├── runtime-module-integration   # Integration action handlers (HTTP, email, scripts)
@@ -31,7 +31,7 @@ The foundational library providing dynamic, runtime-configurable collection mana
 - **DataPath resolution** -- Relationship traversal with prefix optimization for batch resolves
 - **Workflow engine** -- `ActionHandler` interface, `BeforeSaveHook` lifecycle, `WorkflowEngine` for rule execution
 - **Module system** -- `KeltaModule` plugin architecture for extending workflows
-- **Event publishing** -- Async Kafka events via `KafkaEventPublisher` for configuration and record changes
+- **Event publishing** -- Async NATS events via `PlatformEventPublisher` for configuration and record changes
 - **REST router** -- `DynamicCollectionRouter` auto-exposes JSON:API endpoints for registered collections
 
 **Configuration properties:**
@@ -41,7 +41,7 @@ The foundational library providing dynamic, runtime-configurable collection mana
 
 ### runtime-events
 
-Shared Kafka event classes used across Kelta services.
+Shared NATS event classes used across Kelta services.
 
 - `ConfigEvent<T>` -- Generic base event for configuration changes
 - `RecordChangeEvent` -- Record-level lifecycle events
@@ -74,7 +74,7 @@ Integration action handlers for external communication.
 
 - `HttpCalloutActionHandler` -- HTTP requests with response capture
 - `OutboundMessageActionHandler` -- Webhook messages
-- `PublishEventActionHandler` -- Kafka event publishing
+- `PublishEventActionHandler` -- NATS event publishing
 - `EmailAlertActionHandler` -- Email notifications
 - `InvokeScriptActionHandler` -- Server-side script execution
 - `DelayActionHandler` -- Workflow delays
@@ -112,6 +112,6 @@ mvn clean install -DskipTests -f kelta-platform/pom.xml \
 
 - Java 21
 - Spring Boot 3.2.2
-- Spring Kafka, Spring Data Redis, Spring Data JDBC
+- NATS (jnats), Spring Data Redis, Spring Data JDBC
 - PostgreSQL, Jackson
 - Mockito 5.21, Testcontainers 1.19.3, jqwik 1.8.2

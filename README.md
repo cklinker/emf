@@ -25,7 +25,7 @@ Kelta is a platform for building dynamic, runtime-configurable enterprise applic
 | Module | Description |
 |--------|-------------|
 | `kelta-platform/runtime/runtime-core` | Core runtime library — collection management, query engine, validation, dual storage modes |
-| `kelta-platform/runtime/runtime-events` | Shared Kafka event classes for lifecycle events |
+| `kelta-platform/runtime/runtime-events` | Shared NATS event classes for lifecycle events |
 | `kelta-platform/runtime/runtime-jsonapi` | Shared JSON:API model classes |
 | `kelta-platform/runtime/runtime-module-core` | Workflow action handlers (field updates, record CRUD, tasks, decisions) |
 | `kelta-platform/runtime/runtime-module-integration` | Integration action handlers (HTTP callouts, email, scripts, delays) |
@@ -41,7 +41,7 @@ Kelta is a platform for building dynamic, runtime-configurable enterprise applic
 
 **Frontend:** TypeScript, React, Vite, Vitest, Tailwind CSS
 
-**Infrastructure:** PostgreSQL 15, Redis 7, Kafka 3.7 (KRaft), Keycloak 23 (OIDC)
+**Infrastructure:** PostgreSQL 15, Redis 7, NATS 2.10 (JetStream), Keycloak 23 (OIDC)
 
 **Deployment:** Docker, Kubernetes, ArgoCD
 

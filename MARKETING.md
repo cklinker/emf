@@ -54,10 +54,10 @@ Every collection automatically gets a fully compliant JSON:API endpoint. No boil
 
 - **Full CRUD** at `/{tenant}/{collection}` with relationship includes, sparse fieldsets, filtering, sorting, and pagination
 - **Atomic operations** for bulk create/update/delete in a single transactional request
-- **WebSocket realtime subscriptions** for live record change notifications with Kafka bridge and tenant isolation
+- **WebSocket realtime subscriptions** for live record change notifications with NATS bridge and tenant isolation
 - **Auto-generated OpenAPI 3.0 documentation** with embedded Swagger UI — dynamically reflecting your collection schema
 - **Global full-text search** across all collections via PostgreSQL tsvector with per-field indexing control
-- **Dynamic route registration** — schema changes update gateway routes in real-time via Kafka, no restart required
+- **Dynamic route registration** — schema changes update gateway routes in real-time via NATS, no restart required
 
 ### Visual Workflow Builder
 
@@ -122,7 +122,7 @@ Connect Kelta to your existing systems with standards-based integrations.
 - **HTTP callouts** from flows with header, method, and body templating via merge fields
 - **Inbound webhooks** — dedicated endpoints per flow with request body mapping and header capture
 - **Outbound webhooks** powered by Svix with event type mapping, HMAC verification, and collection-scoped filtering
-- **Kafka event streaming** — publish custom events to arbitrary topics from any flow
+- **NATS event streaming** — publish custom events to arbitrary topics from any flow
 - **Email delivery** — per-tenant SMTP with async delivery, email logging, and template management
 - **Push notifications** — SPI with device registration, ready for FCM/APNs integration
 - **Embedded analytics** — Apache Superset integration with guest tokens, automatic dataset sync, and tenant-isolated dashboards
@@ -177,7 +177,7 @@ Everything developers need to build on top of Kelta.
 | **SDK** | TypeScript | Client library, components, plugin SDK, CLI |
 | **PostgreSQL** | v15 | Primary data store with RLS, schema isolation, full-text search |
 | **Redis** | v7 | Rate limiting, caching, PAT revocation, session storage |
-| **Kafka** | v3.7 (KRaft) | Event streaming, realtime bridge, config propagation |
+| **NATS** | v3.7 (KRaft) | Event streaming, realtime bridge, config propagation |
 | **Cerbos** | PDP | Fine-grained ABAC policy engine with per-tenant policies |
 | **OpenSearch** | + Jaeger, OpenTelemetry | Traces, logs, audit events, metrics |
 | **Superset** | Apache | Embedded analytics dashboards |

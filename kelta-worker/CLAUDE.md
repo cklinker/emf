@@ -58,7 +58,7 @@ When a system collection config changes, broadcast via NATS JetStream so all pod
 > **Read-after-write exception (issue #910):** a hook MAY *additionally* trigger a synchronous local refresh so the originating pod is consistent for an immediate read-after-write (e.g. `addField` → `getById` on the same pod), **provided it still publishes the NATS config event** for all other pods. Use `CollectionLifecycleManager.refreshOrInitializeLocally(collectionId)` for this — see `FieldConfigEventPublisher`. Local-refresh-*only* (skipping the broadcast) remains forbidden.
 
 ### NATS Subscriptions
-Listeners are plain classes registered in `config/NatsSubscriptionConfig` at `@PostConstruct` time via `NatsSubscriptionManager`. There are no `@KafkaListener`-style annotations. A listener method typically takes the raw JSON message and extracts the `PlatformEvent` envelope.
+Listeners are plain classes registered in `config/NatsSubscriptionConfig` at `@PostConstruct` time via `NatsSubscriptionManager`. There are no annotation-based listener bindings. A listener method typically takes the raw JSON message and extracts the `PlatformEvent` envelope.
 
 **Reference**: `listener/CollectionSchemaListener.java`, `listener/FlowEventListener.java`, `config/NatsSubscriptionConfig.java`
 

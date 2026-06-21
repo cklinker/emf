@@ -1964,7 +1964,7 @@ Now that collections exist, configure permissions for each profile.
 2. **Expected:** All services show green/healthy status:
    - Control Plane: ✅
    - Database: ✅
-   - Kafka: ✅
+   - NATS: ✅
    - Redis: ✅
 3. **Expected:** API metrics charts show request rate, error rate, and latency.
 

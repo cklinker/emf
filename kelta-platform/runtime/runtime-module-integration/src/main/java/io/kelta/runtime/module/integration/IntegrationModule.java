@@ -30,7 +30,7 @@ import java.util.List;
  *   <li><b>HTTP_CALLOUT</b> — Makes HTTP requests with response capture</li>
  *   <li><b>OUTBOUND_MESSAGE</b> — Sends outbound webhook messages</li>
  *   <li><b>SEND_NOTIFICATION</b> — Sends in-app notifications</li>
- *   <li><b>PUBLISH_EVENT</b> — Publishes custom events (e.g., Kafka)</li>
+ *   <li><b>PUBLISH_EVENT</b> — Publishes custom events (e.g., to NATS)</li>
  *   <li><b>DELAY</b> — Delays subsequent workflow actions</li>
  *   <li><b>EMAIL_ALERT</b> — Sends email notifications</li>
  *   <li><b>INVOKE_SCRIPT</b> — Invokes server-side scripts</li>

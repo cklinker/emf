@@ -32,6 +32,7 @@ ship a change that moves a row.
 | Direct file serving | `GET /api/files/{path}` with range support, tenant-scoped |
 | Notes & attachments | Full S3 lifecycle: presigned-PUT upload + finalize, list/download (`AttachmentUrlEnricher`), delete with S3 cleanup, `AttachmentCleanupHook` cascade on parent delete (idx `idx_attachment_tenant_record`, V142) |
 | Metadata dependency & impact | `MetadataDependencyService` per-tenant graph; `GET /api/metadata/impact?type=&id=&direction=` and `/api/metadata/graph`; Tarjan SCC cycle detection (#1039) |
+| Config-health governance (backend) | `ConfigHealthAnalyzer` scans tenant config via pluggable `HealthRule` beans (circular master-detail, collections without layouts/fields, orphan fields, flows without error handling, over-permissive profiles) → 0–100 score + findings; `GET /api/config-health`. UI dashboard + AiProposal one-click remediation pending |
 | Developer experience | `@kelta/sdk` (`KeltaClient`, `QueryBuilder`), `@kelta/cli`, OpenAPI 3.0 + Swagger at `/api/docs`, Zod schemas, i18n (6 langs, RTL), theme, a11y, 70+ UI pages |
 | Operational | Graceful shutdown (persist in-flight flows), optimistic locking for scheduled tasks, multi-layer cache (Caffeine→Redis→worker) w/ NATS invalidation, security headers, health endpoints |
 

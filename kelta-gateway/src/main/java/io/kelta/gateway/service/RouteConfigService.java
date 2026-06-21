@@ -179,6 +179,7 @@ public class RouteConfigService {
                 {"list-views", "/api/list-views/**", "list-views"},
                 {"ui-pages", "/api/ui-pages/**", "ui-pages"},
                 {"ui-menus", "/api/ui-menus/**", "ui-menus"},
+                {"pages", "/api/pages/**", "pages"},
                 // Security & identity
                 {"profiles", "/api/profiles/**", "profiles"},
                 {"users", "/api/users/**", "users"},

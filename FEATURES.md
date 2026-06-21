@@ -34,7 +34,7 @@ Every collection automatically gets a fully compliant JSON:API endpoint. No boil
 - **Sorting**: `?sort=field,-field` for ascending/descending
 - **Pagination**: `?page[number]=1&page[size]=20`
 - **Sub-resources**: `/{parent}/{parentId}/{child}` for parent-child traversal
-- **Dynamic route registration**: Collection schema changes publish Kafka events that update gateway routes in real-time — no restart required
+- **Dynamic route registration**: Collection schema changes publish NATS events that update gateway routes in real-time — no restart required
 - **Atomic Operations**: `POST /{tenant}/_operations` for bulk CRUD per the JSON:API Atomic Operations spec — multiple create/update/delete operations in a single transactional request
 
 ---
@@ -45,7 +45,7 @@ Search across all your data with a single query. PostgreSQL `tsvector`-backed fu
 
 - Search endpoint: `GET /api/_search?q={query}` with prefix matching and relevance ranking via `ts_rank`
 - Per-field `searchable` flag controls which fields are indexed
-- Search index automatically maintained via Kafka record change events
+- Search index automatically maintained via NATS record change events
 - Tenant-isolated via PostgreSQL Row Level Security on the search index table
 - Async bulk re-index capability when searchable fields change
 
@@ -219,13 +219,13 @@ A full state-machine automation engine inspired by AWS Step Functions, with a vi
 | Record-Triggered (on create/update/delete with filter formulas) | Working |
 | API / Webhook (`POST /api/webhooks/{flowId}` with request body mapping, header capture) | Working |
 | Scheduled (cron expression with timezone) | Working |
-| Kafka-Triggered (key/message filter with dynamic consumer) | TODO |
+| NATS-triggered (key/message filter with dynamic consumer) | TODO |
 
 **Workflow Migration:**
 - `WorkflowMigrationController` migrates legacy workflow rules to modern flow definitions — migrate individual rules or all at once via `/api/admin/migrate-workflow-rules`
 
 > **TODO**
-> - KAFKA_TRIGGERED: No dynamic Kafka consumer created per flow
+> - NATS_TRIGGERED: No dynamic NATS consumer created per flow
 > - Wait state resume: `resumeExecution()` is not implemented — long-duration Wait states persist as WAITING but never resume
 
 ---
@@ -293,9 +293,9 @@ Connect Kelta to your existing systems with HTTP callouts, webhooks, event strea
 **Working:**
 - **HTTP Callout**: Generic HTTP requests from flows with header, method, and body templating via merge fields
 - **Outbound Message**: Structured webhook payloads (XML/JSON) to external systems
-- **Kafka Event Publishing**: Publish custom events to arbitrary Kafka topics from any flow
+- **NATS Event Publishing**: Publish custom events to arbitrary NATS subjects from any flow
 - **Inbound Webhooks**: Flows with AUTOLAUNCHED type get dedicated `POST /api/webhooks/{flowId}` endpoints with request body mapping and header capture (content-type, user-agent)
-- **Outbound Webhooks (Svix)**: Outbound webhook delivery via Svix with event type mapping (`collection.created`, `collection.updated`, etc.), multi-tenant isolation, management portal UI, and collection-scoped webhook filtering. `SvixWebhookPublisher` bridges Kafka config events to Svix. `SvixTenantLifecycleHook` initializes a Svix application per tenant on creation.
+- **Outbound Webhooks (Svix)**: Outbound webhook delivery via Svix with event type mapping (`collection.created`, `collection.updated`, etc.), multi-tenant isolation, management portal UI, and collection-scoped webhook filtering. `SvixWebhookPublisher` bridges NATS config events to Svix. `SvixTenantLifecycleHook` initializes a Svix application per tenant on creation.
 - **Email Delivery**: Standards-based email via `SmtpEmailProvider` with per-tenant SMTP settings stored in `tenant.settings` JSONB column. Async delivery via dedicated thread pool, email logging to `email_log` table, template management, configurable from address/name per tenant, and cached `JavaMailSender` instances (Caffeine, 5-min TTL).
 - **Push Notifications (SPI)**: `PushProvider` SPI with device registration API (`PushDeviceController`). Ships with a log-only default provider — plug in FCM, APNs, or any push backend.
 - **Embedded Analytics (Apache Superset)**: Embedded dashboards with guest token authentication, automatic dataset sync from collections, and tenant-isolated Superset management. `SupersetTenantLifecycleHook` initializes Superset resources on tenant creation. See Embedded Analytics section below.
@@ -313,7 +313,7 @@ Embed interactive dashboards and reports directly into the platform using Apache
 
 - **Guest token generation**: `SupersetController` at `/api/superset/guest-token` generates scoped guest tokens for embedding dashboards with tenant-level row-level security
 - **Dashboard discovery**: `GET /api/superset/dashboards` lists available dashboards for the current tenant
-- **Dataset sync**: `POST /api/superset/datasets/sync` synchronizes collection schemas to Superset datasets. `SupersetCollectionSyncListener` triggers sync automatically when collections change via Kafka events
+- **Dataset sync**: `POST /api/superset/datasets/sync` synchronizes collection schemas to Superset datasets. `SupersetCollectionSyncListener` triggers sync automatically when collections change via NATS events
 - **Tenant isolation**: `SupersetTenantService` manages per-tenant Superset resources. `SupersetTenantLifecycleHook` provisions Superset access on tenant creation
 - **Frontend embedding**: `SupersetEmbed` component renders dashboards inline. `AnalyticsPage` and `DashboardPage` provide dedicated analytics views in the admin UI
 
@@ -324,7 +324,7 @@ Embed interactive dashboards and reports directly into the platform using Apache
 Push real-time record change notifications to connected clients over WebSocket.
 
 - **WebSocket endpoint**: `/ws/realtime` with JWT authentication on upgrade — only authenticated users receive events
-- **Kafka bridge**: `RealtimeKafkaBridge` consumes `kelta.record.changed` Kafka events and routes them to subscribed WebSocket sessions
+- **NATS bridge**: `RealtimeBridge` consumes `kelta.record.changed` NATS events and routes them to subscribed WebSocket sessions
 - **Subscription management**: `SubscriptionManager` with thread-safe per-session subscription tracking. Subscribe to specific collections or record IDs.
 - **Tenant isolation**: Sessions only receive events scoped to their tenant
 - **Subscription limits**: 50 subscriptions per session, 100 connections per tenant — prevents resource exhaustion
@@ -360,7 +360,7 @@ Extend the platform with custom action handlers, before-save hooks, and frontend
 **Working:**
 - **Module SPI**: `KeltaModule` interface with `getActionHandlers()`, `getBeforeSaveHooks()`, `onStartup(ModuleContext)` lifecycle
 - **3 built-in compile-time modules**: Core Actions (8 handlers), Integration (7 handlers), Schema Lifecycle (hooks for tenant, collection, field, user, and profile lifecycle)
-- **Module lifecycle management**: Install, enable, disable, uninstall per tenant with status tracking and Kafka event propagation across pods
+- **Module lifecycle management**: Install, enable, disable, uninstall per tenant with status tracking and NATS event propagation across pods
 - **ModuleContext**: Provides QueryEngine, CollectionRegistry, FormulaEvaluator, and extensible service map to modules
 - **Frontend Plugin SDK** (`@kelta/plugin-sdk`): `BasePlugin` abstract class with `init`/`mount`/`unmount` lifecycle, `ComponentRegistry` for custom field renderers and page components
 
@@ -509,13 +509,13 @@ Production-ready infrastructure patterns baked into the platform.
 
 - **Graceful shutdown**: In-flight flow executions persisted to DB on SIGTERM for resume after restart
 - **Optimistic locking**: Scheduled tasks use `last_scheduled_run` column to prevent duplicate execution across pods
-- **Multi-layer caching**: Caffeine (in-process) -> Redis -> worker backend, with Kafka-driven cache invalidation
+- **Multi-layer caching**: Caffeine (in-process) -> Redis -> worker backend, with NATS-driven cache invalidation
 - **Dual-layer rate limiting**: Per-tenant fixed-window (Redis) + governor limit daily quota
-- **Dynamic route management**: Gateway routes updated in real-time via Kafka events — no restart on schema changes
+- **Dynamic route management**: Gateway routes updated in real-time via NATS events — no restart on schema changes
 - **Security hardening**: CSP headers, strict CORS policies, encrypted session cookies, JSON-only error responses (no stack traces leaked), and mandatory encryption for sensitive fields
 - **Dependency scanning**: Automated security audit pipeline for identifying vulnerable dependencies
 - **Security headers**: `SecurityHeadersFilter` adds standard security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, etc.) to all responses
-- **Health endpoints**: `/actuator/health` with Redis and Kafka connectivity checks, worker reachability monitoring from gateway
+- **Health endpoints**: `/actuator/health` with Redis and NATS connectivity checks, worker reachability monitoring from gateway
 - **Prometheus metrics**: Request counts, latency histograms, error counters, and active collection gauges for HPA autoscaling
 - **Kubernetes-native**: Deployed via ArgoCD with standard deployment manifests
 
@@ -533,7 +533,7 @@ Production-ready infrastructure patterns baked into the platform.
 | CLI | TypeScript, Commander.js | Command-line interface for collection and record management |
 | Database | PostgreSQL 15 | Primary data store (111 Flyway migrations) |
 | Cache | Redis 7 | Rate limiting, caching (routes, permissions, JSON:API responses), PAT revocation |
-| Messaging | Kafka 3.7 (KRaft) | Event streaming (record changes, config changes, module events, realtime bridge) |
+| Messaging | NATS 2.10 (JetStream) | Event streaming (record changes, config changes, module events, realtime bridge) |
 | Authorization | Cerbos PDP | Fine-grained ABAC policy evaluation with per-tenant resource policies and cache invalidation |
 | Observability | OpenSearch, Jaeger, OpenTelemetry | Traces, logs, audit events, metrics |
 | Analytics | Apache Superset | Embedded dashboards with guest token auth and automatic dataset sync |
@@ -558,7 +558,7 @@ What SMB and larger enterprises need from an application platform, and where Kel
 | **Personal Access Tokens** | SHA-256 hashed `klt_` tokens for API access, max 10 per user, Redis-backed revocation |
 | **Custom Domains** | CNAME-based custom tenant domains alongside slug-based URL routing |
 | **API-First Architecture** | Every collection auto-generates a JSON:API endpoint with filtering, sorting, pagination, includes, sparse fieldsets, and atomic bulk operations |
-| **Real-Time Data** | WebSocket subscriptions for live record change notifications with Kafka bridge and tenant isolation |
+| **Real-Time Data** | WebSocket subscriptions for live record change notifications with NATS bridge and tenant isolation |
 | **API Documentation** | Auto-generated OpenAPI 3.0 spec with embedded Swagger UI, dynamically reflecting collection schema |
 | **Workflow Automation** | Visual Flow Builder with 16 action handlers, 8 state types, retry/catch error handling, durable execution, and scheduled triggers |
 | **Email Delivery** | Standards-based SMTP with per-tenant settings, async delivery, email logging, and template management |
@@ -566,9 +566,9 @@ What SMB and larger enterprises need from an application platform, and where Kel
 | **Rate Limiting & Quotas** | Dual-layer rate limiting (per-route + daily governor quota) with configurable per-tenant limits |
 | **Embedded Analytics** | Apache Superset integration with guest tokens, automatic dataset sync, and tenant-isolated dashboards |
 | **Webhook Integrations** | Inbound webhooks (flow triggers) and outbound webhooks (Svix) with event type mapping and HMAC verification |
-| **Full-Text Search** | PostgreSQL tsvector-backed search with per-field indexing control, Kafka-driven index maintenance |
+| **Full-Text Search** | PostgreSQL tsvector-backed search with per-field indexing control, NATS-driven index maintenance |
 | **Observability** | OpenTelemetry tracing, OpenSearch log aggregation, Prometheus metrics, 7 monitoring pages in admin UI |
-| **Extensibility** | Module SPI for backend extensions, Plugin SDK for frontend customization, Kafka event streaming for integration |
+| **Extensibility** | Module SPI for backend extensions, Plugin SDK for frontend customization, NATS event streaming for integration |
 | **Internationalization** | Multi-language support with translation framework |
 | **Accessibility** | WCAG patterns: skip links, ARIA live regions, keyboard navigation, screen reader support |
 | **Dynamic Schema** | Runtime data model changes with no deployments — create collections, fields, relationships, and validation rules on the fly |
@@ -610,7 +610,7 @@ What SMB and larger enterprises need from an application platform, and where Kel
 ### High Priority — Core Platform Gaps
 
 - [ ] **Field-level security read-side stripping**: Write-side enforcement is complete — HIDDEN fields are blocked from create/update. Read-side stripping from API responses is still needed.
-- [ ] **Flow KAFKA_TRIGGERED trigger**: Wire dynamic Kafka consumers per flow with key/message filtering
+- [ ] **Flow NATS_TRIGGERED trigger**: Wire dynamic NATS consumers per flow with key/message filtering
 - [ ] **Flow Wait state resume**: Implement `resumeExecution()` to resume flows paused in Wait states
 - [x] **Permission enforcement default**: `permissions-enabled` now defaults to `true` for production deployments
 

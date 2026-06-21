@@ -22,21 +22,21 @@ Client Request
 |---------|-------------|
 | `auth` | JWT validation, `GatewayPrincipal` extraction, public path matching |
 | `authz` | Route/field authorization filters, permission resolution from worker |
-| `config` | Spring configuration, bootstrap, Kafka/Redis/Security beans |
+| `config` | Spring configuration, bootstrap, NATS/Redis/Security beans |
 | `filter` | Tenant resolution, security headers, request logging |
 | `route` | `DynamicRouteLocator`, `RouteRegistry` (in-memory, thread-safe) |
 | `cache` | `GatewayCacheManager` -- Caffeine-backed tenant slug and governor limit caches |
 | `ratelimit` | `RedisRateLimiter` (sliding window) |
 | `jsonapi` | `IncludeResolver` -- fetches related resources from Redis cache with backend fallback |
-| `listener` | Kafka consumers for collection and worker assignment changes |
-| `health` | Health indicators for Redis, Kafka, and worker service |
+| `listener` | NATS consumers for collection and worker assignment changes |
+| `health` | Health indicators for Redis, NATS, and worker service |
 
 ## Configuration
 
 Key properties from `application.yml`:
 
 ```yaml
-spring.kafka.bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+nats.url: ${NATS_URL:nats://localhost:4222}
 spring.data.redis:
   host: ${REDIS_HOST:localhost}
   port: ${REDIS_PORT:6379}
@@ -52,7 +52,7 @@ kelta.gateway:
     permissions-enabled: ${PERMISSIONS_ENABLED:true}
     permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}
     public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
-  kafka.topics:
+  nats.subjects:
     collection-changed: kelta.config.collection.changed
     worker-assignment-changed: kelta.worker.assignment.changed
     record-changed: kelta.record.changed
@@ -66,11 +66,11 @@ kelta.gateway:
 3. Populates `RouteRegistry` and publishes `RefreshRoutesEvent`
 
 **Runtime:**
-- Routes are **not** hardcoded -- they are discovered from the worker at startup and updated dynamically via Kafka events without restart
+- Routes are **not** hardcoded -- they are discovered from the worker at startup and updated dynamically via NATS events without restart
 - JSON:API resources are cached in Redis with a 10-minute TTL
 - Rate limits are enforced per-tenant using Redis sliding windows backed by governor limit configuration
 
-**Kafka topics consumed:**
+**NATS subjects consumed:**
 - `kelta.config.collection.changed` -- updates routes on collection create/update/delete
 - `kelta.worker.assignment.changed` -- updates routes on worker assignment changes
 - `kelta.record.changed` -- record change events
@@ -89,7 +89,7 @@ mvn verify -f kelta-gateway/pom.xml -B
 
 ## Running Locally
 
-Requires Redis, Kafka, Keycloak, and the worker service. Start infrastructure via Docker Compose from the repo root:
+Requires Redis, NATS, Keycloak, and the worker service. Start infrastructure via Docker Compose from the repo root:
 
 ```bash
 docker-compose up -d
@@ -101,7 +101,7 @@ The gateway starts on port **8080**.
 ## Testing
 
 - **Unit tests** -- JUnit 5 + Mockito, test classes in isolation
-- **Integration tests** -- Testcontainers for Kafka/Redis, MockWebServer for HTTP
+- **Integration tests** -- Testcontainers for NATS/Redis, MockWebServer for HTTP
 - **Property-based tests** -- JUnit QuickCheck for universal property validation
 
 ```bash
@@ -114,7 +114,7 @@ mvn verify -f kelta-gateway/pom.xml -B
 |----------|-------------|
 | `GET /actuator/health` | Overall health |
 | `GET /actuator/health/redis` | Redis connectivity |
-| `GET /actuator/health/kafka` | Kafka connectivity |
+| `GET /actuator/health/nats` | NATS connectivity |
 | `GET /actuator/metrics` | Micrometer metrics |
 
 ## Docker
@@ -127,4 +127,4 @@ Multi-stage build: `maven:3.9-eclipse-temurin-21` (build) -> `eclipse-temurin:21
 - `runtime-events`, `runtime-jsonapi` (Kelta platform modules)
 - Spring Cloud Gateway, Spring WebFlux (reactive)
 - Spring Security OAuth2 Resource Server
-- Spring Data Redis (reactive), Spring Kafka
+- Spring Data Redis (reactive), NATS (jnats)

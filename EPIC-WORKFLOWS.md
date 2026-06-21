@@ -51,7 +51,7 @@ The existing Workflow Rules system will be **fully migrated to Flows** and then 
                                  ▼
 ┌─────────────┐   ┌──────────────────────────────────┐   ┌────────────────┐
 │   Triggers   │──▶│     State Machine Engine          │──▶│  Execution DB  │
-│ Kafka events │   │  ┌──────┐ ┌──────┐ ┌──────────┐ │   │  flow_execution│
+│ NATS events │   │  ┌──────┐ ┌──────┐ ┌──────────┐ │   │  flow_execution│
 │ Record CRUD  │   │  │ Task │ │Choice│ │ Parallel │ │   │  flow_step_log │
 │ Scheduled    │   │  └──┬───┘ └──┬───┘ └────┬─────┘ │   │  flow_variables│
 │ Manual / API │   │     │        │           │       │   └────────────────┘
@@ -69,7 +69,7 @@ The existing Workflow Rules system will be **fully migrated to Flows** and then 
 1. **Durable Execution** — Every state transition persists to PostgreSQL. Executions survive pod restarts and can resume from any checkpoint.
 2. **State Data Flow** — Each step receives input state, produces output state. JSONPath expressions map data between steps (InputPath, OutputPath, ResultPath).
 3. **Unified Handler SPI** — The existing `ActionHandler` interface remains unchanged. All 15+ existing handlers become available as Task state resources.
-4. **Tenant-Scoped Runtime Modules** — JARs downloaded by URL, stored in S3, loaded via sandboxed ClassLoader, scoped to a tenant. Module lifecycle events (install, enable, disable, uninstall) propagate to all pods via Kafka (`kelta.config.module.changed`) — no process restarts required. Modules expose new `ActionHandler` implementations.
+4. **Tenant-Scoped Runtime Modules** — JARs downloaded by URL, stored in S3, loaded via sandboxed ClassLoader, scoped to a tenant. Module lifecycle events (install, enable, disable, uninstall) propagate to all pods via NATS (`kelta.config.module.changed`) — no process restarts required. Modules expose new `ActionHandler` implementations.
 5. **Visual-First Design** — Every flow is visually composable. The JSON definition is the source of truth; the visual builder is a bidirectional editor of that JSON.
 
 ---
@@ -169,7 +169,7 @@ Invoked when a record in a specific collection is created, updated, or deleted.
 | `synchronous` | boolean | No | Default `false`. If `true`, the flow executes synchronously during the save operation (before commit) and can return field updates. Used to replace `BEFORE_CREATE`/`BEFORE_UPDATE` workflow triggers. |
 
 **How it works:**
-1. `FlowEventListener` consumes `kelta.record.changed` Kafka topic
+1. `FlowEventListener` consumes `kelta.record.changed` NATS subject
 2. For each event, queries all ACTIVE flows for the tenant where `flow_type = 'RECORD_TRIGGERED'` and `trigger_config.collection` matches the event's collection
 3. Checks if the event's `changeType` is in `trigger_config.events`
 4. If `triggerFields` is specified and event is UPDATE, checks intersection with `changedFields`
@@ -178,9 +178,9 @@ Invoked when a record in a specific collection is created, updated, or deleted.
 
 **Initial state:** Source key = `record` containing `id`, `collectionName`, `data` (full record), `previousData` (changed fields only), `changedFields[]`. Steps reference: `$.record.data.status`, `$.record.previousData.status`, `$.record.id`, `$.context.tenantId`.
 
-#### 2. Kafka Message Flow (`KAFKA_TRIGGERED`)
+#### 2. NATS message Flow (`NATS_TRIGGERED`)
 
-Invoked when a message arrives on a specific Kafka topic matching filter criteria.
+Invoked when a message arrives on a specific NATS subject matching filter criteria.
 
 **trigger_config schema:**
 ```json
@@ -199,9 +199,9 @@ Invoked when a message arrives on a specific Kafka topic matching filter criteri
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `topic` | string | Yes | Kafka topic to subscribe to |
-| `consumerGroup` | string | No | Custom consumer group. Default: `kelta-flow-{flowId}` |
-| `keyFilter` | string | No | Glob pattern matched against the Kafka message key. If the key doesn't match, the message is skipped. |
+| `topic` | string | Yes | NATS subject to subscribe to |
+| `consumerGroup` | string | No | Custom queue group. Default: `kelta-flow-{flowId}` |
+| `keyFilter` | string | No | Glob pattern matched against the NATS message key. If the key doesn't match, the message is skipped. |
 | `messageFilter` | object | No | JSONPath-based filter on the message body. Only messages where the path matches the operator/value trigger the flow. |
 | `messageFilter.path` | string | Yes (if messageFilter) | JSONPath into the message body |
 | `messageFilter.operator` | string | Yes (if messageFilter) | One of: `equals`, `notEquals`, `contains`, `startsWith`, `exists`, `greaterThan`, `lessThan` |
@@ -209,7 +209,7 @@ Invoked when a message arrives on a specific Kafka topic matching filter criteri
 | `payloadFormat` | string | No | Default `"JSON"`. How to parse the message body: `"JSON"`, `"STRING"`, `"AVRO"` |
 
 **How it works:**
-1. `KafkaFlowTriggerManager` dynamically creates Kafka consumers for each active flow with `KAFKA_TRIGGERED` type
+1. `NatsFlowTriggerManager` dynamically creates NATS consumers for each active flow with `NATS_TRIGGERED` type
 2. When a message arrives, applies key filter (glob match) and message filter (JSONPath + operator)
 3. If filters pass, deserializes message body and starts a flow execution
 
@@ -292,7 +292,7 @@ All trigger types support filtering to determine whether the flow should actuall
 | Trigger Type | Filter Mechanism | Evaluated Against |
 |-------------|-----------------|-------------------|
 | `RECORD_TRIGGERED` | `events[]` + `triggerFields[]` + `filterFormula` | RecordChangeEvent data |
-| `KAFKA_TRIGGERED` | `keyFilter` (glob) + `messageFilter` (JSONPath + operator) | Kafka message key + body |
+| `NATS_TRIGGERED` | `keyFilter` (glob) + `messageFilter` (JSONPath + operator) | NATS message key + body |
 | `SCHEDULED` | Cron expression + timezone | Current timestamp |
 | `AUTOLAUNCHED` | `inputSchema` (JSON Schema validation) | API request body |
 
@@ -303,7 +303,7 @@ Every flow execution starts with a state object that follows a common envelope:
 ```json
 {
   "trigger": {
-    "type": "<RECORD_CHANGE|KAFKA_MESSAGE|SCHEDULED|API_INVOCATION>",
+    "type": "<RECORD_CHANGE|NATS_MESSAGE|SCHEDULED|API_INVOCATION>",
     "...trigger-specific metadata..."
   },
   "<source-specific-key>": {
@@ -321,13 +321,13 @@ Every flow execution starts with a state object that follows a common envelope:
 | Trigger Type | Source Key | Contains |
 |-------------|-----------|----------|
 | `RECORD_TRIGGERED` | `record` | `id`, `collectionName`, `data` (full record), `previousData`, `changedFields` |
-| `KAFKA_TRIGGERED` | `message` | `key`, `headers`, `payload` (parsed message body) |
+| `NATS_TRIGGERED` | `message` | `key`, `headers`, `payload` (parsed message body) |
 | `SCHEDULED` | `input` | Static data from `trigger_config.inputData` |
 | `AUTOLAUNCHED` | `input` | Caller-provided input from API request body |
 
 This means the first step of every flow can use `InputPath` to extract exactly what it needs. For example:
 - A record-triggered flow that only needs the record data: `"InputPath": "$.record.data"`
-- A Kafka-triggered flow that needs the whole message: `"InputPath": "$.message.payload"`
+- A NATS-triggered flow that needs the whole message: `"InputPath": "$.message.payload"`
 - A scheduled flow: `"InputPath": "$.input"`
 
 ### Custom State Mapping (Optional InputMapping)
@@ -362,7 +362,7 @@ New package: `io.kelta.runtime.flow`
 
 **Classes to create:**
 - `FlowEngine` — Core execution engine (async by default):
-  - `startExecution(tenantId, flowId, definition, initialInput, userId)` → creates `flow_execution` row, dispatches to a managed `ExecutorService` thread pool, returns `executionId` immediately. Kafka listener threads are never blocked.
+  - `startExecution(tenantId, flowId, definition, initialInput, userId)` → creates `flow_execution` row, dispatches to a managed `ExecutorService` thread pool, returns `executionId` immediately. NATS listener threads are never blocked.
   - `executeSynchronous(tenantId, flowId, definition, initialInput, userId)` → blocks until completion, returns final state data. Used for `synchronous: true` record-triggered flows (replaces BEFORE_CREATE/BEFORE_UPDATE triggers) where the caller needs the result before commit.
   - `resumeExecution(executionId)` → loads persisted state, resumes from `current_node_id` (async)
   - `cancelExecution(executionId)` → marks execution as CANCELLED
@@ -399,10 +399,10 @@ New package: `io.kelta.runtime.flow`
 New migration: `V71__flow_engine_enhancements.sql`
 
 ```sql
--- Expand flow_type to include KAFKA_TRIGGERED
+-- Expand flow_type to include NATS_TRIGGERED
 ALTER TABLE flow DROP CONSTRAINT chk_flow_type;
 ALTER TABLE flow ADD CONSTRAINT chk_flow_type CHECK (flow_type IN (
-    'RECORD_TRIGGERED', 'KAFKA_TRIGGERED', 'SCHEDULED', 'AUTOLAUNCHED', 'SCREEN'
+    'RECORD_TRIGGERED', 'NATS_TRIGGERED', 'SCHEDULED', 'AUTOLAUNCHED', 'SCREEN'
 ));
 
 -- Add scheduling columns for SCHEDULED flows
@@ -458,11 +458,11 @@ CREATE INDEX idx_flow_pending_resume_event ON flow_pending_resume(resume_event) 
 **New classes:**
 - `FlowTriggerEvaluator` — Evaluates whether a trigger event matches a flow's `trigger_config`:
   - `matchesRecordTrigger(RecordChangeEvent, triggerConfig)` → checks events[], triggerFields[], filterFormula
-  - `matchesKafkaTrigger(kafkaKey, kafkaPayload, triggerConfig)` → checks keyFilter, messageFilter
+  - `matchesMessageTrigger(messageKey, messagePayload, triggerConfig)` → checks keyFilter, messageFilter
   - Uses the existing `FormulaEvaluator` for filterFormula evaluation
 - `InitialStateBuilder` — Constructs the canonical initial state envelope from trigger data:
   - `buildFromRecordEvent(RecordChangeEvent, triggerConfig, flowId, executionId)` → builds `{trigger, record, context}` object
-  - `buildFromKafkaMessage(key, headers, payload, triggerConfig, flowId, executionId)` → builds `{trigger, message, context}` object
+  - `buildFromNatsMessage(key, headers, payload, triggerConfig, flowId, executionId)` → builds `{trigger, message, context}` object
   - `buildFromSchedule(triggerConfig, flowId, executionId)` → builds `{trigger, input, context}` object
   - `buildFromApiInvocation(inputPayload, userId, flowId, executionId)` → builds `{trigger, input, context}` object
   - Applies optional `inputMapping` from trigger_config to flatten/transform the initial state
@@ -483,20 +483,20 @@ CREATE INDEX idx_flow_pending_resume_event ON flow_pending_resume(resume_event) 
   - `GET /api/flows/executions/{executionId}` — Get execution detail with state data
   - `GET /api/flows/executions/{executionId}/steps` — Get step-level log
   - `POST /api/webhooks/{path}` — Webhook endpoint that looks up flow by `webhookPath` in trigger_config. Supports HMAC signature verification via `X-Kelta-Signature` header when `authentication = 'WEBHOOK_SECRET'` (secret stored per-flow, compared using constant-time comparison).
-- `FlowEventListener` — Kafka listener for `kelta.record.changed`:
+- `FlowEventListener` — NATS listener for `kelta.record.changed`:
   - Maintains an in-memory cache of active flow trigger configs per tenant (`ConcurrentHashMap<String, List<FlowTriggerConfig>>`), loaded from DB on startup and invalidated when flows are created/updated/deleted (via the existing system collection save hooks)
   - For each event, checks cached trigger configs — no DB query per event
   - Uses `FlowTriggerEvaluator.matchesRecordTrigger()` to filter
   - Uses `InitialStateBuilder.buildFromRecordEvent()` to construct initial state
   - Calls `FlowEngine.startExecution()` for each matching flow
-- `KafkaFlowTriggerManager` — Manages dynamic Kafka consumers for `KAFKA_TRIGGERED` flows:
-  - **On pod startup:** queries DB for all ACTIVE flows with `flow_type = 'KAFKA_TRIGGERED'`, creates a consumer for each
-  - **Consumer group strategy:** each flow uses consumer group `kelta-flow-{flowId}`. All pods join the same group, so Kafka distributes partitions — each message is processed by exactly one pod. No cross-pod activation events needed.
+- `NatsFlowTriggerManager` — Manages dynamic NATS consumers for `NATS_TRIGGERED` flows:
+  - **On pod startup:** queries DB for all ACTIVE flows with `flow_type = 'NATS_TRIGGERED'`, creates a consumer for each
+  - **queue group strategy:** each flow uses queue group `kelta-flow-{flowId}`. All pods join the same group, so NATS distributes partitions — each message is processed by exactly one pod. No cross-pod activation events needed.
   - On flow activation (via API on this pod), creates a consumer for the configured topic
-  - On message receipt, uses `FlowTriggerEvaluator.matchesKafkaTrigger()` to filter
-  - Uses `InitialStateBuilder.buildFromKafkaMessage()` for initial state
-  - On flow deactivation, closes the consumer on this pod. Other pods will close on next restart or when consumer group rebalances (the inactive flow's consumer will stop receiving messages since no new messages are acknowledged).
-  - Tracks active consumers in `ConcurrentHashMap<String, KafkaConsumer>` (flowId → consumer)
+  - On message receipt, uses `FlowTriggerEvaluator.matchesMessageTrigger()` to filter
+  - Uses `InitialStateBuilder.buildFromNatsMessage()` for initial state
+  - On flow deactivation, closes the consumer on this pod. Other pods will close on next restart or when queue group rebalances (the inactive flow's consumer will stop receiving messages since no new messages are acknowledged).
+  - Tracks active consumers in `ConcurrentHashMap<String, NatsSubscription>` (flowId → consumer)
 - `ScheduledFlowExecutor` — Two responsibilities:
   - Polls `flow` table for SCHEDULED flows due to run (cron evaluation, optimistic locking)
   - Polls `flow_pending_resume` table for Wait states ready to resume
@@ -516,7 +516,7 @@ Map existing ActionHandlers to Task `resource` keys. The following are available
 | `EMAIL_ALERT` | EmailAlertActionHandler | Send email |
 | `SEND_NOTIFICATION` | SendNotificationActionHandler | Send in-app notification |
 | `OUTBOUND_MESSAGE` | OutboundMessageActionHandler | Send webhook |
-| `PUBLISH_EVENT` | PublishEventActionHandler | Publish Kafka event |
+| `PUBLISH_EVENT` | PublishEventActionHandler | Publish NATS event |
 | `INVOKE_SCRIPT` | InvokeScriptActionHandler | Execute server-side script |
 | `LOG_MESSAGE` | LogMessageActionHandler | Write to execution log |
 
@@ -525,7 +525,7 @@ New built-in resources to add:
 |-------------|-------------|
 | `QUERY_RECORDS` | Query a collection with filters, return results as state data |
 | `TRANSFORM_DATA` | Apply a JSONPath/template transformation to state data |
-| `EMIT_KAFKA_EVENT` | Publish a custom event to a specified Kafka topic |
+| `EMIT_EVENT` | Publish a custom event to a specified NATS subject |
 
 ### 1.8 Action Handler Descriptors (UI Integration Contract)
 
@@ -592,9 +592,9 @@ Handlers that return `null` get a generic form (raw JSON config editor). Handler
 
 **Per-Tenant Rate Limiting:** Configurable max concurrent executions per tenant (`kelta.flow.max-concurrent-per-tenant`, default: 50). `FlowEngine` tracks active execution count per tenant in an `AtomicInteger` map. Exceeding the limit → execution rejected with HTTP 429 / error code `TenantRateLimitExceeded`. Queue overflow → execution marked FAILED.
 
-**Idempotency:** `FlowEventListener` deduplicates trigger events using a `(eventId, flowId)` composite key. Uses Redis SET with TTL (default: 5 minutes) for deduplication window. If Redis unavailable, falls back to a DB `flow_execution_dedup` table with periodic TTL cleanup. Prevents duplicate executions from Kafka at-least-once delivery.
+**Idempotency:** `FlowEventListener` deduplicates trigger events using a `(eventId, flowId)` composite key. Uses Redis SET with TTL (default: 5 minutes) for deduplication window. If Redis unavailable, falls back to a DB `flow_execution_dedup` table with periodic TTL cleanup. Prevents duplicate executions from NATS at-least-once delivery.
 
-**Emergency Pause (Kill Switch):** `POST /api/admin/flows/pause-all` — immediately stops all flow execution for a tenant. Sets a `flow_processing_paused` flag in the tenant config (persisted to DB, cached in-memory). All trigger listeners (`FlowEventListener`, `KafkaFlowTriggerManager`, `ScheduledFlowExecutor`) check this flag before starting new executions. In-flight executions complete but no new ones start. Resume via `POST /api/admin/flows/resume-all`. UI: Red "Pause All Flows" button on the Flow Settings page with confirmation dialog. Banner shown at top of Flows list when paused: "Flow processing is paused. No new executions will start."
+**Emergency Pause (Kill Switch):** `POST /api/admin/flows/pause-all` — immediately stops all flow execution for a tenant. Sets a `flow_processing_paused` flag in the tenant config (persisted to DB, cached in-memory). All trigger listeners (`FlowEventListener`, `NatsFlowTriggerManager`, `ScheduledFlowExecutor`) check this flag before starting new executions. In-flight executions complete but no new ones start. Resume via `POST /api/admin/flows/resume-all`. UI: Red "Pause All Flows" button on the Flow Settings page with confirmation dialog. Banner shown at top of Flows list when paused: "Flow processing is paused. No new executions will start."
 
 **Audit Trail:** All flow lifecycle events logged to `flow_audit_log` table:
 - Columns: `id`, `tenant_id`, `flow_id`, `action` (CREATED, UPDATED, ACTIVATED, DEACTIVATED, DELETED, EXECUTED, CANCELLED), `user_id`, `timestamp`, `details` (JSONB — captures before/after for edits)
@@ -639,15 +639,15 @@ CREATE TABLE flow_execution_dedup (
 - [ ] StateDataResolver (JSONPath transforms: InputPath, OutputPath, ResultPath)
 - [ ] FlowEngine with all 8 state executors
 - [ ] FlowStore interface and JdbcFlowStore implementation
-- [ ] FlowTriggerEvaluator (record trigger filtering, Kafka trigger filtering)
+- [ ] FlowTriggerEvaluator (record trigger filtering, NATS trigger filtering)
 - [ ] InitialStateBuilder (canonical state envelope for all trigger types)
 - [ ] InputMappingResolver (optional trigger_config.inputMapping transforms)
 - [ ] Database migration V71 (flow_type expansion, flow_step_log, flow_pending_resume)
 - [ ] FlowExecutionController REST endpoints (execute, cancel, resume, webhook, steps)
 - [ ] FlowEventListener for RECORD_TRIGGERED flows
-- [ ] KafkaFlowTriggerManager for KAFKA_TRIGGERED flows (dynamic consumer management)
+- [ ] NatsFlowTriggerManager for NATS_TRIGGERED flows (dynamic consumer management)
 - [ ] ScheduledFlowExecutor for SCHEDULED flows and Wait state resumption
-- [ ] QUERY_RECORDS, TRANSFORM_DATA, EMIT_KAFKA_EVENT task handlers
+- [ ] QUERY_RECORDS, TRANSFORM_DATA, EMIT_EVENT task handlers
 - [ ] ActionHandlerDescriptor interface and REST endpoint (`GET /api/flows/resources`)
 - [ ] Descriptors for all 15+ built-in handlers (configSchema, inputSchema, outputSchema)
 - [ ] Template expression resolver (`${$.path}` in config values)
@@ -695,7 +695,7 @@ Flows List Page                Create/Edit Flow
 
 Replaces existing `FlowsPage.tsx` following `CollectionsPage.tsx` patterns.
 
-**Columns:** Name (clickable → designer), Type (color-coded badge: Record/Scheduled/API/Kafka), Status (Active green/Draft gray/Disabled red dot), Health (sparkline showing last 24h success/failure ratio — green bar for healthy, yellow for degraded >5% failures, red for critical >20% failures; hover for tooltip with exact counts), Last Run (relative timestamp + status icon), Actions ("···" menu: Edit, Duplicate, View Executions, Enable/Disable, Delete).
+**Columns:** Name (clickable → designer), Type (color-coded badge: Record/Scheduled/API/NATS), Status (Active green/Draft gray/Disabled red dot), Health (sparkline showing last 24h success/failure ratio — green bar for healthy, yellow for degraded >5% failures, red for critical >20% failures; hover for tooltip with exact counts), Last Run (relative timestamp + status icon), Actions ("···" menu: Edit, Duplicate, View Executions, Enable/Disable, Delete).
 
 **Flow failure notifications:** When a flow execution fails, an in-app notification is created for the flow's creator (and optionally configured recipients). Notification includes flow name, error summary, and link to the debug view. Configurable per-flow: "Notify on failure" toggle in flow settings with recipient list. Uses the existing `SEND_NOTIFICATION` infrastructure.
 
@@ -709,14 +709,14 @@ Replaces existing `FlowsPage.tsx` following `CollectionsPage.tsx` patterns.
 
 Full-page, 3-step wizard (progressive disclosure — no blank canvas overwhelm):
 
-**Step 1: Choose Flow Type** — Card selector with 4 options: Record Change, Scheduled, API Call/Webhook, Kafka Message. Each card has icon, title, and brief description. Selected card gets blue border.
+**Step 1: Choose Flow Type** — Card selector with 4 options: Record Change, Scheduled, API Call/Webhook, NATS message. Each card has icon, title, and brief description. Selected card gets blue border.
 
 **Step 2: Configure Trigger** — Adapts form based on Step 1 selection:
 
 - **Record Change:** Collection (searchable dropdown), Events (checkboxes: Created/Updated/Deleted). Advanced (collapsed): triggerFields (multi-select from collection fields), filterFormula (formula editor with syntax highlighting), synchronous checkbox (with warning about execution time).
 - **Scheduled:** Quick presets (Hourly/Daily/Weekly/Monthly) OR cron expression input with human-readable preview. Timezone dropdown. Optional static inputData key-value editor.
 - **API Call/Webhook:** Optional webhook path input (shows full URL preview with copy-to-clipboard button). Authentication dropdown (Tenant API Key/Webhook Secret/None). When "Webhook Secret" is selected: auto-generated HMAC signing secret displayed once with copy button, "Regenerate Secret" action with confirmation. Optional input schema builder (field name, type, required — table with add/remove rows).
-- **Kafka Message:** Topic (text input), Consumer group (auto-generated default, editable). Payload format (JSON/String/Avro). Advanced (collapsed): key filter (glob pattern), message body filter (path + operator + value).
+- **NATS message:** Topic (text input), queue group (auto-generated default, editable). Payload format (JSON/String/Avro). Advanced (collapsed): key filter (glob pattern), message body filter (path + operator + value).
 
 **Step 3: Name & Description** — Name (required), Description (optional). "Open Designer" button creates the flow as draft and navigates to the visual designer.
 
@@ -837,7 +837,7 @@ After Phase 3 migration, "Workflow Rules" is removed and "Flows" becomes the sin
 
 - Component tests for each custom node (renders, selection, inline edit)
 - Component tests for each property panel variant (Task, Choice, Parallel, Map, Wait, Pass)
-- Component tests for trigger configuration forms (Record, Kafka, Scheduled, API)
+- Component tests for trigger configuration forms (Record, NATS, Scheduled, API)
 - Unit tests for Canvas ↔ JSON sync (round-trip fidelity for all state types)
 - Unit tests for validation engine (each rule)
 - Unit tests for input mapping preview generation
@@ -854,7 +854,7 @@ After Phase 3 migration, "Workflow Rules" is removed and "Flows" becomes the sin
 - [ ] Custom edge components (normal, choice-labeled, error/catch)
 - [ ] Steps Palette (left panel, draggable state type cards)
 - [ ] Properties Panel with type-specific forms for all 8 state types
-- [ ] Trigger configuration forms (Record, Kafka, Scheduled, API) in properties panel and wizard
+- [ ] Trigger configuration forms (Record, NATS, Scheduled, API) in properties panel and wizard
 - [ ] Input Mapping configuration UI with live preview
 - [ ] Flow Settings panel (execution timeout, sensitive fields, error handling default, max concurrent)
 - [ ] Webhook secret management (generation, display, regenerate) in API/Webhook trigger config
@@ -1108,7 +1108,7 @@ Implementation approach:
 
 ```
 Install → Download JAR from source URL → Verify SHA-256 checksum → Upload to S3 →
-Parse manifest from JAR → Update DB status → Publish Kafka event →
+Parse manifest from JAR → Update DB status → Publish NATS event →
 All pods: receive event → Download JAR from S3 → Load via sandboxed ClassLoader →
 Validate KeltaModule interface → Register handlers → Set status ACTIVE
 ```
@@ -1120,7 +1120,7 @@ Read ACTIVE modules from DB → Download JARs from S3 → Load ClassLoaders → 
 
 **New class:** `RuntimeModuleManager`
 
-- `installModule(tenantId, jarUrl, checksum, installedBy)` → Downloads JAR from source URL, verifies checksum, uploads to S3, parses manifest, updates DB, publishes `ModuleChangedEvent` to Kafka
+- `installModule(tenantId, jarUrl, checksum, installedBy)` → Downloads JAR from source URL, verifies checksum, uploads to S3, parses manifest, updates DB, publishes `ModuleChangedEvent` to NATS
 - `uninstallModule(tenantId, moduleId)` → Updates DB status, publishes `ModuleChangedEvent` (UNINSTALLED). All pods react: deregister handlers, close ClassLoader. Originating pod deletes JAR from S3 after event is published.
 - `enableModule(tenantId, moduleId)` / `disableModule(tenantId, moduleId)` → Updates DB status, publishes `ModuleChangedEvent` (ENABLED/DISABLED). All pods react: load/unload ClassLoader, register/deregister handlers.
 - `loadModule(tenantId, moduleId)` → Downloads JAR from S3, loads via sandboxed ClassLoader, registers handlers locally (called by event listener)
@@ -1135,25 +1135,25 @@ Extend `ActionHandlerRegistry` to support tenant-scoped handlers:
 - `getTenantHandler(tenantId, actionKey)` → Checks tenant handlers first, then falls back to global
 - `removeTenantHandlers(tenantId, moduleId)`
 
-### 4.5 Kafka-Based Module Event Propagation
+### 4.5 NATS-based Module Event Propagation
 
-Module lifecycle events propagate to **all running worker pods** without process restarts, following the existing `CollectionConfigEventPublisher` → `CollectionSchemaListener` Kafka pattern.
+Module lifecycle events propagate to **all running worker pods** without process restarts, following the existing `CollectionConfigEventPublisher` → `CollectionSchemaListener` NATS pattern.
 
-**Kafka topic:** `kelta.config.module.changed`
+**NATS subject:** `kelta.config.module.changed`
 
-**New event payload (runtime-events):** `ModuleChangedPayload` — fields: `id`, `tenantId`, `moduleId`, `name`, `version`, `s3Key`, `moduleClass`, `manifest` (JSON), `changeType` (INSTALLED/ENABLED/DISABLED/UNINSTALLED). Uses `ConfigEvent<ModuleChangedPayload>` envelope via `EventFactory.createEvent()`. Kafka key: `tenantId:moduleId`.
+**New event payload (runtime-events):** `ModuleChangedPayload` — fields: `id`, `tenantId`, `moduleId`, `name`, `version`, `s3Key`, `moduleClass`, `manifest` (JSON), `changeType` (INSTALLED/ENABLED/DISABLED/UNINSTALLED). Uses `ConfigEvent<ModuleChangedPayload>` envelope via `EventFactory.createEvent()`. NATS key: `tenantId:moduleId`.
 
 **New classes:**
-- `ModuleConfigEventPublisher` (kelta-worker) — Publishes to `kelta.config.module.changed` after DB updates. Uses `KafkaTemplate<String, String>` + `ObjectMapper` (same pattern as `CollectionConfigEventPublisher`).
-- `ModuleEventListener` (kelta-worker) — `@KafkaListener` on `kelta.config.module.changed`. On INSTALLED/ENABLED: calls `runtimeModuleManager.loadModule()`. On DISABLED/UNINSTALLED: calls `runtimeModuleManager.unloadModule()`. S3 cleanup only by originating pod.
-- `ModuleConfigEventListener` (kelta-gateway) — `@KafkaListener` that invalidates `resourceDescriptorCache` so `GET /api/flows/resources` returns updated list.
+- `ModuleConfigEventPublisher` (kelta-worker) — Publishes to `kelta.config.module.changed` after DB updates. Uses `PlatformEventPublisher` + `ObjectMapper` (same pattern as `CollectionConfigEventPublisher`).
+- `ModuleEventListener` (kelta-worker) — `NATS subscription` on `kelta.config.module.changed`. On INSTALLED/ENABLED: calls `runtimeModuleManager.loadModule()`. On DISABLED/UNINSTALLED: calls `runtimeModuleManager.unloadModule()`. S3 cleanup only by originating pod.
+- `ModuleConfigEventListener` (kelta-gateway) — `NATS subscription` that invalidates `resourceDescriptorCache` so `GET /api/flows/resources` returns updated list.
 
 **Design constraints:**
-1. **Fan-out consumer groups:** Each pod uses unique group ID (`${kelta.worker.id}-modules`) so every pod receives every event
+1. **Fan-out queue groups:** Each pod uses unique group ID (`${kelta.worker.id}-modules`) so every pod receives every event
 2. **Idempotent operations:** `loadModule`/`unloadModule` are no-ops if already in target state
 3. **Thread safety:** `ConcurrentHashMap<String, Map<String, LoadedModule>>` (tenantId → moduleId → LoadedModule)
-4. **DB as source of truth:** On pod startup, loads from DB. Kafka only for real-time propagation.
-5. **Ordering:** Kafka key partitioning (`tenantId:moduleId`) ensures in-order processing per module
+4. **DB as source of truth:** On pod startup, loads from DB. NATS only for real-time propagation.
+5. **Ordering:** NATS key partitioning (`tenantId:moduleId`) ensures in-order processing per module
 6. **Cache invalidation:** Gateway invalidates resource descriptors so UI autocomplete stays current
 
 ### 4.6 Module REST API
@@ -1261,15 +1261,15 @@ When a runtime module is active, its action handlers appear in the Task resource
 - [ ] Pod startup module loading from S3 (database as source of truth)
 - [ ] `ModuleChangedPayload` event class (runtime-events)
 - [ ] `ModuleConfigEventPublisher` — publishes to `kelta.config.module.changed` topic
-- [ ] `ModuleEventListener` (kelta-worker) — Kafka listener that loads/unloads modules on each pod
-- [ ] `ModuleConfigEventListener` (kelta-gateway) — Kafka listener that invalidates resource descriptor cache
-- [ ] Fan-out consumer group pattern (each pod receives all module events)
+- [ ] `ModuleEventListener` (kelta-worker) — NATS listener that loads/unloads modules on each pod
+- [ ] `ModuleConfigEventListener` (kelta-gateway) — NATS listener that invalidates resource descriptor cache
+- [ ] Fan-out queue group pattern (each pod receives all module events)
 - [ ] Idempotent load/unload with ConcurrentHashMap-based module tracking
 - [ ] Audit logging for module events
 - [ ] Security tests (verify sandbox prevents forbidden operations)
-- [ ] Integration tests (install module → S3 upload → Kafka event → all pods load ClassLoader → execute flow using module handler)
+- [ ] Integration tests (install module → S3 upload → NATS event → all pods load ClassLoader → execute flow using module handler)
 - [ ] S3 integration test with MinIO (testcontainers)
-- [ ] Kafka event propagation test (verify multi-pod load/unload without restart)
+- [ ] NATS event propagation test (verify multi-pod load/unload without restart)
 
 ---
 
@@ -1310,7 +1310,7 @@ Shows a filterable list of all executions for the current flow:
 │ exec-abc1  │ ✓ Success │ Record upd │  5/5  │  1.2s    │ 2m ago  │
 │ exec-abc2  │ ✕ Failed  │ Record cre │  3/5  │  0.8s    │ 5m ago  │
 │ exec-abc3  │ ● Running │ API call   │  2/5  │  —       │ 12s ago │
-│ exec-abc4  │ ◷ Waiting │ Kafka msg  │  4/5  │  —       │ 1h ago  │
+│ exec-abc4  │ ◷ Waiting │ NATS msg  │  4/5  │  —       │ 1h ago  │
 │────────────────────────────────────────────────────────────────── │
 │ Click any row to open the visual debug view in a new tab         │
 └──────────────────────────────────────────────────────────────────┘
@@ -1342,7 +1342,7 @@ Horizontal bar at bottom: each step as colored segment proportional to duration 
 
 ### 5.5 Live Execution Tracking
 
-For running executions: auto-refresh as steps complete. Worker publishes `FlowStepCompletedEvent` to Kafka topic `kelta.flow.step.completed` on each transition. Gateway subscribes and pushes to UI via SSE at `GET /api/flows/executions/{executionId}/events`. Canvas animates: current node pulsates, completed nodes transition to green check.
+For running executions: auto-refresh as steps complete. Worker publishes `FlowStepCompletedEvent` to NATS subject `kelta.flow.step.completed` on each transition. Gateway subscribes and pushes to UI via SSE at `GET /api/flows/executions/{executionId}/events`. Canvas animates: current node pulsates, completed nodes transition to green check.
 
 ### 5.6 Failed Execution Management & Retry
 
@@ -1369,7 +1369,7 @@ Migration `V74__flow_execution_viewer_support.sql`: Add `parent_execution_id`, `
 - [ ] Audit Log tab in flow designer (chronological change history per flow)
 - [ ] Execution timeline component with click-to-select and scrubber
 - [ ] Live execution tracking via SSE
-- [ ] `kelta.flow.step.completed` Kafka topic and gateway SSE endpoint
+- [ ] `kelta.flow.step.completed` NATS subject and gateway SSE endpoint
 - [ ] Manual retry API endpoints (retry from beginning, retry from failed step)
 - [ ] Retry UI in execution viewer and executions tab
 - [ ] Failed execution dashboard (cross-flow view with bulk retry)
@@ -1429,7 +1429,7 @@ New metrics registered in `FlowMetricsConfig`:
 - "Test" button in FlowDesignerPage toolbar opens a test configuration sheet:
   - **For RECORD_TRIGGERED flows:** "Pick a test record" — searchable dropdown of records from the trigger collection. Selecting a record populates the test input with that record's data as the initial state. Also supports manual JSON entry.
   - **For SCHEDULED/AUTOLAUNCHED flows:** JSON editor with schema-based autocomplete for inputData.
-  - **For KAFKA_TRIGGERED flows:** JSON editor for simulated message payload with key/headers/body fields.
+  - **For NATS_TRIGGERED flows:** JSON editor for simulated message payload with key/headers/body fields.
   - Mock handler configuration panel: toggle per-Task to use real handler or mock response. For each mocked handler, JSON editor for the mock result.
 - Step-through controls (Next Step, Run to End, Reset) — displayed as a floating toolbar at the bottom of the canvas during test execution
 - **Test result display:** When test completes, automatically opens a Debug tab for the test execution. Test executions are visually distinguished (dashed border on debug tab, "TEST" badge). Test runs are hidden by default in the Executions tab (toggle "Show test runs" to see them).
@@ -1481,8 +1481,8 @@ ALTER TABLE flow ADD COLUMN published_version INTEGER;
 
 - Propagate trace context through flow execution. Each flow execution creates a root span; each step creates a child span with `state_type`, `resource`, `duration_ms`, and `status` attributes.
 - HTTP callout handler (`HTTP_CALLOUT`) injects trace headers into outbound requests.
-- Kafka publish handlers inject trace headers into outbound messages.
-- Inbound triggers (Kafka listener, webhook) extract trace context from incoming requests/messages if present.
+- NATS publish handlers inject trace headers into outbound messages.
+- Inbound triggers (NATS listener, webhook) extract trace context from incoming requests/messages if present.
 - Trace ID stored in `flow_execution` table for correlation with external systems.
 
 ### 6.6 Data Retention & Sensitivity
@@ -1542,7 +1542,7 @@ New page: **Flow Settings** — registered in the **Automation** category of Set
 
 **Dependencies tab:**
 - **Collection → Flow impact analysis:** Shows which flows are triggered by or reference each collection. When editing a collection's schema (adding/removing/renaming fields), a warning banner shows affected flows. Example: "3 flows reference field 'status' on collection 'orders': Order Processing, Status Notification, Daily Report."
-- **Flow → Flow dependencies:** Shows which flows invoke other flows (via AUTOLAUNCHED triggers or Kafka events). Visualized as a simple directed graph.
+- **Flow → Flow dependencies:** Shows which flows invoke other flows (via AUTOLAUNCHED triggers or NATS events). Visualized as a simple directed graph.
 - **Module → Flow dependencies:** Shows which flows use action handlers from each runtime module. Warning before disabling/uninstalling a module: "This module provides handlers used by 5 active flows."
 
 ### 6.9 Polish & UX

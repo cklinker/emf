@@ -8,7 +8,7 @@ Generic collection hosting worker for the Kelta platform. Owns database migratio
                     ┌──────────────────────────┐
                     │       kelta-worker         │
                     ├──────────────────────────┤
-  Kafka ──────────► │ CollectionSchemaListener │ ◄── schema change events
+  NATS ──────────► │ CollectionSchemaListener │ ◄── schema change events
                     │ WorkflowEventListener    │ ◄── record change events
                     ├──────────────────────────┤
   HTTP  ──────────► │ DynamicCollectionRouter  │ ◄── JSON:API CRUD for all collections
@@ -21,7 +21,7 @@ Generic collection hosting worker for the Kelta platform. Owns database migratio
                     ├──────────────────────────┤
                     │ PostgreSQL (Flyway)       │ ◄── 67 versioned migrations
                     │ Redis (rate limit counts) │
-                    │ Kafka (event publishing)  │
+                    │ NATS (event publishing)  │
                     │ S3 (optional attachments) │
                     └──────────────────────────┘
 ```
@@ -32,12 +32,12 @@ Generic collection hosting worker for the Kelta platform. Owns database migratio
 |---------|-------------|
 | `controller` | `InternalBootstrapController` (gateway bootstrap, tenants, OIDC, permissions), `GovernorLimitsController` |
 | `service` | `WorkerBootstrapService` (startup init), `CollectionLifecycleManager` (collection lifecycle), `S3StorageService` (attachment URLs) |
-| `listener` | `CollectionSchemaListener` (Kafka schema events), `WorkflowEventListener` (record change → workflow) |
-| `event` | `KafkaRecordEventPublisher` -- publishes record CRUD events to `kelta.record.changed` |
+| `listener` | `CollectionSchemaListener` (NATS schema events), `WorkflowEventListener` (record change → workflow) |
+| `event` | `NatsRecordEventPublisher` -- publishes record CRUD events to `kelta.record.changed` |
 | `workflow` | `ScheduledWorkflowExecutor` -- polls for due rules every 60s with optimistic locking |
 | `filter` | `RequestMetricsFilter` -- Prometheus metrics per collection (request count, duration, errors) |
 | `advice` | `AttachmentUrlEnricher` -- enriches JSON:API responses with presigned S3 download URLs |
-| `config` | Kafka, storage, metrics, workflow, and S3 configuration beans |
+| `config` | NATS, storage, metrics, workflow, and S3 configuration beans |
 
 ## Internal API Endpoints
 
@@ -64,7 +64,7 @@ spring.flyway:
   enabled: ${FLYWAY_ENABLED:true}
   baseline-on-migrate: true
 
-spring.kafka.bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+nats.url: ${NATS_URL:nats://localhost:4222}
 spring.data.redis:
   host: ${REDIS_HOST:localhost}
   port: ${REDIS_PORT:6379}
@@ -136,7 +136,7 @@ mvn verify -f kelta-worker/pom.xml -B
 
 ## Running Locally
 
-Requires PostgreSQL, Redis, and Kafka. Start infrastructure via Docker Compose from the repo root:
+Requires PostgreSQL, Redis, and NATS. Start infrastructure via Docker Compose from the repo root:
 
 ```bash
 docker-compose up -d
@@ -161,5 +161,5 @@ Multi-stage build: `maven:3.9-eclipse-temurin-21` (build) -> `eclipse-temurin:21
 
 - Java 21, Spring Boot 3.2.2
 - All `runtime-*` modules (core, events, jsonapi, module-core, module-integration, module-schema)
-- PostgreSQL + Flyway, Spring Kafka, Spring Data Redis
+- PostgreSQL + Flyway, NATS (jnats), Spring Data Redis
 - AWS SDK S3 (optional, for attachment presigned URLs)

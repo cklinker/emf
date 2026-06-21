@@ -110,8 +110,6 @@ management:
   health:
     redis:
       enabled: true
-    kafka:
-      enabled: false
   tracing:
     export:
       enabled: true

@@ -323,6 +323,39 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     }
 
     @Override
+    public List<Map<String, Object>> semanticSearch(CollectionDefinition definition,
+                                                     String vectorColumn,
+                                                     String queryVectorLiteral,
+                                                     int limit,
+                                                     List<FilterCondition> filters) {
+        TableRef tableRef = getTableRef(definition);
+        String vectorIdent = sanitizeIdentifier(vectorColumn);
+        List<Object> params = new ArrayList<>();
+
+        // Cosine distance (<=>) to the query vector; bound first so its '?' precedes any filter '?'.
+        StringBuilder sql = new StringBuilder("SELECT ");
+        sql.append(buildSelectClause(null, definition));
+        sql.append(", (").append(vectorIdent).append(" <=> CAST(? AS vector)) AS _distance");
+        params.add(queryVectorLiteral);
+        sql.append(" FROM ").append(tableRef.toSql());
+        sql.append(" WHERE ").append(vectorIdent).append(" IS NOT NULL");
+        if (filters != null && !filters.isEmpty()) {
+            sql.append(" AND ").append(buildWhereClause(filters, definition, params));
+        }
+        sql.append(" ORDER BY _distance ASC LIMIT ?");
+        params.add(limit);
+
+        try {
+            List<Map<String, Object>> data = jdbcTemplate.queryForList(sql.toString(), params.toArray());
+            remapColumnNames(definition, data);
+            reconstructCompanionColumns(definition, data);
+            return data;
+        } catch (DataAccessException e) {
+            throw new StorageException("Failed semantic search on collection: " + definition.name(), e);
+        }
+    }
+
+    @Override
     public Map<String, Object> aggregate(CollectionDefinition definition,
                                           List<FilterCondition> filters,
                                           List<AggregationSpec> specs) {

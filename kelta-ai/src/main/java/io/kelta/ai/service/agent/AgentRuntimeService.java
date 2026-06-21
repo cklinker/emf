@@ -46,15 +46,18 @@ public class AgentRuntimeService {
     private final ToolDispatcher toolDispatcher;
     private final TokenTrackingService tokenTrackingService;
     private final AgentExecutionService executionService;
+    private final PiiMaskingService piiMaskingService;
     private final ObjectMapper objectMapper;
 
     public AgentRuntimeService(AgentModelClient modelClient, ToolDispatcher toolDispatcher,
                                TokenTrackingService tokenTrackingService,
-                               AgentExecutionService executionService, ObjectMapper objectMapper) {
+                               AgentExecutionService executionService,
+                               PiiMaskingService piiMaskingService, ObjectMapper objectMapper) {
         this.modelClient = modelClient;
         this.toolDispatcher = toolDispatcher;
         this.tokenTrackingService = tokenTrackingService;
         this.executionService = executionService;
+        this.piiMaskingService = piiMaskingService;
         this.objectMapper = objectMapper;
     }
 
@@ -118,9 +121,11 @@ public class AgentRuntimeService {
                 }
                 DispatchResult result = toolDispatcher.dispatch(
                         tenantId, userId, call.id(), call.name(), call.input());
+                // Mask PII pulled from the platform before it reaches the model or the audit trail.
+                String maskedJson = piiMaskingService.mask(result.resultJson());
                 traces.add(new AgentToolTrace(call.name(), call.input(),
-                        result.resultJson(), result.isError(), true));
-                resultBlocks.add(toolResultBlock(result.toolUseId(), result.resultJson(), result.isError()));
+                        maskedJson, result.isError(), true));
+                resultBlocks.add(toolResultBlock(result.toolUseId(), maskedJson, result.isError()));
             }
             history.add(AgentMessage.user(resultBlocks));
 

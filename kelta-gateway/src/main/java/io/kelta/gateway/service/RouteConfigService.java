@@ -202,6 +202,9 @@ public class RouteConfigService {
                 {"superset", "/api/superset/**", "superset"},
                 {"bulk-jobs", "/api/bulk-jobs/**", "bulk-jobs"},
                 {"migration-runs", "/api/migration-runs/**", "migration-runs"},
+                // ALM & governance
+                {"metadata", "/api/metadata/**", "metadata"},
+                {"config-health", "/api/config-health/**", "config-health"},
                 // Developer tools & media
                 {"docs", "/api/docs/**", "docs"},
                 {"files", "/api/files/**", "files"},

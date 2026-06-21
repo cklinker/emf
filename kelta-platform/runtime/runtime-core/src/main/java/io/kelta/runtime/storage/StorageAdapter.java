@@ -97,7 +97,31 @@ public interface StorageAdapter {
     Map<String, Object> aggregate(CollectionDefinition definition,
                                    List<FilterCondition> filters,
                                    List<AggregationSpec> specs);
-    
+
+    /**
+     * Similarity search over a pgvector {@code VECTOR} column: returns the records whose vector is
+     * closest (by cosine distance, the {@code <=>} operator) to the supplied query vector, nearest
+     * first, each with an extra {@code _distance} entry.
+     *
+     * <p>Only rows with a non-null vector are considered. Optional {@code filters} narrow the set
+     * with the same semantics as {@link #query(CollectionDefinition, QueryRequest)}.
+     *
+     * @param definition         the collection definition
+     * @param vectorColumn       the physical column name of the {@code VECTOR} field
+     * @param queryVectorLiteral the query embedding as a pgvector literal ({@code [0.1,0.2,...]})
+     * @param limit              maximum rows to return
+     * @param filters            optional filter conditions (may be null/empty)
+     * @return matching records ordered nearest-first, each with a {@code _distance} value
+     * @throws UnsupportedOperationException if the adapter does not support vector search
+     */
+    default List<Map<String, Object>> semanticSearch(CollectionDefinition definition,
+                                                      String vectorColumn,
+                                                      String queryVectorLiteral,
+                                                      int limit,
+                                                      List<FilterCondition> filters) {
+        throw new UnsupportedOperationException("Vector search not supported by this storage adapter");
+    }
+
     /**
      * Gets a single record by its ID.
      * 

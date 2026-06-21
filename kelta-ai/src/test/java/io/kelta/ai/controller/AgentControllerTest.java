@@ -40,8 +40,11 @@ class AgentControllerTest {
     @Mock
     private AgentRuntimeService agentRuntimeService;
 
+    @Mock
+    private io.kelta.ai.service.agent.AgentExecutionService agentExecutionService;
+
     private AgentController controller() {
-        return new AgentController(agentService, agentRuntimeService);
+        return new AgentController(agentService, agentRuntimeService, agentExecutionService);
     }
 
     private static AgentDefinition sample(UUID id) {
@@ -163,6 +166,45 @@ class AgentControllerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("input");
         verifyNoInteractions(agentService, agentRuntimeService);
+    }
+
+    @Test
+    @DisplayName("POST run requires X-User-Id (principal for downstream authz)")
+    void runRequiresUser() {
+        UUID id = UUID.randomUUID();
+        assertThatThrownBy(() -> controller().run(TENANT, "  ", id, new AgentRunRequest("hello")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("X-User-Id");
+        verifyNoInteractions(agentService, agentRuntimeService);
+    }
+
+    @Test
+    @DisplayName("GET executions returns the audit trail for a known agent")
+    void executions() {
+        UUID id = UUID.randomUUID();
+        when(agentService.get(TENANT, id)).thenReturn(Optional.of(sample(id)));
+        when(agentExecutionService.list(TENANT, id, null)).thenReturn(List.of(
+                new io.kelta.ai.model.AgentExecution(UUID.randomUUID(), TENANT, id, "u", "in",
+                        "completed", List.of(), 5, 7, 1, "out", null, java.time.Instant.now())));
+
+        ResponseEntity<List<io.kelta.ai.model.AgentExecution>> response =
+                controller().executions(TENANT, id, null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("GET executions returns 404 for an unknown agent")
+    void executionsNotFound() {
+        UUID id = UUID.randomUUID();
+        when(agentService.get(TENANT, id)).thenReturn(Optional.empty());
+
+        ResponseEntity<List<io.kelta.ai.model.AgentExecution>> response =
+                controller().executions(TENANT, id, null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        verifyNoInteractions(agentExecutionService);
     }
 
     @Test

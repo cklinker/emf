@@ -40,6 +40,7 @@ at the bottom so reviewers can see what's already been addressed.
 ## Dependency Risks
 
 - Multiple BOM version overrides in worker POM increase transitive conflict risk (`kelta-worker/pom.xml`). Audit on every Spring Boot bump.
+- **Stale `spring-kafka` dependency retired** (Phase 0): `runtime-core/pom.xml` previously declared `spring-kafka`, `spring-kafka-test`, and `testcontainers-kafka` despite the platform using NATS JetStream exclusively. Removed; the misnamed `KafkaRecordEventPublisher` was renamed to `NatsRecordEventPublisher`. Remaining `Kafka`-worded comments across `kelta-worker`/`kelta-gateway`/`runtime` are cosmetic Kafka→NATS migration debt (the listeners are NATS, not Kafka) — slated for a separate doc-cleanup sweep.
 
 ## Postgres max_connections sizing
 

@@ -23,15 +23,15 @@ import org.springframework.stereotype.Component;
  * @since 1.0.0
  */
 @Component
-public class KafkaRecordEventPublisher implements RecordEventPublisher {
+public class NatsRecordEventPublisher implements RecordEventPublisher {
 
-    private static final Logger logger = LoggerFactory.getLogger(KafkaRecordEventPublisher.class);
+    private static final Logger logger = LoggerFactory.getLogger(NatsRecordEventPublisher.class);
 
     private static final String SUBJECT_PREFIX = "kelta.record.changed.";
 
     private final PlatformEventPublisher eventPublisher;
 
-    public KafkaRecordEventPublisher(PlatformEventPublisher eventPublisher) {
+    public NatsRecordEventPublisher(PlatformEventPublisher eventPublisher) {
         this.eventPublisher = eventPublisher;
     }
 

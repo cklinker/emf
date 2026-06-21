@@ -15,17 +15,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for {@link KafkaRecordEventPublisher}.
+ * Unit tests for {@link NatsRecordEventPublisher}.
  */
-class KafkaRecordEventPublisherTest {
+class NatsRecordEventPublisherTest {
 
     private PlatformEventPublisher eventPublisher;
-    private KafkaRecordEventPublisher publisher;
+    private NatsRecordEventPublisher publisher;
 
     @BeforeEach
     void setUp() {
         eventPublisher = mock(PlatformEventPublisher.class);
-        publisher = new KafkaRecordEventPublisher(eventPublisher);
+        publisher = new NatsRecordEventPublisher(eventPublisher);
     }
 
     @Test

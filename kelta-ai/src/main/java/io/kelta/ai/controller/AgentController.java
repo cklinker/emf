@@ -3,6 +3,10 @@ package io.kelta.ai.controller;
 import io.kelta.ai.model.AgentDefinition;
 import io.kelta.ai.service.AgentService;
 import io.kelta.ai.service.AgentUpsertRequest;
+import io.kelta.ai.service.agent.AgentExecutionException;
+import io.kelta.ai.service.agent.AgentRunRequest;
+import io.kelta.ai.service.agent.AgentRunResult;
+import io.kelta.ai.service.agent.AgentRuntimeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -15,9 +19,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * CRUD for governed agent definitions, scoped to the tenant from {@code X-Tenant-ID}. Routed through
- * the gateway's existing {@code /api/ai/**} static route. The orchestration runtime (slice 6b) runs
- * these agents; this controller manages their configuration only.
+ * CRUD and execution for governed agent definitions, scoped to the tenant from {@code X-Tenant-ID}.
+ * Routed through the gateway's existing {@code /api/ai/**} static route. {@code POST /{id}/run}
+ * drives the bounded tool-use loop via {@link AgentRuntimeService}.
  */
 @RestController
 @RequestMapping("/api/ai/agents")
@@ -26,9 +30,11 @@ public class AgentController {
     private static final Logger log = LoggerFactory.getLogger(AgentController.class);
 
     private final AgentService agentService;
+    private final AgentRuntimeService agentRuntimeService;
 
-    public AgentController(AgentService agentService) {
+    public AgentController(AgentService agentService, AgentRuntimeService agentRuntimeService) {
         this.agentService = agentService;
+        this.agentRuntimeService = agentRuntimeService;
     }
 
     @GetMapping
@@ -71,6 +77,24 @@ public class AgentController {
                 : ResponseEntity.notFound().build();
     }
 
+    @PostMapping("/{id}/run")
+    public ResponseEntity<AgentRunResult> run(@RequestHeader("X-Tenant-ID") String tenantId,
+                                              @RequestHeader(value = "X-User-Id", required = false) String userId,
+                                              @PathVariable UUID id,
+                                              @RequestBody AgentRunRequest request) {
+        if (request == null || request.input() == null || request.input().isBlank()) {
+            throw new IllegalArgumentException("'input' is required");
+        }
+        AgentDefinition agent = agentService.get(tenantId, id).orElse(null);
+        if (agent == null) {
+            return ResponseEntity.notFound().build();
+        }
+        AgentRunResult result = agentRuntimeService.run(tenantId, userId, agent, request.input());
+        log.info("Ran agent '{}' ({}) for tenant {}: {} iterations, {} tool calls",
+                agent.name(), id, tenantId, result.iterations(), result.toolCalls().size());
+        return ResponseEntity.ok(result);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -80,5 +104,13 @@ public class AgentController {
     public ResponseEntity<Map<String, Object>> handleDuplicate(DuplicateKeyException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("error", "An agent with that name already exists"));
+    }
+
+    @ExceptionHandler(AgentExecutionException.class)
+    public ResponseEntity<Map<String, Object>> handleExecution(AgentExecutionException e) {
+        HttpStatus status = e.reason() == AgentExecutionException.Reason.TOKEN_LIMIT_EXCEEDED
+                ? HttpStatus.TOO_MANY_REQUESTS
+                : HttpStatus.CONFLICT;
+        return ResponseEntity.status(status).body(Map.of("error", e.getMessage()));
     }
 }

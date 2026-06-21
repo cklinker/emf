@@ -37,8 +37,23 @@ public class AnthropicService {
 
     public MessageCreateParams.Builder buildRequest(String tenantId, String systemPrompt,
                                                       List<MessageParam> messages) {
-        String model = resolveModel(tenantId);
-        int maxTokens = resolveMaxTokens(tenantId);
+        return buildRequest(tenantId, systemPrompt, messages,
+                toolRegistry.toolDefinitions(), null, null);
+    }
+
+    /**
+     * Builds a request with an explicit tool set and optional model / max-token overrides — the
+     * entry point used by the governed agent runtime, which attaches only the agent's allowed tool
+     * subset and may pin a specific model/budget. {@code modelOverride}/{@code maxTokensOverride}
+     * fall back to the tenant resolution chain when null/blank/non-positive.
+     */
+    public MessageCreateParams.Builder buildRequest(String tenantId, String systemPrompt,
+                                                     List<MessageParam> messages, List<ToolUnion> tools,
+                                                     String modelOverride, Integer maxTokensOverride) {
+        String model = (modelOverride != null && !modelOverride.isBlank())
+                ? modelOverride : resolveModel(tenantId);
+        int maxTokens = (maxTokensOverride != null && maxTokensOverride > 0)
+                ? maxTokensOverride : resolveMaxTokens(tenantId);
 
         MessageCreateParams.Builder builder = MessageCreateParams.builder()
                 .model(model)
@@ -49,7 +64,7 @@ public class AnthropicService {
             builder.addMessage(msg);
         }
 
-        for (ToolUnion tool : toolRegistry.toolDefinitions()) {
+        for (ToolUnion tool : tools) {
             builder.addTool(tool);
         }
 

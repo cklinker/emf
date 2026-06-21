@@ -3,6 +3,10 @@ package io.kelta.ai.controller;
 import io.kelta.ai.model.AgentDefinition;
 import io.kelta.ai.service.AgentService;
 import io.kelta.ai.service.AgentUpsertRequest;
+import io.kelta.ai.service.agent.AgentExecutionException;
+import io.kelta.ai.service.agent.AgentRunRequest;
+import io.kelta.ai.service.agent.AgentRunResult;
+import io.kelta.ai.service.agent.AgentRuntimeService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,8 +22,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,8 +37,11 @@ class AgentControllerTest {
     @Mock
     private AgentService agentService;
 
+    @Mock
+    private AgentRuntimeService agentRuntimeService;
+
     private AgentController controller() {
-        return new AgentController(agentService);
+        return new AgentController(agentService, agentRuntimeService);
     }
 
     private static AgentDefinition sample(UUID id) {
@@ -116,5 +125,55 @@ class AgentControllerTest {
                 controller().handleDuplicate(new DuplicateKeyException("dup"));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody().get("error")).isEqualTo("An agent with that name already exists");
+    }
+
+    @Test
+    @DisplayName("POST run executes the agent and returns the result")
+    void run() {
+        UUID id = UUID.randomUUID();
+        AgentRunResult expected = new AgentRunResult("done", List.of(), 5, 7, 1, "end_turn", false, false);
+        when(agentService.get(TENANT, id)).thenReturn(Optional.of(sample(id)));
+        when(agentRuntimeService.run(eq(TENANT), eq("user-1"), any(), eq("hello"))).thenReturn(expected);
+
+        ResponseEntity<AgentRunResult> response =
+                controller().run(TENANT, "user-1", id, new AgentRunRequest("hello"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().finalText()).isEqualTo("done");
+    }
+
+    @Test
+    @DisplayName("POST run returns 404 for an unknown agent")
+    void runNotFound() {
+        UUID id = UUID.randomUUID();
+        when(agentService.get(TENANT, id)).thenReturn(Optional.empty());
+
+        ResponseEntity<AgentRunResult> response =
+                controller().run(TENANT, "user-1", id, new AgentRunRequest("hello"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        verifyNoInteractions(agentRuntimeService);
+    }
+
+    @Test
+    @DisplayName("POST run rejects blank input with 400")
+    void runBlankInput() {
+        UUID id = UUID.randomUUID();
+        assertThatThrownBy(() -> controller().run(TENANT, "user-1", id, new AgentRunRequest("  ")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("input");
+        verifyNoInteractions(agentService, agentRuntimeService);
+    }
+
+    @Test
+    @DisplayName("token-limit exception maps to 429, disabled maps to 409")
+    void executionErrors() {
+        ResponseEntity<Map<String, Object>> tooMany = controller().handleExecution(
+                new AgentExecutionException(AgentExecutionException.Reason.TOKEN_LIMIT_EXCEEDED, "limit"));
+        assertThat(tooMany.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+
+        ResponseEntity<Map<String, Object>> disabled = controller().handleExecution(
+                new AgentExecutionException(AgentExecutionException.Reason.AGENT_DISABLED, "off"));
+        assertThat(disabled.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 }

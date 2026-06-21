@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 
  * This registry is updated dynamically through:
  * - Initial bootstrap from the worker service
- * - Real-time Kafka events for configuration changes
+ * - Real-time NATS events for configuration changes
  */
 @Component
 public class RouteRegistry {

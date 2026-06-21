@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 /**
- * Kafka listener for module lifecycle change events.
+ * NATS listener for module lifecycle change events.
  * <p>
  * When a module is installed/enabled/disabled/uninstalled on any pod,
  * this listener receives the event and updates the local handler registry.

@@ -8,7 +8,7 @@ import java.util.Objects;
  * Payload for record change events (create, update, delete).
  *
  * <p>Carried inside a {@link PlatformEvent} envelope and published to the
- * {@code kelta.record.changed} Kafka topic, keyed by {@code tenantId:collectionName}.
+ * {@code kelta.record.changed} NATS subject, keyed by {@code tenantId:collectionName}.
  *
  * @since 1.0.0
  */

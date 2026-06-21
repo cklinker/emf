@@ -12,9 +12,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * <p>The worker service is a generic collection hosting service that:
  * <ul>
  *   <li>Loads all active collections from the control plane on startup</li>
- *   <li>Listens for collection schema changes via Kafka events</li>
+ *   <li>Listens for collection schema changes via NATS events</li>
  *   <li>Provides REST endpoints for all collections via DynamicCollectionRouter</li>
- *   <li>Executes workflow rules (after-save via Kafka, before-save in-process, scheduled via poll)</li>
+ *   <li>Executes workflow rules (after-save via NATS, before-save in-process, scheduled via poll)</li>
  * </ul>
  *
  * <p>Pod health is managed by Kubernetes (liveness/readiness probes).

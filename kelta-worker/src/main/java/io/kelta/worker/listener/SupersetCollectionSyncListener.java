@@ -7,7 +7,7 @@ import io.kelta.worker.service.SupersetDatasetService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 /**
- * Kafka listener that syncs Superset datasets when collections are
+ * NATS listener that syncs Superset datasets when collections are
  * created or updated.
  *
  * <p>Consumes from the {@code kelta.config.collection.changed} topic

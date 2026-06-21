@@ -91,7 +91,7 @@ public class ConfigEventListener {
     }
 
     /**
-     * Parses the CollectionChangedPayload from the raw Kafka message.
+     * Parses the CollectionChangedPayload from the raw NATS message.
      * Handles both PlatformEvent wrapper format and flat JSON format.
      */
     private CollectionChangedPayload parseCollectionPayload(String message) {
@@ -195,7 +195,7 @@ public class ConfigEventListener {
     }
 
     /**
-     * Parses the worker assignment payload from the raw Kafka message.
+     * Parses the worker assignment payload from the raw NATS message.
      * Handles both PlatformEvent wrapper format and flat JSON format.
      */
     private Map<String, Object> parseWorkerAssignmentPayload(String message) {

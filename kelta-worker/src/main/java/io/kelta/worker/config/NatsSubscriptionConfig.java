@@ -25,9 +25,9 @@ import org.springframework.context.annotation.Profile;
 /**
  * Registers all worker NATS subscriptions with the {@link NatsSubscriptionManager}.
  *
- * <p>Replaces the previous Kafka listener annotations with explicit NATS
- * subscription registrations, supporting both queue-group (load-balanced)
- * and broadcast (all-pods) delivery modes.
+ * <p>Uses explicit NATS subscription registrations (rather than annotation-driven
+ * listeners), supporting both queue-group (load-balanced) and broadcast (all-pods)
+ * delivery modes.
  *
  * @since 1.0.0
  */

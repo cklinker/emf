@@ -21,7 +21,7 @@ import java.util.Map;
  *
  * <p>There is no control plane dependency. The worker reads collection definitions
  * directly from the shared database. Runtime schema changes are handled by the
- * existing Kafka {@code collection-changed} listener.
+ * existing NATS {@code collection-changed} listener.
  *
  * @since 1.0.0
  */

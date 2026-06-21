@@ -334,7 +334,10 @@ even if requested); each tool then calls the worker carrying the **invoking user
 downstream — the agent never exceeds its caller's permissions. Every run, including
 refusals (disabled agent, exhausted monthly quota), is written to `ai_agent_execution`
 with its tool-call trace, token usage and status, surfaced at
-`GET /api/ai/agents/{id}/executions`.
+`GET /api/ai/agents/{id}/executions`. Tool results are passed through
+`PiiMaskingService` (email / SSN / 16-digit card / NANP phone → `[REDACTED_*]`)
+before they reach the model or the audit trail — platform data the agent pulls is
+masked; the caller's own prompt is not.
 
 **Embed-on-write.** A VECTOR field may also carry `fieldTypeConfig` key
 `"embeddingSource"` naming a text field on the same collection. The wildcard

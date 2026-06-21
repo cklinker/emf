@@ -49,7 +49,7 @@ class AgentRuntimeServiceTest {
 
     private AgentRuntimeService service() {
         return new AgentRuntimeService(modelClient, toolDispatcher, tokenTrackingService,
-                executionService, JsonMapper.builder().build());
+                executionService, new PiiMaskingService(), JsonMapper.builder().build());
     }
 
     private static AgentDefinition agent(List<String> tools) {
@@ -119,6 +119,23 @@ class AgentRuntimeServiceTest {
         verify(toolDispatcher, times(1)).dispatch(eq(TENANT), eq(USER), eq("t1"), eq("search"), any());
         verify(tokenTrackingService).recordUsage(TENANT, 10, 5);
         verify(tokenTrackingService).recordUsage(TENANT, 8, 4);
+    }
+
+    @Test
+    @DisplayName("PII in a tool result is masked in the trace (and what is fed back to the model)")
+    void masksPiiInToolResult() {
+        when(tokenTrackingService.isTokenLimitExceeded(TENANT)).thenReturn(false);
+        when(modelClient.nextTurn(any()))
+                .thenReturn(toolTurn("search", 10, 5))
+                .thenReturn(finalTurn("ok", 2, 1));
+        when(toolDispatcher.dispatch(eq(TENANT), eq(USER), eq("t1"), eq("search"), any()))
+                .thenReturn(DispatchResult.readResult("t1", "search",
+                        "{\"email\":\"jane.doe@example.com\"}", false));
+
+        AgentRunResult result = service().run(TENANT, USER, agent(List.of("search")), "go");
+
+        String traced = result.toolCalls().get(0).resultJson();
+        assertThat(traced).contains("[REDACTED_EMAIL]").doesNotContain("jane.doe@example.com");
     }
 
     @Test

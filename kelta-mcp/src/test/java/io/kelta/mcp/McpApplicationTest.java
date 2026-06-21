@@ -79,6 +79,7 @@ class McpApplicationTest {
                 "query_collection",
                 "get_record",
                 "search",
+                "semantic_search",
                 "describe_api",
                 "create_record",
                 "update_record",

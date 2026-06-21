@@ -44,6 +44,7 @@ ship a change that moves a row.
 | Integration | (see Complete) | **Script execution**: `ScriptExecutor` SPI is a no-op (no GraalVM/JS engine). Connected Apps: client-credentials works, full auth-code flow not |
 | Scheduled jobs | Flow-type cron triggers work | General `scheduled_jobs` dispatcher for SCRIPT / REPORT_EXPORT job types not built |
 | Page builder | Editor + runtime renderer + CRUD | `slug`/`published` fields missing from `ui-pages` system collection def; no server-side component resolution |
+| Semantic search / RAG | `EmbeddingService` SPI + dependency-free `HashingEmbeddingService` default (overridable via `@ConditionalOnMissingBean`); `VECTOR` field type maps to `vector(N)` | HNSW index emission, embed-on-write population, `POST /api/{collection}/semantic-search` + `semantic_search` MCP tool, governed agent runtime (next Rec 3 slices) |
 
 ## 🔴 UI Complete, backend MISSING (do not assume these work end-to-end)
 

@@ -452,6 +452,19 @@ Attach notes and files to any record in the system.
 
 ---
 
+### Metadata Dependency & Impact Analysis | Backend
+
+Answer "what breaks if I change this?" across a tenant's configuration before a delete or promotion.
+
+**Working:**
+- `MetadataDependencyService` builds a per-tenant dependency graph on demand from the live metadata — collections, fields (lookup / master-detail references), flows (collections + sub-flows referenced in the definition JSON), page layouts (collection, placed fields, related lists), validation rules, record types, list views, unique constraints, and profile object/field permissions. Each extractor is best-effort, so a single schema variance never fails the whole graph.
+- Impact API: `GET /api/metadata/impact?type=&id=&direction=dependents|dependencies` — `dependents` returns the transitive set that breaks if the node changes; `dependencies` returns what the node relies on. `GET /api/metadata/graph` returns the full nodes/edges plus detected cycles.
+- **Cycle detection** (Tarjan SCC) surfaces circular master-detail chains — reused by config-health governance.
+
+> **Next:** dependency-graph UI viewer (Phase 2) and diff-based deployment plans with conflict detection (Phase 2, on the existing Promotion/Environment controllers).
+
+---
+
 ### Page Builder | Partial
 
 A visual drag-and-drop page editor for building custom pages.

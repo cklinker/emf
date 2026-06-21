@@ -509,6 +509,17 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.EmbeddingOnWriteHook embeddingOnWriteHook(
+            BeforeSaveHookRegistry hookRegistry,
+            CollectionRegistry collectionRegistry,
+            io.kelta.runtime.embedding.EmbeddingService embeddingService) {
+        io.kelta.worker.listener.EmbeddingOnWriteHook hook =
+                new io.kelta.worker.listener.EmbeddingOnWriteHook(collectionRegistry, embeddingService);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public SubmitForApprovalActionHandler submitForApprovalActionHandler(
             ActionHandlerRegistry actionHandlerRegistry,
             ApprovalService approvalService,

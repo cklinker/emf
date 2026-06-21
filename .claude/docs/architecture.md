@@ -326,6 +326,17 @@ that the gateway stamps into `fieldTypeConfig`. Until pgvector is
 provisioned on a tenant DB, `CREATE TABLE` / `ALTER TABLE` for a VECTOR
 column will fail at execution time — there is no startup probe.
 
+**Embed-on-write.** A VECTOR field may also carry `fieldTypeConfig` key
+`"embeddingSource"` naming a text field on the same collection. The wildcard
+`EmbeddingOnWriteHook` (worker, before-save, order 120) then auto-populates the
+vector on create/update: it embeds the source text with the configured
+`EmbeddingService` and writes the pgvector literal. It is a no-op unless the
+source field is present in the payload (so partial updates that don't touch the
+source keep the existing vector), respects a caller-supplied vector (no
+overwrite), and skips with a warning if the field's `dimension` differs from the
+provider's `dimensions()`. Without `embeddingSource`, vectors must be written
+explicitly by the caller.
+
 ### Email template resolution — tenant override → system default
 
 System-level email templates are seeded under the sentinel `tenant_id = 'system'`

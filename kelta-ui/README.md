@@ -42,6 +42,31 @@ Admin and end-user UI for the Kelta platform. Built with React 19, TypeScript, V
 | `/search` | Global search |
 | `/p/:pageSlug` | Custom pages |
 
+## Adding an admin page
+
+There is **no central route/nav config object** — wiring is explicit:
+
+1. Create the page component in `src/pages/<Name>/`.
+2. Register the route in `src/App.tsx`: add a `React.lazy(...)` import and a `<Route>`
+   inside the tenant routes, wrapping the element in `<AdminPageRoute requiredPolicies={[...]}>`
+   (applies `ProtectedRoute` + policy guards) and/or `<RequirePermission permission="...">`.
+   Note the **different prop shapes**: `AdminPageRoute` takes `requiredPolicies?: string[]`,
+   `RequirePermission` takes `permission: string`. ⚠️ `RequirePermission` is a **soft** guard
+   (renders children while loading, hides only on a confirmed deny) — it is **not** the security
+   boundary. The backend endpoint must enforce the permission itself (`.claude/docs/playbooks.md` §2).
+3. **Nav/discoverability**: there is no sidebar array, and `Header` has no nav list. Surface
+   the page by adding an entry to the `defaultCommands` array in
+   `src/components/SearchModal/SearchModal.tsx` — shape `{ id, type: 'page', title, subtitle,
+   path }` (the `Cmd/Ctrl+K` palette).
+4. **Data**: collection data uses the hooks below. For a **non-collection / admin** endpoint
+   there is no generated hook — call `apiClient.get('/api/admin/...')`
+   (`src/services/apiClient.ts`) inside a TanStack `useQuery`. `apiClient` only auto-unwraps
+   standard `/api/{collection}` JSON:API; admin controllers often return a `single(...)`
+   envelope with rows under `attributes` — unwrap manually.
+
+Reuse `@kelta/components` (don't fork tables/filters/forms) and follow `DESIGN.md`. Full
+recipe incl. backend: `.claude/docs/playbooks.md` → "Add an admin UI page".
+
 ## Context Providers
 
 The app wraps routes in a provider hierarchy:

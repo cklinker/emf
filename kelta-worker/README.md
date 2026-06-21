@@ -19,7 +19,7 @@ Generic collection hosting worker for the Kelta platform. Owns database migratio
                     │ WorkflowEngine           │ ◄── rule evaluation + execution
                     │ ScheduledWorkflowExec    │ ◄── polls for due scheduled rules
                     ├──────────────────────────┤
-                    │ PostgreSQL (Flyway)       │ ◄── 67 versioned migrations
+                    │ PostgreSQL (Flyway)       │ ◄── 142 versioned migrations
                     │ Redis (rate limit counts) │
                     │ NATS (event publishing)  │
                     │ S3 (optional attachments) │
@@ -83,7 +83,7 @@ kelta:
 
 ## Database Migrations
 
-Flyway migrations are in `src/main/resources/db/migration/` (V1 through V67). Key migrations:
+Flyway migrations are in `src/main/resources/db/migration/` (V1 through V142). Key migrations:
 
 | Range | Content |
 |-------|---------|
@@ -96,7 +96,10 @@ Flyway migrations are in `src/main/resources/db/migration/` (V1 through V67). Ke
 | V50 | Demo data (ecommerce clothing store) |
 | V55 | Enhanced permission model |
 | V59-V62 | Workflow engine foundation |
-| V66-V67 | BaseEntity columns for junction/layout tables |
+| V66-V68 | Base entity / audit columns for junction, layout, and system tables |
+| V77-V86 | Row-level security and per-tenant table isolation |
+| V101-V113 | kelta-auth tables, OIDC federation, MFA (TOTP/SMS/push), personal access tokens |
+| V126-V142 | Credential vault, API spec library, layout rules, email templates, custom domains, auto-number sequences |
 
 ## Governor Limits
 
@@ -155,11 +158,21 @@ mvn verify -f kelta-worker/pom.xml -B
 
 ## Docker
 
-Multi-stage build: `maven:3.9-eclipse-temurin-21` (build) -> `eclipse-temurin:21-jre` (runtime). Runs as non-root user `kelta` on port 8080 with G1GC and 75% RAM allocation.
+**Production** (`Dockerfile`): multi-stage **GraalVM CE 25 native-image** build
+(`ghcr.io/graalvm/native-image-community:25-ol9` builder) → `debian:12-slim` runtime —
+**no JRE**, self-contained binary, ~50 ms startup. The native build bakes
+`kelta.storage.s3.enabled=true` at Spring AOT time so `S3StorageService` (and the
+attachment upload controller) are compiled into the binary; runtime `KELTA_S3_*` env vars
+still configure endpoint, bucket, and credentials. Runs as non-root `kelta` on port 8080.
+
+**CI / e2e** (`Dockerfile.jvm`): faster JVM build (`maven:3.9-eclipse-temurin-25` →
+`eclipse-temurin:25-jre-alpine`, `-XX:MaxRAMPercentage=75`). Used only for CI speed, never
+in production.
 
 ## Dependencies
 
-- Java 21, Spring Boot 3.2.2
+- Java 25, Spring Boot 4.0.5
 - All `runtime-*` modules (core, events, jsonapi, module-core, module-integration, module-schema)
 - PostgreSQL + Flyway, NATS (jnats), Spring Data Redis
+- Persistence via Java records + `JdbcTemplate` raw SQL (no Spring Data JPA)
 - AWS SDK S3 (optional, for attachment presigned URLs)

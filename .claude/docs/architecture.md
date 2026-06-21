@@ -44,16 +44,75 @@ Microservices + Event-Driven + Dynamic Configuration Platform. Multi-tenant with
 
 ## Gateway Filter Chain (ordered)
 
+Order values below are the live `getOrder()` returns from source (lower runs first):
+
 | Order | Filter | Purpose |
 |-------|--------|---------|
-| -250 | TenantSlugExtractionFilter | Extract tenant from URL |
-| -200 | TenantResolutionFilter | Resolve tenant ID |
+| -310 | CustomDomainFilter | Map custom domain → tenant |
+| -300 | TenantSlugExtractionFilter | Extract tenant slug from URL |
+| -200 | TenantResolutionFilter | Resolve slug → tenant ID |
+| -150 | IpRateLimitFilter | Per-IP rate limiting |
 | -100 | JwtAuthenticationFilter | Validate JWT |
-| 0 | DynamicRouteLocator | Match route from RouteRegistry |
-| — | RouteAuthorizationFilter | Cerbos permission check |
-| — | HeaderTransformationFilter | Add tenant headers for worker |
+| -99 | PatAuthenticationFilter | Validate PAT (`klt_`) as JWT alternative |
+| -50 | RateLimitFilter / UserIdentityResolutionFilter | Per-tenant rate limit; user identity |
+| 0 | RouteAuthorizationFilter | Cerbos object-level permission check (DynamicRouteLocator then forwards to worker) |
+| 50 | HeaderTransformationFilter | Inject `X-Tenant-*` headers for worker |
+| 100 | SecurityHeadersFilter | Response security headers |
+| 200 | SecurityAuditFilter | Record final response status |
 
-Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
+Cross-cutting (off main path): `ObservabilityContextFilter (-90)`, `HttpBodyCaptureFilter
+(-80)`, `SystemCollectionResponseCacheFilter (-10)`, `RequestLoggingFilter (MAX)`. `?include=`
+resolution is done by `IncludeResolver` (`jsonapi` package), not a numbered filter; read-side
+FLS is enforced in the worker (`CerbosFieldSecurityAdvice`), not the gateway.
+
+Key files: `kelta-gateway/src/main/java/io/kelta/gateway/{filter,auth,authz,ratelimit}/`
+
+### Authorizing a new endpoint (read before adding one)
+
+Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
+
+- **Collection API routes** (`/{tenant}/{collection}`): the gateway `RouteAuthorizationFilter`
+  (order 0) runs the per-resource Cerbos object check, and the worker
+  `CerbosRecordAuthorizationAdvice` + FLS advices add record/field checks.
+- **Static routes** (`/api/admin/**`, `/api/me/**`, `/api/_search/**`, `/api/metrics/**`):
+  `RouteAuthorizationFilter` **skips** ids starting `static-` — they get only the blanket
+  `API_ACCESS` system-permission check. The worker advices **exclude** `/api/admin/`. So a new
+  `/api/admin/...` endpoint is, by default, reachable by **any** authenticated user with API
+  access. To put a *specific* permission on it, **enforce it inside the controller/service**
+  (see "Worker-side system-permission check" below — inject `CerbosPermissionResolver` and
+  check `profile_system_permission`).
+- **New top-level path**: a brand-new `/api/<x>/**` segment must be registered as a static
+  route in `kelta-gateway/.../service/RouteConfigService.registerStaticRoutes()` (and
+  `config/RouteInitializer.registerStaticRoutes()`) or the gateway returns **404**. Sub-paths
+  under an existing segment need no new route.
+
+**Worker-side system-permission check — how (use the existing pattern, don't reinvent):**
+- Enforce a specific system permission **in the controller/service** with a DB lookup against
+  `profile_system_permission` (`profile_id`, `permission_name`, `granted = true`). The reusable
+  callable building block is `BootstrapRepository.findProfileSystemPermissions(profileId)` (also
+  used by `UserPermissionsController`); `SupersetGuestTokenService.hasSystemPermission` shows the
+  same query inline but is `private` — copy the pattern, don't call it. On deny, throw
+  `ResponseStatusException(HttpStatus.FORBIDDEN, …)` (existing admin controllers tend to *degrade*
+  on missing identity rather than hard-deny, so write the explicit deny yourself). The worker
+  does **not** make a Cerbos call for system permissions — Cerbos `system_feature` policies back
+  the *gateway's* blanket `API_ACCESS` check; per-endpoint admin gating is the DB check above.
+- Identity: inject **`CerbosPermissionResolver`** and read `getProfileId(request)`,
+  `getEmail(request)`, `getProfileName(request)`, `getTenantId(request)`, `hasIdentity(request)`.
+  The gateway's `RouteAuthorizationFilter.forwardWithHeaders` sets `X-User-Profile-Id`,
+  `X-User-Email`, `X-User-Profile-Name`, `X-Cerbos-Scope` on **every** forwarded request —
+  including `/api/admin/**` — so `profileId` **is** available; don't re-resolve it.
+- Permission **names** are `profile_system_permission.permission_name` values; the canonical
+  catalog lives in the frontend `SystemPermissionChecklist.tsx` (`VIEW_SETUP`, `MANAGE_USERS`,
+  `API_ACCESS`, `VIEW_ALL_DATA`, …) — no Java enum. A new permission only gates once it is
+  granted on the relevant profiles (rows in `profile_system_permission`).
+
+### Tenant context in the worker
+
+Per-request tenant is **already bound** by `kelta-worker/.../filter/TenantContextFilter` from
+the gateway's `X-Tenant-ID` / `X-Tenant-Slug` headers (as `ScopedValue`s). In a worker
+controller, **read** `TenantContext` (or accept `@RequestHeader("X-Tenant-ID")`) — do **not**
+call `TenantContext.runWithTenant(...)` on a request path; that's for background / cross-tenant
+jobs. RLS then scopes every query automatically.
 
 ## Worker Layers
 
@@ -81,7 +140,7 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 
 ### Component layering — admin app vs. plugin library
 
-`kelta-ui/app/src/components/` and `kelta-web/packages/components/src/` have grown overlapping families of components (data tables, filter builders, field renderers, forms). The consolidation strategy — which variant becomes the base, what features fold in, dependency order, and breaking-change risk for the public `@kelta/components` plugin API — is tracked in `.claude/docs/ui-consolidation-plan.md`. Consult that document before adding a new shared list/form/filter component on either side; reuse a unified component or extend it rather than forking a new variant.
+`kelta-ui/app/src/components/` and `kelta-web/packages/components/src/` have grown overlapping families of components (data tables, filter builders, field renderers, forms). The rule (see `conventions.md` → Component reuse): **reuse the unified `@kelta/components` variant or extend it — never fork a new app-side variant.** This protects the public `@kelta/components` plugin API. Consult `conventions.md` before adding a new shared list/form/filter component on either side.
 
 ## Data Flow
 
@@ -352,9 +411,11 @@ that user-facing config to the `scheduled_job` table (which the
 
 ## CI/CD
 
-- **PR checks** (`.github/workflows/ci.yml`): test-java (build runtime + test gateway, worker) + test-frontend → quality-gate
-- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): test → build-and-push (gateway, worker, UI images) → deploy → smoke-test
-- Custom K8s runner for CI
+Canonical detail: [`ci-cd.md`](ci-cd.md). Summary:
+
+- **PR checks** (`.github/workflows/ci.yml`): change-detection → test-java (build runtime + test gateway, worker, auth, ai, mcp) + test-frontend + integration-tests (Testcontainers) + e2e (Playwright) → quality-gate.
+- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): test → build-and-push to `harbor.rzware.com/emf/emf-*` (gateway, worker, worker-migrate, auth, ui, ai, mcp) → deploy (kustomize → ArgoCD) → smoke-test → auto-rollback on failure → post-deploy e2e.
+- Custom self-hosted K8s runner for CI.
 
 ## Kubernetes
 

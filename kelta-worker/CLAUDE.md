@@ -82,8 +82,10 @@ ls kelta-worker/src/main/resources/db/migration | sort -V | tail -3
 2. Create or update a service class in `service/`
 3. If it needs persistence, add methods to existing repository or create new `@Repository` with `JdbcTemplate`
 4. Add a test: `src/test/java/io/kelta/worker/controller/MyControllerTest.java`
+5. **Tenant context** is pre-bound per request by `filter/TenantContextFilter` from the gateway's `X-Tenant-ID` / `X-Tenant-Slug` headers — **read** `TenantContext` (or `@RequestHeader("X-Tenant-ID")`); do **not** call `runWithTenant` on a request path. RLS scopes queries automatically.
+6. **Authorization**: `/api/admin/**` (and other `static-*` routes) are **not** covered by per-resource Cerbos — they get only the blanket `API_ACCESS` check, and the worker advices exclude `/api/admin/`. Enforce a specific permission **in the controller/service**. A new top-level `/api/<x>/**` segment needs a gateway static route (`RouteConfigService.registerStaticRoutes()`) or it 404s. See `.claude/docs/architecture.md` → Authorizing a new endpoint.
 
-**Reference**: `ModuleController.java` + `ScimUserControllerTest.java`
+**Reference**: `ModuleController.java` + `ScimUserControllerTest.java`. Full recipe: `.claude/docs/playbooks.md` → "Add a worker REST endpoint".
 
 ## When Adding a BeforeSaveHook
 
@@ -93,6 +95,14 @@ ls kelta-worker/src/main/resources/db/migration | sort -V | tail -3
 4. If other pods need to react, register a handler in `NatsSubscriptionConfig`
 
 **Reference**: `CollectionConfigEventPublisher.java`, `ValidationRuleRefreshHook.java`
+
+## When Adding a System Collection
+
+1. Declare it in `runtime-core/.../model/system/SystemCollectionDefinitions.java` — add a `<name>()` factory via the `systemBuilder(name, displayName, tableName)` helper, then add it to `all()`.
+2. The worker does **NOT** create system tables (Flyway owns them) — ship `src/main/resources/db/migration/V<n>__create_<table>.sql` **and** add the table to the RLS-enable migration (V77-style, table names hardcoded).
+3. Register a `<Name>RefreshHook` `@Bean` in `config/FlowConfig.java` via `hookRegistry.register(hook)` that publishes `kelta.config.collection.changed.<id>` (reuse `CollectionConfigEventPublisher.SUBJECT_PREFIX`).
+
+**Reference**: `ValidationRuleRefreshHook.java`. Full recipe: `.claude/docs/playbooks.md` → "Add a system collection".
 
 ## Reference Implementations
 

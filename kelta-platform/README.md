@@ -19,7 +19,7 @@ kelta-platform/runtime/
 The foundational library providing dynamic, runtime-configurable collection management.
 
 **Key capabilities:**
-- **Collection model** -- `CollectionDefinition`, `FieldDefinition`, `FieldType` (26 types), `ValidationRules`, `ReferenceConfig`
+- **Collection model** -- `CollectionDefinition`, `FieldDefinition`, `FieldType` (28 types), `ValidationRules`, `ReferenceConfig`
 - **Registry** -- Thread-safe `ConcurrentCollectionRegistry` with copy-on-write semantics and change listeners
 - **Storage** -- `StorageAdapter` interface with two implementations:
   - `PhysicalTableStorageAdapter` (Mode A) -- real database tables per collection
@@ -43,8 +43,7 @@ The foundational library providing dynamic, runtime-configurable collection mana
 
 Shared NATS event classes used across Kelta services.
 
-- `ConfigEvent<T>` -- Generic base event for configuration changes
-- `RecordChangeEvent` -- Record-level lifecycle events
+- `PlatformEvent<T>` -- Generic envelope event for configuration and record changes
 - `ChangeType` -- Event type enumeration (CREATE, UPDATE, DELETE)
 - `EventFactory` -- Event creation helper
 
@@ -110,8 +109,8 @@ mvn clean install -DskipTests -f kelta-platform/pom.xml \
 
 ## Tech Stack
 
-- Java 21
-- Spring Boot 3.2.2
+- Java 25
+- Spring Boot 4.0.5, Spring Cloud 2025.1.1
 - NATS (jnats), Spring Data Redis, Spring Data JDBC
 - PostgreSQL, Jackson
 - Mockito 5.21, Testcontainers 1.19.3, jqwik 1.8.2

@@ -164,7 +164,7 @@ MCP tools (`query_collection`, `list_picklists`, `list_approvals`) take flat `pa
 ### Component reuse (kelta-ui/app and kelta-web)
 
 - Do not add a new shared list/table/filter/form component in `kelta-ui/app/src/components/` if one already exists for the same purpose in either `kelta-ui/app/` or `kelta-web/packages/components/`. Reuse or extend the existing one.
-- The unification target for these families (DataTable, FilterBuilder, FieldRenderer, ResourceForm, RelatedList) is the library variant under `@kelta/components`. App-side variants are being collapsed into thin re-exports — see `.claude/docs/ui-consolidation-plan.md` for the current state and migration order.
+- The unification target for these families (DataTable, FilterBuilder, FieldRenderer, ResourceForm, RelatedList) is the library variant under `@kelta/components`. **Reuse that variant or extend it — never fork a new app-side variant.** App-side variants are being collapsed into thin re-exports of `@kelta/components`.
 - `@kelta/components` is a public plugin surface. Breaking changes to its exported props need a deprecation window (additive props, `legacy*` flags) — never a hard cutover.
 
 ## MCP tools (kelta-mcp)

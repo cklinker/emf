@@ -10,7 +10,7 @@ at the bottom so reviewers can see what's already been addressed.
 **Network-level defense-in-depth** (out of tree):
 - Worker, auth, ai pods reachable only via gateway in production. Pod-to-pod
   bypass mitigated by K8s NetworkPolicy + service-mesh mTLS, not by app code.
-  Verify on cluster: `kubectl get networkpolicy -n emf`.
+  Verify on cluster: `kubectl get networkpolicy -n kelta`.
 
 ## Known Bugs
 
@@ -31,6 +31,7 @@ at the bottom so reviewers can see what's already been addressed.
 - Hardcoded `emf_control_plane` DB name in `SupersetDatabaseUserService.java` (line 78) — env-driven via `kelta.worker.superset.database-name` default; cleanup is cosmetic.
 - Potential N+1 in `SearchIndexService.java` during reindex (per-collection queries) — harmless under normal load; matters at >1k collections.
 - **Email templates have two parallel lookup axes** — `EmailRepository.findTemplateByKey` resolves by the stable `template_key` column (V133 seeded eight `user.*` defaults); `findTemplateByName` resolves by the human-friendly `name` column (V141 seeded `password_reset`, `user_invite`, `welcome`). Both implement the same tenant-override → `'system'`-sentinel fallback, so callers picking the "wrong" axis still work but may land on a different seed row than intended. Pick one canonical axis once the calling code settles, and drop the unused seed set.
+- **Stale `workflow_action_type` catalog rows** — the `workflow_action_type` table is a **display-only catalog**; its `handler_class` column is never read by Java (flow execution dispatches via `ActionHandlerRegistry`, populated by the compile-time modules). Its seed rows still carry dead `com.emf.controlplane.*` class names and describe `PUBLISH_EVENT` as a "Kafka event" despite Kafka being fully removed. Cosmetic, but misleads anyone reading the table — re-seed accurately or drop `handler_class`.
 
 ## Fragile Areas
 
@@ -87,6 +88,7 @@ Regression guard: `TenantAwareDataSourceTest` asserts tenant connections use tra
 - SQL filter operator mappings in `PhysicalTableStorageAdapter` — no tests.
 - Federated user provisioning (`FederatedUserMapper`) — happy path only; group→profile mapping permutations not covered.
 - Password reset workflow — change/request/reset all unit-tested; full end-to-end (DB → email → reset link → new password) not.
+- `CreateValidationRuleTool` (kelta-mcp) has no `CreateValidationRuleToolTest`, unlike its sibling admin tools — every MCP tool should assert its on-the-wire JSON:API body with WireMock JSON-path matchers.
 
 ---
 

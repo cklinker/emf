@@ -26,7 +26,8 @@ services:
   # ═══════════════════════════════════════════════════════════════════════════
 
   postgres:
-    image: harbor.rzware.com/dockerhub-cache/library/postgres:15-alpine
+    # pgvector-enabled Postgres 15 (adds the `vector` extension for VECTOR fields / semantic search)
+    image: harbor.rzware.com/dockerhub-cache/pgvector/pgvector:pg15
     container_name: kelta-postgres
     restart: unless-stopped
     environment:

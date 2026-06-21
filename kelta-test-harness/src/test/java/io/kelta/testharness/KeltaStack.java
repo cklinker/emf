@@ -81,7 +81,8 @@ public final class KeltaStack {
     @SuppressWarnings("resource")
     public static final PostgreSQLContainer<?> POSTGRES = DB_CONFIG.external()
             ? null
-            : new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+            : new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg15")
+                    .asCompatibleSubstituteFor("postgres"))
                     .withNetworkAliases("postgres")
                     .withNetwork(NETWORK)
                     .withDatabaseName("kelta_control_plane")

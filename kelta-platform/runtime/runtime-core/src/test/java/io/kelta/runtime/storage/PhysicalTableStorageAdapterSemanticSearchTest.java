@@ -82,4 +82,17 @@ class PhysicalTableStorageAdapterSemanticSearchTest {
                 "CREATE INDEX IF NOT EXISTS hnsw_docs_embedding ON public.docs"
                         + " USING hnsw (embedding vector_cosine_ops)");
     }
+
+    @Test
+    @DisplayName("casts placeholders: ?::vector for VECTOR, ?::jsonb for JSON/ARRAY, ? otherwise")
+    void castPlaceholders() {
+        assertThat(PhysicalTableStorageAdapter.castPlaceholder(io.kelta.runtime.model.FieldType.VECTOR))
+                .isEqualTo("?::vector");
+        assertThat(PhysicalTableStorageAdapter.castPlaceholder(io.kelta.runtime.model.FieldType.JSON))
+                .isEqualTo("?::jsonb");
+        assertThat(PhysicalTableStorageAdapter.castPlaceholder(io.kelta.runtime.model.FieldType.ARRAY))
+                .isEqualTo("?::jsonb");
+        assertThat(PhysicalTableStorageAdapter.castPlaceholder(io.kelta.runtime.model.FieldType.STRING))
+                .isEqualTo("?");
+    }
 }

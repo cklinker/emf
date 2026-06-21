@@ -119,6 +119,10 @@ export type { UserDetailPageProps } from './UserDetailPage'
 export { PicklistsPage } from './PicklistsPage'
 export type { PicklistsPageProps } from './PicklistsPage'
 
+// AiAgentsPage - Governed AI agents management page
+export { AiAgentsPage } from './AiAgentsPage'
+export type { AiAgentsPageProps } from './AiAgentsPage'
+
 // HomePage - User-centric landing page
 export { HomePage } from './HomePage'
 export type { HomePageProps } from './HomePage'

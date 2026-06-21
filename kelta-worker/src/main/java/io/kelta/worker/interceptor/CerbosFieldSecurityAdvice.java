@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Strips fields from API responses based on Cerbos field-level security.
@@ -87,79 +86,32 @@ public class CerbosFieldSecurityAdvice implements ResponseBodyAdvice<Object> {
         String tenantId = permissionResolver.getTenantId(httpRequest);
         String collectionId = extractCollectionId(path);
 
+        // Primary data: one batched Cerbos check per collection, then strip denied
+        // fields from both attributes and to-one relationship linkage.
         if (data instanceof List<?> records) {
-            // Collect all unique field IDs across all records, then check once.
-            // Field permissions depend only on profile + collection, not record data,
-            // so one Cerbos call covers the entire response.
-            Set<String> allFieldIds = new LinkedHashSet<>();
-            List<Map<String, Object>> typedRecords = new ArrayList<>();
-            for (Object record : records) {
-                if (record instanceof Map<?, ?> recordMap) {
-                    Map<String, Object> typed = (Map<String, Object>) recordMap;
-                    typedRecords.add(typed);
-                    Object attrObj = typed.get("attributes");
-                    if (attrObj instanceof Map<?, ?> attrMap) {
-                        for (Object key : attrMap.keySet()) {
-                            if (key instanceof String fieldId && !isSystemField(fieldId)) {
-                                allFieldIds.add(fieldId);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!allFieldIds.isEmpty()) {
-                List<String> allowedFields = authzService.batchCheckFieldAccess(
-                        email, profileId, tenantId, collectionId,
-                        new ArrayList<>(allFieldIds), "read");
-                Set<String> allowedSet = new HashSet<>(allowedFields);
-
-                for (Map<String, Object> typedRecord : typedRecords) {
-                    stripFieldsUsing(allowedSet, typedRecord);
-                }
-            }
+            stripCollection(email, profileId, tenantId, collectionId, toTypedRecords(records));
         } else if (data instanceof Map<?, ?> singleRecord) {
-            stripHiddenFields(email, profileId, tenantId, collectionId,
-                    (Map<String, Object>) singleRecord);
+            stripCollection(email, profileId, tenantId, collectionId,
+                    List.of((Map<String, Object>) singleRecord));
         }
 
-        // Also process included resources — group by type for one check per type
+        // Included resources — JSON:API flattens every included resource (at any
+        // relationship depth) into this one array, so grouping by type and checking
+        // once per type covers all of them.
         Object included = responseBody.get("included");
         if (included instanceof List<?> includedList) {
             Map<String, List<Map<String, Object>>> byType = new LinkedHashMap<>();
-            Map<String, Set<String>> fieldsByType = new LinkedHashMap<>();
-
             for (Object item : includedList) {
                 if (item instanceof Map<?, ?> includedRecord) {
                     Map<String, Object> typed = (Map<String, Object>) includedRecord;
                     String includedType = (String) typed.get("type");
                     if (includedType != null) {
                         byType.computeIfAbsent(includedType, k -> new ArrayList<>()).add(typed);
-                        Object attrObj = typed.get("attributes");
-                        if (attrObj instanceof Map<?, ?> attrMap) {
-                            Set<String> fields = fieldsByType.computeIfAbsent(includedType, k -> new LinkedHashSet<>());
-                            for (Object key : attrMap.keySet()) {
-                                if (key instanceof String fieldId && !isSystemField(fieldId)) {
-                                    fields.add(fieldId);
-                                }
-                            }
-                        }
                     }
                 }
             }
-
             for (Map.Entry<String, List<Map<String, Object>>> entry : byType.entrySet()) {
-                String type = entry.getKey();
-                Set<String> fields = fieldsByType.getOrDefault(type, Set.of());
-                if (!fields.isEmpty()) {
-                    List<String> allowed = authzService.batchCheckFieldAccess(
-                            email, profileId, tenantId, type,
-                            new ArrayList<>(fields), "read");
-                    Set<String> allowedSet = new HashSet<>(allowed);
-                    for (Map<String, Object> rec : entry.getValue()) {
-                        stripFieldsUsing(allowedSet, rec);
-                    }
-                }
+                stripCollection(email, profileId, tenantId, entry.getKey(), entry.getValue());
             }
         }
 
@@ -167,63 +119,112 @@ public class CerbosFieldSecurityAdvice implements ResponseBodyAdvice<Object> {
     }
 
     @SuppressWarnings("unchecked")
-    private void stripHiddenFields(String email, String profileId, String tenantId,
-                                    String collectionId, Map<String, Object> record) {
+    private List<Map<String, Object>> toTypedRecords(List<?> records) {
+        List<Map<String, Object>> typed = new ArrayList<>();
+        for (Object record : records) {
+            if (record instanceof Map<?, ?> recordMap) {
+                typed.add((Map<String, Object>) recordMap);
+            }
+        }
+        return typed;
+    }
+
+    /**
+     * Checks read access for every field that appears across {@code records} (one batched
+     * Cerbos call, since field permissions depend only on profile + collection, not record
+     * data) and removes denied fields from each record's {@code attributes} and to-one
+     * {@code relationships} linkage.
+     */
+    private void stripCollection(String email, String profileId, String tenantId,
+                                  String collectionId, List<Map<String, Object>> records) {
+        Set<String> fieldIds = new LinkedHashSet<>();
+        for (Map<String, Object> record : records) {
+            collectCheckableFieldIds(record, fieldIds);
+        }
+        if (fieldIds.isEmpty()) {
+            return;
+        }
+
+        List<String> allowed = authzService.batchCheckFieldAccess(
+                email, profileId, tenantId, collectionId, new ArrayList<>(fieldIds), "read");
+        Set<String> allowedSet = new HashSet<>(allowed);
+
+        if (log.isDebugEnabled() && allowedSet.size() < fieldIds.size()) {
+            log.debug("Field security: {}/{} fields allowed for {} (user={})",
+                    allowedSet.size(), fieldIds.size(), collectionId, email);
+        }
+
+        for (Map<String, Object> record : records) {
+            stripDenied(allowedSet, record);
+        }
+    }
+
+    /**
+     * Collects the non-system field ids that are subject to a field-access check: every key in
+     * {@code attributes}, plus every <em>to-one</em> relationship key (lookup / master-detail
+     * fields are serialized into {@code relationships}, not {@code attributes}). Has-many inverse
+     * relationships (added by {@code ?include=}) are not collection fields and are left alone.
+     */
+    private void collectCheckableFieldIds(Map<String, Object> record, Set<String> out) {
         Object attrObj = record.get("attributes");
-        if (!(attrObj instanceof Map<?, ?> attrMap)) {
-            return;
+        if (attrObj instanceof Map<?, ?> attrMap) {
+            for (Object key : attrMap.keySet()) {
+                if (key instanceof String fieldId && !isSystemField(fieldId)) {
+                    out.add(fieldId);
+                }
+            }
         }
-
-        Map<String, Object> attributes = (Map<String, Object>) attrMap;
-
-        // Collect non-system fields to check
-        List<String> fieldsToCheck = attributes.keySet().stream()
-                .filter(fieldId -> !isSystemField(fieldId))
-                .toList();
-
-        if (fieldsToCheck.isEmpty()) {
-            return;
-        }
-
-        // Single batched Cerbos call for all fields
-        List<String> allowedFields = authzService.batchCheckFieldAccess(
-                email, profileId, tenantId, collectionId, fieldsToCheck, "read");
-
-        Set<String> allowedSet = new HashSet<>(allowedFields);
-        List<String> fieldsToRemove = fieldsToCheck.stream()
-                .filter(f -> !allowedSet.contains(f))
-                .toList();
-
-        if (!fieldsToRemove.isEmpty()) {
-            log.debug("Stripping {} hidden fields from {} for user={}",
-                    fieldsToRemove.size(), collectionId, email);
-            for (String field : fieldsToRemove) {
-                attributes.remove(field);
+        Object relObj = record.get("relationships");
+        if (relObj instanceof Map<?, ?> relMap) {
+            for (Map.Entry<?, ?> entry : relMap.entrySet()) {
+                if (entry.getKey() instanceof String fieldId && !isSystemField(fieldId)
+                        && isToOneRelationship(entry.getValue())) {
+                    out.add(fieldId);
+                }
             }
         }
     }
 
     /**
-     * Strips fields from a record using a pre-computed allowed set.
-     * Used for list responses where field access is checked once for all records.
+     * Removes every denied (non-system) field from a record's {@code attributes} and its to-one
+     * {@code relationships} linkage. A hidden lookup / master-detail field would otherwise leak
+     * the related record's id through {@code relationships}, since the router serializes
+     * relationship fields there rather than in {@code attributes}.
      */
     @SuppressWarnings("unchecked")
-    private void stripFieldsUsing(Set<String> allowedFields, Map<String, Object> record) {
+    private void stripDenied(Set<String> allowedFields, Map<String, Object> record) {
         Object attrObj = record.get("attributes");
-        if (!(attrObj instanceof Map<?, ?> attrMap)) {
-            return;
+        if (attrObj instanceof Map<?, ?> attrMap) {
+            ((Map<String, Object>) attrMap).keySet().removeIf(
+                    key -> key instanceof String f && !isSystemField(f) && !allowedFields.contains(f));
         }
 
-        Map<String, Object> attributes = (Map<String, Object>) attrMap;
-        List<String> fieldsToRemove = attributes.keySet().stream()
-                .filter(f -> !isSystemField(f) && !allowedFields.contains(f))
-                .toList();
-
-        if (!fieldsToRemove.isEmpty()) {
-            for (String field : fieldsToRemove) {
-                attributes.remove(field);
+        Object relObj = record.get("relationships");
+        if (relObj instanceof Map<?, ?> relMapRaw) {
+            Map<String, Object> relationships = (Map<String, Object>) relMapRaw;
+            relationships.entrySet().removeIf(entry ->
+                    entry.getKey() instanceof String f
+                            && !isSystemField(f)
+                            && isToOneRelationship(entry.getValue())
+                            && !allowedFields.contains(f));
+            if (relationships.isEmpty()) {
+                record.remove("relationships");
             }
         }
+    }
+
+    /**
+     * A to-one relationship (lookup / master-detail field) is serialized as
+     * {@code {"data": {"type": ..., "id": ...}}}, or {@code {"data": null}} for an empty FK.
+     * Has-many inverse relationships serialize {@code data} as a list and must not be treated
+     * as collection fields.
+     */
+    private boolean isToOneRelationship(Object relValue) {
+        if (!(relValue instanceof Map<?, ?> relMap) || !relMap.containsKey("data")) {
+            return false;
+        }
+        Object relData = relMap.get("data");
+        return relData == null || relData instanceof Map;
     }
 
     private boolean isSystemField(String fieldId) {

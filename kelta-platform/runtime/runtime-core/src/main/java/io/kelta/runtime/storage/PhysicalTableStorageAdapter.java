@@ -191,6 +191,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 );
             }
 
+            // HNSW index for VECTOR fields — turns the cosine-distance (<=>) similarity
+            // search in semanticSearch() from a flat scan into an approximate-nearest-neighbour
+            // lookup. Idempotent (IF NOT EXISTS), so re-initialization is safe.
+            if (field.type() == FieldType.VECTOR) {
+                String idxName = buildBoundedIdentifier(
+                        "hnsw_", sanitizeIdentifier(getBaseTableName(definition)),
+                        sanitizeIdentifier(columnName));
+                postCreateStatements.add(buildHnswIndexStatement(idxName, qualifiedName, columnName));
+            }
+
             // FK constraints for LOOKUP and MASTER_DETAIL
             if ((field.type() == FieldType.LOOKUP || field.type() == FieldType.MASTER_DETAIL)
                     && field.referenceConfig() != null) {
@@ -743,6 +753,21 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             return definition.storageConfig().tableName();
         }
         return definition.name();
+    }
+
+    /**
+     * Builds the pgvector HNSW index DDL for a {@code VECTOR} column, using the cosine operator
+     * class so the index serves the {@code <=>} distance used by {@link #semanticSearch}.
+     *
+     * @param idxName       the (already length-bounded) index name
+     * @param qualifiedName the schema-qualified table name
+     * @param column        the vector column name (sanitized here)
+     * @return a {@code CREATE INDEX IF NOT EXISTS ... USING hnsw (...)} statement
+     */
+    static String buildHnswIndexStatement(String idxName, String qualifiedName, String column) {
+        return "CREATE INDEX IF NOT EXISTS " + idxName
+                + " ON " + qualifiedName
+                + " USING hnsw (" + sanitizeIdentifier(column) + " vector_cosine_ops)";
     }
 
     /**

@@ -72,4 +72,14 @@ class PhysicalTableStorageAdapterSemanticSearchTest {
         assertThat(params.getValue()).containsExactly("[0.1,0.2]", 5);
         assertThat(rows).hasSize(1);
     }
+
+    @Test
+    @DisplayName("builds an HNSW cosine index DDL for a VECTOR column")
+    void buildsHnswIndexDdl() {
+        String ddl = PhysicalTableStorageAdapter.buildHnswIndexStatement(
+                "hnsw_docs_embedding", "public.docs", "embedding");
+        assertThat(ddl).isEqualTo(
+                "CREATE INDEX IF NOT EXISTS hnsw_docs_embedding ON public.docs"
+                        + " USING hnsw (embedding vector_cosine_ops)");
+    }
 }

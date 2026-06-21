@@ -85,6 +85,7 @@ import {
   TenantsPage,
   TenantDashboardPage,
   PicklistsPage,
+  AiAgentsPage,
   PageLayoutsPage,
   ListViewsPage,
   AnalyticsPage,
@@ -655,6 +656,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="CUSTOMIZE_APPLICATION">
               <PicklistsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* AI Agents route */}
+      <Route
+        path="ai-agents"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <AiAgentsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

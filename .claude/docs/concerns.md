@@ -71,20 +71,15 @@ at the bottom so reviewers can see what's already been addressed.
 
 ## Connection Pooler Compatibility
 
-**RLS tenant variable is session-scoped, not transaction-scoped:**
-- `TenantAwareDataSourceConfig` issues `SET app.current_tenant_id = '<id>'` on every connection borrowed from HikariCP. This is a Postgres **session** setting that persists until the connection is closed or reset.
-- File: `kelta-worker/src/main/java/io/kelta/worker/config/TenantAwareDataSourceConfig.java` (line 89)
-- Also: `kelta-ai/src/main/resources/application.yml` (`hikari.connection-init-sql: SET app.current_tenant_id = ''`)
+**kelta-worker RLS tenant variable is now transaction-scoped (PgBouncer-safe).** ✅ Resolved (Phase 0)
 
-**Impact under PgBouncer transaction-pool mode:**
-- PgBouncer's `pool_mode = transaction` returns a different physical Postgres connection per transaction. Session state set on a prior transaction is lost — RLS `current_setting('app.current_tenant_id', true)` returns the empty default, and the `admin_bypass` policy hits, returning rows for **all tenants**.
-- This is a tenant-isolation correctness bug, not just a perf issue.
+`TenantAwareDataSourceConfig.TenantAwareDataSource` scopes `app.current_tenant_id` per database operation:
+- **Tenant-scoped connection** (non-empty tenant in `TenantContext`): if the borrowed connection is in autocommit mode, autocommit is turned off (begins a transaction), `SET LOCAL app.current_tenant_id = '<id>'` is issued, and a thin commit-on-close proxy commits + restores autocommit when the connection is released. If a Spring-managed transaction already owns the connection, only `SET LOCAL` is issued and the proxy defers commit/rollback to the owner (it watches the owner's `commit()`/`rollback()` to avoid a double-commit). Because the variable is set per transaction on the same backend that serves the query, it survives PgBouncer `pool_mode = transaction`. Connection-hold time is unchanged — the connection is released right after the operation, exactly like the previous autocommit model.
+- **Admin/bypass connection** (no tenant — Flyway, internal, cross-tenant work): keeps the legacy session `SET app.current_tenant_id = ''`. Empty already maps to `admin_bypass`, so transaction scoping is irrelevant to isolation and these paths are unchanged.
 
-**Required configuration when deploying PgBouncer:**
-- Set `pool_mode = session` for all kelta workloads (worker, auth, ai). Lower pooling efficiency than transaction mode but preserves session state. Or:
-- Migrate every tenant-scoped DB callsite to issue `SET LOCAL app.current_tenant_id = '<id>'` inside an explicit transaction (requires refactor of all `JdbcTemplate` auto-commit calls + audit of `@Transactional` boundaries).
+Regression guard: `TenantAwareDataSourceTest` asserts tenant connections use transaction-local `SET LOCAL` (not session `SET`) and commit/restore correctly; the harness `TenantIsolationScenarioTest` exercises real-stack isolation over Postgres + RLS.
 
-**Followup**: dedicated rewrite to `SET LOCAL`-inside-transaction is tracked under Tier-2 DB scaling work.
+**Remaining caveat — kelta-ai:** `kelta-ai/src/main/resources/application.yml` still uses `hikari.connection-init-sql: SET app.current_tenant_id = ''` (a session-level set to the bypass value). kelta-ai runs in admin/bypass mode and filters tenants explicitly in SQL rather than relying on RLS tenant isolation, so it is not a leak vector — but if kelta-ai ever begins relying on RLS for tenant-scoped reads, it must adopt the same transaction-scoped `SET LOCAL` mechanism before being placed behind a transaction-pool. Tracked as a follow-up.
 
 ## Test Coverage Gaps
 

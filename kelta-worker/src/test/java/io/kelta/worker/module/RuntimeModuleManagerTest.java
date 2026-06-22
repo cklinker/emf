@@ -57,6 +57,41 @@ class RuntimeModuleManagerTest {
     }
 
     @Test
+    void installWithJarRejectsBadSignatureBeforeUpload() {
+        ModuleJarService jarService = mock(ModuleJarService.class);
+        ModuleSignatureVerifier verifier = mock(ModuleSignatureVerifier.class);
+        doThrow(new ModuleSignatureException("bad signature"))
+                .when(verifier).verify(any(), any());
+        RuntimeModuleManager jarManager = new RuntimeModuleManager(
+                moduleStore, actionHandlerRegistry, objectMapper, jarService, null, verifier);
+
+        byte[] jar = "jar".getBytes();
+        assertThrows(ModuleSignatureException.class, () ->
+                jarManager.installModuleWithJar(TENANT_ID, MANIFEST_JSON, jar, "user", "sig"));
+
+        // Rejected before any S3 upload or DB write.
+        verify(jarService, never()).uploadJar(any(), any(), any(), any());
+        verify(moduleStore, never()).createModule(any());
+    }
+
+    @Test
+    void installWithJarProceedsWhenSignatureVerifies() {
+        ModuleJarService jarService = mock(ModuleJarService.class);
+        when(jarService.uploadJar(any(), any(), any(), any())).thenReturn("s3/key.jar");
+        ModuleSignatureVerifier verifier = mock(ModuleSignatureVerifier.class); // verify() no-op
+        when(moduleStore.findByTenantAndModuleId(any(), any())).thenReturn(Optional.empty());
+        RuntimeModuleManager jarManager = new RuntimeModuleManager(
+                moduleStore, actionHandlerRegistry, objectMapper, jarService, null, verifier);
+
+        byte[] jar = "jar".getBytes();
+        jarManager.installModuleWithJar(TENANT_ID, MANIFEST_JSON, jar, "user", "sig");
+
+        verify(verifier).verify(eq(jar), eq("sig"));
+        verify(jarService).uploadJar(any(), any(), any(), any());
+        verify(moduleStore).createModule(any());
+    }
+
+    @Test
     void shouldInstallModule() {
         when(moduleStore.findByTenantAndModuleId(TENANT_ID, "test-module"))
             .thenReturn(Optional.empty());

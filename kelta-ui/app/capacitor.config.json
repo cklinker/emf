@@ -1,0 +1,11 @@
+{
+  "appId": "io.kelta.app",
+  "appName": "Kelta",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "always"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

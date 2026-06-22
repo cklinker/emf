@@ -94,7 +94,8 @@ class ExternalEntityMaterializerTest {
 
         assertThat(result.collectionId()).isEqualTo("col-1");
         assertThat(result.collectionName()).isEqualTo("pets");
-        assertThat(result.fieldCount()).isEqualTo(3);
+        // 3 derived props (id, name, age) but "id" is reserved → 2 fields created.
+        assertThat(result.fieldCount()).isEqualTo(2);
 
         // Collection created once with an external-rest adapterConfig.
         ArgumentCaptor<Map<String, Object>> collCaptor = ArgumentCaptor.forClass(Map.class);
@@ -114,8 +115,36 @@ class ExternalEntityMaterializerTest {
                 .containsEntry("path", "/pets")
                 .containsEntry("idAttribute", "id");
 
-        // One field record per derived property.
-        verify(queryEngine, times(3)).create(eq(fieldsDef), any());
+        // One field record per non-reserved derived property (id skipped).
+        verify(queryEngine, times(2)).create(eq(fieldsDef), any());
+    }
+
+    @Test
+    @DisplayName("skips reserved system field names (id/createdAt/…) when creating fields")
+    void skipsReservedFieldNames() {
+        String response = """
+            {"200": {"content": {"application/json": {"schema": {
+              "type": "array",
+              "items": {"type": "object", "properties": {
+                "id": {"type": "string"},
+                "createdAt": {"type": "string", "format": "date-time"},
+                "title": {"type": "string"}
+              }}
+            }}}}}
+            """;
+        when(specService.findById("spec-1", TENANT)).thenReturn(Optional.of(spec("https://api.pet/v1")));
+        when(operationRepository.findOperation(TENANT, "spec-1", "get__pets"))
+                .thenReturn(Optional.of(getOp("GET", response)));
+        when(collectionRegistry.get("pets")).thenReturn(null);
+        when(queryEngine.create(eq(collectionsDef), any())).thenReturn(Map.of("id", "col-1"));
+        when(queryEngine.create(eq(fieldsDef), any())).thenReturn(Map.of("id", "f"));
+
+        MaterializeResult result = materializer.materialize("spec-1", "get__pets",
+                new MaterializeRequest("pets", null, null, null, null), TENANT);
+
+        // Only "title" is a real field; id + createdAt are reserved.
+        assertThat(result.fieldCount()).isEqualTo(1);
+        verify(queryEngine, times(1)).create(eq(fieldsDef), any());
     }
 
     @Test

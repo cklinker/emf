@@ -99,7 +99,8 @@ class ExternalCollectionMaterializeScenarioTest extends ScenarioBase {
                 .as("materialize should succeed against real Postgres").isTrue();
         Map<String, Object> body = materialized.getBody();
         assertThat(body.get("collectionName")).isEqualTo("extpets");
-        assertThat(((Number) body.get("fieldCount")).intValue()).isEqualTo(2);
+        // Item schema is {id, name}; "id" is a reserved system field → 1 real field.
+        assertThat(((Number) body.get("fieldCount")).intValue()).isEqualTo(1);
         assertThat(String.valueOf(body.get("collectionId"))).isNotBlank();
 
         // 4. The collection record persisted under the tenant.

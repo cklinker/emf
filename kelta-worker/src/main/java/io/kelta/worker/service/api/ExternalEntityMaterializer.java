@@ -39,6 +39,10 @@ public class ExternalEntityMaterializer {
     /** Collection names must be a safe identifier (also the route segment). */
     private static final Pattern COLLECTION_NAME = Pattern.compile("^[a-z][a-z0-9_]*$");
 
+    /** Reserved system field names (case-insensitive) — cannot be user fields. */
+    private static final java.util.Set<String> RESERVED_FIELD_NAMES =
+            java.util.Set.of("id", "createdat", "updatedat", "createdby", "updatedby", "tenantid");
+
     private final QueryEngine queryEngine;
     private final CollectionRegistry collectionRegistry;
     private final ApiSpecService specService;
@@ -147,7 +151,14 @@ public class ExternalEntityMaterializer {
             String collectionId = String.valueOf(created.get("id"));
 
             int order = 0;
+            int fieldsCreated = 0;
             for (DerivedField field : derived.fields()) {
+                // System field names (id, createdAt, …) are reserved and map to
+                // built-in columns — the external adapter handles the id via
+                // adapterConfig.idAttribute, so skip them rather than fail validation.
+                if (isReserved(field.name())) {
+                    continue;
+                }
                 Map<String, Object> fieldData = new LinkedHashMap<>();
                 fieldData.put("collectionId", collectionId);
                 fieldData.put("name", field.name());
@@ -156,12 +167,17 @@ public class ExternalEntityMaterializer {
                 fieldData.put("fieldOrder", order++);
                 fieldData.put("active", true);
                 queryEngine.create(fieldsDef, fieldData);
+                fieldsCreated++;
             }
 
             log.info("Materialized external-rest collection '{}' (id={}) from spec={} op={} with {} fields",
-                    name, collectionId, specId, opId, derived.fields().size());
-            return new MaterializeResult(collectionId, name, derived.fields().size());
+                    name, collectionId, specId, opId, fieldsCreated);
+            return new MaterializeResult(collectionId, name, fieldsCreated);
         });
+    }
+
+    private boolean isReserved(String fieldName) {
+        return RESERVED_FIELD_NAMES.contains(fieldName.toLowerCase());
     }
 
     private String defaultDisplayName(String name, ApiOperation op) {

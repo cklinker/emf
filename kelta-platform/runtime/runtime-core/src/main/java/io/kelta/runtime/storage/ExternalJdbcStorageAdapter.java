@@ -1,5 +1,6 @@
 package io.kelta.runtime.storage;
 
+import io.kelta.runtime.credential.ResolvedCredential;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.query.AggregationSpec;
 import io.kelta.runtime.query.FilterCondition;
@@ -54,9 +55,16 @@ public class ExternalJdbcStorageAdapter implements ExternalStorageAdapter {
     private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
 
     private final ExternalJdbcConnectionProvider connectionProvider;
+    private final CredentialProvider credentialProvider;
 
     public ExternalJdbcStorageAdapter(ExternalJdbcConnectionProvider connectionProvider) {
+        this(connectionProvider, null);
+    }
+
+    public ExternalJdbcStorageAdapter(ExternalJdbcConnectionProvider connectionProvider,
+                                      CredentialProvider credentialProvider) {
         this.connectionProvider = connectionProvider;
+        this.credentialProvider = credentialProvider;
     }
 
     @Override
@@ -216,7 +224,23 @@ public class ExternalJdbcStorageAdapter implements ExternalStorageAdapter {
     // --- helpers ------------------------------------------------------------
 
     private JdbcTemplate jdbc(JdbcConf cfg) {
-        return connectionProvider.jdbcTemplate(new JdbcConfig(cfg.jdbcUrl(), cfg.username(), cfg.password()));
+        String username = cfg.username();
+        String password = cfg.password();
+        // A vault credentialRef (basic_auth) supplies the connection user/password,
+        // so the secret never lives in adapter_config; inline values are the fallback.
+        if (cfg.credentialRef() != null && !cfg.credentialRef().isBlank() && credentialProvider != null) {
+            ResolvedCredential cred = credentialProvider.resolve(cfg.credentialRef())
+                    .orElseThrow(() -> new StorageException("Credential not found: " + cfg.credentialRef()));
+            Object user = cred.secret("username");
+            Object pass = cred.secret("password");
+            if (user != null) {
+                username = user.toString();
+            }
+            if (pass != null) {
+                password = pass.toString();
+            }
+        }
+        return connectionProvider.jdbcTemplate(new JdbcConfig(cfg.jdbcUrl(), username, password));
     }
 
     private Optional<Map<String, Object>> findById(JdbcTemplate jdbc, JdbcConf cfg, String id) {
@@ -276,7 +300,8 @@ public class ExternalJdbcStorageAdapter implements ExternalStorageAdapter {
     }
 
     /** Parsed view of a collection's external-JDBC {@code adapterConfig}. */
-    private record JdbcConf(String jdbcUrl, String username, String password, String table, String idColumn) {
+    private record JdbcConf(String jdbcUrl, String username, String password, String table, String idColumn,
+                            String credentialRef) {
 
         static JdbcConf from(CollectionDefinition definition) {
             Map<String, String> cfg = definition.storageConfig() != null
@@ -289,7 +314,8 @@ public class ExternalJdbcStorageAdapter implements ExternalStorageAdapter {
             }
             String table = identifier(cfg.getOrDefault("table", definition.name()));
             String idColumn = identifier(cfg.getOrDefault("idColumn", "id"));
-            return new JdbcConf(jdbcUrl, cfg.get("username"), cfg.get("password"), table, idColumn);
+            return new JdbcConf(jdbcUrl, cfg.get("username"), cfg.get("password"), table, idColumn,
+                    cfg.get("credentialRef"));
         }
     }
 }

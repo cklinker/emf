@@ -1,5 +1,6 @@
 package io.kelta.runtime.storage;
 
+import io.kelta.runtime.credential.ResolvedCredential;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.query.AggregationSpec;
 import io.kelta.runtime.query.FilterCondition;
@@ -16,6 +17,7 @@ import io.kelta.runtime.storage.RestExecutor.RestResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,10 +60,17 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
 
     private final RestExecutor executor;
     private final ObjectMapper objectMapper;
+    private final CredentialProvider credentialProvider;
 
     public ExternalRestStorageAdapter(RestExecutor executor, ObjectMapper objectMapper) {
+        this(executor, objectMapper, null);
+    }
+
+    public ExternalRestStorageAdapter(RestExecutor executor, ObjectMapper objectMapper,
+                                      CredentialProvider credentialProvider) {
         this.executor = executor;
         this.objectMapper = objectMapper;
+        this.credentialProvider = credentialProvider;
     }
 
     @Override
@@ -194,13 +203,57 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
         if (body != null) {
             headers.put("Content-Type", "application/json");
         }
-        if (cfg.bearerToken() != null && !cfg.bearerToken().isBlank()) {
-            headers.put("Authorization", "Bearer " + cfg.bearerToken());
-        }
+        applyAuth(headers, cfg);
         try {
             return executor.exchange(new RestRequest(method, url, headers, body));
         } catch (RuntimeException e) {
             throw new StorageException("External REST transport failure: " + method + " " + url, e);
+        }
+    }
+
+    /**
+     * Apply auth to the request headers. A vault {@code credentialRef} (resolved to a
+     * decrypted {@link ResolvedCredential}) takes precedence; the inline {@code bearerToken}
+     * remains as a fallback for simple/test configs. Auth-by-type mirrors the HTTP-callout
+     * handler so connector credentials behave identically to flow callouts.
+     */
+    private void applyAuth(Map<String, String> headers, RestConfig cfg) {
+        if (cfg.credentialRef() != null && !cfg.credentialRef().isBlank() && credentialProvider != null) {
+            ResolvedCredential cred = credentialProvider.resolve(cfg.credentialRef())
+                    .orElseThrow(() -> new StorageException("Credential not found: " + cfg.credentialRef()));
+            switch (cred.type()) {
+                case "bearer_token" -> putIfPresent(headers, "Authorization", "Bearer ", cred.secret("token"));
+                case "basic_auth" -> {
+                    Object user = cred.secret("username");
+                    Object pass = cred.secret("password");
+                    if (user != null && pass != null) {
+                        String encoded = Base64.getEncoder().encodeToString(
+                                (user + ":" + pass).getBytes(StandardCharsets.UTF_8));
+                        headers.put("Authorization", "Basic " + encoded);
+                    }
+                }
+                case "api_key" -> {
+                    Object value = cred.secret("value");
+                    Object headerName = cred.metadata("headerName");
+                    Object prefix = cred.metadata("prefix");
+                    if (value != null && headerName != null) {
+                        headers.put(headerName.toString(), (prefix == null ? "" : prefix.toString()) + value);
+                    }
+                }
+                case "oauth2_client_credentials", "oauth2_authorization_code" ->
+                        putIfPresent(headers, "Authorization", "Bearer ", cred.secret("accessToken"));
+                default -> { /* smtp/custom: nothing to apply to an HTTP request */ }
+            }
+            return;
+        }
+        if (cfg.bearerToken() != null && !cfg.bearerToken().isBlank()) {
+            headers.put("Authorization", "Bearer " + cfg.bearerToken());
+        }
+    }
+
+    private static void putIfPresent(Map<String, String> headers, String name, String prefix, Object value) {
+        if (value != null) {
+            headers.put(name, prefix + value);
         }
     }
 
@@ -316,7 +369,8 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
             String idAttribute,
             String pageParam,
             String sizeParam,
-            String bearerToken) {
+            String bearerToken,
+            String credentialRef) {
 
         static RestConfig from(CollectionDefinition definition) {
             Map<String, String> cfg = definition.storageConfig() != null
@@ -336,7 +390,8 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
                     cfg.getOrDefault("idAttribute", "id"),
                     cfg.getOrDefault("pageParam", "page"),
                     cfg.getOrDefault("sizeParam", "pageSize"),
-                    cfg.get("bearerToken"));
+                    cfg.get("bearerToken"),
+                    cfg.get("credentialRef"));
         }
 
         String collectionUrl() {

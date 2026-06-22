@@ -1,5 +1,6 @@
 package io.kelta.runtime.storage;
 
+import io.kelta.runtime.credential.ResolvedCredential;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.CollectionDefinitionBuilder;
 import io.kelta.runtime.model.FieldDefinitionBuilder;
@@ -217,5 +218,66 @@ class ExternalRestStorageAdapterTest {
         adapter.initializeCollection(orders(Map.of()));
         adapter.updateCollectionSchema(orders(Map.of()), orders(Map.of()));
         assertThat(Optional.empty()).isEmpty(); // reached without exception
+    }
+
+    // --- credential resolution (slice 4d-2a) --------------------------------
+
+    private static ResolvedCredential cred(String type, Map<String, Object> secret, Map<String, Object> meta) {
+        return new ResolvedCredential("c1", "conn", type, secret, meta, java.time.Instant.EPOCH);
+    }
+
+    private ExternalRestStorageAdapter adapterWithCredential(RecordingExecutor executor, ResolvedCredential cred) {
+        CredentialProvider provider = ref -> "vault-ref".equals(ref) ? Optional.of(cred) : Optional.empty();
+        return new ExternalRestStorageAdapter(executor, objectMapper, provider);
+    }
+
+    @Test
+    @DisplayName("resolves a bearer_token credential into an Authorization header")
+    void resolvesBearerCredential() {
+        RecordingExecutor executor = new RecordingExecutor(r -> new RestResponse(200, "[]"));
+        ExternalRestStorageAdapter adapter =
+                adapterWithCredential(executor, cred("bearer_token", Map.of("token", "T0K3N"), Map.of()));
+
+        adapter.query(orders(Map.of("credentialRef", "vault-ref")), QueryRequest.defaults());
+
+        assertThat(executor.last.headers()).containsEntry("Authorization", "Bearer T0K3N");
+    }
+
+    @Test
+    @DisplayName("resolves a basic_auth credential into a Basic Authorization header")
+    void resolvesBasicCredential() {
+        RecordingExecutor executor = new RecordingExecutor(r -> new RestResponse(200, "[]"));
+        ExternalRestStorageAdapter adapter = adapterWithCredential(executor,
+                cred("basic_auth", Map.of("username", "u", "password", "p"), Map.of()));
+
+        adapter.query(orders(Map.of("credentialRef", "vault-ref")), QueryRequest.defaults());
+
+        String expected = "Basic " + java.util.Base64.getEncoder()
+                .encodeToString("u:p".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(executor.last.headers()).containsEntry("Authorization", expected);
+    }
+
+    @Test
+    @DisplayName("resolves an api_key credential into its configured header")
+    void resolvesApiKeyCredential() {
+        RecordingExecutor executor = new RecordingExecutor(r -> new RestResponse(200, "[]"));
+        ExternalRestStorageAdapter adapter = adapterWithCredential(executor,
+                cred("api_key", Map.of("value", "abc"), Map.of("headerName", "X-Api-Key", "prefix", "Key ")));
+
+        adapter.query(orders(Map.of("credentialRef", "vault-ref")), QueryRequest.defaults());
+
+        assertThat(executor.last.headers()).containsEntry("X-Api-Key", "Key abc");
+    }
+
+    @Test
+    @DisplayName("a credentialRef that resolves to nothing is a StorageException")
+    void unresolvedCredentialFails() {
+        RecordingExecutor executor = new RecordingExecutor(r -> new RestResponse(200, "[]"));
+        CredentialProvider empty = ref -> Optional.empty();
+        ExternalRestStorageAdapter adapter = new ExternalRestStorageAdapter(executor, objectMapper, empty);
+
+        assertThatThrownBy(() ->
+                adapter.query(orders(Map.of("credentialRef", "missing")), QueryRequest.defaults()))
+                .isInstanceOf(StorageException.class);
     }
 }

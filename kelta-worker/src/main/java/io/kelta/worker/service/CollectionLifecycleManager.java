@@ -48,13 +48,15 @@ public class CollectionLifecycleManager {
 
     private static final String SELECT_COLLECTION_BY_ID = """
             SELECT id, name, display_name, description, active,
-                   current_version, system_collection, path, tenant_id, display_field_id
+                   current_version, system_collection, path, tenant_id, display_field_id,
+                   adapter_config
             FROM collection WHERE id = ? AND active = true
             """;
 
     private static final String SELECT_COLLECTION_BY_NAME = """
             SELECT id, name, display_name, description, active,
-                   current_version, system_collection, path, tenant_id, display_field_id
+                   current_version, system_collection, path, tenant_id, display_field_id,
+                   adapter_config
             FROM collection WHERE name = ? AND active = true
             LIMIT 1
             """;
@@ -499,8 +501,12 @@ public class CollectionLifecycleManager {
             }
         }
 
-        // Storage config — all user-defined collections use physical tables
-        builder.storageConfig(StorageConfig.physicalTable(collectionName));
+        // Storage config — physical table by default; an external adapter is
+        // selected when adapter_config carries an adapterType (Rec 4).
+        Map<String, String> adapterConfig = parseAdapterConfig(data.get("adapter_config"), collectionName);
+        builder.storageConfig(adapterConfig.isEmpty()
+                ? StorageConfig.physicalTable(collectionName)
+                : new StorageConfig(collectionName, adapterConfig));
 
         // Parse system collection flag
         Boolean systemCollection = (Boolean) data.get("system_collection");
@@ -731,6 +737,37 @@ public class CollectionLifecycleManager {
             return str;
         }
         return defaultValue;
+    }
+
+    /**
+     * Parse the {@code adapter_config} JSONB column into a flat string map for
+     * {@link StorageConfig}. A {@code PGobject} or JSON string is parsed; values are
+     * stringified. Returns an empty map for null/blank/malformed input (so a parse
+     * failure degrades to the safe physical-table default rather than failing the load).
+     *
+     * <p>Package-private for direct unit testing.
+     */
+    Map<String, String> parseAdapterConfig(Object raw, String collectionName) {
+        if (raw == null) {
+            return Map.of();
+        }
+        String json = raw.toString();
+        if (json.isBlank() || "{}".equals(json)) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(json, Map.class);
+            Map<String, String> result = new LinkedHashMap<>();
+            parsed.forEach((key, value) -> {
+                if (value != null) {
+                    result.put(key, value.toString());
+                }
+            });
+            return result;
+        } catch (RuntimeException e) {
+            log.warn("Failed to parse adapter_config for collection '{}': {}", collectionName, e.getMessage());
+            return Map.of();
+        }
     }
 
     // =========================================================================

@@ -237,6 +237,7 @@ public final class SystemCollectionDefinitions {
                 .withDefault(1))
             .addField(FieldDefinition.lookup("displayFieldId", "fields", "Display Field")
                 .withColumnName("display_field_id"))
+            .addField(FieldDefinition.json("adapterConfig").withColumnName("adapter_config"))
             .build();
     }
 

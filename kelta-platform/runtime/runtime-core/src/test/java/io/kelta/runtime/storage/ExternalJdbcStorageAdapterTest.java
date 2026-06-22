@@ -166,4 +166,36 @@ class ExternalJdbcStorageAdapterTest {
         // table still intact
         assertThat(h2.queryForObject("SELECT COUNT(*) FROM orders", Long.class)).isEqualTo(3L);
     }
+
+    @Test
+    @DisplayName("resolves a basic_auth credentialRef into the connection user/password")
+    void resolvesCredential() {
+        java.util.concurrent.atomic.AtomicReference<ExternalJdbcConnectionProvider.JdbcConfig> captured =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        ExternalJdbcConnectionProvider provider = config -> {
+            captured.set(config);
+            return h2;
+        };
+        io.kelta.runtime.credential.ResolvedCredential cred = new io.kelta.runtime.credential.ResolvedCredential(
+                "c1", "db", "basic_auth",
+                Map.of("username", "dbuser", "password", "dbpass"), Map.of(), java.time.Instant.EPOCH);
+        CredentialProvider credentials = ref -> "vault-ref".equals(ref)
+                ? java.util.Optional.of(cred) : java.util.Optional.empty();
+        ExternalJdbcStorageAdapter credAdapter = new ExternalJdbcStorageAdapter(provider, credentials);
+
+        credAdapter.query(orders(Map.of("credentialRef", "vault-ref")), QueryRequest.defaults());
+
+        assertThat(captured.get().username()).isEqualTo("dbuser");
+        assertThat(captured.get().password()).isEqualTo("dbpass");
+    }
+
+    @Test
+    @DisplayName("an unresolved credentialRef is a StorageException")
+    void unresolvedCredentialFails() {
+        ExternalJdbcStorageAdapter credAdapter =
+                new ExternalJdbcStorageAdapter(config -> h2, ref -> java.util.Optional.empty());
+        assertThatThrownBy(() ->
+                credAdapter.query(orders(Map.of("credentialRef", "missing")), QueryRequest.defaults()))
+                .isInstanceOf(StorageException.class);
+    }
 }

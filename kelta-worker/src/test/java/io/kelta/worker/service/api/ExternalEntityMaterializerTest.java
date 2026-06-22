@@ -100,7 +100,12 @@ class ExternalEntityMaterializerTest {
         ArgumentCaptor<Map<String, Object>> collCaptor = ArgumentCaptor.forClass(Map.class);
         verify(queryEngine).create(eq(collectionsDef), collCaptor.capture());
         Map<String, Object> data = collCaptor.getValue();
-        assertThat(data).containsEntry("name", "pets").containsEntry("path", "/api/pets");
+        assertThat(data)
+                .containsEntry("name", "pets")
+                .containsEntry("path", "/api/pets")
+                // tenant_id is NOT NULL on the collection table; a direct
+                // queryEngine.create must supply tenantId (no JSON:API layer injects it).
+                .containsEntry("tenantId", TENANT);
         @SuppressWarnings("unchecked")
         Map<String, Object> adapter = (Map<String, Object>) data.get("adapterConfig");
         assertThat(adapter)

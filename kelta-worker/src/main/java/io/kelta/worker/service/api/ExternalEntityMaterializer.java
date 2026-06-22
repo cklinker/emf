@@ -127,6 +127,11 @@ public class ExternalEntityMaterializer {
             }
 
             Map<String, Object> collectionData = new LinkedHashMap<>();
+            // The storage adapter writes tenant_id for a tenant-scoped system
+            // collection only when "tenantId" is present in the record. The JSON:API
+            // layer injects it on the HTTP path; a direct queryEngine.create must set
+            // it itself, or the NOT NULL collection.tenant_id is violated.
+            collectionData.put("tenantId", tenantId);
             collectionData.put("name", name);
             collectionData.put("displayName",
                     req.displayName() != null && !req.displayName().isBlank()

@@ -682,6 +682,36 @@ describe('PageBuilderPage', () => {
         expect(screen.getByTestId('save-page-button')).not.toBeDisabled()
       })
     })
+
+    it('shows the table data-source editor and binds a collection', async () => {
+      const user = userEvent.setup()
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => {
+        expect(screen.getByText('dashboard')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByTestId('page-name-0'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('palette-item-table')).toBeInTheDocument()
+      })
+
+      // Add a table component — its data-source editor should appear
+      await user.click(screen.getByTestId('palette-item-table'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('property-collection')).toBeInTheDocument()
+        expect(screen.getByTestId('property-columns')).toBeInTheDocument()
+        expect(screen.getByTestId('property-limit')).toBeInTheDocument()
+      })
+
+      await user.type(screen.getByTestId('property-collection'), 'orders')
+
+      await waitFor(() => {
+        expect(screen.getByTestId('save-page-button')).not.toBeDisabled()
+      })
+    })
   })
 
   describe('Canvas', () => {

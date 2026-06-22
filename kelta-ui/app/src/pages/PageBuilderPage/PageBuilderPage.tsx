@@ -255,6 +255,19 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
     })
   }
 
+  // Table data-source binding lives under props.dataView ({ collection, fields, limit }).
+  const dataView =
+    (component.props.dataView as
+      | { collection?: string; fields?: string[]; limit?: number }
+      | undefined) ?? {}
+  const handleDataViewChange = (patch: {
+    collection?: string
+    fields?: string[]
+    limit?: number
+  }) => {
+    handlePropChange('dataView', { ...dataView, ...patch })
+  }
+
   return (
     <div
       className="bg-background border border-border rounded-md p-4 overflow-y-auto"
@@ -398,6 +411,66 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
                 onChange={(e) => handlePropChange('alt', e.target.value)}
                 placeholder="Image description"
                 data-testid="property-alt"
+              />
+            </div>
+          </>
+        )}
+        {component.type === 'table' && (
+          <>
+            <div className="flex flex-col gap-1">
+              <label
+                className="text-xs font-medium text-muted-foreground"
+                htmlFor="prop-collection"
+              >
+                Collection
+              </label>
+              <input
+                id="prop-collection"
+                type="text"
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                value={dataView.collection || ''}
+                onChange={(e) => handleDataViewChange({ collection: e.target.value || undefined })}
+                placeholder="orders"
+                data-testid="property-collection"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-columns">
+                Columns
+              </label>
+              <input
+                id="prop-columns"
+                type="text"
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                value={(dataView.fields ?? []).join(', ')}
+                onChange={(e) =>
+                  handleDataViewChange({
+                    fields: e.target.value
+                      .split(',')
+                      .map((f) => f.trim())
+                      .filter((f) => f.length > 0),
+                  })
+                }
+                placeholder="comma-separated, e.g. id, status, total"
+                data-testid="property-columns"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-limit">
+                Row limit
+              </label>
+              <input
+                id="prop-limit"
+                type="number"
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                value={dataView.limit ?? ''}
+                onChange={(e) =>
+                  handleDataViewChange({
+                    limit: e.target.value ? Number(e.target.value) : undefined,
+                  })
+                }
+                placeholder="25"
+                data-testid="property-limit"
               />
             </div>
           </>

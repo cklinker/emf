@@ -18,7 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage, DataSourceSettings } from '../../components'
 import {
   FieldEditor,
   type FieldDefinition as FieldEditorDefinition,
@@ -164,6 +164,7 @@ export function CollectionDetailPage({
     | 'fieldHistory'
     | 'setupAudit'
     | 'versions'
+    | 'dataSource'
   >('fields')
 
   // Fetch collection data with included fields.
@@ -615,6 +616,7 @@ export function CollectionDetailPage({
         | 'fieldHistory'
         | 'setupAudit'
         | 'versions'
+        | 'dataSource'
     ) => {
       setActiveTab(tab)
     },
@@ -1144,8 +1146,16 @@ export function CollectionDetailPage({
             { key: 'fieldHistory', label: t('collections.fieldHistory'), id: 'field-history' },
             { key: 'setupAudit', label: t('collections.setupAudit'), id: 'setup-audit' },
             { key: 'versions', label: t('collections.versionHistory'), id: 'versions' },
+            { key: 'dataSource', label: t('collections.dataSource'), id: 'data-source' },
           ] as const
-        ).map((tab) => (
+        )
+          // Data Source (external connectors) only applies to user collections.
+          .filter(
+            (tab) =>
+              tab.key !== 'dataSource' ||
+              !(collection as { systemCollection?: boolean } | undefined)?.systemCollection
+          )
+          .map((tab) => (
           <button
             key={tab.key}
             type="button"
@@ -2189,6 +2199,11 @@ export function CollectionDetailPage({
             </div>
           )}
         </section>
+      )}
+
+      {/* Data Source Panel (external connectors) */}
+      {activeTab === 'dataSource' && collectionId && (
+        <DataSourceSettings collectionId={collectionId} />
       )}
 
       {/* Delete Confirmation Dialog */}

@@ -130,6 +130,7 @@
     "recordTypes": "Record Types",
     "fieldHistory": "Field History",
     "setupAudit": "Setup Audit",
+    "dataSource": "Data Source",
     "showSystem": "Show system collections"
   },
   "validationRules": {
@@ -1095,6 +1096,25 @@
     "collection": "Collection",
     "assignmentStatus": "Status",
     "assignedAt": "Assigned"
+  },
+  "dataSource": {
+    "type": "Data source",
+    "physical": "Physical table (default)",
+    "rest": "External REST API",
+    "jdbc": "External database (JDBC)",
+    "help": "Back this collection with an external system instead of a Kelta table. Records are read and written through the external source.",
+    "saved": "Data source saved",
+    "field": {
+      "baseUrl": "Base URL",
+      "path": "Resource path",
+      "dataPath": "Records JSON path",
+      "idAttribute": "ID attribute",
+      "jdbcUrl": "JDBC URL",
+      "table": "Table name",
+      "idColumn": "ID column",
+      "credentialRef": "Credential",
+      "credentialRefHelp": "Name or id of a vault credential used to authenticate. Leave blank for an unauthenticated source."
+    }
   },
   "errors": {
     "generic": "An error occurred. Please try again.",

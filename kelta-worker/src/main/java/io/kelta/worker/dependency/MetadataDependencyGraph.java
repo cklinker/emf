@@ -2,9 +2,12 @@ package io.kelta.worker.dependency;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -130,6 +133,73 @@ public class MetadataDependencyGraph {
     public boolean hasCycle() {
         return !findCycles().isEmpty();
     }
+
+    /**
+     * Orders {@code changeSet} for safe deployment: a node's dependencies (the targets of its
+     * outgoing edges) appear before it, so applying the list in order never references a
+     * not-yet-deployed item. Only nodes present in the graph are considered, and only edges
+     * <em>between</em> change-set members constrain the order (Kahn's algorithm). Ties break by
+     * (type, id) for a stable, reproducible plan. Nodes trapped in a cycle within the change set
+     * cannot be ordered and are omitted — callers detect them via {@code changeSet \ result} (and
+     * {@link #findCycles()} explains why).
+     */
+    public List<MetadataNode> topologicalOrder(Collection<MetadataNode> changeSet) {
+        Map<String, MetadataNode> scope = new LinkedHashMap<>();
+        for (MetadataNode n : changeSet) {
+            MetadataNode resolved = nodes.get(n.key());
+            if (resolved != null) {
+                scope.put(resolved.key(), resolved);
+            }
+        }
+
+        // depCount[X] = number of X's dependency edges whose target is also in scope.
+        Map<String, Integer> depCount = new HashMap<>();
+        for (MetadataNode n : scope.values()) {
+            int count = 0;
+            for (MetadataEdge edge : outgoing.getOrDefault(n.key(), List.of())) {
+                if (scope.containsKey(edge.to().key())) {
+                    count++;
+                }
+            }
+            depCount.put(n.key(), count);
+        }
+
+        List<MetadataNode> ready = new ArrayList<>();
+        for (MetadataNode n : scope.values()) {
+            if (depCount.get(n.key()) == 0) {
+                ready.add(n);
+            }
+        }
+        ready.sort(NODE_ORDER);
+
+        List<MetadataNode> order = new ArrayList<>(scope.size());
+        Set<String> placed = new HashSet<>();
+        while (!ready.isEmpty()) {
+            MetadataNode current = ready.remove(0);
+            if (!placed.add(current.key())) {
+                continue;
+            }
+            order.add(current);
+            List<MetadataNode> unlocked = new ArrayList<>();
+            for (MetadataEdge edge : incoming.getOrDefault(current.key(), List.of())) {
+                MetadataNode dependent = edge.from();
+                if (!scope.containsKey(dependent.key()) || placed.contains(dependent.key())) {
+                    continue;
+                }
+                int remaining = depCount.get(dependent.key()) - 1;
+                depCount.put(dependent.key(), remaining);
+                if (remaining == 0) {
+                    unlocked.add(dependent);
+                }
+            }
+            unlocked.sort(NODE_ORDER);
+            ready.addAll(unlocked);
+        }
+        return order;
+    }
+
+    private static final Comparator<MetadataNode> NODE_ORDER =
+            Comparator.comparing((MetadataNode n) -> n.type().name()).thenComparing(MetadataNode::id);
 
     /** Iterative Tarjan's strongly-connected-components, returning only components of size &gt; 1. */
     private final class Tarjan {

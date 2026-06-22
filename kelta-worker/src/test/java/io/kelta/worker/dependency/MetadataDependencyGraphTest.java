@@ -123,4 +123,63 @@ class MetadataDependencyGraphTest {
 
         assertThat(g.resolve(MetadataType.COLLECTION, "account").name()).isEqualTo("Collection account");
     }
+
+    @Test
+    @DisplayName("topologicalOrder places dependencies before dependents")
+    void topoOrdersDependenciesFirst() {
+        MetadataDependencyGraph g = new MetadataDependencyGraph();
+        MetadataNode account = collection("account");
+        MetadataNode lookup = field("contact.account");
+        // lookup depends on account → account must deploy first
+        g.addEdge(lookup, account, DependencyKind.LOOKUP);
+
+        List<MetadataNode> order = g.topologicalOrder(List.of(lookup, account));
+
+        assertThat(order).containsExactly(account, lookup);
+    }
+
+    @Test
+    @DisplayName("topologicalOrder only constrains on edges between change-set members")
+    void topoIgnoresOutOfScopeEdges() {
+        MetadataDependencyGraph g = new MetadataDependencyGraph();
+        MetadataNode account = collection("account");
+        MetadataNode lookup = field("contact.account");
+        g.addEdge(lookup, account, DependencyKind.LOOKUP);
+
+        // account is not in the change set → its absence doesn't block the lookup.
+        List<MetadataNode> order = g.topologicalOrder(List.of(lookup));
+
+        assertThat(order).containsExactly(lookup);
+    }
+
+    @Test
+    @DisplayName("topologicalOrder omits nodes trapped in a cycle")
+    void topoOmitsCyclicNodes() {
+        MetadataDependencyGraph g = new MetadataDependencyGraph();
+        MetadataNode a = collection("a");
+        MetadataNode b = collection("b");
+        MetadataNode standalone = collection("standalone");
+        g.addEdge(a, b, DependencyKind.MASTER_DETAIL);
+        g.addEdge(b, a, DependencyKind.MASTER_DETAIL);
+        g.addNode(standalone);
+
+        List<MetadataNode> order = g.topologicalOrder(List.of(a, b, standalone));
+
+        // The acyclic node is ordered; the cyclic pair is omitted.
+        assertThat(order).containsExactly(standalone);
+    }
+
+    @Test
+    @DisplayName("topologicalOrder breaks ties deterministically by (type, id)")
+    void topoDeterministicTies() {
+        MetadataDependencyGraph g = new MetadataDependencyGraph();
+        MetadataNode c2 = collection("c2");
+        MetadataNode c1 = collection("c1");
+        g.addNode(c2);
+        g.addNode(c1);
+
+        List<MetadataNode> order = g.topologicalOrder(List.of(c2, c1));
+
+        assertThat(order).containsExactly(c1, c2);
+    }
 }

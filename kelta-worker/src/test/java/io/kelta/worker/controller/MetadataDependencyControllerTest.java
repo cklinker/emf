@@ -1,5 +1,6 @@
 package io.kelta.worker.controller;
 
+import io.kelta.worker.dependency.MetadataNode;
 import io.kelta.worker.dependency.MetadataType;
 import io.kelta.worker.service.MetadataDependencyService;
 import io.kelta.worker.service.MetadataDependencyService.Direction;
@@ -7,16 +8,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -82,5 +87,59 @@ class MetadataDependencyControllerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsKey("data");
+    }
+
+    @Test
+    @DisplayName("deployment-plan parses the change set and wraps the plan")
+    void deploymentPlanParsesChangeSet() {
+        when(service.deploymentPlan(eq(TENANT), anyList(), eq(false)))
+                .thenReturn(Map.of("plan", List.of(), "planCount", 0));
+
+        ResponseEntity<Map<String, Object>> response = controller.deploymentPlan(
+                TENANT, Map.of("changeSet", List.of(Map.of("type", "collection", "id", "orders"))));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsKey("data");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MetadataNode>> changeSet = ArgumentCaptor.forClass(List.class);
+        verify(service).deploymentPlan(eq(TENANT), changeSet.capture(), eq(false));
+        assertThat(changeSet.getValue()).singleElement().satisfies(n -> {
+            assertThat(n.type()).isEqualTo(MetadataType.COLLECTION);
+            assertThat(n.id()).isEqualTo("orders");
+        });
+    }
+
+    @Test
+    @DisplayName("deployment-plan passes includeDependencies through")
+    void deploymentPlanIncludeDependencies() {
+        when(service.deploymentPlan(eq(TENANT), anyList(), eq(true))).thenReturn(Map.of("plan", List.of()));
+
+        controller.deploymentPlan(TENANT, Map.of(
+                "changeSet", List.of(Map.of("type", "flow", "id", "f1")),
+                "includeDependencies", true));
+
+        verify(service).deploymentPlan(eq(TENANT), anyList(), eq(true));
+    }
+
+    @Test
+    @DisplayName("deployment-plan rejects an empty/absent change set with 400")
+    void deploymentPlanEmptyChangeSet() {
+        ResponseEntity<Map<String, Object>> response =
+                controller.deploymentPlan(TENANT, Map.of("changeSet", List.of()));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).containsKey("errors");
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    @DisplayName("deployment-plan rejects an unknown metadata type with 400")
+    void deploymentPlanInvalidType() {
+        ResponseEntity<Map<String, Object>> response = controller.deploymentPlan(
+                TENANT, Map.of("changeSet", List.of(Map.of("type", "bogus", "id", "x"))));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verifyNoInteractions(service);
     }
 }

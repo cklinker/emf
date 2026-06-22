@@ -7,8 +7,8 @@
  * {@link componentRegistry} for any other node type. This is the runtime counterpart of the
  * builder's preview — versioned via the render contract so the node schema can evolve.
  */
-import React from 'react'
-import { useQuery } from '@tanstack/react-query'
+import React, { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { componentRegistry } from '@/services/componentRegistry'
 import { useApi } from '@/context/ApiContext'
@@ -147,6 +147,79 @@ function DataTableNode({ dataView }: { dataView: DataViewConfig }): React.ReactE
   )
 }
 
+/**
+ * Renders a create form bound to a collection: one input per declared field, submitting a new
+ * record through the authorized JSON:API path (`apiClient.postResource`) so Cerbos/FLS apply on
+ * create. Field-level validation/types are a later refinement.
+ */
+function FormNode({ dataView }: { dataView: DataViewConfig }): React.ReactElement {
+  const { apiClient } = useApi()
+  const collection = dataView.collection
+  const fields = dataView.fields ?? []
+  const [values, setValues] = useState<Record<string, string>>({})
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.postResource(`/api/${collection}`, values),
+    onSuccess: () => setValues({}),
+  })
+
+  if (!collection || fields.length === 0) {
+    return (
+      <div
+        className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground"
+        data-testid="page-node-form"
+      >
+        Form (no data source configured)
+      </div>
+    )
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-3 rounded-md border border-border p-4"
+      data-testid="page-node-form"
+      onSubmit={(e) => {
+        e.preventDefault()
+        mutation.mutate()
+      }}
+    >
+      {fields.map((field) => (
+        <div key={field} className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor={`form-${field}`}>
+            {field}
+          </label>
+          <input
+            id={`form-${field}`}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            value={values[field] ?? ''}
+            onChange={(e) => setValues((prev) => ({ ...prev, [field]: e.target.value }))}
+          />
+        </div>
+      ))}
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          disabled={mutation.isPending}
+          data-testid="form-submit"
+        >
+          {mutation.isPending ? 'Submitting…' : 'Submit'}
+        </button>
+        {mutation.isSuccess && (
+          <span className="text-sm text-primary" data-testid="form-success">
+            Saved
+          </span>
+        )}
+        {mutation.isError && (
+          <span className="text-sm text-destructive" data-testid="form-error">
+            Could not save
+          </span>
+        )}
+      </div>
+    </form>
+  )
+}
+
 function renderChildren(node: PageNode, tenantSlug: string): React.ReactNode {
   return (node.children ?? []).map((child) => (
     <PageNodeRenderer key={child.id} node={child} tenantSlug={tenantSlug} />
@@ -215,15 +288,7 @@ function PageNodeRenderer({
     case 'table':
       return <DataTableNode dataView={readDataView(props)} />
     case 'form':
-      // Form input binding lands in a later slice; render a labelled placeholder.
-      return (
-        <div
-          className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground"
-          data-testid="page-node-form"
-        >
-          Form
-        </div>
-      )
+      return <FormNode dataView={readDataView(props)} />
     default: {
       const Comp = componentRegistry.getPageComponent(node.type)
       if (Comp) {

@@ -673,6 +673,21 @@
     "confirmSuspend": "Are you sure you want to suspend this tenant? Users will not be able to access this tenant's data.",
     "confirmActivate": "Are you sure you want to activate this tenant?"
   },
+  "configHealth": {
+    "title": "Configuration Health",
+    "subtitle": "Automated scan of this tenant's metadata for anti-patterns and risks.",
+    "score": "Health Score",
+    "rulesRun": "Rules evaluated",
+    "refresh": "Re-scan",
+    "refreshing": "Scanning…",
+    "noFindings": "No configuration issues found — everything looks healthy.",
+    "loadError": "Failed to load the configuration-health report.",
+    "severity": {
+      "ERROR": "Error",
+      "WARNING": "Warning",
+      "INFO": "Info"
+    }
+  },
   "dashboard": {
     "title": "Dashboard",
     "systemHealth": "System Health",
@@ -1067,6 +1082,7 @@
       "errors": "Errors",
       "performance": "Performance",
       "activity": "Activity",
+      "health": "Health",
       "settings": "Settings"
     },
     "overview": {

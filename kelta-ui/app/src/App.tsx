@@ -121,6 +121,7 @@ import {
   SearchSettingsPage,
   MonitoringLayout,
   MonitoringOverviewPage,
+  ConfigHealthPage,
   PasswordPolicyPage,
   MfaPolicyPage,
 } from './pages'
@@ -978,6 +979,7 @@ function TenantRoutes(): React.ReactElement {
         <Route path="errors" element={<ErrorDashboardPage />} />
         <Route path="performance" element={<EndpointPerformancePage />} />
         <Route path="activity" element={<UserActivityPage />} />
+        <Route path="health" element={<ConfigHealthPage />} />
         <Route
           path="settings"
           element={

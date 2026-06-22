@@ -315,6 +315,7 @@ are bugs. When in doubt, trust the code and correct the doc to match.
 | `concerns.md` | Known risks, fragile files (don't bloat), tech debt, test gaps, Postgres connection sizing |
 | `ci-cd.md` | GitHub Actions pipeline, Harbor/ArgoCD deploy, smoke/rollback, container builds |
 | `status.md` | **Capability map: what's Complete vs UI-only-stub vs Planned** — check before touching a subsystem |
+| `specs/` | **Forward-looking feature specs** (multi-slice efforts). `specs/page-builder-parity.md` is the parent for the page-builder→OutSystems-parity work; per-slice specs (contracts, UI samples, migrations, file-by-file changes) live in `specs/page-builder/`. Read the relevant slice spec before implementing it. |
 
 Module-level: `kelta-{ai,auth,gateway,mcp,worker}/CLAUDE.md`, `kelta-ui/DESIGN.md`.
 Human-facing: `README.md` (local dev, ports, Makefile), `CONTRIBUTING.md`, `SECURITY.md`.

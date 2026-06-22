@@ -35,7 +35,19 @@ import java.util.Optional;
  * @since 1.0.0
  */
 public interface StorageAdapter {
-    
+
+    /**
+     * The backing-store type this adapter serves, used by {@code DispatchingStorageAdapter}
+     * to route a collection to the right adapter. A collection selects an adapter via
+     * {@code storageConfig().adapterConfig().get("adapterType")}; the default
+     * {@code "physical-table"} is used when unset.
+     *
+     * @return the adapter's storage-type key (must be unique across adapters)
+     */
+    default String storageType() {
+        return "physical-table";
+    }
+
     /**
      * Initializes storage for a collection.
      * 

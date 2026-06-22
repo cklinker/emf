@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Builds a tenant's metadata dependency graph on demand and answers impact-analysis queries
@@ -98,6 +100,66 @@ public class MetadataDependencyService {
         result.put("direct", direct.stream().map(MetadataEdge::toMap).toList());
         result.put("transitive", transitive.stream().map(MetadataNode::toMap).toList());
         result.put("transitiveCount", transitive.size());
+        return result;
+    }
+
+    /**
+     * Computes a dependency-ordered deployment plan for a change set: the list of metadata items to
+     * apply, ordered so each item's dependencies come first. When {@code includeDependencies} is
+     * true the plan is expanded to also include the transitive dependencies of each requested item
+     * (so applying the plan in a fresh environment is self-contained). Items not present in the
+     * graph are reported under {@code missing}; items trapped in a dependency cycle can't be ordered
+     * and are reported under {@code cyclic} (with the offending {@code cycles}).
+     */
+    public Map<String, Object> deploymentPlan(String tenantId, List<MetadataNode> changeSet,
+                                              boolean includeDependencies) {
+        MetadataDependencyGraph graph = buildGraph(tenantId);
+
+        List<Map<String, Object>> missing = new ArrayList<>();
+        LinkedHashMap<String, MetadataNode> scope = new LinkedHashMap<>();
+        for (MetadataNode requested : changeSet) {
+            MetadataNode resolved = graph.resolve(requested.type(), requested.id());
+            if (resolved == null) {
+                missing.add(requested.toMap());
+                continue;
+            }
+            scope.put(resolved.key(), resolved);
+            if (includeDependencies) {
+                for (MetadataNode dependency : graph.transitiveDependencies(resolved)) {
+                    scope.put(dependency.key(), dependency);
+                }
+            }
+        }
+
+        List<MetadataNode> ordered = graph.topologicalOrder(scope.values());
+        Set<String> orderedKeys = ordered.stream().map(MetadataNode::key).collect(Collectors.toSet());
+
+        List<Map<String, Object>> plan = new ArrayList<>(ordered.size());
+        for (int i = 0; i < ordered.size(); i++) {
+            Map<String, Object> entry = ordered.get(i).toMap();
+            entry.put("order", i + 1);
+            plan.add(entry);
+        }
+
+        List<Map<String, Object>> cyclic = scope.values().stream()
+                .filter(n -> !orderedKeys.contains(n.key()))
+                .map(MetadataNode::toMap)
+                .toList();
+
+        List<List<Map<String, Object>>> cycles = graph.findCycles().stream()
+                .filter(cycle -> cycle.stream().anyMatch(n -> scope.containsKey(n.key())))
+                .map(cycle -> cycle.stream().map(MetadataNode::toMap).toList())
+                .toList();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("plan", plan);
+        result.put("planCount", plan.size());
+        result.put("includeDependencies", includeDependencies);
+        result.put("missing", missing);
+        result.put("cyclic", cyclic);
+        result.put("cycles", cycles);
+        result.put("hasCycle", !cyclic.isEmpty());
+        result.put("computedAt", Instant.now().toString());
         return result;
     }
 

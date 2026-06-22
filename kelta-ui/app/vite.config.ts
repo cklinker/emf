@@ -1,8 +1,17 @@
+import { webcrypto } from 'node:crypto'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+
+// vite-plugin-pwa (Workbox) hashes precache entries with the Web Crypto API.
+// Node 18 — the version the kelta-ui Docker image builds with — does not expose
+// `crypto` as a global, so `npx vite build` throws "ReferenceError: crypto is not
+// defined" once the PWA plugin runs. Polyfill it for the build process.
+if (!globalThis.crypto) {
+  globalThis.crypto = webcrypto as unknown as Crypto
+}
 
 // https://vite.dev/config/
 export default defineConfig({

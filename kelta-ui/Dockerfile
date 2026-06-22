@@ -4,7 +4,10 @@
 # =============================================================================
 # Stage 1: Install dependencies and build
 # =============================================================================
-FROM harbor.rzware.com/dockerhub-cache/library/node:18-alpine AS builder
+# Node 20 (not 18, which is EOL): vite-plugin-pwa's Workbox needs the Web Crypto
+# API as a process global — Node 18 doesn't expose it, so the service-worker
+# generation step fails with "crypto is not defined".
+FROM harbor.rzware.com/dockerhub-cache/library/node:20-alpine AS builder
 
 WORKDIR /app
 

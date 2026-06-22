@@ -1,7 +1,16 @@
 import { Outlet, NavLink, Navigate, useLocation, useParams } from 'react-router-dom'
 import { useI18n } from '../../context/I18nContext'
 import { cn } from '@/lib/utils'
-import { BarChart3, FileText, ScrollText, AlertTriangle, Zap, Users, Settings } from 'lucide-react'
+import {
+  BarChart3,
+  FileText,
+  ScrollText,
+  AlertTriangle,
+  Zap,
+  Users,
+  Settings,
+  HeartPulse,
+} from 'lucide-react'
 
 const TABS = [
   { path: 'overview', labelKey: 'monitoring.tabs.overview', icon: BarChart3 },
@@ -10,6 +19,7 @@ const TABS = [
   { path: 'errors', labelKey: 'monitoring.tabs.errors', icon: AlertTriangle },
   { path: 'performance', labelKey: 'monitoring.tabs.performance', icon: Zap },
   { path: 'activity', labelKey: 'monitoring.tabs.activity', icon: Users },
+  { path: 'health', labelKey: 'monitoring.tabs.health', icon: HeartPulse },
   { path: 'settings', labelKey: 'monitoring.tabs.settings', icon: Settings },
 ] as const
 

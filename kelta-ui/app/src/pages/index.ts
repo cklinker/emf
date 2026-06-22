@@ -265,6 +265,10 @@ export type { EndpointPerformancePageProps } from './EndpointPerformancePage'
 export { ObservabilitySettingsPage } from './ObservabilitySettingsPage'
 export type { ObservabilitySettingsPageProps } from './ObservabilitySettingsPage'
 
+// ConfigHealthPage - Configuration-health dashboard (Rec 6)
+export { ConfigHealthPage } from './ConfigHealthPage'
+export type { ConfigHealthPageProps } from './ConfigHealthPage'
+
 // MonitoringPage - Monitoring hub layout and overview
 export { MonitoringLayout, MonitoringOverviewPage } from './MonitoringPage'
 

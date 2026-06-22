@@ -16,7 +16,13 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "knip": "knip",
-    "knip:production": "knip --production"
+    "knip:production": "knip --production",
+    "cap:sync": "cap sync",
+    "cap:copy": "cap copy",
+    "cap:add:ios": "cap add ios",
+    "cap:add:android": "cap add android",
+    "cap:open:ios": "cap open ios",
+    "cap:open:android": "cap open android"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

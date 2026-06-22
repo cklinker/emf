@@ -107,6 +107,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
         definitions.add(oidcProviders());
+        definitions.add(samlProviders());
         definitions.add(credentials());
         definitions.add(credentialOauthTokens());
         definitions.add(apiSpecs());
@@ -708,6 +709,30 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("groups_claim"))
             .addField(FieldDefinition.text("groupsProfileMapping")
                 .withColumnName("groups_profile_mapping"))
+            .build();
+    }
+
+    public static CollectionDefinition samlProviders() {
+        return systemBuilder("saml-providers", "SAML Providers", "saml_provider")
+            .displayFieldName("name")
+            .addField(FieldDefinition.requiredString("name", 100))
+            .addField(FieldDefinition.requiredString("registrationId", 100)
+                .withColumnName("registration_id"))
+            .addField(FieldDefinition.requiredString("idpEntityId", 500)
+                .withColumnName("idp_entity_id"))
+            .addField(FieldDefinition.requiredString("ssoUrl", 500)
+                .withColumnName("sso_url"))
+            // IdP signing certificate (PEM) — TEXT, no length bound.
+            .addField(FieldDefinition.text("idpCertificate")
+                .withColumnName("idp_certificate"))
+            .addField(FieldDefinition.string("nameIdFormat", 200)
+                .withColumnName("name_id_format"))
+            // Assertion attribute → user-field mappings.
+            .addField(FieldDefinition.string("emailAttribute", 200)
+                .withColumnName("email_attribute"))
+            .addField(FieldDefinition.string("profileAttribute", 200)
+                .withColumnName("profile_attribute"))
+            .addField(FieldDefinition.bool("active").withDefault(true))
             .build();
     }
 

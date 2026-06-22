@@ -206,10 +206,22 @@ public class ApiSpecController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            log.error("Materialize failed for spec={} op={}: {}", specId, opId, e.getMessage(), e);
+            String rootCause = rootCauseMessage(e);
+            log.error("Materialize failed for spec={} op={}: {}", specId, opId, rootCause, e);
             return ResponseEntity.internalServerError()
-                .body(Map.of("error", "Materialize failed", "message", e.getMessage()));
+                .body(Map.of("error", "Materialize failed",
+                    "message", e.getMessage() == null ? rootCause : e.getMessage(),
+                    "cause", rootCause));
         }
+    }
+
+    /** Walks the cause chain so the deepest (usually SQL) message surfaces in the response. */
+    private static String rootCauseMessage(Throwable t) {
+        Throwable cur = t;
+        while (cur.getCause() != null && cur.getCause() != cur) {
+            cur = cur.getCause();
+        }
+        return cur.getClass().getSimpleName() + ": " + cur.getMessage();
     }
 
     @GetMapping("/api-operations/search")

@@ -293,6 +293,16 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.UIPageSlugHook uiPageSlugHook(
+            BeforeSaveHookRegistry hookRegistry,
+            JdbcTemplate jdbcTemplate) {
+        io.kelta.worker.listener.UIPageSlugHook hook =
+                new io.kelta.worker.listener.UIPageSlugHook(jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public FieldConfigEventPublisher fieldConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher,

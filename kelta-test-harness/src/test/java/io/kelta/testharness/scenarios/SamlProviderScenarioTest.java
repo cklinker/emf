@@ -75,5 +75,26 @@ class SamlProviderScenarioTest extends ScenarioBase {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> rows = (List<Map<String, Object>>) list.getBody().get("data");
         assertThat(rows).as("created provider appears in the tenant's list").isNotEmpty();
+
+        // The kelta-auth SSO flow reads provider config through the worker's
+        // internal endpoint, which runs with NO tenant context. saml_provider is
+        // FORCE-RLS, so this exercises the admin-bypass read path (empty
+        // app.current_tenant_id) + the tenant_id filter on real Postgres — the
+        // behaviour Mockito worker tests cannot see.
+        ResponseEntity<List> internal = workerClient()
+                .get()
+                .uri("/internal/saml/providers?tenantId=" + tenantId)
+                .retrieve()
+                .toEntity(List.class);
+
+        assertThat(internal.getStatusCode().is2xxSuccessful()).isTrue();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> internalRows = internal.getBody();
+        assertThat(internalRows)
+                .as("internal endpoint returns the tenant's active SAML providers")
+                .isNotEmpty();
+        assertThat(internalRows.stream().anyMatch(p -> "acme".equals(p.get("registrationId"))))
+                .as("created provider is returned by the internal endpoint with camelCase keys")
+                .isTrue();
     }
 }

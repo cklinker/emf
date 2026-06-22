@@ -387,7 +387,94 @@ class InternalBootstrapControllerTest {
         }
     }
 
+    @Nested
+    @DisplayName("GET /internal/saml/providers")
+    class SamlProvidersTests {
+
+        @Test
+        @DisplayName("Should map snake_case columns to camelCase response")
+        void returnsSamlProviders() {
+            when(repository.findActiveSamlProvidersByTenant("tenant-1"))
+                    .thenReturn(List.of(samlProviderRow()));
+
+            ResponseEntity<List<Map<String, Object>>> response =
+                    controller.getSamlProvidersByTenant("tenant-1");
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            List<Map<String, Object>> body = response.getBody();
+            assertThat(body).hasSize(1);
+            Map<String, Object> provider = body.get(0);
+            assertThat(provider.get("id")).isEqualTo("saml-1");
+            assertThat(provider.get("registrationId")).isEqualTo("acme");
+            assertThat(provider.get("idpEntityId")).isEqualTo("https://idp.acme/entity");
+            assertThat(provider.get("ssoUrl")).isEqualTo("https://idp.acme/sso");
+            assertThat(provider.get("idpCertificate")).isEqualTo("-----BEGIN CERTIFICATE-----X-----END CERTIFICATE-----");
+            assertThat(provider.get("emailAttribute")).isEqualTo("email");
+            assertThat(provider.get("active")).isEqualTo(true);
+            // No raw snake_case keys leak through.
+            assertThat(provider).doesNotContainKeys("idp_entity_id", "sso_url", "registration_id");
+        }
+
+        @Test
+        @DisplayName("Should return empty list when tenant has no providers")
+        void returnsEmptyList() {
+            when(repository.findActiveSamlProvidersByTenant("tenant-1")).thenReturn(List.of());
+
+            ResponseEntity<List<Map<String, Object>>> response =
+                    controller.getSamlProvidersByTenant("tenant-1");
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            assertThat(response.getBody()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /internal/saml/by-entity-id")
+    class SamlByEntityIdTests {
+
+        @Test
+        @DisplayName("Should return the provider matching the entity ID")
+        void returnsProviderByEntityId() {
+            when(repository.findSamlProviderByEntityIdAndTenant("https://idp.acme/entity", "tenant-1"))
+                    .thenReturn(Optional.of(samlProviderRow()));
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.getSamlProviderByEntityId("https://idp.acme/entity", "tenant-1");
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            assertThat(response.getBody().get("registrationId")).isEqualTo("acme");
+            assertThat(response.getBody().get("emailAttribute")).isEqualTo("email");
+        }
+
+        @Test
+        @DisplayName("Should return 404 when no provider matches the entity ID")
+        void returns404WhenNotFound() {
+            when(repository.findSamlProviderByEntityIdAndTenant("https://unknown/entity", "tenant-1"))
+                    .thenReturn(Optional.empty());
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.getSamlProviderByEntityId("https://unknown/entity", "tenant-1");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(404);
+        }
+    }
+
     // ==================== Helper Methods ====================
+
+    private Map<String, Object> samlProviderRow() {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", "saml-1");
+        row.put("name", "Acme IdP");
+        row.put("registration_id", "acme");
+        row.put("idp_entity_id", "https://idp.acme/entity");
+        row.put("sso_url", "https://idp.acme/sso");
+        row.put("idp_certificate", "-----BEGIN CERTIFICATE-----X-----END CERTIFICATE-----");
+        row.put("name_id_format", "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress");
+        row.put("email_attribute", "email");
+        row.put("profile_attribute", null);
+        row.put("active", true);
+        return row;
+    }
 
     private Map<String, Object> collectionRow(String id, String name, String path, boolean system) {
         Map<String, Object> row = new HashMap<>();

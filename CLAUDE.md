@@ -142,7 +142,7 @@ visual system.
 | Frontend | React | 19.2 | `kelta-ui/app/package.json` |
 | Frontend build | Vite / Vitest | web 5.1/1.3, ui 7.2/4.0 | package.json (npm, Node 18 in CI) |
 | E2E | Playwright | 1.50 | `e2e-tests/package.json` |
-| Migrations | Flyway | head **V145**, next **V146** | `kelta-worker/.../db/migration/` |
+| Migrations | Flyway | head **V146**, next **V147** | `kelta-worker/.../db/migration/` |
 
 Check the relevant `pom.xml` / `package.json` for exact current versions before pinning.
 

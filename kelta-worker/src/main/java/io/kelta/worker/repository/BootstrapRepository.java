@@ -60,6 +60,19 @@ public class BootstrapRepository {
             FROM oidc_provider WHERE tenant_id = ? AND active = true
             """;
 
+    private static final String SELECT_ACTIVE_SAML_PROVIDERS_BY_TENANT = """
+            SELECT id, name, registration_id, idp_entity_id, sso_url, idp_certificate,
+                   name_id_format, email_attribute, profile_attribute, active
+            FROM saml_provider WHERE tenant_id = ? AND active = true
+            """;
+
+    private static final String SELECT_SAML_PROVIDER_BY_ENTITY_ID_AND_TENANT = """
+            SELECT id, name, registration_id, idp_entity_id, sso_url, idp_certificate,
+                   name_id_format, email_attribute, profile_attribute, active
+            FROM saml_provider WHERE idp_entity_id = ? AND tenant_id = ? AND active = true
+            LIMIT 1
+            """;
+
     private static final String SELECT_USER_BY_EMAIL_ANY_STATUS = """
             SELECT id, profile_id, status FROM platform_user
             WHERE email = ? AND tenant_id = ?
@@ -148,6 +161,16 @@ public class BootstrapRepository {
 
     public List<Map<String, Object>> findActiveOidcProvidersByTenant(String tenantId) {
         return jdbcTemplate.queryForList(SELECT_ACTIVE_OIDC_PROVIDERS_BY_TENANT, tenantId);
+    }
+
+    public List<Map<String, Object>> findActiveSamlProvidersByTenant(String tenantId) {
+        return jdbcTemplate.queryForList(SELECT_ACTIVE_SAML_PROVIDERS_BY_TENANT, tenantId);
+    }
+
+    public Optional<Map<String, Object>> findSamlProviderByEntityIdAndTenant(String entityId, String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                SELECT_SAML_PROVIDER_BY_ENTITY_ID_AND_TENANT, entityId, tenantId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 
     public Optional<Map<String, Object>> findUserByEmailAnyStatus(String email, String tenantId) {

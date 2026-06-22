@@ -29,6 +29,7 @@ import { usePlugins } from '../../context/PluginContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import type { PageComponentProps } from '../../types/plugin'
 import { cn } from '@/lib/utils'
+import { readComponents, readConfig, mergeConfig } from './pageConfig'
 
 /**
  * UI Page interface matching the API response
@@ -1108,7 +1109,7 @@ export function PageBuilderPage({
   const currentPageId = currentPage?.id ?? null
   if (currentPageId && loadedPageId !== currentPageId) {
     setLoadedPageId(currentPageId)
-    setComponents(currentPage?.components || [])
+    setComponents(readComponents(currentPage))
     setHasUnsavedChanges(false)
   }
 
@@ -1124,7 +1125,7 @@ export function PageBuilderPage({
       handleCloseForm()
       // Open the editor for the new page
       setEditingPageId(newPage.id)
-      setComponents([])
+      setComponents(readComponents(newPage))
       setViewMode('editor')
     },
     onError: (error: Error) => {
@@ -1200,7 +1201,7 @@ export function PageBuilderPage({
       showToast(t('builder.pages.duplicateSuccess') || 'Page duplicated successfully', 'success')
       // Open the editor for the duplicated page
       setEditingPageId(newPage.id)
-      setComponents(newPage.components || [])
+      setComponents(readComponents(newPage))
       setViewMode('editor')
     },
     onError: (error: Error) => {
@@ -1229,21 +1230,24 @@ export function PageBuilderPage({
   // Handle form submit
   const handleFormSubmit = useCallback(
     (data: PageFormData) => {
-      const pageData: Partial<UIPage> = {
-        name: data.name,
-        path: data.path,
-        title: data.title,
-        layout: { type: data.layoutType },
-      }
+      const base = { name: data.name, path: data.path, title: data.title }
+      const layout: PageLayout = { type: data.layoutType }
 
       if (editingPage) {
-        updateMutation.mutate({ id: editingPage.id, data: pageData })
+        // Preserve the existing component tree; only update the layout in config.
+        updateMutation.mutate({
+          id: editingPage.id,
+          data: {
+            ...base,
+            config: mergeConfig(readConfig(editingPage), { layout }),
+          } as unknown as Partial<UIPage>,
+        })
       } else {
         createMutation.mutate({
-          ...pageData,
-          components: [],
+          ...base,
           published: false,
-        })
+          config: { layout, components: [] },
+        } as unknown as Partial<UIPage>)
       }
     },
     [editingPage, createMutation, updateMutation]
@@ -1348,11 +1352,15 @@ export function PageBuilderPage({
   // Handle save page
   const handleSavePage = useCallback(() => {
     if (!editingPageId) return
+    // The component tree persists inside the `config` JSON column (top-level `components` is
+    // dropped by the worker as an unknown field), merged with any existing layout.
     updateMutation.mutate({
       id: editingPageId,
-      data: { components },
+      data: {
+        config: mergeConfig(readConfig(currentPage), { components }),
+      } as unknown as Partial<UIPage>,
     })
-  }, [editingPageId, components, updateMutation])
+  }, [editingPageId, components, currentPage, updateMutation])
 
   // Handle preview mode toggle (Requirement 7.7)
   const handleTogglePreview = useCallback(() => {

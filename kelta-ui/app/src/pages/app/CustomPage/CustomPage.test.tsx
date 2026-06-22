@@ -5,13 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CustomPage } from './CustomPage'
 import { componentRegistry } from '@/services/componentRegistry'
 
-// Mock API context
-const mockGetList = vi.fn()
+const mockGet = vi.fn()
 vi.mock('@/context/ApiContext', () => ({
   useApi: vi.fn(() => ({
     apiClient: {
-      get: vi.fn(),
-      getList: mockGetList,
+      get: mockGet,
+      getList: vi.fn(),
       getOne: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
@@ -21,19 +20,19 @@ vi.mock('@/context/ApiContext', () => ({
   })),
 }))
 
-function TestWrapper({
-  children,
-  initialEntries,
-}: {
-  children: React.ReactNode
-  initialEntries: string[]
-}) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  })
-  return (
+function contract(components: unknown[], title = 'My Page') {
+  return { version: '1.0', slug: 'my-page', title, path: '/my-page', tree: { components } }
+}
+
+function renderAt(slug = 'my-page') {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
+      <MemoryRouter initialEntries={[`/test-tenant/app/p/${slug}`]}>
+        <Routes>
+          <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>
   )
 }
@@ -44,117 +43,74 @@ describe('CustomPage', () => {
     componentRegistry.clear()
   })
 
-  it('shows page not found when API returns null', async () => {
-    mockGetList.mockResolvedValueOnce([])
+  it('shows page not found when the render endpoint 404s', async () => {
+    mockGet.mockRejectedValueOnce(new Error('not found'))
+    renderAt('missing')
+    await waitFor(() => expect(screen.getByText('Page not found')).toBeDefined())
+  })
 
-    render(
-      <TestWrapper initialEntries={['/test-tenant/app/p/my-page']}>
-        <Routes>
-          <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
-        </Routes>
-      </TestWrapper>
+  it('renders the component tree from the render contract', async () => {
+    mockGet.mockResolvedValueOnce(
+      contract([
+        { id: 'h', type: 'heading', props: { text: 'Welcome' } },
+        { id: 't', type: 'text', props: { text: 'Hello there' } },
+        { id: 'b', type: 'button', props: { label: 'Go' } },
+      ])
     )
-
+    renderAt()
     await waitFor(() => {
-      expect(screen.getByText('Page not found')).toBeDefined()
+      expect(screen.getByTestId('page-node-heading')).toHaveTextContent('Welcome')
+      expect(screen.getByTestId('page-node-text')).toHaveTextContent('Hello there')
+      expect(screen.getByTestId('page-node-button')).toHaveTextContent('Go')
     })
   })
 
-  it('shows component not available when not registered', async () => {
-    mockGetList.mockResolvedValueOnce([
-      {
-        id: 'page-1',
-        path: 'my-page',
-        title: 'My Custom Page',
-        component: 'unregistered_widget',
-      },
-    ])
-
-    render(
-      <TestWrapper initialEntries={['/test-tenant/app/p/my-page']}>
-        <Routes>
-          <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
-        </Routes>
-      </TestWrapper>
+  it('renders nested children inside a container', async () => {
+    mockGet.mockResolvedValueOnce(
+      contract([
+        {
+          id: 'c',
+          type: 'container',
+          children: [{ id: 'h2', type: 'heading', props: { text: 'Nested' } }],
+        },
+      ])
     )
-
-    await waitFor(() => {
-      expect(screen.getByText('Component not available')).toBeDefined()
-    })
+    renderAt()
+    await waitFor(() => expect(screen.getByTestId('page-node-heading')).toHaveTextContent('Nested'))
   })
 
-  it('renders the registered component when found', async () => {
-    // Register a test component
-    const TestPageComponent = ({ config }: { config?: Record<string, unknown> }) => (
-      <div data-testid="custom-component">Custom Content: {config?.message as string}</div>
-    )
-    componentRegistry.registerPageComponent('test_widget', TestPageComponent)
-
-    mockGetList.mockResolvedValueOnce([
-      {
-        id: 'page-1',
-        path: 'my-page',
-        title: 'Test Page',
-        component: 'test_widget',
-        props: { message: 'Hello World' },
-      },
-    ])
-
-    render(
-      <TestWrapper initialEntries={['/test-tenant/app/p/my-page']}>
-        <Routes>
-          <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
-        </Routes>
-      </TestWrapper>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('custom-component')).toBeDefined()
-      expect(screen.getByText('Custom Content: Hello World')).toBeDefined()
-    })
+  it('shows an empty-state when the tree has no components', async () => {
+    mockGet.mockResolvedValueOnce(contract([]))
+    renderAt()
+    await waitFor(() => expect(screen.getByTestId('page-empty')).toBeDefined())
   })
 
-  it('shows breadcrumb with page title', async () => {
-    const TestComponent = () => <div>Test</div>
-    componentRegistry.registerPageComponent('my_comp', TestComponent)
-
-    mockGetList.mockResolvedValueOnce([
-      {
-        id: 'page-1',
-        path: 'dashboard',
-        title: 'Sales Dashboard',
-        component: 'my_comp',
-      },
-    ])
-
-    render(
-      <TestWrapper initialEntries={['/test-tenant/app/p/dashboard']}>
-        <Routes>
-          <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
-        </Routes>
-      </TestWrapper>
+  it('falls back to a placeholder for an unknown node type', async () => {
+    mockGet.mockResolvedValueOnce(contract([{ id: 'x', type: 'mystery_widget', props: {} }]))
+    renderAt()
+    await waitFor(() =>
+      expect(screen.getByTestId('page-node-unknown')).toHaveTextContent('mystery_widget')
     )
+  })
 
+  it('renders a registered plugin component for a custom node type', async () => {
+    const Widget = ({ config }: { config?: Record<string, unknown> }) => (
+      <div data-testid="plugin-widget">Plugin: {config?.message as string}</div>
+    )
+    componentRegistry.registerPageComponent('custom_widget', Widget)
+    mockGet.mockResolvedValueOnce(
+      contract([{ id: 'w', type: 'custom_widget', props: { message: 'hi' } }])
+    )
+    renderAt()
+    await waitFor(() => expect(screen.getByTestId('plugin-widget')).toHaveTextContent('Plugin: hi'))
+  })
+
+  it('shows the page title in the breadcrumb', async () => {
+    mockGet.mockResolvedValueOnce(contract([], 'Sales Dashboard'))
+    renderAt()
     await waitFor(() => {
       expect(screen.getByText('Sales Dashboard')).toBeDefined()
       expect(screen.getByText('Home')).toBeDefined()
-    })
-  })
-
-  it('handles API error gracefully', async () => {
-    mockGetList.mockRejectedValueOnce(new Error('Network error'))
-
-    render(
-      <TestWrapper initialEntries={['/test-tenant/app/p/broken-page']}>
-        <Routes>
-          <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
-        </Routes>
-      </TestWrapper>
-    )
-
-    // When the API fails, the query catch returns null, so we get "Page not found"
-    await waitFor(() => {
-      expect(screen.getByText('Page not found')).toBeDefined()
     })
   })
 })

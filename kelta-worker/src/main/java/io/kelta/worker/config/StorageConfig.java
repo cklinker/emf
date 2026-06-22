@@ -1,9 +1,15 @@
 package io.kelta.worker.config;
 
 import io.kelta.runtime.registry.CollectionOnDemandLoader;
+import io.kelta.runtime.storage.CredentialProvider;
+import io.kelta.runtime.storage.ExternalJdbcConnectionProvider;
+import io.kelta.runtime.storage.ExternalJdbcStorageAdapter;
+import io.kelta.runtime.storage.ExternalRestStorageAdapter;
+import io.kelta.runtime.storage.RestExecutor;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Configuration for storage beans used by the worker service.
@@ -28,5 +34,25 @@ public class StorageConfig {
     @Bean
     public CollectionOnDemandLoader collectionOnDemandLoader(CollectionLifecycleManager lifecycleManager) {
         return lifecycleManager::loadCollectionByName;
+    }
+
+    /**
+     * Registers the external REST storage adapter so the {@code DispatchingStorageAdapter}
+     * routes {@code adapterType=external-rest} collections to it (Rec 4 slice 4d-2b).
+     */
+    @Bean
+    public ExternalRestStorageAdapter externalRestStorageAdapter(
+            RestExecutor restExecutor, ObjectMapper objectMapper, CredentialProvider credentialProvider) {
+        return new ExternalRestStorageAdapter(restExecutor, objectMapper, credentialProvider);
+    }
+
+    /**
+     * Registers the external JDBC storage adapter so the {@code DispatchingStorageAdapter}
+     * routes {@code adapterType=external-jdbc} collections to it (Rec 4 slice 4d-2b).
+     */
+    @Bean
+    public ExternalJdbcStorageAdapter externalJdbcStorageAdapter(
+            ExternalJdbcConnectionProvider connectionProvider, CredentialProvider credentialProvider) {
+        return new ExternalJdbcStorageAdapter(connectionProvider, credentialProvider);
     }
 }

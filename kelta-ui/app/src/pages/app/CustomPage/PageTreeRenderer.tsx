@@ -8,7 +8,10 @@
  * builder's preview — versioned via the render contract so the node schema can evolve.
  */
 import React from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
 import { componentRegistry } from '@/services/componentRegistry'
+import { useApi } from '@/context/ApiContext'
 
 export interface PageNode {
   id: string
@@ -17,8 +20,131 @@ export interface PageNode {
   children?: PageNode[]
 }
 
+/** A table node's data binding: which collection to read and which fields to show as columns. */
+interface DataViewConfig {
+  collection?: string
+  fields?: string[]
+  limit?: number
+}
+
+const MAX_TABLE_ROWS = 100
+
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
+}
+
+function asStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
+}
+
+function readDataView(props: Record<string, unknown>): DataViewConfig {
+  const dv = props.dataView
+  if (dv && typeof dv === 'object') {
+    const o = dv as Record<string, unknown>
+    return {
+      collection: asString(o.collection) || undefined,
+      fields: asStringList(o.fields),
+      limit: typeof o.limit === 'number' ? o.limit : undefined,
+    }
+  }
+  return {}
+}
+
+/**
+ * Renders a bound data table. Fetches the collection through the normal JSON:API endpoint
+ * (`apiClient.getList`), so the gateway + worker enforce Cerbos/FLS — denied fields are stripped
+ * server-side; we only display the author-declared columns.
+ */
+function DataTableNode({ dataView }: { dataView: DataViewConfig }): React.ReactElement {
+  const { apiClient } = useApi()
+  const collection = dataView.collection
+  const limit = Math.min(dataView.limit ?? 25, MAX_TABLE_ROWS)
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['page-table', collection, limit],
+    queryFn: () =>
+      apiClient.getList<Record<string, unknown>>(`/api/${collection}?page[size]=${limit}`),
+    enabled: !!collection,
+    staleTime: 60 * 1000,
+    retry: false,
+  })
+
+  if (!collection) {
+    return (
+      <div
+        className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground"
+        data-testid="page-node-table"
+      >
+        Table (no data source configured)
+      </div>
+    )
+  }
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-6" data-testid="page-node-table">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  if (isError) {
+    return (
+      <div
+        className="rounded-md border border-border p-4 text-sm text-destructive"
+        data-testid="page-node-table"
+      >
+        Could not load data.
+      </div>
+    )
+  }
+
+  const rows = data ?? []
+  const columns =
+    dataView.fields && dataView.fields.length > 0
+      ? dataView.fields
+      : rows.length > 0
+        ? Object.keys(rows[0])
+        : []
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-border" data-testid="page-node-table">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="bg-muted">
+            {columns.map((col) => (
+              <th key={col} className="border-b border-border px-3 py-2 text-left font-medium">
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td
+                className="px-3 py-4 text-center text-muted-foreground"
+                colSpan={Math.max(columns.length, 1)}
+              >
+                No records
+              </td>
+            </tr>
+          ) : (
+            rows.map((row, i) => (
+              <tr
+                key={asString(row.id, String(i))}
+                className="border-b border-border last:border-b-0"
+              >
+                {columns.map((col) => (
+                  <td key={col} className="px-3 py-2">
+                    {row[col] == null ? '' : String(row[col])}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 function renderChildren(node: PageNode, tenantSlug: string): React.ReactNode {
@@ -87,14 +213,15 @@ function PageNodeRenderer({
         </div>
       )
     case 'table':
+      return <DataTableNode dataView={readDataView(props)} />
     case 'form':
-      // Data-bound nodes (DataView binding) land in a later slice; render a labelled placeholder.
+      // Form input binding lands in a later slice; render a labelled placeholder.
       return (
         <div
           className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground"
-          data-testid={`page-node-${node.type}`}
+          data-testid="page-node-form"
         >
-          {node.type === 'table' ? 'Table' : 'Form'}
+          Form
         </div>
       )
     default: {

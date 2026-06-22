@@ -6,11 +6,12 @@ import { CustomPage } from './CustomPage'
 import { componentRegistry } from '@/services/componentRegistry'
 
 const mockGet = vi.fn()
+const mockGetList = vi.fn()
 vi.mock('@/context/ApiContext', () => ({
   useApi: vi.fn(() => ({
     apiClient: {
       get: mockGet,
-      getList: vi.fn(),
+      getList: mockGetList,
       getOne: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
@@ -112,5 +113,39 @@ describe('CustomPage', () => {
       expect(screen.getByText('Sales Dashboard')).toBeDefined()
       expect(screen.getByText('Home')).toBeDefined()
     })
+  })
+
+  it('binds a table node to a collection and renders the declared columns', async () => {
+    mockGet.mockResolvedValueOnce(
+      contract([
+        {
+          id: 'tbl',
+          type: 'table',
+          props: { dataView: { collection: 'orders', fields: ['id', 'status'] } },
+        },
+      ])
+    )
+    mockGetList.mockResolvedValueOnce([
+      { id: 'o1', status: 'open' },
+      { id: 'o2', status: 'shipped' },
+    ])
+
+    renderAt()
+
+    await waitFor(() => {
+      expect(screen.getByText('shipped')).toBeInTheDocument()
+    })
+    expect(screen.getByText('open')).toBeInTheDocument()
+    // Fetches the bound collection through the authorized JSON:API path.
+    expect(mockGetList).toHaveBeenCalledWith(expect.stringContaining('/api/orders'))
+  })
+
+  it('shows a placeholder for a table node without a data source', async () => {
+    mockGet.mockResolvedValueOnce(contract([{ id: 'tbl', type: 'table', props: {} }]))
+    renderAt()
+    await waitFor(() =>
+      expect(screen.getByTestId('page-node-table')).toHaveTextContent(/no data source/i)
+    )
+    expect(mockGetList).not.toHaveBeenCalled()
   })
 })

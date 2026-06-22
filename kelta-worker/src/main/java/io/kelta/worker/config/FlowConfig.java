@@ -436,6 +436,16 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.UIPageConfigEventPublisher uiPageConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.UIPageConfigEventPublisher hook =
+                new io.kelta.worker.listener.UIPageConfigEventPublisher(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public LayoutSectionRefreshHook layoutSectionRefreshHook(
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher) {

@@ -197,6 +197,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.collection.changed.<tenantId>` | Collection schema changed |
 | `kelta.config.field.changed.<tenantId>` | Field changed |
 | `kelta.config.layout.changed.<layoutId>` | Page layout changed |
+| `kelta.config.page.changed.<pageId>` | UI page (screen builder) changed |
 | `kelta.config.flow.changed.<tenantId>` | Flow definition changed |
 | `kelta.config.feature.changed.<tenantId>` | System feature toggled |
 | `kelta.config.domain.changed.<domainId>` | Custom domain changed |

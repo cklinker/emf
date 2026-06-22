@@ -150,6 +150,15 @@
             <artifactId>spring-boot-starter-opentelemetry</artifactId>
         </dependency>
 
+        <!-- OTLP span exporter at compile scope: per-tenant OTLP routing (Rec 7)
+             builds OtlpHttpSpanExporter directly. The starter pulls this in at
+             runtime scope only; promote to compile so it's available to javac.
+             Version is managed by the OpenTelemetry BOM via the starter. -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+
         <!-- NATS messaging for configuration updates -->
         <dependency>
             <groupId>io.kelta</groupId>

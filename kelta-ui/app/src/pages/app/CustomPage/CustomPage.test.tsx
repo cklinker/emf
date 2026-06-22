@@ -53,7 +53,7 @@ describe('CustomPage', () => {
     mockGet.mockResolvedValueOnce(
       contract([
         { id: 'h', type: 'heading', props: { text: 'Welcome' } },
-        { id: 't', type: 'text', props: { text: 'Hello there' } },
+        { id: 't', type: 'text', props: { content: 'Hello there' } },
         { id: 'b', type: 'button', props: { label: 'Go' } },
       ])
     )

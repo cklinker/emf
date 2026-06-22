@@ -44,9 +44,10 @@ function PageNodeRenderer({
         </h2>
       )
     case 'text':
+      // The builder's text component stores its body in `content` (heading uses `text`).
       return (
         <p className="text-sm text-muted-foreground" data-testid="page-node-text">
-          {asString(props.text)}
+          {asString(props.content, asString(props.text))}
         </p>
       )
     case 'button': {

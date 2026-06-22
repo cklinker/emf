@@ -712,6 +712,30 @@ describe('PageBuilderPage', () => {
         expect(screen.getByTestId('save-page-button')).not.toBeDisabled()
       })
     })
+
+    it('shows the form data-source editor (collection + fields, no row limit)', async () => {
+      const user = userEvent.setup()
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => {
+        expect(screen.getByText('dashboard')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByTestId('page-name-0'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('palette-item-form')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByTestId('palette-item-form'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('property-collection')).toBeInTheDocument()
+        expect(screen.getByTestId('property-columns')).toBeInTheDocument()
+      })
+      // Row limit is table-only.
+      expect(screen.queryByTestId('property-limit')).not.toBeInTheDocument()
+    })
   })
 
   describe('Canvas', () => {

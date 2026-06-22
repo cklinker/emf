@@ -415,7 +415,7 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
             </div>
           </>
         )}
-        {component.type === 'table' && (
+        {(component.type === 'table' || component.type === 'form') && (
           <>
             <div className="flex flex-col gap-1">
               <label
@@ -436,7 +436,7 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-columns">
-                Columns
+                {component.type === 'form' ? 'Fields' : 'Columns'}
               </label>
               <input
                 id="prop-columns"
@@ -455,24 +455,26 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
                 data-testid="property-columns"
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-limit">
-                Row limit
-              </label>
-              <input
-                id="prop-limit"
-                type="number"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={dataView.limit ?? ''}
-                onChange={(e) =>
-                  handleDataViewChange({
-                    limit: e.target.value ? Number(e.target.value) : undefined,
-                  })
-                }
-                placeholder="25"
-                data-testid="property-limit"
-              />
-            </div>
+            {component.type === 'table' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-limit">
+                  Row limit
+                </label>
+                <input
+                  id="prop-limit"
+                  type="number"
+                  className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  value={dataView.limit ?? ''}
+                  onChange={(e) =>
+                    handleDataViewChange({
+                      limit: e.target.value ? Number(e.target.value) : undefined,
+                    })
+                  }
+                  placeholder="25"
+                  data-testid="property-limit"
+                />
+              </div>
+            )}
           </>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CustomPage } from './CustomPage'
@@ -7,6 +8,7 @@ import { componentRegistry } from '@/services/componentRegistry'
 
 const mockGet = vi.fn()
 const mockGetList = vi.fn()
+const mockPostResource = vi.fn()
 vi.mock('@/context/ApiContext', () => ({
   useApi: vi.fn(() => ({
     apiClient: {
@@ -14,6 +16,7 @@ vi.mock('@/context/ApiContext', () => ({
       getList: mockGetList,
       getOne: vi.fn(),
       post: vi.fn(),
+      postResource: mockPostResource,
       put: vi.fn(),
       patch: vi.fn(),
       delete: vi.fn(),
@@ -147,5 +150,40 @@ describe('CustomPage', () => {
       expect(screen.getByTestId('page-node-table')).toHaveTextContent(/no data source/i)
     )
     expect(mockGetList).not.toHaveBeenCalled()
+  })
+
+  it('renders a form node bound to a collection and submits a new record', async () => {
+    const user = userEvent.setup()
+    mockGet.mockResolvedValueOnce(
+      contract([
+        {
+          id: 'f',
+          type: 'form',
+          props: { dataView: { collection: 'leads', fields: ['name', 'email'] } },
+        },
+      ])
+    )
+    mockPostResource.mockResolvedValueOnce({ id: 'new' })
+
+    renderAt()
+
+    await waitFor(() => expect(screen.getByTestId('page-node-form')).toBeInTheDocument())
+    await user.type(screen.getByLabelText('name'), 'Acme')
+    await user.click(screen.getByTestId('form-submit'))
+
+    await waitFor(() =>
+      expect(mockPostResource).toHaveBeenCalledWith(
+        '/api/leads',
+        expect.objectContaining({ name: 'Acme' })
+      )
+    )
+  })
+
+  it('shows a placeholder for a form node without a data source', async () => {
+    mockGet.mockResolvedValueOnce(contract([{ id: 'f', type: 'form', props: {} }]))
+    renderAt()
+    await waitFor(() =>
+      expect(screen.getByTestId('page-node-form')).toHaveTextContent(/no data source/i)
+    )
   })
 })

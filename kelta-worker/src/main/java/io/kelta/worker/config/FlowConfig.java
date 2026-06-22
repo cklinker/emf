@@ -509,6 +509,17 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.RecordTombstoneHook recordTombstoneHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.repository.RecordTombstoneRepository tombstoneRepository,
+            CollectionRegistry collectionRegistry) {
+        io.kelta.worker.listener.RecordTombstoneHook hook =
+                new io.kelta.worker.listener.RecordTombstoneHook(tombstoneRepository, collectionRegistry);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public RecordTypeEnforcementHook recordTypeEnforcementHook(
             BeforeSaveHookRegistry hookRegistry,
             JdbcTemplate jdbcTemplate,

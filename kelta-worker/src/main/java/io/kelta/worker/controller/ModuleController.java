@@ -4,6 +4,7 @@ import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.event.ModuleChangeType;
 import io.kelta.runtime.module.TenantModuleData;
 import io.kelta.worker.module.ModuleConfigEventPublisher;
+import io.kelta.worker.module.ModuleSignatureException;
 import io.kelta.worker.module.RuntimeModuleManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,7 +101,8 @@ public class ModuleController {
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestHeader(value = "X-User-ID", required = false) String userId,
             @RequestPart("manifest") String manifestJson,
-            @RequestPart("jar") MultipartFile jarFile) {
+            @RequestPart("jar") MultipartFile jarFile,
+            @RequestPart(value = "signature", required = false) String signature) {
         try {
             if (manifestJson == null || manifestJson.isBlank()) {
                 return ResponseEntity.badRequest().body(
@@ -114,12 +116,16 @@ public class ModuleController {
             byte[] jarBytes = jarFile.getBytes();
             TenantModuleData installed = runtimeModuleManager.installModuleWithJar(
                 tenantId, manifestJson, jarBytes,
-                userId != null ? userId : "system");
+                userId != null ? userId : "system", signature);
 
             eventPublisher.publishEvent(installed, ModuleChangeType.INSTALLED);
 
             return ResponseEntity.ok(
                     JsonApiResponseBuilder.single("modules", installed.id(), moduleToAttributes(installed)));
+        } catch (ModuleSignatureException e) {
+            log.warn("Rejected module JAR install — signature verification failed: {}", e.getMessage());
+            return ResponseEntity.status(403).body(
+                    JsonApiResponseBuilder.error("403", "Signature Verification Failed", e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(409).body(
                     JsonApiResponseBuilder.error("409", "Conflict", e.getMessage()));

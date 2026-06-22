@@ -31,6 +31,8 @@ public class AuthProperties {
 
     private DirectLogin directLogin = new DirectLogin();
 
+    private Saml saml = new Saml();
+
     public String getIssuerUri() { return issuerUri; }
     public void setIssuerUri(String issuerUri) { this.issuerUri = issuerUri; }
 
@@ -68,6 +70,9 @@ public class AuthProperties {
         this.directLogin = (directLogin != null) ? directLogin : new DirectLogin();
     }
 
+    public Saml getSaml() { return saml; }
+    public void setSaml(Saml saml) { this.saml = (saml != null) ? saml : new Saml(); }
+
     /**
      * Credential-carrying record for a single internal service caller. A blank
      * secret disables registration for that client, so the default (empty map)
@@ -77,6 +82,36 @@ public class AuthProperties {
         private String secret;
         public String getSecret() { return secret; }
         public void setSecret(String secret) { this.secret = secret; }
+    }
+
+    /**
+     * SAML 2.0 service-provider settings. The platform acts as ONE SAML SP across
+     * all tenants; each tenant's IdP config (entity ID, SSO URL, signing cert) is
+     * stored per-tenant in the worker's {@code saml_provider} table and loaded at
+     * runtime. The SP <em>signing</em> keypair below is platform-wide — it signs
+     * outbound AuthnRequests and is published in the SP metadata that admins
+     * register at their IdP.
+     *
+     * <p>Both PEM values are injected from the environment (the private key is a
+     * secret). When either is blank, SP request signing is disabled and
+     * AuthnRequests are sent unsigned — usable with IdPs that don't require signed
+     * requests, but {@code /saml2/metadata} then advertises no signing cert.
+     */
+    public static class Saml {
+        /** SP signing certificate, PEM ({@code -----BEGIN CERTIFICATE-----}). */
+        private String spSigningCertificate;
+        /** SP signing private key, PKCS#8 PEM ({@code -----BEGIN PRIVATE KEY-----}). Secret. */
+        private String spSigningPrivateKey;
+
+        public String getSpSigningCertificate() { return spSigningCertificate; }
+        public void setSpSigningCertificate(String spSigningCertificate) {
+            this.spSigningCertificate = spSigningCertificate;
+        }
+
+        public String getSpSigningPrivateKey() { return spSigningPrivateKey; }
+        public void setSpSigningPrivateKey(String spSigningPrivateKey) {
+            this.spSigningPrivateKey = spSigningPrivateKey;
+        }
     }
 
     /**

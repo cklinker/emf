@@ -1,12 +1,15 @@
 package io.kelta.auth.controller;
 
 import io.kelta.auth.federation.DynamicClientRegistrationRepository;
+import io.kelta.auth.federation.DynamicRelyingPartyRegistrationRepository;
 import io.kelta.auth.service.AuthDomainResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistrationRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,11 +25,15 @@ public class LoginController {
 
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final AuthDomainResolver domainResolver;
+    private final RelyingPartyRegistrationRepository relyingPartyRegistrationRepository;
 
     public LoginController(ClientRegistrationRepository clientRegistrationRepository,
-                           AuthDomainResolver domainResolver) {
+                           AuthDomainResolver domainResolver,
+                           ObjectProvider<RelyingPartyRegistrationRepository> relyingPartyRepoProvider) {
         this.clientRegistrationRepository = clientRegistrationRepository;
         this.domainResolver = domainResolver;
+        // Present only when SAML federation is wired (FederatedUserMapper available).
+        this.relyingPartyRegistrationRepository = relyingPartyRepoProvider.getIfAvailable();
     }
 
     @GetMapping("/login")
@@ -62,6 +69,15 @@ public class LoginController {
                     .map(reg -> new SsoProviderInfo(reg.getRegistrationId(), reg.getClientName()))
                     .toList();
             model.addAttribute("ssoProviders", providers);
+        }
+
+        // SAML SSO buttons link to /saml2/authenticate/{registrationId}.
+        if (tenantId != null
+                && relyingPartyRegistrationRepository instanceof DynamicRelyingPartyRegistrationRepository samlRepo) {
+            List<SsoProviderInfo> samlProviders = samlRepo.findButtonsByTenantId(tenantId).stream()
+                    .map(b -> new SsoProviderInfo(b.registrationId(), b.name()))
+                    .toList();
+            model.addAttribute("samlProviders", samlProviders);
         }
 
         return "login";

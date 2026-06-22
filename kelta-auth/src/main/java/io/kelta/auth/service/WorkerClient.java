@@ -159,6 +159,13 @@ public class WorkerClient {
             String emailClaim, String usernameClaim, String nameClaim
     ) {}
 
+    public record SamlProviderInfo(
+            String id, String name, String registrationId,
+            String idpEntityId, String ssoUrl, String idpCertificate,
+            String nameIdFormat, String emailAttribute, String profileAttribute,
+            boolean active
+    ) {}
+
     public record UserIdentity(
             String userId, String profileId, String profileName
     ) {}
@@ -241,6 +248,72 @@ public class WorkerClient {
             log.warn("Failed to list OIDC providers for tenant {}: {}", tenantId, e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * Lists the active SAML providers configured for a tenant. Used by
+     * {@code DynamicRelyingPartyRegistrationRepository} to build relying-party
+     * registrations. Returns an empty list on any failure — callers treat that
+     * as "tenant has no SAML federation".
+     */
+    public List<SamlProviderInfo> findActiveSamlProviders(String tenantId) {
+        try {
+            JsonNode response = restClient.get()
+                    .uri("/internal/saml/providers?tenantId={tenantId}", tenantId)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            if (response == null || !response.isArray()) {
+                return List.of();
+            }
+
+            List<SamlProviderInfo> providers = new ArrayList<>();
+            for (JsonNode node : response) {
+                providers.add(parseSamlProviderInfo(node));
+            }
+            return providers;
+        } catch (Exception e) {
+            log.warn("Failed to list SAML providers for tenant {}: {}", tenantId, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Resolves a single active SAML provider by IdP entity ID within a tenant.
+     * Used by the SAML success handler to recover the provider's attribute
+     * mappings from the validated assertion's issuer.
+     */
+    public Optional<SamlProviderInfo> findSamlProviderByEntityId(String entityId, String tenantId) {
+        try {
+            JsonNode response = restClient.get()
+                    .uri("/internal/saml/by-entity-id?entityId={entityId}&tenantId={tenantId}", entityId, tenantId)
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (response == null) {
+                return Optional.empty();
+            }
+            return Optional.of(parseSamlProviderInfo(response));
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound nf) {
+            return Optional.empty();
+        } catch (Exception e) {
+            log.warn("Failed to look up SAML provider for entityId {}: {}", entityId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private SamlProviderInfo parseSamlProviderInfo(JsonNode node) {
+        return new SamlProviderInfo(
+                node.path("id").asText(null),
+                node.path("name").asText(null),
+                node.path("registrationId").asText(null),
+                node.path("idpEntityId").asText(null),
+                node.path("ssoUrl").asText(null),
+                node.path("idpCertificate").asText(null),
+                node.path("nameIdFormat").asText(null),
+                node.path("emailAttribute").asText(null),
+                node.path("profileAttribute").asText(null),
+                node.path("active").asBoolean(true)
+        );
     }
 
     public record JitProvisionResult(

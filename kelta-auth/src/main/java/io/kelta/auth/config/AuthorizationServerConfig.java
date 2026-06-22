@@ -39,8 +39,12 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import io.kelta.auth.controller.ForcePasswordChangeController;
 import io.kelta.auth.controller.MfaController;
 import io.kelta.auth.federation.DynamicClientRegistrationRepository;
+import io.kelta.auth.federation.DynamicRelyingPartyRegistrationRepository;
 import io.kelta.auth.federation.FederatedLoginSuccessHandler;
 import io.kelta.auth.federation.FederatedUserMapper;
+import io.kelta.auth.federation.SamlFederatedLoginSuccessHandler;
+import io.kelta.auth.federation.SamlSpCredentials;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistrationRepository;
 import io.kelta.auth.model.KeltaUserDetails;
 import io.kelta.auth.service.AuthDomainResolver;
 import io.kelta.auth.service.OidcDiscoveryService;
@@ -237,6 +241,58 @@ public class AuthorizationServerConfig {
                     "OAuth2 federation is disabled because KELTA_ENCRYPTION_KEY is not configured. "
                     + "Set the KELTA_ENCRYPTION_KEY environment variable to enable OIDC provider federation.");
         };
+    }
+
+    /**
+     * Security filter chain for the SAML 2.0 SSO flow (Rec 8). Handles the
+     * AuthnRequest initiation ({@code /saml2/authenticate/**}), the assertion
+     * consumer ({@code /login/saml2/sso/**}), and SP metadata
+     * ({@code /saml2/metadata/**}). Runs before the default chain via its tight
+     * security matcher.
+     *
+     * <p>Gated on {@code EncryptionService} — the same condition that enables
+     * {@link FederatedUserMapper} (which backs the assertion → user mapping) and
+     * the OIDC {@code clientRegistrationRepository} bean — so SAML federation is
+     * wired exactly when federation is enabled.
+     */
+    @Bean
+    @Order(0)
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnBean(EncryptionService.class)
+    public SecurityFilterChain samlSecurityFilterChain(
+            HttpSecurity http,
+            RelyingPartyRegistrationRepository relyingPartyRegistrationRepository,
+            FederatedUserMapper federatedUserMapper,
+            WorkerClient workerClient) throws Exception {
+        http
+            .securityMatcher("/saml2/**", "/login/saml2/**")
+            .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+            // The assertion-consumer POST comes cross-site from the IdP with no
+            // CSRF token; the SAML response signature is the integrity guarantee.
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/login/saml2/sso/**", "/saml2/**"))
+            .cors(Customizer.withDefaults())
+            .saml2Login(saml2 -> saml2
+                    .loginPage("/login")
+                    .relyingPartyRegistrationRepository(relyingPartyRegistrationRepository)
+                    .successHandler(new SamlFederatedLoginSuccessHandler(federatedUserMapper, workerClient)))
+            .saml2Metadata(Customizer.withDefaults());
+
+        return http.build();
+    }
+
+    /**
+     * Per-tenant SAML relying-party registrations, loaded at runtime from the
+     * worker. The platform SP signing keypair (if configured) signs outbound
+     * AuthnRequests for every tenant. Gated on {@code EncryptionService} so the
+     * SAML chain and this bean appear/disappear together with OIDC federation.
+     */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnBean(EncryptionService.class)
+    public RelyingPartyRegistrationRepository relyingPartyRegistrationRepository(
+            WorkerClient workerClient, AuthProperties authProperties) {
+        SamlSpCredentials spCredentials = SamlSpCredentials.fromPem(
+                authProperties.getSaml().getSpSigningCertificate(),
+                authProperties.getSaml().getSpSigningPrivateKey());
+        return new DynamicRelyingPartyRegistrationRepository(workerClient, spCredentials);
     }
 
     @Bean

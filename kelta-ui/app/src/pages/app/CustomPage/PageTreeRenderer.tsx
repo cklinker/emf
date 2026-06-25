@@ -14,6 +14,7 @@ import { componentRegistry } from '@/services/componentRegistry'
 import { useApi } from '@/context/ApiContext'
 import { RenderTree } from '@/pages/PageBuilderPage/widgets/renderTree'
 import { RENDER_TREE_V2 } from '@/pages/PageBuilderPage/widgets/renderFlags'
+import type { BindingScope } from '@/pages/PageBuilderPage/model/bindingScope'
 import '@/pages/PageBuilderPage/widgets/builtins'
 
 export interface PageNode {
@@ -342,12 +343,17 @@ function LegacyPageTreeRenderer({
 export function PageTreeRenderer({
   components,
   tenantSlug,
+  scope,
 }: {
   components: PageNode[]
   tenantSlug: string
+  /** Live binding scope (slice 2d). Only threaded through the v2 `RenderTree`; the legacy path ignores it. */
+  scope?: BindingScope
 }): React.ReactElement {
   if (RENDER_TREE_V2) {
-    return <RenderTree components={components} tenantSlug={tenantSlug} mode="runtime" />
+    return (
+      <RenderTree components={components} tenantSlug={tenantSlug} mode="runtime" scope={scope} />
+    )
   }
   return <LegacyPageTreeRenderer components={components} tenantSlug={tenantSlug} />
 }

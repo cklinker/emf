@@ -28,9 +28,11 @@ import { getTenantSlug } from '../../context/TenantContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
 import { readComponents, readConfig, mergeConfig } from './pageConfig'
+import type { PageDataSource, PageVariable } from './pageConfig'
 import { Palette } from './palette/Palette'
 import { Inspector } from './inspector/Inspector'
 import { Canvas } from './canvas/Canvas'
+import { PageSettingsDrawer } from './inspector/pageSettings/PageSettingsDrawer'
 import { RenderTree } from './widgets/renderTree'
 import { widgetRegistry } from './widgets/registry'
 import './widgets/builtins'
@@ -549,6 +551,11 @@ export function PageBuilderPage({
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
+  // Page-level config (slice 2d): variables + on-load data sources, authored in the page-settings drawer.
+  const [pageVariables, setPageVariables] = useState<PageVariable[]>([])
+  const [pageDataSources, setPageDataSources] = useState<PageDataSource[]>([])
+  const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
+
   // Preview mode state (Requirement 7.7)
   const [isPreviewMode, setIsPreviewMode] = useState(false)
 
@@ -577,6 +584,9 @@ export function PageBuilderPage({
   if (currentPageId && loadedPageId !== currentPageId) {
     setLoadedPageId(currentPageId)
     setComponents(seedComponents(currentPage))
+    const cfg = readConfig(currentPage)
+    setPageVariables(cfg.variables ?? [])
+    setPageDataSources(cfg.dataSources ?? [])
     setHasUnsavedChanges(false)
   }
 
@@ -593,6 +603,9 @@ export function PageBuilderPage({
       // Open the editor for the new page
       setEditingPageId(newPage.id)
       setComponents(seedComponents(newPage))
+      const cfg = readConfig(newPage)
+      setPageVariables(cfg.variables ?? [])
+      setPageDataSources(cfg.dataSources ?? [])
       setViewMode('editor')
     },
     onError: (error: Error) => {
@@ -843,13 +856,25 @@ export function PageBuilderPage({
       data: {
         config: mergeConfig(existing, {
           components: components as ModelPageComponent[],
-          variables: existing.variables,
-          dataSources: existing.dataSources,
+          // Slice 2d: persist the drawer-authored page-level config. `mergeConfig` only overlays keys it
+          // is passed, so these MUST be passed here or they are silently dropped on save.
+          variables: pageVariables,
+          dataSources: pageDataSources,
           schemaVersion: 2,
         }),
       } as unknown as Partial<UIPage>,
     })
-  }, [editingPageId, components, currentPage, updateMutation])
+  }, [editingPageId, components, currentPage, pageVariables, pageDataSources, updateMutation])
+
+  // Page-settings drawer edits (mark unsaved so Save lights up).
+  const handleVariablesChange = useCallback((next: PageVariable[]) => {
+    setPageVariables(next)
+    setHasUnsavedChanges(true)
+  }, [])
+  const handleDataSourcesChange = useCallback((next: PageDataSource[]) => {
+    setPageDataSources(next)
+    setHasUnsavedChanges(true)
+  }, [])
 
   // Handle preview mode toggle (Requirement 7.7)
   const handleTogglePreview = useCallback(() => {
@@ -952,6 +977,16 @@ export function PageBuilderPage({
             >
               {t('builder.pages.preview')}
             </button>
+            {/* Page settings drawer (slice 2d): page-level variables + on-load data sources. */}
+            <button
+              type="button"
+              className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+              onClick={() => setPageSettingsOpen(true)}
+              aria-label={t('builder.pageSettings.open')}
+              data-testid="page-settings-button"
+            >
+              {t('builder.pageSettings.open')}
+            </button>
             {currentPage && (
               <>
                 {/* Duplicate button (Requirement 7.10) */}
@@ -1031,6 +1066,16 @@ export function PageBuilderPage({
             onChange={handleComponentChange as (updates: Partial<ModelPageComponent>) => void}
           />
         </div>
+
+        {/* Page-settings drawer (slice 2d): variables + on-load data sources. */}
+        <PageSettingsDrawer
+          open={pageSettingsOpen}
+          onOpenChange={setPageSettingsOpen}
+          variables={pageVariables}
+          dataSources={pageDataSources}
+          onVariablesChange={handleVariablesChange}
+          onDataSourcesChange={handleDataSourcesChange}
+        />
 
         {/* Preview mode overlay (Requirement 7.7, 12.5) */}
         {isPreviewMode && (

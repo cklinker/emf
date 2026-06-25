@@ -574,6 +574,55 @@
         "varValue": "Value",
         "message": "Message"
       }
+    },
+    "pageSettings": {
+      "title": "Page settings",
+      "open": "Page settings",
+      "close": "Close"
+    },
+    "variables": {
+      "title": "Variables",
+      "add": "Add variable",
+      "remove": "Remove variable",
+      "name": "Name",
+      "type": "Type",
+      "default": "Default",
+      "namePlaceholder": "e.g. count",
+      "empty": "No variables yet."
+    },
+    "data": {
+      "title": "Data sources",
+      "add": "Add source",
+      "remove": "Remove source",
+      "name": "Name",
+      "namePlaceholder": "e.g. accounts",
+      "collection": "Collection",
+      "collectionPlaceholder": "e.g. accounts",
+      "limit": "Limit",
+      "fields": "Fields",
+      "fieldsPlaceholder": "comma-separated, e.g. name, email",
+      "filter": "Filter",
+      "recordId": "Record id",
+      "mode": {
+        "list": "List",
+        "single": "Single"
+      },
+      "maxSources": "A page can declare at most {{max}} data sources.",
+      "empty": "No data sources yet."
+    },
+    "binding": {
+      "fx": "Expression",
+      "edit": "Edit",
+      "clear": "Clear",
+      "expression": "Expression",
+      "literal": "Literal",
+      "mode": {
+        "path": "Path",
+        "expr": "Expression"
+      }
+    },
+    "repeater": {
+      "truncated": "Showing {{shown}} of {{total}} rows."
     }
   },
   "packages": {

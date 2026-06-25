@@ -4,17 +4,28 @@ import React from 'react'
 import { Heading, Type, MousePointerClick, Image as ImageIcon } from 'lucide-react'
 import type { WidgetDescriptor, WidgetRenderProps } from '../types'
 import { asString } from '../util'
+import { interpolate } from '../../model/interpolate'
+import type { BindingScope } from '../../model/bindingScope'
 
 const HEADING_LEVELS = ['h1', 'h2', 'h3', 'h4']
 
-function HeadingRender({ node }: WidgetRenderProps): React.ReactElement {
+/**
+ * Coerce a resolved prop to text, then run `{{…}}` interpolation against the scope so authors can mix
+ * literals + merge tags in free-text props (`"Showing {{data.accounts[0].name}}"`). The structured
+ * `$bind` form is already resolved by `renderNode`; this only handles inline tags in literal strings.
+ */
+function asText(value: unknown, scope: BindingScope, fallback = ''): string {
+  return interpolate(asString(value, fallback), scope)
+}
+
+function HeadingRender({ node, scope }: WidgetRenderProps): React.ReactElement {
   const rawLevel = asString(node.props?.level, 'h2')
   // 2a deliberately honors `level` (the runtime previously hardcoded <h2>).
   const tag = HEADING_LEVELS.includes(rawLevel) ? rawLevel : 'h2'
   return React.createElement(
     tag,
     { className: 'text-2xl font-semibold text-foreground', 'data-testid': 'page-node-heading' },
-    asString(node.props?.text, 'Heading')
+    asText(node.props?.text, scope, 'Heading')
   )
 }
 
@@ -51,9 +62,9 @@ const text: WidgetDescriptor = {
   propSchema: [
     { key: 'content', label: 'Content', kind: 'textarea', bindable: true, group: 'content' },
   ],
-  Render: ({ node }) => (
+  Render: ({ node, scope }) => (
     <p className="text-sm text-muted-foreground" data-testid="page-node-text">
-      {asString(node.props?.content, asString(node.props?.text))}
+      {asText(node.props?.content ?? node.props?.text, scope)}
     </p>
   ),
 }
@@ -80,8 +91,8 @@ const button: WidgetDescriptor = {
     { key: 'events', label: 'Events', kind: 'event-list', group: 'events' },
   ],
   supportedEvents: ['onClick'],
-  Render: ({ node }) => {
-    const label = asString(node.props?.label, 'Button')
+  Render: ({ node, scope }) => {
+    const label = asText(node.props?.label, scope, 'Button')
     const href = asString(node.props?.href)
     const className =
       'inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground'

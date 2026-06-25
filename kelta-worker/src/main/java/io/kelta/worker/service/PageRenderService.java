@@ -30,7 +30,7 @@ public class PageRenderService {
     private static final Logger log = LoggerFactory.getLogger(PageRenderService.class);
 
     /** Render-contract version — bumped when the component-tree node schema changes incompatibly. */
-    static final String CONTRACT_VERSION = "1.0";
+    static final String CONTRACT_VERSION = "2.0";
     private static final String UI_PAGES = "ui-pages";
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
@@ -66,21 +66,28 @@ public class PageRenderService {
         }
 
         Map<String, Object> page = result.data().getFirst();
+        Map<String, Object> config = parseConfig(page.get("config"));   // never null
         return Optional.of(new PageRenderContract(
                 CONTRACT_VERSION,
                 asString(page.get("slug")),
                 asString(page.get("title")),
                 asString(page.get("path")),
-                extractTree(page.get("config"))));
+                extractObjectList(config.get("variables")),
+                extractObjectList(config.get("dataSources")),
+                config));                                                // tree = whole config, verbatim
     }
 
     private static String asString(Object value) {
         return value == null ? null : String.valueOf(value);
     }
 
-    /** The builder's component tree is stored in the page's {@code config} JSON (object or string). */
+    /**
+     * Parse the page's {@code config} JSON (delivered as a Map or a serialized String) once. The
+     * whole map is the render contract's {@code tree} — there is no {@code config.tree} wrapper; the
+     * component tree lives at {@code config.components}, so the FE reads {@code tree.components}.
+     */
     @SuppressWarnings("unchecked")
-    private Map<String, Object> extractTree(Object config) {
+    private Map<String, Object> parseConfig(Object config) {
         if (config instanceof Map<?, ?> map) {
             return (Map<String, Object>) map;
         }
@@ -92,5 +99,17 @@ public class PageRenderService {
             }
         }
         return Map.of();
+    }
+
+    /**
+     * Page-level {@code variables}/{@code dataSources} from {@code config} — opaque pass-through JSON,
+     * default empty. The server never inspects their internals or resolves bindings.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> extractObjectList(Object value) {
+        if (value instanceof List<?> list) {
+            return (List<Map<String, Object>>) (List<?>) list;
+        }
+        return List.of();
     }
 }

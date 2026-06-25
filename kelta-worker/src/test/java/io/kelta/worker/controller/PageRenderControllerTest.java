@@ -30,7 +30,8 @@ class PageRenderControllerTest {
     @Test
     @DisplayName("returns 200 with the contract for a published page")
     void rendersPage() {
-        PageRenderContract contract = new PageRenderContract("1.0", "home", "Home", "/home",
+        PageRenderContract contract = new PageRenderContract("2.0", "home", "Home", "/home",
+                java.util.List.of(), java.util.List.of(),
                 Map.of("components", java.util.List.of()));
         when(pageRenderService.render("home")).thenReturn(Optional.of(contract));
 

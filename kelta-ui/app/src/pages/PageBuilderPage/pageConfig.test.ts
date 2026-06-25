@@ -58,5 +58,44 @@ describe('pageConfig', () => {
       expect(result.layout).toEqual({ type: 'sidebar' })
       expect(result.components?.map((c) => c.id)).toEqual(['keep'])
     })
+
+    it('overlays schemaVersion:2 while preserving the 2a-covered keys (components/layout)', () => {
+      const result = mergeConfig(
+        { layout: { type: 'grid' }, components: [comp('keep')] },
+        { schemaVersion: 2 }
+      )
+      expect(result.schemaVersion).toBe(2)
+      expect(result.layout).toEqual({ type: 'grid' })
+      expect(result.components?.map((c) => c.id)).toEqual(['keep'])
+    })
+
+    it('overlays variables/dataSources/access when passed', () => {
+      const result = mergeConfig(
+        {},
+        {
+          variables: [{ name: 'count', type: 'number', default: 0 }],
+          dataSources: [{ name: 'orders', collection: 'orders', mode: 'list' }],
+          access: { requiredPermission: 'orders:view' },
+        }
+      )
+      expect(result.variables).toEqual([{ name: 'count', type: 'number', default: 0 }])
+      expect(result.dataSources).toEqual([{ name: 'orders', collection: 'orders', mode: 'list' }])
+      expect(result.access).toEqual({ requiredPermission: 'orders:view' })
+    })
+
+    it('leaves an omitted key untouched (never wipes the existing value)', () => {
+      const result = mergeConfig(
+        { variables: [{ name: 'keep', type: 'string' }], schemaVersion: 2 },
+        { components: [comp('x')] }
+      )
+      // variables/schemaVersion omitted from changes ⇒ preserved.
+      expect(result.variables).toEqual([{ name: 'keep', type: 'string' }])
+      expect(result.schemaVersion).toBe(2)
+    })
+
+    it('does NOT invent schemaVersion when only components are passed (additive helper)', () => {
+      const result = mergeConfig({ components: [comp('a')] }, { components: [comp('b')] })
+      expect(result.schemaVersion).toBeUndefined()
+    })
   })
 })

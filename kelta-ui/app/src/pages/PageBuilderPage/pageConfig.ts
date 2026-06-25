@@ -39,11 +39,17 @@ export interface PageDataSource {
  * Persisting the new siblings on save is wired in slices 2c/2d; here they are type surface only.
  */
 export interface PageConfig {
+  /**
+   * @deprecated Inert legacy (slice 2c). The widget tree + per-child `span` now own layout; the
+   * create-form `layoutType` select still writes this and it round-trips untouched, but nothing in the
+   * canvas/runtime reads it. Removal of the select is deferred to a follow-up.
+   */
   layout?: PageLayout
   components?: PageComponent[]
   variables?: PageVariable[]
   dataSources?: PageDataSource[]
   access?: { requiredPermission?: string }
+  /** v2 marker — slice 2c is the first writer (stamped on every save once a tree is authored/migrated). */
   schemaVersion?: 2
 }
 
@@ -66,13 +72,32 @@ export function readConfig(page: Partial<UIPage> | null | undefined): PageConfig
   return p.config ?? {}
 }
 
-/** Merges new components/layout into an existing config, preserving untouched keys. */
+/**
+ * Merges new page-level config into an existing config, overlaying ONLY the keys explicitly passed and
+ * preserving every untouched key. Widened in slice 2c to overlay the v2 page-level siblings
+ * (`variables`/`dataSources`/`access`/`schemaVersion`) alongside `components`/`layout`.
+ *
+ * Load-bearing rule (parent §"Save & persistence"): a key is overlaid ONLY when the CALLER passes it.
+ * Widening the accepted keys here is useless unless `handleSavePage` passes them — an omitted key is
+ * never written (and never wiped). The save call site (`handleSavePage`) therefore passes the full set.
+ */
 export function mergeConfig(
   existing: PageConfig,
-  changes: { components?: PageComponent[]; layout?: PageLayout }
+  changes: {
+    components?: PageComponent[]
+    layout?: PageLayout
+    variables?: PageVariable[]
+    dataSources?: PageDataSource[]
+    access?: { requiredPermission?: string }
+    schemaVersion?: 2
+  }
 ): PageConfig {
   const merged: PageConfig = { ...existing }
   if (changes.layout !== undefined) merged.layout = changes.layout
   if (changes.components !== undefined) merged.components = changes.components
+  if (changes.variables !== undefined) merged.variables = changes.variables
+  if (changes.dataSources !== undefined) merged.dataSources = changes.dataSources
+  if (changes.access !== undefined) merged.access = changes.access
+  if (changes.schemaVersion !== undefined) merged.schemaVersion = changes.schemaVersion
   return merged
 }

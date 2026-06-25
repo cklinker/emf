@@ -419,6 +419,18 @@
       "selectComponent": "Select a component to edit its properties",
       "canvasEmpty": "No components added yet",
       "canvasHint": "Drag components from the palette or click to add them",
+      "columnEmpty": "Drop a widget here",
+      "spanLabel": "Width",
+      "resizeAria": "Resize column width",
+      "reorderAria": "Reorder {{type}}",
+      "unsavedConfirm": "You have unsaved changes. Discard them?",
+      "dnd": {
+        "instructions": "To pick up a widget, press space or enter. Use the arrow keys to move it. Press space or enter again to drop, or escape to cancel.",
+        "picked": "Picked up {{type}}.",
+        "over": "{{type}} is over {{container}}.",
+        "dropped": "Dropped {{type}} over {{container}}.",
+        "cancelled": "Movement cancelled. {{type}} was returned."
+      },
       "confirmDelete": "Are you sure you want to delete this page? This action cannot be undone.",
       "namePlaceholder": "e.g., dashboard",
       "nameHint": "Lowercase letters, numbers, and underscores only. Must start with a letter.",

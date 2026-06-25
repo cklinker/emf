@@ -60,10 +60,12 @@ class PageRenderServiceTest {
 
         assertThat(result).isPresent();
         PageRenderContract contract = result.get();
-        assertThat(contract.version()).isEqualTo("1.0");
+        assertThat(contract.version()).isEqualTo("2.0");
         assertThat(contract.slug()).isEqualTo("home");
         assertThat(contract.title()).isEqualTo("Home");
         assertThat(contract.tree()).containsKey("components");
+        assertThat(contract.variables()).isEmpty();
+        assertThat(contract.dataSources()).isEmpty();
 
         ArgumentCaptor<QueryRequest> req = ArgumentCaptor.forClass(QueryRequest.class);
         verify(queryEngine).executeQuery(eq(def), req.capture());
@@ -80,7 +82,51 @@ class PageRenderServiceTest {
     }
 
     @Test
-    @DisplayName("parses a config stored as a JSON string")
+    @DisplayName("surfaces a v2 page's variables and dataSources alongside the whole config as tree")
+    void rendersV2Page() {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(collectionRegistry.get("ui-pages")).thenReturn(def);
+        List<Object> components = List.of(Map.of("id", "h1", "type", "heading"));
+        Map<String, Object> config = Map.of(
+                "schemaVersion", 2,
+                "components", components,
+                "variables", List.of(Map.of("name", "statusFilter", "type", "string")),
+                "dataSources", List.of(Map.of("name", "tickets", "collection", "tickets")));
+        Map<String, Object> page = Map.of("slug", "dashboard", "title", "Dashboard",
+                "path", "/dashboard", "config", config);
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
+
+        Optional<PageRenderContract> result = service().render("dashboard");
+
+        assertThat(result).isPresent();
+        PageRenderContract contract = result.get();
+        assertThat(contract.version()).isEqualTo("2.0");
+        assertThat(contract.tree()).containsKeys("components", "variables", "dataSources");
+        assertThat(contract.tree().get("components")).isEqualTo(components);
+        assertThat(contract.variables()).hasSize(1);
+        assertThat(contract.dataSources()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("a v1 Map config (no variables/dataSources) becomes the tree with empty sibling lists")
+    void v1WholeConfigToTree() {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(collectionRegistry.get("ui-pages")).thenReturn(def);
+        Map<String, Object> page = Map.of("slug", "welcome", "title", "Welcome", "path", "/welcome",
+                "config", Map.of("components", List.of(Map.of("type", "heading")),
+                        "layout", Map.of("kind", "stack")));
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
+
+        PageRenderContract contract = service().render("welcome").orElseThrow();
+
+        assertThat(contract.version()).isEqualTo("2.0");
+        assertThat(contract.tree()).containsKeys("components", "layout");
+        assertThat(contract.variables()).isEmpty();
+        assertThat(contract.dataSources()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("parses a config stored as a JSON string, defaulting the sibling lists to empty")
     void parsesStringConfig() {
         CollectionDefinition def = mock(CollectionDefinition.class);
         when(collectionRegistry.get("ui-pages")).thenReturn(def);
@@ -92,6 +138,60 @@ class PageRenderServiceTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().tree()).containsKey("components");
+        assertThat(result.get().variables()).isEmpty();
+        assertThat(result.get().dataSources()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a config String with no siblings parses once: whole config to tree, empty lists")
+    void v1StringConfigToTree() {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(collectionRegistry.get("ui-pages")).thenReturn(def);
+        Map<String, Object> page = Map.of("slug", "home", "title", "Home", "path", "/home",
+                "config", "{\"components\":[{\"type\":\"heading\"}],\"layout\":{\"kind\":\"stack\"}}");
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
+
+        PageRenderContract contract = service().render("home").orElseThrow();
+
+        assertThat(contract.tree()).containsKeys("components", "layout");
+        assertThat(contract.variables()).isEmpty();
+        assertThat(contract.dataSources()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a null config yields an empty tree and empty sibling lists without an NPE")
+    void nullConfig() {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(collectionRegistry.get("ui-pages")).thenReturn(def);
+        Map<String, Object> page = new java.util.HashMap<>();
+        page.put("slug", "home");
+        page.put("title", "Home");
+        page.put("path", "/home");
+        page.put("config", null);
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
+
+        PageRenderContract contract = service().render("home").orElseThrow();
+
+        assertThat(contract.version()).isEqualTo("2.0");
+        assertThat(contract.tree()).isEmpty();
+        assertThat(contract.variables()).isEmpty();
+        assertThat(contract.dataSources()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an unparseable config String warns and yields an empty tree, no throw")
+    void garbageStringConfig() {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(collectionRegistry.get("ui-pages")).thenReturn(def);
+        Map<String, Object> page = Map.of("slug", "home", "title", "Home", "path", "/home",
+                "config", "not json");
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
+
+        PageRenderContract contract = service().render("home").orElseThrow();
+
+        assertThat(contract.tree()).isEmpty();
+        assertThat(contract.variables()).isEmpty();
+        assertThat(contract.dataSources()).isEmpty();
     }
 
     @Test

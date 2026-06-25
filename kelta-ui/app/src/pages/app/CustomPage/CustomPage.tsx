@@ -24,13 +24,22 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/context/ApiContext'
 import { PageTreeRenderer, type PageNode } from './PageTreeRenderer'
+import type { PageDataSource, PageVariable } from '@/pages/PageBuilderPage/pageConfig'
 
-/** Versioned page render contract returned by GET /api/pages/{slug}/render. */
+/**
+ * Versioned page render contract returned by GET /api/pages/{slug}/render.
+ *
+ * `variables` / `dataSources` are page-level config surfaced verbatim (the server never resolves
+ * bindings or fetches data sources — that stays on the authorized JSON:API path). They are consumed
+ * by slices 2d/2e; here they are typed only so the contract is stable and they are not dropped.
+ */
 interface PageRenderContract {
   version: string
   slug: string
   title: string | null
   path: string | null
+  variables: PageVariable[]
+  dataSources: PageDataSource[]
   tree: { components?: PageNode[]; layout?: unknown }
 }
 

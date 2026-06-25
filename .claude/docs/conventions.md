@@ -167,6 +167,16 @@ MCP tools (`query_collection`, `list_picklists`, `list_approvals`) take flat `pa
 - The unification target for these families (DataTable, FilterBuilder, FieldRenderer, ResourceForm, RelatedList) is the library variant under `@kelta/components`. **Reuse that variant or extend it — never fork a new app-side variant.** App-side variants are being collapsed into thin re-exports of `@kelta/components`.
 - `@kelta/components` is a public plugin surface. Breaking changes to its exported props need a deprecation window (additive props, `legacy*` flags) — never a hard cutover.
 
+### Page builder config v2 (`ui-pages.config` JSON)
+
+The page-builder stores its whole tree + page-level config inside the single `ui-pages.config` JSON column (`PageBuilderPage/pageConfig.ts`). The server is a pass-through and never parses it — all binding/layout resolution is client-side (preserving Cerbos/FLS). Canonical shape: the component tree lives at **`config.components`** (no `config.tree` wrapper); `variables`, `dataSources`, `access`, and `schemaVersion` are **siblings** of `components`.
+
+- **Layout vocabulary (slice 2c):** `grid`/`row` are 12-col CSS-grid tracks (`grid grid-cols-12`), `column` is a vertical stack cell, `divider` is a leaf `<hr>`. The **only persisted layout state is per-child `span: {base, sm?, md?, lg?}`** (each `1..12`, mobile-first — `base` applies at all widths, prefixes override upward), mapped to Tailwind `col-span-*` + `sm:/md:/lg:` literals (`canvas/spanClasses.ts`; the 48 class names are spelled out so the Tailwind JIT scanner can see them — never `` `col-span-${n}` ``). **No pixel/row/column coordinates are stored.** The legacy `position {row,column,width,height}` is migrated away on builder load by `model/migrate.ts` (`width → span.base`, grouped by `row` into a root `grid` of `column`s) — idempotent; a page at `schemaVersion: 2` is never re-migrated.
+- **`schemaVersion: 2`** marks a migrated/v2-authored page (slice 2c is the first writer, stamped on every save).
+- **Save-path rule (load-bearing):** `mergeConfig` overlays a key ONLY when the `handleSavePage` call passes it. Widening `mergeConfig`'s accepted keys is useless unless the call passes them — every page-level sibling (`schemaVersion`/`variables`/`dataSources`/`access`) must be passed at the save call site or it is silently dropped (and a migrated page re-migrates on every reload). Test the `updateMutation.mutate` **payload**, not just `mergeConfig`'s return.
+- **`config.layout` is inert legacy (slice 2c):** the create-form `layoutType` select still writes `config.layout.type` and it round-trips untouched, but the widget tree + `span` own layout — nothing reads `config.layout`. Removal deferred.
+- **DnD convention:** the **page canvas** uses `@dnd-kit` (`PageBuilderPage/canvas/*`), scoped to that surface only. `PageLayoutsPage`/`MenuBuilderPage`/`FlowDesignerPage` stay on **native HTML5 DnD** — do not migrate them, and do not mix the two libs in one tree.
+
 ## MCP tools (kelta-mcp)
 
 ### Friendly args → native JSON:API body

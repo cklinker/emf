@@ -20,22 +20,23 @@
  * - 12.5: Use registered custom page components when rendering pages
  */
 
-import React, { useState, useCallback, useEffect, useRef, type ComponentType } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { usePlugins } from '../../context/PluginContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
-import type { PageComponentProps } from '../../types/plugin'
 import { cn } from '@/lib/utils'
 import { readComponents, readConfig, mergeConfig } from './pageConfig'
 import { Palette } from './palette/Palette'
 import { Inspector } from './inspector/Inspector'
+import { Canvas } from './canvas/Canvas'
 import { RenderTree } from './widgets/renderTree'
 import { widgetRegistry } from './widgets/registry'
 import './widgets/builtins'
-import type { PageComponent as ModelPageComponent } from './model/pageModel'
+import type { PageComponent as ModelPageComponent, ResponsiveSpan } from './model/pageModel'
+import { insertNode } from './model/treeOps'
+import { migrateTree, needsMigration } from './model/migrate'
 
 /**
  * UI Page interface matching the API response
@@ -62,18 +63,23 @@ export interface PageLayout {
 }
 
 /**
- * Page component definition
+ * Page component definition. Slice 2c stops writing `position` (the v2 layout is the widget tree +
+ * per-child `span`) and adds `span?`; `position` is retained only as deprecated legacy input that
+ * `migrate.ts` reads and strips on load.
  */
 export interface PageComponent {
   id: string
   type: string
   props: Record<string, unknown>
   children?: PageComponent[]
-  position: ComponentPosition
+  span?: ResponsiveSpan
+  /** @deprecated Legacy canvas coords — ignored by the renderer, migrated away by `migrate.ts` (2c). */
+  position?: ComponentPosition
 }
 
 /**
- * Component position on the canvas
+ * Component position on the canvas.
+ * @deprecated Legacy layout coords — no longer written; migrated to `grid`/`column` + `span` on load.
  */
 export interface ComponentPosition {
   row: number
@@ -100,9 +106,6 @@ interface FormErrors {
   path?: string
   title?: string
 }
-
-/** The set of registered built-in widget types — used to distinguish built-ins from plugin components. */
-const BUILTIN_TYPES = new Set(widgetRegistry.list().map((w) => w.type))
 
 /**
  * Props for PageBuilderPage component
@@ -148,6 +151,21 @@ function validateForm(data: PageFormData, t: (key: string) => string): FormError
  */
 function generateId(): string {
   return `comp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
+ * Read a page's component tree, migrating a legacy `position`-based tree (no `schemaVersion: 2`) into the
+ * v2 `grid`/`column` + `span` model on load (slice 2c). A page already at `schemaVersion: 2`, or one with
+ * no `position` anywhere, is returned untouched — the migration is idempotent and runs only in the
+ * builder (never server-side), so a page is only rewritten when an author opens + saves it.
+ */
+function seedComponents(page: Partial<UIPage> | null | undefined): PageComponent[] {
+  const raw = readComponents(page)
+  const cfg = readConfig(page)
+  if (cfg.schemaVersion === 2) return raw
+  return needsMigration(raw as ModelPageComponent[])
+    ? (migrateTree(raw as ModelPageComponent[]) as PageComponent[])
+    : raw
 }
 
 /**
@@ -242,162 +260,8 @@ function Preview({ page, components, onClose }: PreviewProps): React.ReactElemen
   )
 }
 
-/**
- * Canvas Component - displays the page layout with components
- * Requirement 12.5: Use registered custom page components when rendering pages
- */
-interface CanvasProps {
-  components: PageComponent[]
-  selectedId: string | null
-  onSelect: (id: string | null) => void
-  onDrop: (componentType: string) => void
-  onDelete: (id: string) => void
-  getPageComponent?: (name: string) => ComponentType<PageComponentProps> | undefined
-}
-
-function Canvas({
-  components,
-  selectedId,
-  onSelect,
-  onDrop,
-  onDelete,
-  getPageComponent,
-}: CanvasProps): React.ReactElement {
-  const { t } = useI18n()
-  const [isDragOver, setIsDragOver] = useState(false)
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
-
-  const handleDragLeave = () => {
-    setIsDragOver(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    const componentType = e.dataTransfer.getData('componentType')
-    if (componentType) {
-      onDrop(componentType)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent, componentId: string) => {
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault()
-      onDelete(componentId)
-    }
-  }
-
-  const renderComponent = (comp: PageComponent) => {
-    const isSelected = selectedId === comp.id
-
-    // The descriptor (built-in, or a synthetic plugin/unknown fallback) supplies the node's label + icon.
-    const descriptor = widgetRegistry.get(comp.type)
-    const Icon = descriptor.icon
-    // A node is "custom" when it isn't a registered built-in but IS a registered plugin page component.
-    const isBuiltin = BUILTIN_TYPES.has(comp.type)
-    const CustomComponent = getPageComponent?.(comp.type)
-    const isCustomComponent = !isBuiltin && !!CustomComponent
-
-    return (
-      <div
-        key={comp.id}
-        className={cn(
-          'bg-muted border border-border rounded p-2 cursor-pointer transition-[border-color,box-shadow] hover:border-muted-foreground/40 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20',
-          isSelected && 'border-primary ring-2 ring-primary/20',
-          isCustomComponent &&
-            'border-blue-300 bg-blue-50 hover:border-blue-500 dark:border-blue-800 dark:bg-blue-950/40 dark:hover:border-blue-400',
-          isSelected &&
-            isCustomComponent &&
-            'border-blue-500 ring-2 ring-blue-500/20 dark:border-blue-400'
-        )}
-        onClick={() => onSelect(comp.id)}
-        onKeyDown={(e) => handleKeyDown(e, comp.id)}
-        tabIndex={0}
-        role="button"
-        aria-label={`${comp.type} component${isCustomComponent ? ' (custom)' : ''}`}
-        aria-pressed={isSelected}
-        data-testid={`canvas-component-${comp.id}`}
-        data-custom={isCustomComponent ? 'true' : 'false'}
-      >
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-xs font-medium text-muted-foreground uppercase">
-            {comp.type}
-            {isCustomComponent && (
-              <span
-                className="inline-flex items-center ml-1 px-1 py-[2px] text-[10px] font-medium text-blue-700 bg-blue-100 rounded uppercase tracking-wide dark:text-blue-300 dark:bg-blue-900/60"
-                data-testid={`custom-badge-${comp.id}`}
-              >
-                Custom
-              </span>
-            )}
-          </span>
-          <button
-            type="button"
-            className="flex items-center justify-center w-5 h-5 p-0 text-base text-muted-foreground bg-transparent border-none rounded cursor-pointer transition-colors hover:text-destructive hover:bg-destructive/10 focus:outline-2 focus:outline-primary focus:outline-offset-2"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(comp.id)
-            }}
-            aria-label={`Delete ${comp.type} component`}
-            data-testid={`delete-component-${comp.id}`}
-          >
-            ×
-          </button>
-        </div>
-        <div className="text-sm text-foreground">
-          {isCustomComponent && CustomComponent ? (
-            // Render custom component preview
-            <div
-              className="p-2 bg-background rounded min-h-[40px] dark:bg-muted"
-              data-testid={`custom-preview-${comp.id}`}
-            >
-              <CustomComponent config={comp.props} />
-            </div>
-          ) : (
-            // Descriptor-driven node chip: icon + label (the canvas mini-preview; live preview is Preview/RenderTree).
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <Icon size={14} />
-              {descriptor.label}
-            </span>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events
-    <div
-      className={cn(
-        'bg-background border-2 border-dashed border-border rounded-md p-4 overflow-y-auto min-h-[400px] max-md:min-h-[300px] transition-[border-color,background-color]',
-        isDragOver && 'border-primary bg-primary/5'
-      )}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      onClick={() => onSelect(null)}
-      data-testid="page-canvas"
-      role="region"
-      aria-label="Page canvas"
-    >
-      {components.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground text-center">
-          <p>{t('builder.pages.canvasEmpty')}</p>
-          <p className="text-sm mt-2">{t('builder.pages.canvasHint')}</p>
-        </div>
-      ) : (
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-        <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-          {components.map(renderComponent)}
-        </div>
-      )}
-    </div>
-  )
-}
+// The canvas now lives in `./canvas/Canvas.tsx` (the `@dnd-kit` layout engine, slice 2c). The legacy
+// native-HTML5-DnD `Canvas` + its `renderComponent`/drag handlers were removed in this slice.
 
 /**
  * Page Form Component - for creating/editing page configuration
@@ -664,8 +528,9 @@ export function PageBuilderPage({
   const { apiClient, keltaClient } = useApi()
   const { showToast } = useToast()
 
-  // Requirement 12.5: Get custom page components from plugin system
-  const { getPageComponent } = usePlugins()
+  // The canvas resolves plugin page components itself (via the widget registry / componentRegistry).
+  // The end-user route binds the tenant slug; in the admin builder it is read from TenantContext.
+  const tenantSlug = getTenantSlug()
 
   // View mode: 'list' shows all pages, 'editor' shows the page editor
   const [viewMode, setViewMode] = useState<'list' | 'editor'>(pageId ? 'editor' : 'list')
@@ -682,7 +547,6 @@ export function PageBuilderPage({
   // Editor state
   const [components, setComponents] = useState<PageComponent[]>([])
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null)
-  const [, setDraggedComponentType] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   // Preview mode state (Requirement 7.7)
@@ -712,7 +576,7 @@ export function PageBuilderPage({
   const currentPageId = currentPage?.id ?? null
   if (currentPageId && loadedPageId !== currentPageId) {
     setLoadedPageId(currentPageId)
-    setComponents(readComponents(currentPage))
+    setComponents(seedComponents(currentPage))
     setHasUnsavedChanges(false)
   }
 
@@ -728,7 +592,7 @@ export function PageBuilderPage({
       handleCloseForm()
       // Open the editor for the new page
       setEditingPageId(newPage.id)
-      setComponents(readComponents(newPage))
+      setComponents(seedComponents(newPage))
       setViewMode('editor')
     },
     onError: (error: Error) => {
@@ -804,7 +668,7 @@ export function PageBuilderPage({
       showToast(t('builder.pages.duplicateSuccess') || 'Page duplicated successfully', 'success')
       // Open the editor for the duplicated page
       setEditingPageId(newPage.id)
-      setComponents(readComponents(newPage))
+      setComponents(seedComponents(newPage))
       setViewMode('editor')
     },
     onError: (error: Error) => {
@@ -881,69 +745,84 @@ export function PageBuilderPage({
     setViewMode('editor')
   }, [])
 
-  // Handle back to list
+  // Handle back to list — confirm before discarding unsaved in-builder changes (slice 2c). dnd-kit makes
+  // more canvas state losable (reorders, span resizes, drop-into-container moves), so we guard the exit.
   const handleBackToList = useCallback(() => {
-    if (hasUnsavedChanges) {
-      // Could show a confirmation dialog here
+    if (hasUnsavedChanges && !window.confirm(t('builder.pages.unsavedConfirm'))) {
+      return // stay in the builder; nothing is reset
     }
     setViewMode('list')
     setEditingPageId(null)
     setComponents([])
     setSelectedComponentId(null)
     setHasUnsavedChanges(false)
+  }, [hasUnsavedChanges, t])
+
+  // Native tab-close / refresh guard while editing with unsaved changes (slice 2c).
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = '' // browsers show their own native prompt; the string is ignored
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [hasUnsavedChanges])
 
-  // Handle component drag start
-  const handleDragStart = useCallback((componentType: string) => {
-    setDraggedComponentType(componentType)
+  // Tree-mutation callback — every drop/move/resize from the canvas routes its new tree through here.
+  const handleTreeChange = useCallback((next: PageComponent[]) => {
+    setComponents(next)
+    setHasUnsavedChanges(true)
   }, [])
 
-  // Handle adding component — seed the new node with the widget descriptor's defaultProps.
-  const handleAddComponent = useCallback(
-    (componentType: string) => {
-      const newComponent: PageComponent = {
-        id: generateId(),
-        type: componentType,
-        props: { ...widgetRegistry.get(componentType).defaultProps },
-        position: { row: components.length, column: 0, width: 12, height: 1 },
-      }
-      setComponents((prev) => [...prev, newComponent])
-      setSelectedComponentId(newComponent.id)
-      setHasUnsavedChanges(true)
-    },
-    [components.length]
-  )
-
-  // Handle component drop on canvas
-  const handleCanvasDrop = useCallback(
-    (componentType: string) => {
-      handleAddComponent(componentType)
-      setDraggedComponentType(null)
-    },
-    [handleAddComponent]
-  )
+  // Handle adding a component via the palette CLICK path — append to root via `insertNode` so click-add
+  // and drop-add agree on the descriptor defaults. No legacy `position` is written (slice 2c).
+  const handleAddComponent = useCallback((componentType: string) => {
+    const node: PageComponent = {
+      id: generateId(),
+      type: componentType,
+      props: { ...widgetRegistry.get(componentType).defaultProps },
+    }
+    setComponents(
+      (prev) =>
+        insertNode(
+          prev as ModelPageComponent[],
+          node as ModelPageComponent,
+          null
+        ) as PageComponent[]
+    )
+    setSelectedComponentId(node.id)
+    setHasUnsavedChanges(true)
+  }, [])
 
   // Handle component selection
   const handleSelectComponent = useCallback((id: string | null) => {
     setSelectedComponentId(id)
   }, [])
 
-  // Handle component property change
+  // Handle component property change from the inspector — patch the selected node anywhere in the tree.
   const handleComponentChange = useCallback(
     (updates: Partial<PageComponent>) => {
       if (!selectedComponentId) return
-      setComponents((prev) =>
-        prev.map((comp) => (comp.id === selectedComponentId ? { ...comp, ...updates } : comp))
-      )
+      const patch = (nodes: PageComponent[]): PageComponent[] =>
+        nodes.map((comp) => {
+          if (comp.id === selectedComponentId) return { ...comp, ...updates }
+          return comp.children ? { ...comp, children: patch(comp.children) } : comp
+        })
+      setComponents((prev) => patch(prev))
       setHasUnsavedChanges(true)
     },
     [selectedComponentId]
   )
 
-  // Handle component delete
+  // Handle component delete — remove the node anywhere in the tree.
   const handleDeleteComponent = useCallback(
     (id: string) => {
-      setComponents((prev) => prev.filter((comp) => comp.id !== id))
+      const strip = (nodes: PageComponent[]): PageComponent[] =>
+        nodes
+          .filter((comp) => comp.id !== id)
+          .map((comp) => (comp.children ? { ...comp, children: strip(comp.children) } : comp))
+      setComponents((prev) => strip(prev))
       if (selectedComponentId === id) {
         setSelectedComponentId(null)
       }
@@ -952,15 +831,22 @@ export function PageBuilderPage({
     [selectedComponentId]
   )
 
-  // Handle save page
+  // Handle save page — slice 2c OWNS the canonical save path. The tree persists inside the `config` JSON
+  // column; `schemaVersion: 2` is stamped on EVERY save (so a migrated legacy page is persisted and never
+  // re-migrates on reload). `variables`/`dataSources` round-trip their current value (authored in 2d) so
+  // the call shape is final — `mergeConfig` only overlays keys it is passed, so they MUST be passed here.
   const handleSavePage = useCallback(() => {
     if (!editingPageId) return
-    // The component tree persists inside the `config` JSON column (top-level `components` is
-    // dropped by the worker as an unknown field), merged with any existing layout.
+    const existing = readConfig(currentPage)
     updateMutation.mutate({
       id: editingPageId,
       data: {
-        config: mergeConfig(readConfig(currentPage), { components }),
+        config: mergeConfig(existing, {
+          components: components as ModelPageComponent[],
+          variables: existing.variables,
+          dataSources: existing.dataSources,
+          schemaVersion: 2,
+        }),
       } as unknown as Partial<UIPage>,
     })
   }, [editingPageId, components, currentPage, updateMutation])
@@ -1129,14 +1015,16 @@ export function PageBuilderPage({
         </header>
 
         <div className="grid grid-cols-[200px_1fr_280px] max-lg:grid-cols-[160px_1fr_240px] max-md:grid-cols-1 max-md:grid-rows-[auto_1fr_auto] gap-4 flex-1 min-h-0 overflow-hidden">
-          <Palette onDragStart={handleDragStart} onAddComponent={handleAddComponent} />
+          {/* Palette is rendered INSIDE the Canvas's DndContext (its tiles are draggable sources). The
+              DndContext adds no DOM wrapper, so the palette + canvas stay as the first two grid columns. */}
           <Canvas
-            components={components}
+            components={components as ModelPageComponent[]}
             selectedId={selectedComponentId}
             onSelect={handleSelectComponent}
-            onDrop={handleCanvasDrop}
+            onChange={handleTreeChange as (next: ModelPageComponent[]) => void}
             onDelete={handleDeleteComponent}
-            getPageComponent={getPageComponent}
+            tenantSlug={tenantSlug}
+            palette={<Palette onAddComponent={handleAddComponent} />}
           />
           <Inspector
             node={selectedComponent as ModelPageComponent | null}

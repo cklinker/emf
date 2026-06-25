@@ -576,6 +576,35 @@ describe('PageBuilderPage', () => {
         expect(screen.getByTestId('palette-item-table')).toBeInTheDocument()
         expect(screen.getByTestId('palette-item-card')).toBeInTheDocument()
         expect(screen.getByTestId('palette-item-container')).toBeInTheDocument()
+        // Slice 2c layout widgets.
+        expect(screen.getByTestId('palette-item-grid')).toBeInTheDocument()
+        expect(screen.getByTestId('palette-item-row')).toBeInTheDocument()
+        expect(screen.getByTestId('palette-item-column')).toBeInTheDocument()
+        expect(screen.getByTestId('palette-item-divider')).toBeInTheDocument()
+      })
+    })
+
+    it('click-adds a grid (slice 2c) with its defaultProps, appended to root', async () => {
+      const user = userEvent.setup()
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/ui-pages/1')) return Promise.resolve({ data: mockPages[0] })
+        return Promise.resolve({ data: mockPages })
+      })
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('palette-item-grid')).toBeInTheDocument())
+
+      await user.click(screen.getByTestId('palette-item-grid'))
+
+      await waitFor(() => {
+        // The grid is a container → the canvas renders it as a droppable container (not the descriptor
+        // preview). A new canvas node + a grid container plumbing appear.
+        const canvas = screen.getByTestId('page-canvas')
+        expect(canvas.querySelector('[data-testid^="canvas-component-"]')).toBeInTheDocument()
+        expect(
+          canvas.querySelector('[data-testid^="container-"][data-grid-track="true"]')
+        ).toBeTruthy()
       })
     })
 
@@ -1047,6 +1076,173 @@ describe('PageBuilderPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/updated successfully/i)).toBeInTheDocument()
       })
+    })
+
+    it('save payload (the §5.9 BLOCKER fix) contains config.schemaVersion: 2', async () => {
+      const user = userEvent.setup()
+
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/ui-pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
+        }
+        return Promise.resolve({ data: mockPages })
+      })
+      mockAxios.patch.mockResolvedValueOnce({ data: { ...mockPages[0], components: [] } })
+
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('palette-item-heading')).toBeInTheDocument())
+      await user.click(screen.getByTestId('palette-item-heading'))
+      await waitFor(() => expect(screen.getByTestId('save-page-button')).not.toBeDisabled())
+      await user.click(screen.getByTestId('save-page-button'))
+
+      await waitFor(() => expect(mockAxios.patch).toHaveBeenCalled())
+      const body = mockAxios.patch.mock.calls[0][1] as {
+        data: { attributes: { config: { schemaVersion?: number; components?: unknown[] } } }
+      }
+      // The mutation PAYLOAD (not just mergeConfig's return) must carry schemaVersion: 2.
+      expect(body.data.attributes.config.schemaVersion).toBe(2)
+      expect(body.data.attributes.config.components).toHaveLength(1)
+    })
+  })
+
+  describe('Migration on load + persisted on save (slice 2c)', () => {
+    // A legacy page: nodes carry `position`, the config has no `schemaVersion`.
+    const legacyPage: UIPage = {
+      id: '1',
+      name: 'dashboard',
+      path: '/dashboard',
+      title: 'Dashboard',
+      layout: { type: 'single' },
+      published: false,
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+      // The worker stores the tree inside config; legacy nodes have position, no schemaVersion.
+      components: [],
+      config: {
+        layout: { type: 'single' },
+        components: [
+          {
+            id: 'leg_a',
+            type: 'heading',
+            props: { text: 'Hi' },
+            position: { row: 0, column: 0, width: 12, height: 1 },
+          },
+          {
+            id: 'leg_b',
+            type: 'text',
+            props: {},
+            position: { row: 1, column: 0, width: 6, height: 1 },
+          },
+        ],
+      },
+    } as unknown as UIPage
+
+    it('migrates a legacy position tree to a grid/column structure on load', async () => {
+      const user = userEvent.setup()
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/ui-pages/1')) return Promise.resolve({ data: legacyPage })
+        return Promise.resolve({ data: mockPages })
+      })
+
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+
+      await waitFor(() => {
+        // The canvas renders the migrated grid > column structure. Container nodes are droppables
+        // (`container-*`); the migrated grid track carries data-grid-track, and the leaf heading
+        // renders through the shared path (`page-node-heading`).
+        const canvas = screen.getByTestId('page-canvas')
+        expect(
+          canvas.querySelector('[data-testid^="container-"][data-grid-track="true"]')
+        ).toBeTruthy()
+        expect(screen.getByTestId('page-node-heading')).toBeInTheDocument()
+      })
+    })
+
+    it('persists schemaVersion: 2 and the migrated components on save (no node dropped)', async () => {
+      const user = userEvent.setup()
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/ui-pages/1')) return Promise.resolve({ data: legacyPage })
+        return Promise.resolve({ data: mockPages })
+      })
+      mockAxios.patch.mockResolvedValueOnce({ data: legacyPage })
+
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('page-node-heading')).toBeInTheDocument())
+
+      // Make a change so the save button enables, then save.
+      await user.click(screen.getByTestId('palette-item-divider'))
+      await waitFor(() => expect(screen.getByTestId('save-page-button')).not.toBeDisabled())
+      await user.click(screen.getByTestId('save-page-button'))
+
+      await waitFor(() => expect(mockAxios.patch).toHaveBeenCalled())
+      const body = mockAxios.patch.mock.calls[0][1] as {
+        data: {
+          attributes: { config: { schemaVersion?: number; components?: Array<{ type: string }> } }
+        }
+      }
+      expect(body.data.attributes.config.schemaVersion).toBe(2)
+      // The migrated grid + the newly-added divider are both present (no node dropped).
+      const types = body.data.attributes.config.components!.map((c) => c.type)
+      expect(types).toContain('grid')
+      expect(types).toContain('divider')
+    })
+  })
+
+  describe('Unsaved-changes guard (slice 2c §5.10)', () => {
+    beforeEach(() => {
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/ui-pages/1')) return Promise.resolve({ data: mockPages[0] })
+        return Promise.resolve({ data: mockPages })
+      })
+    })
+
+    it('confirm → false keeps the builder open (no reset)', async () => {
+      const user = userEvent.setup()
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('palette-item-heading')).toBeInTheDocument())
+
+      // Make an unsaved change.
+      await user.click(screen.getByTestId('palette-item-heading'))
+      await waitFor(() => expect(screen.getByTestId('save-page-button')).not.toBeDisabled())
+
+      await user.click(screen.getByTestId('back-to-list-button'))
+
+      expect(confirmSpy).toHaveBeenCalled()
+      // The i18n key (not a hardcoded literal) is used for the confirm message.
+      expect(confirmSpy.mock.calls[0][0]).toMatch(/unsaved changes/i)
+      // Still in the editor — the canvas is present, no reset to the list.
+      expect(screen.getByTestId('page-canvas')).toBeInTheDocument()
+      confirmSpy.mockRestore()
+    })
+
+    it('confirm → true returns to the list view', async () => {
+      const user = userEvent.setup()
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('palette-item-heading')).toBeInTheDocument())
+
+      await user.click(screen.getByTestId('palette-item-heading'))
+      await waitFor(() => expect(screen.getByTestId('save-page-button')).not.toBeDisabled())
+
+      await user.click(screen.getByTestId('back-to-list-button'))
+
+      expect(confirmSpy).toHaveBeenCalled()
+      await waitFor(() => expect(screen.queryByTestId('page-canvas')).not.toBeInTheDocument())
+      confirmSpy.mockRestore()
     })
   })
 

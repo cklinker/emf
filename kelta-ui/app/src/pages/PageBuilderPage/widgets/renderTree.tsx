@@ -3,6 +3,7 @@
  * to duplicate per-type switches). `renderNode` looks up the descriptor, resolves the node's props
  * once (identity in 2a, real in 2d), and calls the descriptor's `Render`.
  */
+/* eslint-disable react-refresh/only-export-components -- shared render path exports both RenderTree and renderNode */
 import React from 'react'
 import { resolveBindings, type BindingScope } from '../model/bindingScope'
 import { widgetRegistry } from './registry'
@@ -36,6 +37,21 @@ function NodeRenderer({ node, scope, mode, tenantSlug }: NodeRendererProps): Rea
       mode={mode}
       tenantSlug={tenantSlug}
       renderChild={renderChild}
+    />
+  )
+}
+
+/** Render a SINGLE node through the shared path (used by the canvas `SelectableNode`, slice 2c). */
+export function renderNode(
+  node: RenderNode,
+  opts: { mode?: 'editor' | 'runtime'; tenantSlug: string; scope?: BindingScope }
+): React.ReactElement {
+  return (
+    <NodeRenderer
+      node={node}
+      scope={opts.scope ?? {}}
+      mode={opts.mode ?? 'runtime'}
+      tenantSlug={opts.tenantSlug}
     />
   )
 }

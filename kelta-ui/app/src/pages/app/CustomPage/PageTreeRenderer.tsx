@@ -12,6 +12,9 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { componentRegistry } from '@/services/componentRegistry'
 import { useApi } from '@/context/ApiContext'
+import { RenderTree } from '@/pages/PageBuilderPage/widgets/renderTree'
+import { RENDER_TREE_V2 } from '@/pages/PageBuilderPage/widgets/renderFlags'
+import '@/pages/PageBuilderPage/widgets/builtins'
 
 export interface PageNode {
   id: string
@@ -303,7 +306,12 @@ function PageNodeRenderer({
   }
 }
 
-export function PageTreeRenderer({
+/**
+ * Legacy per-type switch renderer — retained as the fallback path while the v2 registry-based
+ * `RenderTree` soaks (gated by {@link RENDER_TREE_V2}). Do not extend; new widgets register as
+ * descriptors under `PageBuilderPage/widgets/builtins`.
+ */
+function LegacyPageTreeRenderer({
   components,
   tenantSlug,
 }: {
@@ -324,4 +332,22 @@ export function PageTreeRenderer({
       ))}
     </div>
   )
+}
+
+/**
+ * Runtime renderer for a published page's component tree. Delegates to the shared `RenderTree`
+ * (registry-driven, also used by the builder preview) when {@link RENDER_TREE_V2} is on, else falls
+ * back to the legacy switch renderer.
+ */
+export function PageTreeRenderer({
+  components,
+  tenantSlug,
+}: {
+  components: PageNode[]
+  tenantSlug: string
+}): React.ReactElement {
+  if (RENDER_TREE_V2) {
+    return <RenderTree components={components} tenantSlug={tenantSlug} mode="runtime" />
+  }
+  return <LegacyPageTreeRenderer components={components} tenantSlug={tenantSlug} />
 }

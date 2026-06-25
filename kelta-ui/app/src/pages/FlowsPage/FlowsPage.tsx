@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { getTenantSlug } from '../../context/TenantContext'
-import { unwrapCollection } from '../../utils/jsonapi'
+import { unwrapCollection, unwrapResource } from '../../utils/jsonapi'
 import {
   useToast,
   ConfirmDialog,
@@ -116,7 +116,9 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
           (errBody as Record<string, string>).message || `Execute failed: ${resp.statusText}`
         )
       }
-      return (await resp.json()) as { executionId: string }
+      // The execute endpoint returns a JSON:API envelope
+      // ({ data: { type: 'flow-executions', id, attributes } }); the execution id is `data.id`.
+      return unwrapResource<{ id: string }>(await resp.json())
     },
     onSuccess: (data) => {
       showToast(t('flows.executionStarted'), 'success')
@@ -125,10 +127,8 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
         queryClient.invalidateQueries({ queryKey: ['flow-executions', execItemId] })
       }
       // Navigate to the debug view in the flow designer
-      if (runFlowTarget && data?.executionId) {
-        navigate(
-          `/${getTenantSlug()}/flows/${runFlowTarget.id}/design?executionId=${data.executionId}`
-        )
+      if (runFlowTarget && data?.id) {
+        navigate(`/${getTenantSlug()}/flows/${runFlowTarget.id}/design?executionId=${data.id}`)
       }
     },
     onError: (err: Error) => showToast(err.message, 'error'),

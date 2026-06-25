@@ -90,3 +90,53 @@ describe('EventListField', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('EventListField per-action sub-forms (2e)', () => {
+  it('runFlow: toggling awaitResult sets the flag', async () => {
+    const onChange = renderField({
+      onClick: [{ action: 'runFlow', flowId: 'f1', input: {} }],
+    })
+    await userEvent.click(screen.getByTestId('event-param-awaitResult'))
+    expect(onChange).toHaveBeenLastCalledWith({
+      onClick: [{ action: 'runFlow', flowId: 'f1', input: {}, awaitResult: true }],
+    })
+  })
+
+  it('runFlow: adding an input row writes an input map entry', async () => {
+    const onChange = renderField({
+      onClick: [{ action: 'runFlow', flowId: 'f1', input: {} }],
+    })
+    await userEvent.click(screen.getByTestId('event-param-input-add'))
+    expect(onChange).toHaveBeenLastCalledWith({
+      onClick: [{ action: 'runFlow', flowId: 'f1', input: { key1: '' } }],
+    })
+  })
+
+  it('navigate: toggling newTab sets the flag', async () => {
+    const onChange = renderField({ onClick: [{ action: 'navigate', to: '/x' }] })
+    await userEvent.click(screen.getByTestId('event-param-newTab'))
+    expect(onChange).toHaveBeenLastCalledWith({
+      onClick: [{ action: 'navigate', to: '/x', newTab: true }],
+    })
+  })
+
+  it('updateRecord: shows and edits a recordId field', async () => {
+    const onChange = renderField({
+      onClick: [{ action: 'updateRecord', collection: 'orders', attributes: {} }],
+    })
+    await userEvent.type(screen.getByTestId('event-param-recordId'), 'r')
+    expect(onChange).toHaveBeenLastCalledWith({
+      onClick: [{ action: 'updateRecord', collection: 'orders', attributes: {}, recordId: 'r' }],
+    })
+  })
+
+  it('createRecord: adding an attribute row writes an attributes map entry', async () => {
+    const onChange = renderField({
+      onClick: [{ action: 'createRecord', collection: 'orders', attributes: {} }],
+    })
+    await userEvent.click(screen.getByTestId('event-param-attr-add'))
+    expect(onChange).toHaveBeenLastCalledWith({
+      onClick: [{ action: 'createRecord', collection: 'orders', attributes: { key1: '' } }],
+    })
+  })
+})

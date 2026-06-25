@@ -28,6 +28,7 @@ import type { PageDataSource, PageVariable } from '@/pages/PageBuilderPage/pageC
 import { usePageVariables } from '@/pages/PageBuilderPage/hooks/usePageVariables'
 import { usePageDataSources } from '@/pages/PageBuilderPage/hooks/usePageDataSources'
 import type { BindingScope } from '@/pages/PageBuilderPage/model/bindingScope'
+import type { PageRuntimeValue } from '@/pages/PageBuilderPage/runtime/PageRuntimeContext'
 
 /**
  * Versioned page render contract returned by GET /api/pages/{slug}/render.
@@ -74,7 +75,7 @@ export function CustomPage(): React.ReactElement {
   // JSON:API path so Cerbos/FLS stay enforced server-side.
   const variables = React.useMemo<PageVariable[]>(() => contract?.variables ?? [], [contract])
   const dataSources = React.useMemo<PageDataSource[]>(() => contract?.dataSources ?? [], [contract])
-  const { vars } = usePageVariables(variables)
+  const { vars, setVar } = usePageVariables(variables)
   const page = React.useMemo(
     () => ({ slug: pageSlug, params: pageSlug ? { pageSlug } : undefined }),
     [pageSlug]
@@ -82,6 +83,17 @@ export function CustomPage(): React.ReactElement {
   // Data sources may read vars/page in their filter/recordId bindings.
   const { data } = usePageDataSources(dataSources, { vars, page }, pageSlug)
   const scope: BindingScope = React.useMemo(() => ({ vars, data, page }), [vars, data, page])
+
+  // Page-level action deps (slice 2e): `setVar` writes a page variable; `dataSourceQueryKey` mirrors the
+  // `usePageDataSources` query-key prefix so `refreshData` invalidates the right source's on-load fetch.
+  const runtime = React.useMemo<PageRuntimeValue>(
+    () => ({
+      tenantSlug: tenantSlug || '',
+      setVar,
+      dataSourceQueryKey: (name: string) => ['page-data', pageSlug ?? '', name],
+    }),
+    [tenantSlug, setVar, pageSlug]
+  )
 
   if (isLoading) {
     return (
@@ -144,6 +156,7 @@ export function CustomPage(): React.ReactElement {
         components={contract.tree?.components ?? []}
         tenantSlug={tenantSlug || ''}
         scope={scope}
+        runtime={runtime}
       />
     </div>
   )

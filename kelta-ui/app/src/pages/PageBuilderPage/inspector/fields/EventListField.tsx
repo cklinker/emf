@@ -206,7 +206,30 @@ export function EventListField({
   )
 }
 
-/** Minimal per-action param editor — values are stored verbatim into the PageAction; runtime is 2e. */
+const LABEL_CLASS = 'text-[11px] font-medium text-muted-foreground'
+
+/** A labeled row wrapper for one sub-form field. */
+function Field({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}): React.ReactElement {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className={LABEL_CLASS}>{label}</span>
+      {children}
+    </label>
+  )
+}
+
+/**
+ * Per-action sub-form (slice 2e §5.2). Each action type gets its minimal labeled config. Values are
+ * stored verbatim into the PageAction; the runtime (executeAction) resolves bindable values at fire time.
+ * String value cells accept either a literal or a `{{record.id}}`-style merge tag (resolved by the
+ * runtime's interpolation/binding layer).
+ */
 function ActionParams({
   action,
   onChange,
@@ -218,95 +241,257 @@ function ActionParams({
   switch (action.action) {
     case 'runFlow':
       return (
-        <input
-          className={INPUT_CLASS}
-          value={action.flowId}
-          onChange={(e) => onChange({ flowId: e.target.value })}
-          placeholder={t('builder.events.param.flowId')}
-          data-testid="event-param-flowId"
-        />
+        <div className="flex flex-col gap-1.5">
+          <Field label={t('builder.actions.runFlow.flowId')}>
+            <input
+              className={INPUT_CLASS}
+              value={action.flowId}
+              onChange={(e) => onChange({ flowId: e.target.value })}
+              placeholder={t('builder.events.param.flowId')}
+              data-testid="event-param-flowId"
+            />
+          </Field>
+          <MapRows
+            label={t('builder.actions.runFlow.inputs')}
+            addLabel={t('builder.actions.runFlow.addInput')}
+            testidPrefix="event-param-input"
+            value={(action.input ?? {}) as Record<string, PropValue>}
+            onChange={(input) => onChange({ input })}
+          />
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={!!action.awaitResult}
+              onChange={(e) => onChange({ awaitResult: e.target.checked })}
+              data-testid="event-param-awaitResult"
+            />
+            <span className={LABEL_CLASS}>{t('builder.actions.runFlow.awaitResult')}</span>
+          </label>
+        </div>
       )
     case 'navigate':
       return (
-        <input
-          className={INPUT_CLASS}
-          value={action.to}
-          onChange={(e) => onChange({ to: e.target.value })}
-          placeholder={t('builder.events.param.to')}
-          data-testid="event-param-to"
-        />
+        <div className="flex flex-col gap-1.5">
+          <Field label={t('builder.actions.navigate.to')}>
+            <input
+              className={INPUT_CLASS}
+              value={action.to}
+              onChange={(e) => onChange({ to: e.target.value })}
+              placeholder={t('builder.events.param.to')}
+              data-testid="event-param-to"
+            />
+          </Field>
+          <NewTabToggle action={action} onChange={onChange} t={t} />
+        </div>
       )
     case 'openUrl':
       return (
-        <input
-          className={INPUT_CLASS}
-          value={typeof action.url === 'string' ? action.url : ''}
-          onChange={(e) => onChange({ url: e.target.value })}
-          placeholder={t('builder.events.param.url')}
-          data-testid="event-param-url"
-        />
+        <div className="flex flex-col gap-1.5">
+          <Field label={t('builder.actions.openUrl.url')}>
+            <input
+              className={INPUT_CLASS}
+              value={typeof action.url === 'string' ? action.url : ''}
+              onChange={(e) => onChange({ url: e.target.value })}
+              placeholder={t('builder.events.param.url')}
+              data-testid="event-param-url"
+            />
+          </Field>
+          <NewTabToggle action={action} onChange={onChange} t={t} />
+        </div>
       )
     case 'createRecord':
     case 'updateRecord':
       return (
-        <input
-          className={INPUT_CLASS}
-          value={action.collection}
-          onChange={(e) => onChange({ collection: e.target.value })}
-          placeholder={t('builder.events.param.collection')}
-          data-testid="event-param-collection"
-        />
+        <div className="flex flex-col gap-1.5">
+          <Field label={t('builder.actions.record.collection')}>
+            <input
+              className={INPUT_CLASS}
+              value={action.collection}
+              onChange={(e) => onChange({ collection: e.target.value })}
+              placeholder={t('builder.events.param.collection')}
+              data-testid="event-param-collection"
+            />
+          </Field>
+          {action.action === 'updateRecord' && (
+            <Field label={t('builder.actions.record.recordId')}>
+              <input
+                className={INPUT_CLASS}
+                value={typeof action.recordId === 'string' ? action.recordId : ''}
+                onChange={(e) => onChange({ recordId: e.target.value })}
+                placeholder={t('builder.actions.record.recordId')}
+                data-testid="event-param-recordId"
+              />
+            </Field>
+          )}
+          <MapRows
+            label={t('builder.actions.record.attributes')}
+            addLabel={t('builder.actions.record.addAttribute')}
+            testidPrefix="event-param-attr"
+            value={(action.attributes ?? {}) as Record<string, PropValue>}
+            onChange={(attributes) => onChange({ attributes })}
+          />
+        </div>
       )
     case 'refreshData':
       return (
-        <input
-          className={INPUT_CLASS}
-          value={action.dataSource}
-          onChange={(e) => onChange({ dataSource: e.target.value })}
-          placeholder={t('builder.events.param.dataSource')}
-          data-testid="event-param-dataSource"
-        />
+        <Field label={t('builder.actions.refreshData.dataSource')}>
+          <input
+            className={INPUT_CLASS}
+            value={action.dataSource}
+            onChange={(e) => onChange({ dataSource: e.target.value })}
+            placeholder={t('builder.events.param.dataSource')}
+            data-testid="event-param-dataSource"
+          />
+        </Field>
       )
     case 'setVar':
       return (
         <div className="flex gap-1.5">
-          <input
-            className={INPUT_CLASS}
-            value={action.name}
-            onChange={(e) => onChange({ name: e.target.value })}
-            placeholder={t('builder.events.param.varName')}
-            data-testid="event-param-name"
-          />
-          <input
-            className={INPUT_CLASS}
-            value={typeof action.value === 'string' ? action.value : ''}
-            onChange={(e) => onChange({ value: e.target.value })}
-            placeholder={t('builder.events.param.varValue')}
-            data-testid="event-param-value"
-          />
+          <Field label={t('builder.actions.setVar.name')}>
+            <input
+              className={INPUT_CLASS}
+              value={action.name}
+              onChange={(e) => onChange({ name: e.target.value })}
+              placeholder={t('builder.events.param.varName')}
+              data-testid="event-param-name"
+            />
+          </Field>
+          <Field label={t('builder.actions.setVar.value')}>
+            <input
+              className={INPUT_CLASS}
+              value={typeof action.value === 'string' ? action.value : ''}
+              onChange={(e) => onChange({ value: e.target.value })}
+              placeholder={t('builder.events.param.varValue')}
+              data-testid="event-param-value"
+            />
+          </Field>
         </div>
       )
     case 'showToast':
       return (
         <div className="flex gap-1.5">
-          <select
-            className="p-1.5 text-xs text-foreground bg-background border border-border rounded focus:outline-none focus:border-primary"
-            value={action.level}
-            onChange={(e) => onChange({ level: e.target.value })}
-            data-testid="event-param-level"
-          >
-            <option value="info">{t('builder.events.toast.info')}</option>
-            <option value="success">{t('builder.events.toast.success')}</option>
-            <option value="error">{t('builder.events.toast.error')}</option>
-          </select>
-          <input
-            className={INPUT_CLASS}
-            value={typeof action.message === 'string' ? action.message : ''}
-            onChange={(e) => onChange({ message: e.target.value })}
-            placeholder={t('builder.events.param.message')}
-            data-testid="event-param-message"
-          />
+          <Field label={t('builder.actions.showToast.level')}>
+            <select
+              className="p-1.5 text-xs text-foreground bg-background border border-border rounded focus:outline-none focus:border-primary"
+              value={action.level}
+              onChange={(e) => onChange({ level: e.target.value })}
+              data-testid="event-param-level"
+            >
+              <option value="info">{t('builder.events.toast.info')}</option>
+              <option value="success">{t('builder.events.toast.success')}</option>
+              <option value="error">{t('builder.events.toast.error')}</option>
+            </select>
+          </Field>
+          <Field label={t('builder.actions.showToast.message')}>
+            <input
+              className={INPUT_CLASS}
+              value={typeof action.message === 'string' ? action.message : ''}
+              onChange={(e) => onChange({ message: e.target.value })}
+              placeholder={t('builder.events.param.message')}
+              data-testid="event-param-message"
+            />
+          </Field>
         </div>
       )
   }
+}
+
+/** Shared "New tab" checkbox for navigate/openUrl. */
+function NewTabToggle({
+  action,
+  onChange,
+  t,
+}: {
+  action: Extract<PageAction, { action: 'navigate' | 'openUrl' }>
+  onChange: (patch: Record<string, PropValue>) => void
+  t: (key: string) => string
+}): React.ReactElement {
+  return (
+    <label className="flex items-center gap-1.5">
+      <input
+        type="checkbox"
+        checked={!!action.newTab}
+        onChange={(e) => onChange({ newTab: e.target.checked })}
+        data-testid="event-param-newTab"
+      />
+      <span className={LABEL_CLASS}>{t('builder.actions.navigate.newTab')}</span>
+    </label>
+  )
+}
+
+/**
+ * Key→value rows editor for an action's `input`/`attributes` map. Keys are free-text; values accept a
+ * literal or a `{{merge.tag}}` (resolved by the runtime). Emits the whole map immutably on every edit.
+ */
+function MapRows({
+  label,
+  addLabel,
+  testidPrefix,
+  value,
+  onChange,
+}: {
+  label: string
+  addLabel: string
+  testidPrefix: string
+  value: Record<string, PropValue>
+  onChange: (next: Record<string, PropValue>) => void
+}): React.ReactElement {
+  const entries = Object.entries(value)
+
+  const writeKey = (oldKey: string, newKey: string) => {
+    const next: Record<string, PropValue> = {}
+    for (const [k, v] of entries) next[k === oldKey ? newKey : k] = v
+    onChange(next)
+  }
+  const writeVal = (key: string, v: PropValue) => onChange({ ...value, [key]: v })
+  const removeKey = (key: string) => {
+    const next = { ...value }
+    delete next[key]
+    onChange(next)
+  }
+  const addRow = () => {
+    // Find a free placeholder key so the new empty row is addressable.
+    let i = entries.length + 1
+    let key = `key${i}`
+    while (key in value) key = `key${++i}`
+    onChange({ ...value, [key]: '' })
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className={LABEL_CLASS}>{label}</span>
+      {entries.map(([key, val], i) => (
+        <div className="flex items-center gap-1" key={i} data-testid={`${testidPrefix}-row-${i}`}>
+          <input
+            className={INPUT_CLASS}
+            value={key}
+            onChange={(e) => writeKey(key, e.target.value)}
+            data-testid={`${testidPrefix}-key-${i}`}
+          />
+          <input
+            className={INPUT_CLASS}
+            value={typeof val === 'string' ? val : JSON.stringify(val)}
+            onChange={(e) => writeVal(key, e.target.value)}
+            data-testid={`${testidPrefix}-value-${i}`}
+          />
+          <button
+            type="button"
+            className="px-1 text-sm text-muted-foreground hover:text-destructive"
+            onClick={() => removeKey(key)}
+            data-testid={`${testidPrefix}-remove-${i}`}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="self-start rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-accent"
+        onClick={addRow}
+        data-testid={`${testidPrefix}-add`}
+      >
+        + {addLabel}
+      </button>
+    </div>
+  )
 }

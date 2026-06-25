@@ -15,6 +15,10 @@ import { useApi } from '@/context/ApiContext'
 import { RenderTree } from '@/pages/PageBuilderPage/widgets/renderTree'
 import { RENDER_TREE_V2 } from '@/pages/PageBuilderPage/widgets/renderFlags'
 import type { BindingScope } from '@/pages/PageBuilderPage/model/bindingScope'
+import {
+  PageRuntimeProvider,
+  type PageRuntimeValue,
+} from '@/pages/PageBuilderPage/runtime/PageRuntimeContext'
 import '@/pages/PageBuilderPage/widgets/builtins'
 
 export interface PageNode {
@@ -344,15 +348,25 @@ export function PageTreeRenderer({
   components,
   tenantSlug,
   scope,
+  runtime,
 }: {
   components: PageNode[]
   tenantSlug: string
   /** Live binding scope (slice 2d). Only threaded through the v2 `RenderTree`; the legacy path ignores it. */
   scope?: BindingScope
+  /** Page-level action deps (slice 2e: setVar/refreshData query key). Provided to runtime event widgets. */
+  runtime?: PageRuntimeValue
 }): React.ReactElement {
   if (RENDER_TREE_V2) {
+    const runtimeValue: PageRuntimeValue = runtime ?? {
+      tenantSlug,
+      setVar: () => {},
+      dataSourceQueryKey: (name: string) => ['page-data', name],
+    }
     return (
-      <RenderTree components={components} tenantSlug={tenantSlug} mode="runtime" scope={scope} />
+      <PageRuntimeProvider value={runtimeValue}>
+        <RenderTree components={components} tenantSlug={tenantSlug} mode="runtime" scope={scope} />
+      </PageRuntimeProvider>
     )
   }
   return <LegacyPageTreeRenderer components={components} tenantSlug={tenantSlug} />

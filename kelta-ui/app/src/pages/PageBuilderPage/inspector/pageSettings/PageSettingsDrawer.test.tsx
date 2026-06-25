@@ -40,6 +40,7 @@ function Harness({
           setDataSources(d)
           onDataSourcesChange?.(d)
         }}
+        onRequiredPermissionChange={() => {}}
       />
     </I18nProvider>
   )

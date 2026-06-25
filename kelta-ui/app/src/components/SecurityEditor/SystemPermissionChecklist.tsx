@@ -134,6 +134,15 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
   },
 ]
 
+/**
+ * Flattened catalog of the system permissions (name + label), the single source for any picker that
+ * needs to offer a permission — e.g. the page-builder per-page "Access" field (slice 1h). Derived from
+ * {@link PERMISSION_CATEGORIES} so adding a permission updates both at once.
+ */
+export const SYSTEM_PERMISSIONS: { name: string; label: string }[] = PERMISSION_CATEGORIES.flatMap(
+  (category) => category.permissions.map((p) => ({ name: p.name, label: p.label }))
+)
+
 export interface SystemPermissionChecklistProps {
   /** Map of permission name to granted status */
   permissions: Record<string, boolean>

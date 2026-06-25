@@ -554,6 +554,9 @@ export function PageBuilderPage({
   // Page-level config (slice 2d): variables + on-load data sources, authored in the page-settings drawer.
   const [pageVariables, setPageVariables] = useState<PageVariable[]>([])
   const [pageDataSources, setPageDataSources] = useState<PageDataSource[]>([])
+  // Slice 1h: optional per-page access restriction (a system-permission name). `undefined` ⇒ untouched
+  // (no key written); `{}` ⇒ explicitly cleared (no restriction).
+  const [pageAccess, setPageAccess] = useState<{ requiredPermission?: string } | undefined>(undefined)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
 
   // Preview mode state (Requirement 7.7)
@@ -587,6 +590,7 @@ export function PageBuilderPage({
     const cfg = readConfig(currentPage)
     setPageVariables(cfg.variables ?? [])
     setPageDataSources(cfg.dataSources ?? [])
+    setPageAccess(cfg.access)
     setHasUnsavedChanges(false)
   }
 
@@ -606,6 +610,7 @@ export function PageBuilderPage({
       const cfg = readConfig(newPage)
       setPageVariables(cfg.variables ?? [])
       setPageDataSources(cfg.dataSources ?? [])
+      setPageAccess(cfg.access)
       setViewMode('editor')
     },
     onError: (error: Error) => {
@@ -860,11 +865,22 @@ export function PageBuilderPage({
           // is passed, so these MUST be passed here or they are silently dropped on save.
           variables: pageVariables,
           dataSources: pageDataSources,
+          // Slice 1h: persist the per-page access restriction. `undefined` is skipped by `mergeConfig`
+          // (untouched page keeps no key); `{}` writes an explicit "no restriction".
+          access: pageAccess,
           schemaVersion: 2,
         }),
       } as unknown as Partial<UIPage>,
     })
-  }, [editingPageId, components, currentPage, pageVariables, pageDataSources, updateMutation])
+  }, [
+    editingPageId,
+    components,
+    currentPage,
+    pageVariables,
+    pageDataSources,
+    pageAccess,
+    updateMutation,
+  ])
 
   // Page-settings drawer edits (mark unsaved so Save lights up).
   const handleVariablesChange = useCallback((next: PageVariable[]) => {
@@ -873,6 +889,12 @@ export function PageBuilderPage({
   }, [])
   const handleDataSourcesChange = useCallback((next: PageDataSource[]) => {
     setPageDataSources(next)
+    setHasUnsavedChanges(true)
+  }, [])
+  const handleRequiredPermissionChange = useCallback((permission: string | undefined) => {
+    // A selected permission stores `{requiredPermission}`; "Anyone (published)" stores `{}` to
+    // explicitly clear any previously-set restriction on save.
+    setPageAccess(permission ? { requiredPermission: permission } : {})
     setHasUnsavedChanges(true)
   }, [])
 
@@ -1075,6 +1097,8 @@ export function PageBuilderPage({
           dataSources={pageDataSources}
           onVariablesChange={handleVariablesChange}
           onDataSourcesChange={handleDataSourcesChange}
+          requiredPermission={pageAccess?.requiredPermission}
+          onRequiredPermissionChange={handleRequiredPermissionChange}
         />
 
         {/* Preview mode overlay (Requirement 7.7, 12.5) */}

@@ -575,6 +575,54 @@
         "message": "Message"
       }
     },
+    "actions": {
+      "runFlow": {
+        "label": "Run Flow",
+        "flowId": "Flow",
+        "awaitResult": "Await result",
+        "inputs": "Inputs",
+        "addInput": "Add input"
+      },
+      "navigate": {
+        "label": "Navigate",
+        "to": "To",
+        "params": "Params",
+        "newTab": "New tab"
+      },
+      "openUrl": {
+        "label": "Open URL",
+        "url": "URL"
+      },
+      "createRecord": {
+        "label": "Create Record"
+      },
+      "updateRecord": {
+        "label": "Update Record"
+      },
+      "record": {
+        "collection": "Collection",
+        "attributes": "Attributes",
+        "addAttribute": "Add attribute",
+        "recordId": "Record ID"
+      },
+      "refreshData": {
+        "label": "Refresh Data",
+        "dataSource": "Data source"
+      },
+      "setVar": {
+        "label": "Set Variable",
+        "name": "Name",
+        "value": "Value"
+      },
+      "showToast": {
+        "label": "Show Toast",
+        "level": "Level",
+        "message": "Message"
+      },
+      "edit": "Edit action",
+      "done": "Done",
+      "actionsInOrder": "Actions (run in order)"
+    },
     "pageSettings": {
       "title": "Page settings",
       "open": "Page settings",

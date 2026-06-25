@@ -11,6 +11,9 @@ import { Loader2, Grid3x3, FileEdit } from 'lucide-react'
 import { useApi } from '@/context/ApiContext'
 import type { WidgetDescriptor, WidgetRenderProps } from '../types'
 import { asString, asStringList } from '../util'
+import type { PageAction } from '../../model/pageModel'
+import type { BindingScope } from '../../model/bindingScope'
+import { useActionRunner } from '../../runtime/useActionRunner'
 
 const MAX_TABLE_ROWS = 100
 
@@ -135,15 +138,25 @@ function DataTable({ dataView }: { dataView: DataViewConfig }): React.ReactEleme
   )
 }
 
-function FormCreate({ dataView }: { dataView: DataViewConfig }): React.ReactElement {
+function FormCreate({
+  dataView,
+  onCreated,
+}: {
+  dataView: DataViewConfig
+  /** Called AFTER the built-in create resolves, with the created record (for onSubmit actions). */
+  onCreated?: (created: Record<string, unknown>) => void
+}): React.ReactElement {
   const { apiClient } = useApi()
   const collection = dataView.collection
   const fields = dataView.fields ?? []
   const [values, setValues] = useState<Record<string, string>>({})
 
   const mutation = useMutation({
-    mutationFn: () => apiClient.postResource(`/api/${collection}`, values),
-    onSuccess: () => setValues({}),
+    mutationFn: () => apiClient.postResource<Record<string, unknown>>(`/api/${collection}`, values),
+    onSuccess: (created) => {
+      setValues({})
+      onCreated?.(created)
+    },
   })
 
   if (!collection || fields.length === 0) {
@@ -220,9 +233,36 @@ function TableRender({ node, mode }: WidgetRenderProps): React.ReactElement {
   return <DataTable dataView={readDataView(node.props)} />
 }
 
-function FormRender({ node, mode }: WidgetRenderProps): React.ReactElement {
+/**
+ * Runtime form variant that runs `events.onSubmit` AFTER the built-in create resolves, with the created
+ * record merged into scope so `{$bind:'record.id'}` resolves. Only mounted when onSubmit actions exist —
+ * so a plain form never pulls in the action runner (and thus never requires a ToastProvider).
+ */
+function FormCreateWithEvents({
+  dataView,
+  onSubmitActions,
+  scope,
+}: {
+  dataView: DataViewConfig
+  onSubmitActions: PageAction[]
+  scope: BindingScope
+}): React.ReactElement {
+  const { run } = useActionRunner()
+  const onCreated = (created: Record<string, unknown>) => {
+    const submitScope: BindingScope = { ...scope, record: { ...scope.record, ...created } }
+    void run(onSubmitActions, submitScope)
+  }
+  return <FormCreate dataView={dataView} onCreated={onCreated} />
+}
+
+function FormRender({ node, mode, scope }: WidgetRenderProps): React.ReactElement {
   if (mode === 'editor') return placeholder(<FileEdit size={24} />, 'Form', 'page-node-form')
-  return <FormCreate dataView={readDataView(node.props)} />
+  const dataView = readDataView(node.props)
+  const onSubmit = node.events?.onSubmit
+  if (onSubmit && onSubmit.length > 0) {
+    return <FormCreateWithEvents dataView={dataView} onSubmitActions={onSubmit} scope={scope} />
+  }
+  return <FormCreate dataView={dataView} />
 }
 
 const table: WidgetDescriptor = {

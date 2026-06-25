@@ -76,8 +76,10 @@ export function Palette({ onAddComponent }: PaletteProps): React.ReactElement {
       </h3>
       <div className="flex flex-col gap-4">
         {CATEGORY_ORDER.map((category) => {
-          const widgets = byCategory[category]
-          if (!widgets || widgets.length === 0) return null
+          // Exclude palette-hidden internals (e.g. the `tab-panel` container — registered so the render
+          // path resolves it, but never offered as a standalone, draggable palette widget).
+          const widgets = (byCategory[category] ?? []).filter((w) => !w.paletteHidden)
+          if (widgets.length === 0) return null
           return (
             <div key={category} className="flex flex-col gap-2">
               <h4

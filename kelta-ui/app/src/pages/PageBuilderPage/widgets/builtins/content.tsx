@@ -1,7 +1,11 @@
-/** Content built-ins: heading, text, button, image. Markup matches the runtime renderer for parity. */
+/**
+ * Content built-ins: heading, text, button. (The `image` built-in moved to `./image.tsx` in slice 2g,
+ * where it gains bindable `src`/`alt`, an `objectFit` prop, and `src` scheme-validation.) Markup matches
+ * the runtime renderer for parity.
+ */
 /* eslint-disable react-refresh/only-export-components -- widget-descriptor module, not an HMR component file */
 import React from 'react'
-import { Heading, Type, MousePointerClick, Image as ImageIcon } from 'lucide-react'
+import { Heading, Type, MousePointerClick } from 'lucide-react'
 import type { WidgetDescriptor, WidgetRenderProps } from '../types'
 import { asString } from '../util'
 import { interpolate } from '../../model/interpolate'
@@ -158,24 +162,4 @@ function RuntimeButton({
   )
 }
 
-const image: WidgetDescriptor = {
-  type: 'image',
-  label: 'Image',
-  icon: ImageIcon,
-  category: 'content',
-  defaultProps: {},
-  propSchema: [
-    { key: 'src', label: 'Source URL', kind: 'text', bindable: true, group: 'content' },
-    { key: 'alt', label: 'Alt text', kind: 'text', bindable: true, group: 'content' },
-  ],
-  Render: ({ node }) => (
-    <img
-      src={asString(node.props?.src)}
-      alt={asString(node.props?.alt, 'Image')}
-      className="max-w-full rounded-md"
-      data-testid="page-node-image"
-    />
-  ),
-}
-
-export const contentWidgets: WidgetDescriptor[] = [heading, text, button, image]
+export const contentWidgets: WidgetDescriptor[] = [heading, text, button]

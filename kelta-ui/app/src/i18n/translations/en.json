@@ -626,7 +626,13 @@
     "pageSettings": {
       "title": "Page settings",
       "open": "Page settings",
-      "close": "Close"
+      "close": "Close",
+      "access": {
+        "title": "Access",
+        "label": "Required permission",
+        "anyone": "Anyone (published)",
+        "hint": "Users without this permission get a 404 — the page is hidden, not shown as forbidden."
+      }
     },
     "variables": {
       "title": "Variables",

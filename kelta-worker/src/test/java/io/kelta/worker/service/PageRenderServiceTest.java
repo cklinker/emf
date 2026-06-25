@@ -7,6 +7,7 @@ import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.query.QueryRequest;
 import io.kelta.runtime.query.QueryResult;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.repository.BootstrapRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,8 +39,12 @@ class PageRenderServiceTest {
     @Mock
     private CollectionRegistry collectionRegistry;
 
+    @Mock
+    private BootstrapRepository bootstrapRepository;
+
     private PageRenderService service() {
-        return new PageRenderService(queryEngine, collectionRegistry, JsonMapper.builder().build());
+        return new PageRenderService(queryEngine, collectionRegistry, JsonMapper.builder().build(),
+                bootstrapRepository);
     }
 
     private static QueryResult oneRow(Map<String, Object> page) {
@@ -56,7 +61,7 @@ class PageRenderServiceTest {
                 "config", Map.of("components", List.of()));
         when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
 
-        Optional<PageRenderContract> result = service().render("home");
+        Optional<PageRenderContract> result = service().render("home", "p-1");
 
         assertThat(result).isPresent();
         PageRenderContract contract = result.get();
@@ -96,7 +101,7 @@ class PageRenderServiceTest {
                 "path", "/dashboard", "config", config);
         when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
 
-        Optional<PageRenderContract> result = service().render("dashboard");
+        Optional<PageRenderContract> result = service().render("dashboard", "p-1");
 
         assertThat(result).isPresent();
         PageRenderContract contract = result.get();
@@ -117,7 +122,7 @@ class PageRenderServiceTest {
                         "layout", Map.of("kind", "stack")));
         when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
 
-        PageRenderContract contract = service().render("welcome").orElseThrow();
+        PageRenderContract contract = service().render("welcome", "p-1").orElseThrow();
 
         assertThat(contract.version()).isEqualTo("2.0");
         assertThat(contract.tree()).containsKeys("components", "layout");
@@ -134,7 +139,7 @@ class PageRenderServiceTest {
                 "config", "{\"components\":[{\"type\":\"heading\"}]}");
         when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
 
-        Optional<PageRenderContract> result = service().render("home");
+        Optional<PageRenderContract> result = service().render("home", "p-1");
 
         assertThat(result).isPresent();
         assertThat(result.get().tree()).containsKey("components");
@@ -151,7 +156,7 @@ class PageRenderServiceTest {
                 "config", "{\"components\":[{\"type\":\"heading\"}],\"layout\":{\"kind\":\"stack\"}}");
         when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
 
-        PageRenderContract contract = service().render("home").orElseThrow();
+        PageRenderContract contract = service().render("home", "p-1").orElseThrow();
 
         assertThat(contract.tree()).containsKeys("components", "layout");
         assertThat(contract.variables()).isEmpty();
@@ -170,7 +175,7 @@ class PageRenderServiceTest {
         page.put("config", null);
         when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
 
-        PageRenderContract contract = service().render("home").orElseThrow();
+        PageRenderContract contract = service().render("home", "p-1").orElseThrow();
 
         assertThat(contract.version()).isEqualTo("2.0");
         assertThat(contract.tree()).isEmpty();
@@ -187,7 +192,7 @@ class PageRenderServiceTest {
                 "config", "not json");
         when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
 
-        PageRenderContract contract = service().render("home").orElseThrow();
+        PageRenderContract contract = service().render("home", "p-1").orElseThrow();
 
         assertThat(contract.tree()).isEmpty();
         assertThat(contract.variables()).isEmpty();
@@ -202,21 +207,105 @@ class PageRenderServiceTest {
         when(queryEngine.executeQuery(eq(def), any(QueryRequest.class)))
                 .thenReturn(QueryResult.of(List.of(), 0, new Pagination(1, 1)));
 
-        assertThat(service().render("missing")).isEmpty();
+        assertThat(service().render("missing", "p-1")).isEmpty();
     }
 
     @Test
     @DisplayName("returns empty when the ui-pages collection is not registered")
     void emptyWhenNoCollection() {
         when(collectionRegistry.get("ui-pages")).thenReturn(null);
-        assertThat(service().render("home")).isEmpty();
+        assertThat(service().render("home", "p-1")).isEmpty();
         verifyNoInteractions(queryEngine);
     }
 
     @Test
     @DisplayName("returns empty for a blank slug without touching the registry")
     void blankSlug() {
-        assertThat(service().render("  ")).isEmpty();
+        assertThat(service().render("  ", "p-1")).isEmpty();
         verify(collectionRegistry, never()).get(any());
+    }
+
+    // --- 1h: optional per-page authorization gate ---------------------------
+
+    /** A restricted published page whose config requires {@code VIEW_SETUP}. */
+    private void stubRestrictedPage(String slug) {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(collectionRegistry.get("ui-pages")).thenReturn(def);
+        Map<String, Object> config = Map.of(
+                "access", Map.of("requiredPermission", "VIEW_SETUP"),
+                "components", List.of(Map.of("id", "h1", "type", "heading")));
+        Map<String, Object> page = Map.of("slug", slug, "title", "Admin", "path", "/admin",
+                "config", config);
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
+    }
+
+    @Test
+    @DisplayName("1h: renders a restricted page when the profile is granted the required permission")
+    void allowsWhenProfileGranted() {
+        stubRestrictedPage("admin");
+        when(bootstrapRepository.findProfileSystemPermissions("p-1"))
+                .thenReturn(List.of(Map.of("permission_name", "VIEW_SETUP", "granted", true)));
+
+        Optional<PageRenderContract> result = service().render("admin", "p-1");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().tree()).containsKey("components");
+        verify(bootstrapRepository).findProfileSystemPermissions("p-1");
+    }
+
+    @Test
+    @DisplayName("1h: denies (empty → 404) when the profile is not granted the permission")
+    void deniesWith404WhenProfileNotGranted() {
+        stubRestrictedPage("admin");
+        when(bootstrapRepository.findProfileSystemPermissions("p-1")).thenReturn(List.of());
+
+        assertThat(service().render("admin", "p-1")).isEmpty();
+        verify(bootstrapRepository).findProfileSystemPermissions("p-1");
+    }
+
+    @Test
+    @DisplayName("1h: a granted=false row is not a grant — denies")
+    void deniesWhenPermissionGrantedFalse() {
+        stubRestrictedPage("admin");
+        when(bootstrapRepository.findProfileSystemPermissions("p-1"))
+                .thenReturn(List.of(Map.of("permission_name", "VIEW_SETUP", "granted", false)));
+
+        assertThat(service().render("admin", "p-1")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("1h: a null profile id denies without any permission lookup")
+    void deniesWhenNoProfileId() {
+        stubRestrictedPage("admin");
+
+        assertThat(service().render("admin", null)).isEmpty();
+        verifyNoInteractions(bootstrapRepository);
+    }
+
+    @Test
+    @DisplayName("1h: an unrestricted page never performs a permission lookup (back-compat)")
+    void absentAccessKeySkipsCheck() {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(collectionRegistry.get("ui-pages")).thenReturn(def);
+        Map<String, Object> page = Map.of("slug", "home", "title", "Home", "path", "/home",
+                "config", Map.of("components", List.of()));
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
+
+        assertThat(service().render("home", "p-1")).isPresent();
+        verifyNoInteractions(bootstrapRepository);
+    }
+
+    @Test
+    @DisplayName("1h: a blank requiredPermission is treated as no restriction")
+    void blankRequiredPermissionSkipsCheck() {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(collectionRegistry.get("ui-pages")).thenReturn(def);
+        Map<String, Object> page = Map.of("slug", "home", "title", "Home", "path", "/home",
+                "config", Map.of("access", Map.of("requiredPermission", ""),
+                        "components", List.of()));
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(oneRow(page));
+
+        assertThat(service().render("home", "p-1")).isPresent();
+        verifyNoInteractions(bootstrapRepository);
     }
 }

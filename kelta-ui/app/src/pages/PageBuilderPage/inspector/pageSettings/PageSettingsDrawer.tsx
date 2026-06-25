@@ -16,6 +16,7 @@ import { useI18n } from '@/context/I18nContext'
 import type { PageDataSource, PageVariable } from '../../pageConfig'
 import { VariablesSection } from './VariablesSection'
 import { DataSourcesSection } from './DataSourcesSection'
+import { AccessSection } from './AccessSection'
 
 export interface PageSettingsDrawerProps {
   open: boolean
@@ -24,6 +25,9 @@ export interface PageSettingsDrawerProps {
   dataSources: PageDataSource[]
   onVariablesChange: (next: PageVariable[]) => void
   onDataSourcesChange: (next: PageDataSource[]) => void
+  /** Slice 1h: the page's `config.access.requiredPermission` (undefined ⇒ no restriction). */
+  requiredPermission?: string
+  onRequiredPermissionChange: (permission: string | undefined) => void
 }
 
 export function PageSettingsDrawer({
@@ -33,6 +37,8 @@ export function PageSettingsDrawer({
   dataSources,
   onVariablesChange,
   onDataSourcesChange,
+  requiredPermission,
+  onRequiredPermissionChange,
 }: PageSettingsDrawerProps): React.ReactElement {
   const { t } = useI18n()
   return (
@@ -49,7 +55,10 @@ export function PageSettingsDrawer({
         <div className="flex flex-col gap-6">
           <VariablesSection variables={variables} onChange={onVariablesChange} />
           <DataSourcesSection dataSources={dataSources} onChange={onDataSourcesChange} />
-          {/* Reserved slot — slice 1h adds the Access field here. */}
+          <AccessSection
+            requiredPermission={requiredPermission}
+            onChange={onRequiredPermissionChange}
+          />
         </div>
       </SheetContent>
     </Sheet>

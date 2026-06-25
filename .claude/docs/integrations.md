@@ -159,6 +159,20 @@ Escape hatches in the controller:
 - `body.state` — if present, the controller treats it as a pre-built initial state envelope (only `context` is auto-filled). Use this when you need to seed `record`/`headers` keys that `buildFromApiInvocation` doesn't produce.
 - `body.test: true` — runs the flow in test mode (`isTest=true`); does not change how `input` is resolved.
 
+### Page-event → flow framing (page builder, slice 2e)
+
+A page-builder `runFlow` action (a button `onClick`, etc.) rides the **same**
+`POST /api/flows/{flowId}/execute` double-wrap rule. The editor stores the **inner** input
+map on `action.input` (e.g. `{ orderId: {$bind:'record.id'} }`); the client-side action runtime
+(`kelta-ui/app/src/pages/PageBuilderPage/runtime/executeAction.ts`) resolves the `{$bind}` values
+against the live click scope and sends `{ input: <resolved action.input> }` as the HTTP body — i.e.
+it adds the **outer** wrap. So the flow reads `$.input.<key>` exactly as above; the author never
+wraps twice. The execute response is async (`200` with `attributes.status:"RUNNING"`); the execution
+id is `data.id` (read via `unwrapResource(json).id`). With `awaitResult:true` the runtime polls
+`GET /api/flows/executions/{id}` every 1.5 s (up to 60 s) until a terminal status
+(`COMPLETED`/`FAILED`/`CANCELLED`) — `FAILED`/`CANCELLED` reject and stop the action chain. This is
+the only new flow framing 2e introduces (no new endpoint or subject). No backend change.
+
 ### Scheduled (cron) invocation — `triggerConfig.inputData`
 
 For SCHEDULED flows there is no per-run HTTP body, so the static payload lives on the

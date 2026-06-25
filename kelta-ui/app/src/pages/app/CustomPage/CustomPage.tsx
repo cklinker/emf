@@ -25,6 +25,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/context/ApiContext'
 import { PageTreeRenderer, type PageNode } from './PageTreeRenderer'
 import type { PageDataSource, PageVariable } from '@/pages/PageBuilderPage/pageConfig'
+import { usePageVariables } from '@/pages/PageBuilderPage/hooks/usePageVariables'
+import { usePageDataSources } from '@/pages/PageBuilderPage/hooks/usePageDataSources'
+import type { BindingScope } from '@/pages/PageBuilderPage/model/bindingScope'
+import type { PageRuntimeValue } from '@/pages/PageBuilderPage/runtime/PageRuntimeContext'
 
 /**
  * Versioned page render contract returned by GET /api/pages/{slug}/render.
@@ -64,6 +68,32 @@ export function CustomPage(): React.ReactElement {
     staleTime: 5 * 60 * 1000,
     retry: false,
   })
+
+  // Build the live binding scope CLIENT-SIDE (slice 2d). Hooks run unconditionally (before any early
+  // return) with empty defaults when there is no contract yet. The server resolves NOTHING — vars are
+  // seeded from the contract's declared defaults and each data source is fetched over the authorized
+  // JSON:API path so Cerbos/FLS stay enforced server-side.
+  const variables = React.useMemo<PageVariable[]>(() => contract?.variables ?? [], [contract])
+  const dataSources = React.useMemo<PageDataSource[]>(() => contract?.dataSources ?? [], [contract])
+  const { vars, setVar } = usePageVariables(variables)
+  const page = React.useMemo(
+    () => ({ slug: pageSlug, params: pageSlug ? { pageSlug } : undefined }),
+    [pageSlug]
+  )
+  // Data sources may read vars/page in their filter/recordId bindings.
+  const { data } = usePageDataSources(dataSources, { vars, page }, pageSlug)
+  const scope: BindingScope = React.useMemo(() => ({ vars, data, page }), [vars, data, page])
+
+  // Page-level action deps (slice 2e): `setVar` writes a page variable; `dataSourceQueryKey` mirrors the
+  // `usePageDataSources` query-key prefix so `refreshData` invalidates the right source's on-load fetch.
+  const runtime = React.useMemo<PageRuntimeValue>(
+    () => ({
+      tenantSlug: tenantSlug || '',
+      setVar,
+      dataSourceQueryKey: (name: string) => ['page-data', pageSlug ?? '', name],
+    }),
+    [tenantSlug, setVar, pageSlug]
+  )
 
   if (isLoading) {
     return (
@@ -125,6 +155,8 @@ export function CustomPage(): React.ReactElement {
       <PageTreeRenderer
         components={contract.tree?.components ?? []}
         tenantSlug={tenantSlug || ''}
+        scope={scope}
+        runtime={runtime}
       />
     </div>
   )

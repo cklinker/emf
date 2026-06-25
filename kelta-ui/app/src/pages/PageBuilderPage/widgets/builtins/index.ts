@@ -6,6 +6,7 @@ import { widgetRegistry } from '../registry'
 import { contentWidgets } from './content'
 import { layoutWidgets } from './layout'
 import { dataWidgets } from './data'
+import { dataBindingWidgets } from './dataBinding'
 
 let registered = false
 
@@ -13,7 +14,7 @@ let registered = false
 export function registerBuiltinWidgets(): void {
   if (registered) return
   registered = true
-  for (const w of [...contentWidgets, ...layoutWidgets, ...dataWidgets]) {
+  for (const w of [...contentWidgets, ...layoutWidgets, ...dataWidgets, ...dataBindingWidgets]) {
     widgetRegistry.register(w)
   }
 }

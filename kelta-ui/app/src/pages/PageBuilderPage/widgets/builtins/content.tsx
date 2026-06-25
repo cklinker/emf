@@ -4,17 +4,30 @@ import React from 'react'
 import { Heading, Type, MousePointerClick, Image as ImageIcon } from 'lucide-react'
 import type { WidgetDescriptor, WidgetRenderProps } from '../types'
 import { asString } from '../util'
+import { interpolate } from '../../model/interpolate'
+import type { BindingScope } from '../../model/bindingScope'
+import type { PageAction } from '../../model/pageModel'
+import { useActionRunner } from '../../runtime/useActionRunner'
 
 const HEADING_LEVELS = ['h1', 'h2', 'h3', 'h4']
 
-function HeadingRender({ node }: WidgetRenderProps): React.ReactElement {
+/**
+ * Coerce a resolved prop to text, then run `{{…}}` interpolation against the scope so authors can mix
+ * literals + merge tags in free-text props (`"Showing {{data.accounts[0].name}}"`). The structured
+ * `$bind` form is already resolved by `renderNode`; this only handles inline tags in literal strings.
+ */
+function asText(value: unknown, scope: BindingScope, fallback = ''): string {
+  return interpolate(asString(value, fallback), scope)
+}
+
+function HeadingRender({ node, scope }: WidgetRenderProps): React.ReactElement {
   const rawLevel = asString(node.props?.level, 'h2')
   // 2a deliberately honors `level` (the runtime previously hardcoded <h2>).
   const tag = HEADING_LEVELS.includes(rawLevel) ? rawLevel : 'h2'
   return React.createElement(
     tag,
     { className: 'text-2xl font-semibold text-foreground', 'data-testid': 'page-node-heading' },
-    asString(node.props?.text, 'Heading')
+    asText(node.props?.text, scope, 'Heading')
   )
 }
 
@@ -51,9 +64,9 @@ const text: WidgetDescriptor = {
   propSchema: [
     { key: 'content', label: 'Content', kind: 'textarea', bindable: true, group: 'content' },
   ],
-  Render: ({ node }) => (
+  Render: ({ node, scope }) => (
     <p className="text-sm text-muted-foreground" data-testid="page-node-text">
-      {asString(node.props?.content, asString(node.props?.text))}
+      {asText(node.props?.content ?? node.props?.text, scope)}
     </p>
   ),
 }
@@ -80,21 +93,69 @@ const button: WidgetDescriptor = {
     { key: 'events', label: 'Events', kind: 'event-list', group: 'events' },
   ],
   supportedEvents: ['onClick'],
-  Render: ({ node }) => {
-    const label = asString(node.props?.label, 'Button')
-    const href = asString(node.props?.href)
-    const className =
-      'inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground'
-    return href ? (
-      <a href={href} className={className} data-testid="page-node-button">
-        {label}
-      </a>
-    ) : (
-      <button type="button" className={className} data-testid="page-node-button">
-        {label}
-      </button>
-    )
-  },
+  Render: ButtonRender,
+}
+
+const BUTTON_CLASS =
+  'inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground'
+
+/**
+ * Button render. In `mode:'editor'` it is INERT (a plain button/link — clicking selects the node on the
+ * canvas, never runs actions). In `mode:'runtime'` it mounts {@link RuntimeButton}, which wires the
+ * action runner so `events.onClick` fires on click. An href-only button (no onClick) is unchanged.
+ */
+function ButtonRender({ node, scope, mode }: WidgetRenderProps): React.ReactElement {
+  const label = asText(node.props?.label, scope, 'Button')
+  const href = asString(node.props?.href)
+  const onClick = node.events?.onClick
+
+  if (mode === 'runtime' && onClick && onClick.length > 0) {
+    return <RuntimeButton label={label} href={href || undefined} actions={onClick} scope={scope} />
+  }
+
+  return href ? (
+    <a href={href} className={BUTTON_CLASS} data-testid="page-node-button">
+      {label}
+    </a>
+  ) : (
+    <button type="button" className={BUTTON_CLASS} data-testid="page-node-button">
+      {label}
+    </button>
+  )
+}
+
+/** Runtime-only button that fires its onClick action list through the shared action runner. */
+function RuntimeButton({
+  label,
+  href,
+  actions,
+  scope,
+}: {
+  label: string
+  href?: string
+  actions: PageAction[]
+  scope: BindingScope
+}): React.ReactElement {
+  const { run } = useActionRunner()
+  const handleClick = (e: React.MouseEvent) => {
+    // An onClick action takes over from a plain href navigation (the actions decide where to go).
+    if (href) e.preventDefault()
+    void run(actions, scope)
+  }
+  return href ? (
+    <a href={href} className={BUTTON_CLASS} onClick={handleClick} data-testid="page-node-button">
+      {label}
+    </a>
+  ) : (
+    <button
+      type="button"
+      className={BUTTON_CLASS}
+      onClick={handleClick}
+      data-testid="page-node-button"
+    >
+      {label}
+    </button>
+  )
 }
 
 const image: WidgetDescriptor = {

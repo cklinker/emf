@@ -38,6 +38,7 @@ const DATA_SOURCE_FIELDS = [
     key: 'dataView',
     label: 'Data source',
     kind: 'collection-picker' as const,
+    group: 'data',
     dependsOnCollection: true,
   },
 ]
@@ -240,7 +241,10 @@ const form: WidgetDescriptor = {
   icon: FileEdit,
   category: 'input',
   defaultProps: {},
-  propSchema: DATA_SOURCE_FIELDS,
+  propSchema: [
+    ...DATA_SOURCE_FIELDS,
+    { key: 'events', label: 'Events', kind: 'event-list', group: 'events' },
+  ],
   supportedEvents: ['onSubmit'],
   Render: FormRender,
 }

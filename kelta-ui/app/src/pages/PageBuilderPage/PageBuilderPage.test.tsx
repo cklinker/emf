@@ -738,6 +738,122 @@ describe('PageBuilderPage', () => {
     })
   })
 
+  describe('Schema-driven palette + inspector (slice 2b)', () => {
+    beforeEach(() => {
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/ui-pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
+        }
+        return Promise.resolve({ data: mockPages })
+      })
+    })
+
+    it('renders the palette grouped by category from the widget registry', async () => {
+      const user = userEvent.setup()
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('palette-category-layout')).toBeInTheDocument()
+        expect(screen.getByTestId('palette-category-content')).toBeInTheDocument()
+        expect(screen.getByTestId('palette-category-data')).toBeInTheDocument()
+        expect(screen.getByTestId('palette-category-input')).toBeInTheDocument()
+        // form lives under input, table under data.
+        expect(screen.getByTestId('palette-item-form')).toBeInTheDocument()
+        expect(screen.getByTestId('palette-item-table')).toBeInTheDocument()
+      })
+    })
+
+    it('renders the schema-driven inspector for a heading (text + level under Content)', async () => {
+      const user = userEvent.setup()
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('palette-item-heading')).toBeInTheDocument())
+      await user.click(screen.getByTestId('palette-item-heading'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('property-text')).toBeInTheDocument()
+        expect(screen.getByTestId('property-level')).toBeInTheDocument()
+        expect(screen.getByTestId('property-group-content')).toBeInTheDocument()
+        // text is bindable → has the fx toggle; level is not.
+        expect(screen.getByTestId('bindable-fx-text')).toBeInTheDocument()
+        expect(screen.queryByTestId('bindable-fx-level')).not.toBeInTheDocument()
+      })
+    })
+
+    it('seeds a new component with the descriptor defaultProps (heading text)', async () => {
+      const user = userEvent.setup()
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('palette-item-heading')).toBeInTheDocument())
+      await user.click(screen.getByTestId('palette-item-heading'))
+
+      // defaultProps.text === 'Heading' is seeded into the new node.
+      await waitFor(() => expect(screen.getByTestId('property-text')).toHaveValue('Heading'))
+    })
+
+    it("fx toggle on a heading writes a { $bind } binding into the node's props", async () => {
+      const user = userEvent.setup()
+      mockAxios.patch.mockResolvedValueOnce({ data: { ...mockPages[0] } })
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('palette-item-heading')).toBeInTheDocument())
+      await user.click(screen.getByTestId('palette-item-heading'))
+      await waitFor(() => expect(screen.getByTestId('bindable-fx-text')).toBeInTheDocument())
+
+      // Toggle to expression mode → the literal editor is replaced by the expression chip.
+      await user.click(screen.getByTestId('bindable-fx-text'))
+      await waitFor(() =>
+        expect(screen.getByTestId('bindable-expr-property-text')).toBeInTheDocument()
+      )
+
+      await user.click(screen.getByTestId('save-page-button'))
+      await waitFor(() => expect(mockAxios.patch).toHaveBeenCalled())
+      const body = mockAxios.patch.mock.calls.at(-1)?.[1] as {
+        data?: { attributes?: { config?: { components?: unknown[] } } }
+      }
+      const saved = body?.data?.attributes?.config?.components?.[0] as {
+        props?: { text?: unknown }
+      }
+      expect(saved?.props?.text).toMatchObject({ $bind: '', mode: 'expr' })
+    })
+
+    it('authoring a button onClick action persists events.onClick in the saved config', async () => {
+      const user = userEvent.setup()
+      mockAxios.patch.mockResolvedValueOnce({ data: { ...mockPages[0] } })
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => expect(screen.getByText('dashboard')).toBeInTheDocument())
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => expect(screen.getByTestId('palette-item-button')).toBeInTheDocument())
+      await user.click(screen.getByTestId('palette-item-button'))
+
+      // The button descriptor declares an event-list field + supportedEvents:['onClick'].
+      await waitFor(() => expect(screen.getByTestId('event-add-onClick')).toBeInTheDocument())
+      await user.click(screen.getByTestId('event-add-onClick'))
+
+      await waitFor(() => expect(screen.getByTestId('save-page-button')).not.toBeDisabled())
+      await user.click(screen.getByTestId('save-page-button'))
+
+      await waitFor(() => expect(mockAxios.patch).toHaveBeenCalled())
+      const body = mockAxios.patch.mock.calls.at(-1)?.[1] as {
+        data?: { attributes?: { config?: { components?: unknown[] } } }
+      }
+      const saved = body?.data?.attributes?.config?.components?.[0] as {
+        events?: { onClick?: Array<{ action?: string }> }
+      }
+      expect(saved?.events?.onClick?.[0]?.action).toBe('runFlow')
+    })
+  })
+
   describe('Canvas', () => {
     beforeEach(() => {
       mockAxios.get.mockResolvedValue({ data: mockPages })

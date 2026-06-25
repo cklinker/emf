@@ -25,11 +25,12 @@ const heading: WidgetDescriptor = {
   category: 'content',
   defaultProps: { text: 'Heading', level: 'h2' },
   propSchema: [
-    { key: 'text', label: 'Text', kind: 'text', bindable: true },
+    { key: 'text', label: 'Text', kind: 'text', bindable: true, group: 'content' },
     {
       key: 'level',
       label: 'Level',
       kind: 'select',
+      group: 'content',
       options: [
         { label: 'H1', value: 'h1' },
         { label: 'H2', value: 'h2' },
@@ -47,7 +48,9 @@ const text: WidgetDescriptor = {
   icon: Type,
   category: 'content',
   defaultProps: { content: '' },
-  propSchema: [{ key: 'content', label: 'Content', kind: 'textarea', bindable: true }],
+  propSchema: [
+    { key: 'content', label: 'Content', kind: 'textarea', bindable: true, group: 'content' },
+  ],
   Render: ({ node }) => (
     <p className="text-sm text-muted-foreground" data-testid="page-node-text">
       {asString(node.props?.content, asString(node.props?.text))}
@@ -62,17 +65,19 @@ const button: WidgetDescriptor = {
   category: 'content',
   defaultProps: { label: 'Button' },
   propSchema: [
-    { key: 'label', label: 'Label', kind: 'text', bindable: true },
+    { key: 'label', label: 'Label', kind: 'text', bindable: true, group: 'content' },
     {
       key: 'variant',
       label: 'Variant',
       kind: 'select',
+      group: 'content',
       options: [
         { label: 'Primary', value: 'primary' },
         { label: 'Secondary', value: 'secondary' },
         { label: 'Danger', value: 'danger' },
       ],
     },
+    { key: 'events', label: 'Events', kind: 'event-list', group: 'events' },
   ],
   supportedEvents: ['onClick'],
   Render: ({ node }) => {
@@ -99,8 +104,8 @@ const image: WidgetDescriptor = {
   category: 'content',
   defaultProps: {},
   propSchema: [
-    { key: 'src', label: 'Source URL', kind: 'text', bindable: true },
-    { key: 'alt', label: 'Alt text', kind: 'text', bindable: true },
+    { key: 'src', label: 'Source URL', kind: 'text', bindable: true, group: 'content' },
+    { key: 'alt', label: 'Alt text', kind: 'text', bindable: true, group: 'content' },
   ],
   Render: ({ node }) => (
     <img

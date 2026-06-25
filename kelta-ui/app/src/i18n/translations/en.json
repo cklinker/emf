@@ -477,6 +477,91 @@
         "labelTooLong": "Label must be 100 characters or less",
         "pathFormat": "Path must start with /"
       }
+    },
+    "palette": {
+      "addAria": "Add {{label}} component",
+      "category": {
+        "layout": "Layout",
+        "content": "Content",
+        "data": "Data",
+        "input": "Input",
+        "navigation": "Navigation",
+        "chart": "Chart"
+      }
+    },
+    "inspector": {
+      "componentType": "Component Type",
+      "id": "ID",
+      "noProperties": "No editable properties.",
+      "group": {
+        "content": "Content",
+        "data": "Data",
+        "events": "Events",
+        "layout": "Layout"
+      },
+      "bindable": {
+        "toggle": "Toggle expression mode"
+      },
+      "expression": {
+        "edit": "Edit expression",
+        "pickerTitle": "Insert field or function"
+      },
+      "dataView": {
+        "collection": "Collection",
+        "collectionPlaceholder": "orders",
+        "columns": "Columns",
+        "fields": "Fields",
+        "columnsPlaceholder": "comma-separated, e.g. id, status, total",
+        "limit": "Row limit"
+      },
+      "fieldPicker": {
+        "empty": "Select a collection first."
+      },
+      "span": {
+        "base": "Base",
+        "sm": "SM",
+        "md": "MD",
+        "lg": "LG"
+      },
+      "children": {
+        "summary": "{{count}} child component(s) — edit on canvas."
+      }
+    },
+    "events": {
+      "onClick": "On Click",
+      "onChange": "On Change",
+      "onSubmit": "On Submit",
+      "onLoad": "On Load",
+      "addAction": "Add action",
+      "removeAction": "Remove action",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "actionType": "Action type",
+      "action": {
+        "runFlow": "Run Flow",
+        "navigate": "Navigate",
+        "openUrl": "Open URL",
+        "createRecord": "Create Record",
+        "updateRecord": "Update Record",
+        "refreshData": "Refresh Data",
+        "setVar": "Set Variable",
+        "showToast": "Show Toast"
+      },
+      "toast": {
+        "info": "Info",
+        "success": "Success",
+        "error": "Error"
+      },
+      "param": {
+        "flowId": "Flow ID",
+        "to": "Path, e.g. /orders",
+        "url": "https://example.com",
+        "collection": "Collection",
+        "dataSource": "Data source",
+        "varName": "Variable name",
+        "varValue": "Value",
+        "message": "Message"
+      }
     }
   },
   "packages": {

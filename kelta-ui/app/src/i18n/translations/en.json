@@ -671,6 +671,16 @@
     },
     "repeater": {
       "truncated": "Showing {{shown}} of {{total}} rows."
+    },
+    "form": {
+      "label": "Form",
+      "noDataSource": "Form (no data source configured)",
+      "saved": "Saved"
+    },
+    "input": {
+      "noFieldConfigured": "Input (no field configured)",
+      "selectPlaceholder": "Select…",
+      "required": "Required"
     }
   },
   "packages": {

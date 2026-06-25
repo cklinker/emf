@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { I18nProvider } from '@/context/I18nContext'
 import { CustomPage } from './CustomPage'
 import { componentRegistry } from '@/services/componentRegistry'
 
@@ -24,6 +24,17 @@ vi.mock('@/context/ApiContext', () => ({
   })),
 }))
 
+// The `form` widget renders @kelta/components' ResourceForm, which needs a KeltaProvider + SDK client.
+// CustomPage tests only assert tree wiring, so we stub ResourceForm to a marker exposing resourceName.
+// The full typed-submit flow is covered in widgets/builtins/form.test.tsx.
+vi.mock('@kelta/components', () => ({
+  ResourceForm: ({ resourceName }: { resourceName: string }) => (
+    <div data-testid="resource-form" data-resource={resourceName} />
+  ),
+  setComponentRegistry: vi.fn(),
+  getComponentRegistry: vi.fn(() => undefined),
+}))
+
 function contract(components: unknown[], title = 'My Page') {
   return { version: '1.0', slug: 'my-page', title, path: '/my-page', tree: { components } }
 }
@@ -32,11 +43,13 @@ function renderAt(slug = 'my-page') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/test-tenant/app/p/${slug}`]}>
-        <Routes>
-          <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
-        </Routes>
-      </MemoryRouter>
+      <I18nProvider>
+        <MemoryRouter initialEntries={[`/test-tenant/app/p/${slug}`]}>
+          <Routes>
+            <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>
     </QueryClientProvider>
   )
 }
@@ -152,31 +165,22 @@ describe('CustomPage', () => {
     expect(mockGetList).not.toHaveBeenCalled()
   })
 
-  it('renders a form node bound to a collection and submits a new record', async () => {
-    const user = userEvent.setup()
+  it('renders a form node bound to a collection through ResourceForm (slice 2f)', async () => {
     mockGet.mockResolvedValueOnce(
       contract([
         {
           id: 'f',
           type: 'form',
-          props: { dataView: { collection: 'leads', fields: ['name', 'email'] } },
+          props: { dataView: { collection: 'leads' } },
         },
       ])
     )
-    mockPostResource.mockResolvedValueOnce({ id: 'new' })
 
     renderAt()
 
+    // The `form` widget mounts the typed/validated ResourceForm bound to the configured collection.
     await waitFor(() => expect(screen.getByTestId('page-node-form')).toBeInTheDocument())
-    await user.type(screen.getByLabelText('name'), 'Acme')
-    await user.click(screen.getByTestId('form-submit'))
-
-    await waitFor(() =>
-      expect(mockPostResource).toHaveBeenCalledWith(
-        '/api/leads',
-        expect.objectContaining({ name: 'Acme' })
-      )
-    )
+    expect(screen.getByTestId('resource-form')).toHaveAttribute('data-resource', 'leads')
   })
 
   it('shows a placeholder for a form node without a data source', async () => {

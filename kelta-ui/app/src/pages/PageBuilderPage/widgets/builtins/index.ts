@@ -7,6 +7,9 @@ import { contentWidgets } from './content'
 import { layoutWidgets } from './layout'
 import { dataWidgets } from './data'
 import { dataBindingWidgets } from './dataBinding'
+import { formWidgets } from './forms'
+import { inputWidgets } from './inputs'
+import { registerFormFieldRenderers } from './registerFormFieldRenderers'
 
 let registered = false
 
@@ -14,9 +17,19 @@ let registered = false
 export function registerBuiltinWidgets(): void {
   if (registered) return
   registered = true
-  for (const w of [...contentWidgets, ...layoutWidgets, ...dataWidgets, ...dataBindingWidgets]) {
+  for (const w of [
+    ...contentWidgets,
+    ...layoutWidgets,
+    ...dataWidgets,
+    ...dataBindingWidgets,
+    ...formWidgets,
+    ...inputWidgets,
+  ]) {
     widgetRegistry.register(w)
   }
+  // Upgrade the `form` widget's ResourceForm picklist/lookup/multi-picklist/rich-text fields to the
+  // rich controls via @kelta/components' setComponentRegistry seam (slice 2f).
+  registerFormFieldRenderers()
 }
 
 registerBuiltinWidgets()

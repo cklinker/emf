@@ -41,6 +41,11 @@ export interface PropFieldSchema {
   bindable?: boolean
   group?: string
   dependsOnCollection?: boolean
+  /**
+   * 2f: when `kind:'field-picker'`, restrict the field list to these UI `FieldType`s (the 2b inspector
+   * reads this hint). Additive — descriptors without it offer every field.
+   */
+  fieldTypeFilter?: import('@/hooks/useCollectionSchema').FieldType[]
 }
 
 /**

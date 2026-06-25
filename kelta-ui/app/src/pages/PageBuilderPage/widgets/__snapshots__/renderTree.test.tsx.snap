@@ -30,6 +30,7 @@ exports[`RenderTree > matches the golden snapshot for the built-in widget set (e
       class="max-w-full rounded-md"
       data-testid="page-node-image"
       src="img.png"
+      style="object-fit: cover;"
     />
     <div
       class="rounded-lg border border-border bg-card p-4"

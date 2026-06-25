@@ -671,6 +671,80 @@
     },
     "repeater": {
       "truncated": "Showing {{shown}} of {{total}} rows."
+    },
+    "form": {
+      "label": "Form",
+      "noDataSource": "Form (no data source configured)",
+      "saved": "Saved"
+    },
+    "input": {
+      "noFieldConfigured": "Input (no field configured)",
+      "selectPlaceholder": "Select…",
+      "required": "Required"
+    },
+    "widget": {
+      "chart": {
+        "label": "Chart",
+        "empty": "No data",
+        "field": {
+          "dataView": "Data source",
+          "chartType": "Chart type",
+          "xKey": "X axis key",
+          "series": "Series",
+          "height": "Height (px)",
+          "showLegend": "Show legend",
+          "showGrid": "Show grid"
+        }
+      },
+      "tabs": {
+        "label": "Tabs",
+        "empty": "No tabs configured.",
+        "field": {
+          "tabs": "Tabs",
+          "defaultTab": "Default tab"
+        }
+      },
+      "tabPanel": {
+        "label": "Tab panel",
+        "field": {
+          "value": "Tab value"
+        }
+      },
+      "nav": {
+        "label": "Nav",
+        "empty": "No menu items.",
+        "field": {
+          "orientation": "Orientation",
+          "items": "Menu items"
+        }
+      },
+      "icon": {
+        "label": "Icon",
+        "field": {
+          "name": "Icon name",
+          "size": "Size (px)",
+          "color": "Color"
+        }
+      },
+      "link": {
+        "label": "Link",
+        "default": "Link",
+        "field": {
+          "label": "Label",
+          "to": "Internal route",
+          "href": "External URL",
+          "newTab": "Open in new tab"
+        }
+      },
+      "image": {
+        "label": "Image",
+        "empty": "No image source",
+        "field": {
+          "src": "Source URL",
+          "alt": "Alt text",
+          "objectFit": "Fit"
+        }
+      }
     }
   },
   "packages": {

@@ -1,19 +1,18 @@
 /**
- * Data built-ins: table and form. Ported verbatim (behavior-preserving) from the runtime renderer's
- * former `DataTableNode` / `FormNode`. Data still flows over the authorized JSON:API path so the
- * gateway + worker enforce Cerbos/FLS. In editor mode they render a lightweight placeholder instead
- * of issuing live fetches.
+ * Data built-in: table. Ported verbatim (behavior-preserving) from the runtime renderer's former
+ * `DataTableNode`. Data still flows over the authorized JSON:API path so the gateway + worker enforce
+ * Cerbos/FLS. In editor mode it renders a lightweight placeholder instead of issuing live fetches.
+ *
+ * The `form` widget moved to `./forms.tsx` in slice 2f, where it renders through `@kelta/components`'
+ * typed/validated `ResourceForm` (replacing the old text-only `FormCreate`).
  */
 /* eslint-disable react-refresh/only-export-components -- widget-descriptor module, not an HMR component file */
-import React, { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { Loader2, Grid3x3, FileEdit } from 'lucide-react'
+import React from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Loader2, Grid3x3 } from 'lucide-react'
 import { useApi } from '@/context/ApiContext'
 import type { WidgetDescriptor, WidgetRenderProps } from '../types'
 import { asString, asStringList } from '../util'
-import type { PageAction } from '../../model/pageModel'
-import type { BindingScope } from '../../model/bindingScope'
-import { useActionRunner } from '../../runtime/useActionRunner'
 
 const MAX_TABLE_ROWS = 100
 
@@ -138,84 +137,6 @@ function DataTable({ dataView }: { dataView: DataViewConfig }): React.ReactEleme
   )
 }
 
-function FormCreate({
-  dataView,
-  onCreated,
-}: {
-  dataView: DataViewConfig
-  /** Called AFTER the built-in create resolves, with the created record (for onSubmit actions). */
-  onCreated?: (created: Record<string, unknown>) => void
-}): React.ReactElement {
-  const { apiClient } = useApi()
-  const collection = dataView.collection
-  const fields = dataView.fields ?? []
-  const [values, setValues] = useState<Record<string, string>>({})
-
-  const mutation = useMutation({
-    mutationFn: () => apiClient.postResource<Record<string, unknown>>(`/api/${collection}`, values),
-    onSuccess: (created) => {
-      setValues({})
-      onCreated?.(created)
-    },
-  })
-
-  if (!collection || fields.length === 0) {
-    return (
-      <div
-        className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground"
-        data-testid="page-node-form"
-      >
-        Form (no data source configured)
-      </div>
-    )
-  }
-
-  return (
-    <form
-      className="flex flex-col gap-3 rounded-md border border-border p-4"
-      data-testid="page-node-form"
-      onSubmit={(e) => {
-        e.preventDefault()
-        mutation.mutate()
-      }}
-    >
-      {fields.map((field) => (
-        <div key={field} className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor={`form-${field}`}>
-            {field}
-          </label>
-          <input
-            id={`form-${field}`}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            value={values[field] ?? ''}
-            onChange={(e) => setValues((prev) => ({ ...prev, [field]: e.target.value }))}
-          />
-        </div>
-      ))}
-      <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          disabled={mutation.isPending}
-          data-testid="form-submit"
-        >
-          {mutation.isPending ? 'Submitting…' : 'Submit'}
-        </button>
-        {mutation.isSuccess && (
-          <span className="text-sm text-primary" data-testid="form-success">
-            Saved
-          </span>
-        )}
-        {mutation.isError && (
-          <span className="text-sm text-destructive" data-testid="form-error">
-            Could not save
-          </span>
-        )}
-      </div>
-    </form>
-  )
-}
-
 function placeholder(icon: React.ReactNode, label: string, testid: string): React.ReactElement {
   return (
     <div
@@ -233,38 +154,6 @@ function TableRender({ node, mode }: WidgetRenderProps): React.ReactElement {
   return <DataTable dataView={readDataView(node.props)} />
 }
 
-/**
- * Runtime form variant that runs `events.onSubmit` AFTER the built-in create resolves, with the created
- * record merged into scope so `{$bind:'record.id'}` resolves. Only mounted when onSubmit actions exist —
- * so a plain form never pulls in the action runner (and thus never requires a ToastProvider).
- */
-function FormCreateWithEvents({
-  dataView,
-  onSubmitActions,
-  scope,
-}: {
-  dataView: DataViewConfig
-  onSubmitActions: PageAction[]
-  scope: BindingScope
-}): React.ReactElement {
-  const { run } = useActionRunner()
-  const onCreated = (created: Record<string, unknown>) => {
-    const submitScope: BindingScope = { ...scope, record: { ...scope.record, ...created } }
-    void run(onSubmitActions, submitScope)
-  }
-  return <FormCreate dataView={dataView} onCreated={onCreated} />
-}
-
-function FormRender({ node, mode, scope }: WidgetRenderProps): React.ReactElement {
-  if (mode === 'editor') return placeholder(<FileEdit size={24} />, 'Form', 'page-node-form')
-  const dataView = readDataView(node.props)
-  const onSubmit = node.events?.onSubmit
-  if (onSubmit && onSubmit.length > 0) {
-    return <FormCreateWithEvents dataView={dataView} onSubmitActions={onSubmit} scope={scope} />
-  }
-  return <FormCreate dataView={dataView} />
-}
-
 const table: WidgetDescriptor = {
   type: 'table',
   label: 'Table',
@@ -275,18 +164,4 @@ const table: WidgetDescriptor = {
   Render: TableRender,
 }
 
-const form: WidgetDescriptor = {
-  type: 'form',
-  label: 'Form',
-  icon: FileEdit,
-  category: 'input',
-  defaultProps: {},
-  propSchema: [
-    ...DATA_SOURCE_FIELDS,
-    { key: 'events', label: 'Events', kind: 'event-list', group: 'events' },
-  ],
-  supportedEvents: ['onSubmit'],
-  Render: FormRender,
-}
-
-export const dataWidgets: WidgetDescriptor[] = [table, form]
+export const dataWidgets: WidgetDescriptor[] = [table]

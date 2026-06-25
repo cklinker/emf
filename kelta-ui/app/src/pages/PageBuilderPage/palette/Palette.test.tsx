@@ -47,15 +47,30 @@ describe('Palette', () => {
     }
   })
 
-  it('groups widgets by category and omits empty categories (navigation absent)', () => {
+  it('groups widgets by category, including navigation and chart once 2g registers them', () => {
     render(<Palette onAddComponent={vi.fn()} />, { wrapper })
     expect(screen.getByTestId('palette-category-layout')).toBeInTheDocument()
     expect(screen.getByTestId('palette-category-content')).toBeInTheDocument()
     expect(screen.getByTestId('palette-category-data')).toBeInTheDocument()
     expect(screen.getByTestId('palette-category-input')).toBeInTheDocument()
-    // navigation/chart have no built-ins → no section.
-    expect(screen.queryByTestId('palette-category-navigation')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('palette-category-chart')).not.toBeInTheDocument()
+    // navigation (nav/tabs) and chart (chart) gained built-ins in slice 2g → their sections appear.
+    expect(screen.getByTestId('palette-category-navigation')).toBeInTheDocument()
+    expect(screen.getByTestId('palette-category-chart')).toBeInTheDocument()
+  })
+
+  it('lists the 2g breadth widgets in their categories and hides the internal tab-panel', () => {
+    render(<Palette onAddComponent={vi.fn()} />, { wrapper })
+    const navSection = screen.getByTestId('palette-category-navigation')
+      .parentElement as HTMLElement
+    const chartSection = screen.getByTestId('palette-category-chart').parentElement as HTMLElement
+    expect(within(navSection).getByTestId('palette-item-nav')).toBeInTheDocument()
+    expect(within(navSection).getByTestId('palette-item-tabs')).toBeInTheDocument()
+    expect(within(chartSection).getByTestId('palette-item-chart')).toBeInTheDocument()
+    // content gained icon + link.
+    expect(screen.getByTestId('palette-item-icon')).toBeInTheDocument()
+    expect(screen.getByTestId('palette-item-link')).toBeInTheDocument()
+    // tab-panel is registered but palette-hidden — it must NOT appear as a draggable tile.
+    expect(screen.queryByTestId('palette-item-tab-panel')).not.toBeInTheDocument()
   })
 
   it('places form under the input category, not data', () => {

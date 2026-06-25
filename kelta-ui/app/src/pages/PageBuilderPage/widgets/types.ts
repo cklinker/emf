@@ -41,6 +41,11 @@ export interface PropFieldSchema {
   bindable?: boolean
   group?: string
   dependsOnCollection?: boolean
+  /**
+   * 2f: when `kind:'field-picker'`, restrict the field list to these UI `FieldType`s (the 2b inspector
+   * reads this hint). Additive — descriptors without it offer every field.
+   */
+  fieldTypeFilter?: import('@/hooks/useCollectionSchema').FieldType[]
 }
 
 /**
@@ -65,6 +70,12 @@ export interface WidgetDescriptor {
   defaultProps: Record<string, PropValue>
   propSchema: PropFieldSchema[]
   acceptsChildren?: boolean
+  /**
+   * Registered but excluded from the palette (e.g. the internal `tab-panel` container). The
+   * registry-driven palette (2b) filters these out; `widgetRegistry.get` still resolves them so the
+   * render path never falls through to the unknown descriptor.
+   */
+  paletteHidden?: boolean
   /** Events this widget exposes in the inspector's `event-list` field (wired in 2e). */
   supportedEvents?: EventName[]
   /** The single render function used by BOTH the editor preview and the runtime. */

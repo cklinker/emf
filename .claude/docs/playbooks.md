@@ -93,6 +93,13 @@ registry — never add a per-type `if (node.type === …)` branch anywhere.
 1. Create a `WidgetDescriptor` in `widgets/builtins/<group>.tsx` (`{ type, label, icon, category, defaultProps, propSchema, acceptsChildren?, supportedEvents?, Render }`) and add it to that file's exported array (registered via `widgets/builtins/index.ts`).
 2. The palette, inspector, and both renderers pick it up automatically. `category` controls its palette section; `propSchema` controls its inspector fields; `Render` is the one function used by both the editor preview and the runtime.
 
+**Typed-input sub-pattern** (slice 2f — a `category:'input'` widget bound to a `{collection, field}`)
+- The `Render` reads `{collection, field}` and resolves the field's `FieldType` via `useFieldDef` (wraps `useCollectionSchema`), then maps the type to a control (`widgets/builtins/inputs/*` — `text-input`/`number-input`/`checkbox`/`dropdown`/`datepicker`/`lookup`/`multi-picklist`/`rich-text`). The `field-picker` prop carries a `fieldTypeFilter` so the inspector lists only compatible fields.
+- For **picklist/multi-picklist** options use the shared `usePicklistOptions` hook (FIELD vs GLOBAL source via `fieldTypeConfig.globalPicklistId`, hitting `GET /api/picklist-values?filter[…]`); for **lookups** use `useLookupOptions` (→ `useLookupDisplayMap`). Never re-implement the picklist source resolution — reuse the hook.
+- **Reuse** `LookupSelect`/`MultiPicklistSelect`/`RichTextEditor` — never re-implement a typed control. A `{$bind}` default value arrives **already resolved** at `Render` (resolved-node invariant) — do not call `resolveBindings`.
+- For the **`form` widget**, prefer extending `@kelta/components` `ResourceForm` via `setComponentRegistry` (`registerFormFieldRenderers.ts`) over forking it — that upgrades its picklist/lookup/multi/rich-text fields to the same rich controls.
+- **HTML-bearing output** (`rich_text` display, a bound HTML value) MUST pass the **same** sanitizer the `FieldRenderer` `rich_text` path uses (render via `<FieldRenderer type="rich_text">`, which strips tags) — **never** `dangerouslySetInnerHTML` on unsanitized bound HTML.
+
 **Add a new inspector field kind** (when no existing `PropFieldKind` fits a prop)
 1. Add the kind to `PropFieldKind` in `widgets/types.ts`.
 2. Create `inspector/fields/<Kind>Field.tsx` implementing `FieldEditorProps` (from `inspector/fields/types.ts`) with its `onChange` **value-write contract** (literal editors write a scalar; export it from `inspector/fields/index.ts`).

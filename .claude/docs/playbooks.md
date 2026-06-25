@@ -83,6 +83,32 @@ A new `GET/POST /api/...` served by the worker, tenant-scoped, optionally permis
 
 ---
 
+## 3b. Add a page-builder widget / inspector field kind
+
+The page builder (`kelta-ui/app/src/pages/PageBuilderPage/`) is **descriptor-driven** (slices 2a/2b). The
+palette, inspector, canvas chip, editor preview, and runtime renderer are all single loops over the widget
+registry — never add a per-type `if (node.type === …)` branch anywhere.
+
+**Add a new widget**
+1. Create a `WidgetDescriptor` in `widgets/builtins/<group>.tsx` (`{ type, label, icon, category, defaultProps, propSchema, acceptsChildren?, supportedEvents?, Render }`) and add it to that file's exported array (registered via `widgets/builtins/index.ts`).
+2. The palette, inspector, and both renderers pick it up automatically. `category` controls its palette section; `propSchema` controls its inspector fields; `Render` is the one function used by both the editor preview and the runtime.
+
+**Add a new inspector field kind** (when no existing `PropFieldKind` fits a prop)
+1. Add the kind to `PropFieldKind` in `widgets/types.ts`.
+2. Create `inspector/fields/<Kind>Field.tsx` implementing `FieldEditorProps` (from `inspector/fields/types.ts`) with its `onChange` **value-write contract** (literal editors write a scalar; export it from `inspector/fields/index.ts`).
+3. Add one `case` to the kind→editor map in `inspector/Inspector.tsx` (the single place that knows the mapping).
+4. If the prop should support the `fx` literal↔expression toggle, mark its schema field `bindable: true` — `Inspector` auto-wraps it in `BindableField` (which writes `{ $bind, mode:'expr' }` in expr mode).
+5. Add a Vitest block to `inspector/fields/fields.test.tsx`.
+6. **Localize every visible string** via `useI18n`/`t('builder.*')` (group/field labels, hints, category headers) — never hardcode English; `data-testid`s stay untranslated.
+
+> Authoring an `event-list`/`expression` value only **writes** the model. The runtime that consumes it is
+> slice 2e (action runtime) / 2d (binding resolution) — do not add execution/resolution to the editor.
+
+**Tests**: Vitest for the field write-contract + an `Inspector`/`Palette` render test.
+**Docs**: [`status.md`](status.md) page-builder row if it's a new capability; [`conventions.md`](conventions.md) if it changes the inspector convention.
+
+---
+
 ## 4. Add an MCP tool
 
 Expose a platform operation to MCP clients (kelta-admin or kelta-user toolset).

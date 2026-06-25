@@ -22,14 +22,20 @@
 
 import React, { useState, useCallback, useEffect, useRef, type ComponentType } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Image, FileEdit, Grid3x3, Square, Box } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { usePlugins } from '../../context/PluginContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import type { PageComponentProps } from '../../types/plugin'
 import { cn } from '@/lib/utils'
 import { readComponents, readConfig, mergeConfig } from './pageConfig'
+import { Palette } from './palette/Palette'
+import { Inspector } from './inspector/Inspector'
+import { RenderTree } from './widgets/renderTree'
+import { widgetRegistry } from './widgets/registry'
+import './widgets/builtins'
+import type { PageComponent as ModelPageComponent } from './model/pageModel'
 
 /**
  * UI Page interface matching the API response
@@ -95,19 +101,8 @@ interface FormErrors {
   title?: string
 }
 
-/**
- * Available component types for the palette
- */
-const AVAILABLE_COMPONENTS = [
-  { type: 'heading', label: 'Heading', icon: 'H' },
-  { type: 'text', label: 'Text', icon: 'T' },
-  { type: 'button', label: 'Button', icon: 'B' },
-  { type: 'image', label: 'Image', icon: 'I' },
-  { type: 'form', label: 'Form', icon: 'F' },
-  { type: 'table', label: 'Table', icon: '⊞' },
-  { type: 'card', label: 'Card', icon: '▢' },
-  { type: 'container', label: 'Container', icon: '◻' },
-]
+/** The set of registered built-in widget types — used to distinguish built-ins from plugin components. */
+const BUILTIN_TYPES = new Set(widgetRegistry.list().map((w) => w.type))
 
 /**
  * Props for PageBuilderPage component
@@ -180,456 +175,21 @@ function StatusBadge({ published }: StatusBadgeProps): React.ReactElement {
 }
 
 /**
- * Component Palette Component
- */
-interface ComponentPaletteProps {
-  onDragStart: (componentType: string) => void
-  onAddComponent: (componentType: string) => void
-}
-
-function ComponentPalette({
-  onDragStart,
-  onAddComponent,
-}: ComponentPaletteProps): React.ReactElement {
-  const { t } = useI18n()
-
-  return (
-    <div
-      className="bg-background border border-border rounded-md p-4 overflow-y-auto"
-      data-testid="component-palette"
-    >
-      <h3 className="m-0 mb-4 text-sm font-semibold text-foreground">
-        {t('builder.pages.components')}
-      </h3>
-      <div className="grid grid-cols-2 max-md:grid-cols-4 gap-2">
-        {AVAILABLE_COMPONENTS.map((comp) => (
-          <button
-            key={comp.type}
-            type="button"
-            className="flex flex-col items-center justify-center p-2 bg-muted border border-border rounded cursor-grab transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 active:cursor-grabbing"
-            draggable
-            onDragStart={() => onDragStart(comp.type)}
-            onClick={() => onAddComponent(comp.type)}
-            aria-label={`Add ${comp.label} component`}
-            data-testid={`palette-item-${comp.type}`}
-          >
-            <span className="text-lg mb-1">{comp.icon}</span>
-            <span className="text-xs text-muted-foreground">{comp.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Property Panel Component
- */
-interface PropertyPanelProps {
-  component: PageComponent | null
-  onChange: (updates: Partial<PageComponent>) => void
-}
-
-function PropertyPanel({ component, onChange }: PropertyPanelProps): React.ReactElement {
-  const { t } = useI18n()
-
-  if (!component) {
-    return (
-      <div
-        className="bg-background border border-border rounded-md p-4 overflow-y-auto"
-        data-testid="property-panel"
-      >
-        <h3 className="m-0 mb-4 text-sm font-semibold text-foreground">
-          {t('builder.pages.properties')}
-        </h3>
-        <p className="text-muted-foreground text-sm text-center py-6">
-          {t('builder.pages.selectComponent')}
-        </p>
-      </div>
-    )
-  }
-
-  const handlePropChange = (key: string, value: unknown) => {
-    onChange({
-      props: { ...component.props, [key]: value },
-    })
-  }
-
-  // Table data-source binding lives under props.dataView ({ collection, fields, limit }).
-  const dataView =
-    (component.props.dataView as
-      | { collection?: string; fields?: string[]; limit?: number }
-      | undefined) ?? {}
-  const handleDataViewChange = (patch: {
-    collection?: string
-    fields?: string[]
-    limit?: number
-  }) => {
-    handlePropChange('dataView', { ...dataView, ...patch })
-  }
-
-  return (
-    <div
-      className="bg-background border border-border rounded-md p-4 overflow-y-auto"
-      data-testid="property-panel"
-    >
-      <h3 className="m-0 mb-4 text-sm font-semibold text-foreground">
-        {t('builder.pages.properties')}
-      </h3>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-type">
-            Component Type
-          </label>
-          <span id="prop-type" className="text-sm text-foreground capitalize">
-            {component.type}
-          </span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-id">
-            ID
-          </label>
-          <input
-            id="prop-id"
-            type="text"
-            className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-muted disabled:text-muted-foreground"
-            value={component.id}
-            disabled
-            data-testid="property-id"
-          />
-        </div>
-        {component.type === 'heading' && (
-          <>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-text">
-                Text
-              </label>
-              <input
-                id="prop-text"
-                type="text"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={(component.props.text as string) || ''}
-                onChange={(e) => handlePropChange('text', e.target.value)}
-                placeholder="Enter heading text"
-                data-testid="property-text"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-level">
-                Level
-              </label>
-              <select
-                id="prop-level"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={(component.props.level as string) || 'h1'}
-                onChange={(e) => handlePropChange('level', e.target.value)}
-                data-testid="property-level"
-              >
-                <option value="h1">H1</option>
-                <option value="h2">H2</option>
-                <option value="h3">H3</option>
-                <option value="h4">H4</option>
-              </select>
-            </div>
-          </>
-        )}
-        {component.type === 'text' && (
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-content">
-              Content
-            </label>
-            <textarea
-              id="prop-content"
-              className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-y min-h-[80px]"
-              value={(component.props.content as string) || ''}
-              onChange={(e) => handlePropChange('content', e.target.value)}
-              placeholder="Enter text content"
-              rows={4}
-              data-testid="property-content"
-            />
-          </div>
-        )}
-        {component.type === 'button' && (
-          <>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-label">
-                Label
-              </label>
-              <input
-                id="prop-label"
-                type="text"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={(component.props.label as string) || ''}
-                onChange={(e) => handlePropChange('label', e.target.value)}
-                placeholder="Button label"
-                data-testid="property-label"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-variant">
-                Variant
-              </label>
-              <select
-                id="prop-variant"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={(component.props.variant as string) || 'primary'}
-                onChange={(e) => handlePropChange('variant', e.target.value)}
-                data-testid="property-variant"
-              >
-                <option value="primary">Primary</option>
-                <option value="secondary">Secondary</option>
-                <option value="danger">Danger</option>
-              </select>
-            </div>
-          </>
-        )}
-        {component.type === 'image' && (
-          <>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-src">
-                Source URL
-              </label>
-              <input
-                id="prop-src"
-                type="text"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={(component.props.src as string) || ''}
-                onChange={(e) => handlePropChange('src', e.target.value)}
-                placeholder="https://example.com/image.png"
-                data-testid="property-src"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-alt">
-                Alt Text
-              </label>
-              <input
-                id="prop-alt"
-                type="text"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={(component.props.alt as string) || ''}
-                onChange={(e) => handlePropChange('alt', e.target.value)}
-                placeholder="Image description"
-                data-testid="property-alt"
-              />
-            </div>
-          </>
-        )}
-        {(component.type === 'table' || component.type === 'form') && (
-          <>
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-xs font-medium text-muted-foreground"
-                htmlFor="prop-collection"
-              >
-                Collection
-              </label>
-              <input
-                id="prop-collection"
-                type="text"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={dataView.collection || ''}
-                onChange={(e) => handleDataViewChange({ collection: e.target.value || undefined })}
-                placeholder="orders"
-                data-testid="property-collection"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-columns">
-                {component.type === 'form' ? 'Fields' : 'Columns'}
-              </label>
-              <input
-                id="prop-columns"
-                type="text"
-                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                value={(dataView.fields ?? []).join(', ')}
-                onChange={(e) =>
-                  handleDataViewChange({
-                    fields: e.target.value
-                      .split(',')
-                      .map((f) => f.trim())
-                      .filter((f) => f.length > 0),
-                  })
-                }
-                placeholder="comma-separated, e.g. id, status, total"
-                data-testid="property-columns"
-              />
-            </div>
-            {component.type === 'table' && (
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-limit">
-                  Row limit
-                </label>
-                <input
-                  id="prop-limit"
-                  type="number"
-                  className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={dataView.limit ?? ''}
-                  onChange={(e) =>
-                    handleDataViewChange({
-                      limit: e.target.value ? Number(e.target.value) : undefined,
-                    })
-                  }
-                  placeholder="25"
-                  data-testid="property-limit"
-                />
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/**
  * Preview Component - displays the page as it will appear to end users
  * Requirement 7.7: Preview mode shows page as it will appear to end users
  * Requirement 12.5: Use registered custom page components when rendering pages
+ *
+ * Renders the component tree through the shared registry-driven `RenderTree` (editor mode), the same
+ * path the canvas preview and the runtime renderer use — so previewing matches what end users see.
  */
 interface PreviewProps {
   page: UIPage | null
   components: PageComponent[]
   onClose: () => void
-  getPageComponent?: (name: string) => ComponentType<PageComponentProps> | undefined
 }
 
-function Preview({
-  page,
-  components,
-  onClose,
-  getPageComponent,
-}: PreviewProps): React.ReactElement {
+function Preview({ page, components, onClose }: PreviewProps): React.ReactElement {
   const { t } = useI18n()
-
-  const renderPreviewComponent = (comp: PageComponent): React.ReactNode => {
-    // Requirement 12.5: Check for custom page component first
-    const CustomComponent = getPageComponent?.(comp.type)
-    if (CustomComponent) {
-      return (
-        <div
-          key={comp.id}
-          className="p-4 bg-background border border-border rounded-md dark:bg-muted dark:border-border"
-          data-testid={`preview-custom-${comp.id}`}
-        >
-          <CustomComponent config={comp.props} />
-        </div>
-      )
-    }
-
-    // Fall back to default component rendering
-    switch (comp.type) {
-      case 'heading': {
-        const level = (comp.props.level as string) || 'h1'
-        const text = (comp.props.text as string) || 'Heading'
-        const HeadingTag = level as keyof JSX.IntrinsicElements
-        return (
-          <HeadingTag key={comp.id} className="m-0 text-foreground">
-            {text}
-          </HeadingTag>
-        )
-      }
-      case 'text':
-        return (
-          <p key={comp.id} className="m-0 text-foreground leading-relaxed">
-            {(comp.props.content as string) || 'Text content'}
-          </p>
-        )
-      case 'button':
-        return (
-          <button
-            key={comp.id}
-            type="button"
-            className={cn(
-              'inline-block px-4 py-2 text-sm font-medium border-none rounded-md cursor-default',
-              ((comp.props.variant as string) || 'primary') === 'primary' &&
-                'text-primary-foreground bg-primary',
-              (comp.props.variant as string) === 'secondary' &&
-                'text-foreground bg-muted border border-border',
-              (comp.props.variant as string) === 'danger' &&
-                'text-primary-foreground bg-destructive'
-            )}
-            disabled
-          >
-            {(comp.props.label as string) || 'Button'}
-          </button>
-        )
-      case 'image':
-        return (
-          <div key={comp.id} className="max-w-full">
-            {(comp.props.src as string) ? (
-              <img
-                src={comp.props.src as string}
-                alt={(comp.props.alt as string) || 'Image'}
-                className="max-w-full h-auto rounded-md"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
-                <span>
-                  <Image size={24} />
-                </span>
-                <span>{t('builder.pages.imagePlaceholder') || 'Image'}</span>
-              </div>
-            )}
-          </div>
-        )
-      case 'form':
-        return (
-          <div key={comp.id} className="w-full">
-            <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
-              <span>
-                <FileEdit size={24} />
-              </span>
-              <span>Form Component</span>
-            </div>
-          </div>
-        )
-      case 'table':
-        return (
-          <div key={comp.id} className="w-full">
-            <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
-              <span>
-                <Grid3x3 size={24} />
-              </span>
-              <span>Table Component</span>
-            </div>
-          </div>
-        )
-      case 'card':
-        return (
-          <div key={comp.id} className="w-full">
-            <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
-              <span>
-                <Square size={24} />
-              </span>
-              <span>Card Component</span>
-            </div>
-          </div>
-        )
-      case 'container':
-        return (
-          <div key={comp.id} className="w-full">
-            {comp.children?.map(renderPreviewComponent) || (
-              <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
-                <span>
-                  <Box size={24} />
-                </span>
-                <span>Container</span>
-              </div>
-            )}
-          </div>
-        )
-      default:
-        return (
-          <div
-            key={comp.id}
-            className="p-4 bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-300"
-          >
-            Unknown component: {comp.type}
-          </div>
-        )
-    }
-  }
 
   return (
     <div
@@ -660,7 +220,7 @@ function Preview({
               <p>{t('builder.pages.canvasEmpty')}</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">{components.map(renderPreviewComponent)}</div>
+            <RenderTree mode="editor" components={components} tenantSlug={getTenantSlug()} />
           )}
         </div>
         <footer className="flex justify-between items-center px-6 py-4 border-t border-border bg-muted">
@@ -734,9 +294,13 @@ function Canvas({
   const renderComponent = (comp: PageComponent) => {
     const isSelected = selectedId === comp.id
 
-    // Requirement 12.5: Check for custom page component
+    // The descriptor (built-in, or a synthetic plugin/unknown fallback) supplies the node's label + icon.
+    const descriptor = widgetRegistry.get(comp.type)
+    const Icon = descriptor.icon
+    // A node is "custom" when it isn't a registered built-in but IS a registered plugin page component.
+    const isBuiltin = BUILTIN_TYPES.has(comp.type)
     const CustomComponent = getPageComponent?.(comp.type)
-    const isCustomComponent = !!CustomComponent
+    const isCustomComponent = !isBuiltin && !!CustomComponent
 
     return (
       <div
@@ -785,7 +349,7 @@ function Canvas({
           </button>
         </div>
         <div className="text-sm text-foreground">
-          {isCustomComponent ? (
+          {isCustomComponent && CustomComponent ? (
             // Render custom component preview
             <div
               className="p-2 bg-background rounded min-h-[40px] dark:bg-muted"
@@ -794,47 +358,11 @@ function Canvas({
               <CustomComponent config={comp.props} />
             </div>
           ) : (
-            // Default component previews
-            <>
-              {comp.type === 'heading' && (
-                <span className="font-semibold">{(comp.props.text as string) || 'Heading'}</span>
-              )}
-              {comp.type === 'text' && (
-                <span className="text-muted-foreground">
-                  {(comp.props.content as string) || 'Text content'}
-                </span>
-              )}
-              {comp.type === 'button' && (
-                <span className="inline-block px-2 py-1 bg-primary text-primary-foreground rounded text-xs">
-                  {(comp.props.label as string) || 'Button'}
-                </span>
-              )}
-              {comp.type === 'image' && (
-                <span className="text-muted-foreground">
-                  <Image size={14} /> Image
-                </span>
-              )}
-              {comp.type === 'form' && (
-                <span className="text-muted-foreground">
-                  <FileEdit size={14} /> Form
-                </span>
-              )}
-              {comp.type === 'table' && (
-                <span className="text-muted-foreground">
-                  <Grid3x3 size={14} /> Table
-                </span>
-              )}
-              {comp.type === 'card' && (
-                <span className="text-muted-foreground">
-                  <Square size={14} /> Card
-                </span>
-              )}
-              {comp.type === 'container' && (
-                <span className="text-muted-foreground">
-                  <Box size={14} /> Container
-                </span>
-              )}
-            </>
+            // Descriptor-driven node chip: icon + label (the canvas mini-preview; live preview is Preview/RenderTree).
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <Icon size={14} />
+              {descriptor.label}
+            </span>
           )}
         </div>
       </div>
@@ -1370,13 +898,13 @@ export function PageBuilderPage({
     setDraggedComponentType(componentType)
   }, [])
 
-  // Handle adding component
+  // Handle adding component — seed the new node with the widget descriptor's defaultProps.
   const handleAddComponent = useCallback(
     (componentType: string) => {
       const newComponent: PageComponent = {
         id: generateId(),
         type: componentType,
-        props: {},
+        props: { ...widgetRegistry.get(componentType).defaultProps },
         position: { row: components.length, column: 0, width: 12, height: 1 },
       }
       setComponents((prev) => [...prev, newComponent])
@@ -1601,7 +1129,7 @@ export function PageBuilderPage({
         </header>
 
         <div className="grid grid-cols-[200px_1fr_280px] max-lg:grid-cols-[160px_1fr_240px] max-md:grid-cols-1 max-md:grid-rows-[auto_1fr_auto] gap-4 flex-1 min-h-0 overflow-hidden">
-          <ComponentPalette onDragStart={handleDragStart} onAddComponent={handleAddComponent} />
+          <Palette onDragStart={handleDragStart} onAddComponent={handleAddComponent} />
           <Canvas
             components={components}
             selectedId={selectedComponentId}
@@ -1610,7 +1138,10 @@ export function PageBuilderPage({
             onDelete={handleDeleteComponent}
             getPageComponent={getPageComponent}
           />
-          <PropertyPanel component={selectedComponent} onChange={handleComponentChange} />
+          <Inspector
+            node={selectedComponent as ModelPageComponent | null}
+            onChange={handleComponentChange as (updates: Partial<ModelPageComponent>) => void}
+          />
         </div>
 
         {/* Preview mode overlay (Requirement 7.7, 12.5) */}
@@ -1619,7 +1150,6 @@ export function PageBuilderPage({
             page={currentPage || null}
             components={components}
             onClose={handleClosePreview}
-            getPageComponent={getPageComponent}
           />
         )}
 

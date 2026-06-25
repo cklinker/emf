@@ -13,7 +13,10 @@ const card: WidgetDescriptor = {
   icon: Square,
   category: 'layout',
   defaultProps: {},
-  propSchema: [],
+  propSchema: [
+    { key: 'span', label: 'Column span', kind: 'span', group: 'layout' },
+    { key: 'children', label: 'Children', kind: 'children', group: 'layout' },
+  ],
   acceptsChildren: true,
   Render: (props) => (
     <div className="rounded-lg border border-border bg-card p-4" data-testid="page-node-card">
@@ -28,7 +31,10 @@ const container: WidgetDescriptor = {
   icon: Box,
   category: 'layout',
   defaultProps: {},
-  propSchema: [],
+  propSchema: [
+    { key: 'span', label: 'Column span', kind: 'span', group: 'layout' },
+    { key: 'children', label: 'Children', kind: 'children', group: 'layout' },
+  ],
   acceptsChildren: true,
   Render: (props) => (
     <div className="space-y-4" data-testid="page-node-container">

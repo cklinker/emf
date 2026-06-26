@@ -47,8 +47,20 @@ interface PageRenderContract {
   tree: { components?: PageNode[]; layout?: unknown }
 }
 
-export function CustomPage(): React.ReactElement {
-  const { tenantSlug, pageSlug } = useParams<{ tenantSlug: string; pageSlug: string }>()
+export interface CustomPageProps {
+  /**
+   * When set, renders this page slug instead of the `:pageSlug` route param. Used by `AppHomePage` to
+   * render a `config.isHomePage` page in place of the default home (the URL stays `/app/home`).
+   */
+  slug?: string
+}
+
+export function CustomPage({ slug: slugOverride }: CustomPageProps = {}): React.ReactElement {
+  const { tenantSlug, pageSlug: routePageSlug } = useParams<{
+    tenantSlug: string
+    pageSlug: string
+  }>()
+  const pageSlug = slugOverride ?? routePageSlug
   const basePath = `/${tenantSlug}/app`
   const { apiClient } = useApi()
 

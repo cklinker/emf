@@ -49,6 +49,12 @@ export interface PageConfig {
   variables?: PageVariable[]
   dataSources?: PageDataSource[]
   access?: { requiredPermission?: string }
+  /**
+   * When true, this page overrides the end-user app's default landing page (`/app/home`) — the runtime
+   * renders it in place of `AppHomePage`. At most one page per tenant should set this; the resolver
+   * picks the first published + active page that does.
+   */
+  isHomePage?: boolean
   /** v2 marker — slice 2c is the first writer (stamped on every save once a tree is authored/migrated). */
   schemaVersion?: 2
 }
@@ -89,6 +95,7 @@ export function mergeConfig(
     variables?: PageVariable[]
     dataSources?: PageDataSource[]
     access?: { requiredPermission?: string }
+    isHomePage?: boolean
     schemaVersion?: 2
   }
 ): PageConfig {
@@ -98,6 +105,7 @@ export function mergeConfig(
   if (changes.variables !== undefined) merged.variables = changes.variables
   if (changes.dataSources !== undefined) merged.dataSources = changes.dataSources
   if (changes.access !== undefined) merged.access = changes.access
+  if (changes.isHomePage !== undefined) merged.isHomePage = changes.isHomePage
   if (changes.schemaVersion !== undefined) merged.schemaVersion = changes.schemaVersion
   return merged
 }

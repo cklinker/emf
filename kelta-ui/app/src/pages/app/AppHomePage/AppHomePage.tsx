@@ -23,6 +23,8 @@ import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/context/AuthContext'
 import { useAppContext } from '@/context/AppContext'
 import { useConfig } from '@/context/ConfigContext'
+import { CustomPage } from '../CustomPage/CustomPage'
+import { resolveHomePageSlug } from './homePage'
 
 /**
  * Format a timestamp into a human-readable relative time string.
@@ -89,6 +91,16 @@ export function AppHomePage(): React.ReactElement {
 
   // Extract collection tabs from menu config
   const collectionTabs = useMemo(() => getCollectionTabs(config), [config])
+
+  // A page-builder page can override this default home (config.isHomePage). When one is configured,
+  // render it in place of the default content — the URL stays /app/home.
+  const homePageSlug = useMemo(
+    () => resolveHomePageSlug((config as { pages?: unknown } | null)?.pages),
+    [config]
+  )
+  if (homePageSlug) {
+    return <CustomPage slug={homePageSlug} />
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">

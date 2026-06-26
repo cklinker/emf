@@ -17,6 +17,7 @@ import type { PageDataSource, PageVariable } from '../../pageConfig'
 import { VariablesSection } from './VariablesSection'
 import { DataSourcesSection } from './DataSourcesSection'
 import { AccessSection } from './AccessSection'
+import { HomePageSection } from './HomePageSection'
 
 export interface PageSettingsDrawerProps {
   open: boolean
@@ -28,6 +29,9 @@ export interface PageSettingsDrawerProps {
   /** Slice 1h: the page's `config.access.requiredPermission` (undefined ⇒ no restriction). */
   requiredPermission?: string
   onRequiredPermissionChange: (permission: string | undefined) => void
+  /** Whether this page overrides the app's default home (`config.isHomePage`). */
+  isHomePage: boolean
+  onIsHomePageChange: (isHomePage: boolean) => void
 }
 
 export function PageSettingsDrawer({
@@ -39,6 +43,8 @@ export function PageSettingsDrawer({
   onDataSourcesChange,
   requiredPermission,
   onRequiredPermissionChange,
+  isHomePage,
+  onIsHomePageChange,
 }: PageSettingsDrawerProps): React.ReactElement {
   const { t } = useI18n()
   return (
@@ -59,6 +65,7 @@ export function PageSettingsDrawer({
             requiredPermission={requiredPermission}
             onChange={onRequiredPermissionChange}
           />
+          <HomePageSection isHomePage={isHomePage} onChange={onIsHomePageChange} />
         </div>
       </SheetContent>
     </Sheet>

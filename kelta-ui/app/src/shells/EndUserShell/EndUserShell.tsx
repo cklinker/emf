@@ -12,39 +12,11 @@ import React, { useState, useCallback, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { TopNavBar } from './TopNavBar'
 import { GlobalSearch } from './GlobalSearch'
+import { buildNavTabs } from './navTabs'
 import { useAuth } from '@/context/AuthContext'
 import { useConfig } from '@/context/ConfigContext'
 import { PageLoader } from '@/components/PageLoader'
 import { SkipLinks } from '@/components/SkipLinks'
-import type { NavTab } from './TopNavBar'
-import type { MenuConfig } from '@/types/config'
-
-/**
- * Extract collection-based navigation tabs from menu config.
- * Pure function — safe for React compiler optimization.
- */
-function buildNavTabs(menus: MenuConfig[] | undefined): NavTab[] {
-  if (!menus) return []
-
-  const collectionTabs: NavTab[] = []
-  for (const menu of menus) {
-    if (menu.items) {
-      for (const item of menu.items) {
-        if (item.path && item.path.startsWith('/resources/')) {
-          const collectionName = item.path.replace('/resources/', '').split('/')[0]
-          if (collectionName) {
-            collectionTabs.push({
-              collectionName,
-              label: item.label || collectionName,
-              icon: item.icon,
-            })
-          }
-        }
-      }
-    }
-  }
-  return collectionTabs
-}
 
 export function EndUserShell(): React.ReactElement {
   const { user, logout } = useAuth()

@@ -13,7 +13,7 @@
 
 import React, { useState, useCallback } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Search, Bell, Settings, LayoutGrid, Menu, Home, Database } from 'lucide-react'
+import { Search, Bell, Settings, LayoutGrid, Menu, Home, Database, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -23,11 +23,16 @@ import { UserMenu } from '@/components/UserMenu'
 import type { User } from '@/types/auth'
 
 /**
- * Navigation tab definition — represents a collection in the top nav.
+ * Navigation tab definition — represents a collection list or a custom page in the top nav.
+ * A collection tab routes to `…/o/<target>`; a page tab routes to `…/p/<target>`.
  */
 export interface NavTab {
-  /** Collection API name */
-  collectionName: string
+  /** Stable, unique key for the tab (the source menu-item path). */
+  key: string
+  /** What this tab points at. */
+  kind: 'collection' | 'page'
+  /** Collection API name (kind `collection`) or page slug (kind `page`). */
+  target: string
   /** Display label */
   label: string
   /** Lucide icon name (optional) */
@@ -71,20 +76,29 @@ export function TopNavBar({
 
   const basePath = `/${tenantSlug}/app`
 
+  const tabPath = useCallback(
+    (tab: NavTab) =>
+      tab.kind === 'page' ? `${basePath}/p/${tab.target}` : `${basePath}/o/${tab.target}`,
+    [basePath]
+  )
+
   const handleTabClick = useCallback(
     (tab: NavTab, index: number) => {
       setActiveTabIndex(index)
-      navigate(`${basePath}/o/${tab.collectionName}`)
+      navigate(tabPath(tab))
     },
-    [navigate, basePath]
+    [navigate, tabPath]
   )
+
+  const collectionTabs = tabs.filter((tab) => tab.kind === 'collection')
+  const pageTabs = tabs.filter((tab) => tab.kind === 'page')
 
   const handleMobileNavClick = useCallback(
     (path: string) => {
       setMobileMenuOpen(false)
       navigate(path)
     },
-    [navigate]
+    [navigate, setMobileMenuOpen]
   )
 
   return (
@@ -109,7 +123,7 @@ export function TopNavBar({
                 <Home className="h-4 w-4 text-muted-foreground" />
                 Home
               </button>
-              {tabs.length > 0 && (
+              {collectionTabs.length > 0 && (
                 <>
                   <Separator className="my-2" />
                   <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -117,13 +131,31 @@ export function TopNavBar({
                   </p>
                 </>
               )}
-              {tabs.map((tab) => (
+              {collectionTabs.map((tab) => (
                 <button
-                  key={tab.collectionName}
-                  onClick={() => handleMobileNavClick(`${basePath}/o/${tab.collectionName}`)}
+                  key={tab.key}
+                  onClick={() => handleMobileNavClick(tabPath(tab))}
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
                 >
                   <Database className="h-4 w-4 text-muted-foreground" />
+                  {tab.label}
+                </button>
+              ))}
+              {pageTabs.length > 0 && (
+                <>
+                  <Separator className="my-2" />
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Pages
+                  </p>
+                </>
+              )}
+              {pageTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => handleMobileNavClick(tabPath(tab))}
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground" />
                   {tab.label}
                 </button>
               ))}
@@ -181,7 +213,7 @@ export function TopNavBar({
       >
         {tabs.map((tab, index) => (
           <button
-            key={tab.collectionName}
+            key={tab.key}
             onClick={() => handleTabClick(tab, index)}
             className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               activeTabIndex === index

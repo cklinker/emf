@@ -114,36 +114,38 @@ export function TenantProvider({ children }: { children: React.ReactNode }): Rea
   const mode: TenantMode = customDomain ? 'custom-domain' : 'slug'
 
   // In custom-domain mode the slug isn't in the URL — we hydrate it later
-  // from /api/whoami. Until that completes we have no slug to show, which is
-  // fine: routing and API calls work without it on a custom domain.
-  const [resolvedSlug, setResolvedSlug] = useState<string>(() =>
-    customDomain ? '' : (tenantSlug || 'default'),
-  )
-
-  syncTenantSlug(resolvedSlug)
+  // from /api/whoami (async). Until that resolves it is ''. In slug mode the
+  // slug is derived directly from the URL param, so it needs no state at all.
+  const [customDomainSlug, setCustomDomainSlug] = useState<string>('')
 
   useEffect(() => {
-    if (customDomain) {
-      // Worker echoes the gateway-injected X-Tenant-Slug header back so the UI
-      // can label things by tenant. No auth needed (custom-domain mode resolves
-      // tenant from Host pre-auth) — but the endpoint is also fine post-auth.
-      fetch('/api/whoami', { credentials: 'include' })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j) => {
-          if (j && typeof j.tenantSlug === 'string' && j.tenantSlug) {
-            setResolvedSlug(j.tenantSlug)
-            syncTenantSlug(j.tenantSlug)
-          }
-        })
-        .catch(() => {
-          // Silent: tenant labels degrade gracefully without a slug
-        })
-      return
+    if (!customDomain) return
+
+    // Worker echoes the gateway-injected X-Tenant-Slug header back so the UI
+    // can label things by tenant. No auth needed (custom-domain mode resolves
+    // tenant from Host pre-auth) — but the endpoint is also fine post-auth.
+    let cancelled = false
+    fetch('/api/whoami', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!cancelled && j && typeof j.tenantSlug === 'string' && j.tenantSlug) {
+          setCustomDomainSlug(j.tenantSlug)
+        }
+      })
+      .catch(() => {
+        // Silent: tenant labels degrade gracefully without a slug
+      })
+    return () => {
+      cancelled = true
     }
-    const next = tenantSlug || 'default'
-    setResolvedSlug(next)
-    syncTenantSlug(next)
-  }, [customDomain, tenantSlug])
+  }, [customDomain])
+
+  // Derived during render — slug mode tracks the URL param reactively, and
+  // custom-domain mode reflects the hydrated slug ('' until /api/whoami resolves).
+  const resolvedSlug = customDomain ? customDomainSlug : tenantSlug || 'default'
+
+  // Mirror to the module-level variable for non-hook callers (getTenantSlug).
+  syncTenantSlug(resolvedSlug)
 
   const value: TenantContextValue = {
     tenantSlug: resolvedSlug,

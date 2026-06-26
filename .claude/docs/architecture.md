@@ -187,6 +187,20 @@ by `sectionId IN (section ids)` after `layout-sections` resolves directly).
 Includes are skipped silently when the target is unresolvable — `200` with
 no `included` entry — never `5xx`.
 
+The field-name path and the always-on relationship serialization both require the field's
+`referenceConfig` to be present. `CollectionLifecycleManager.loadFieldsFromDb` builds it from the
+`reference_target` column, but many LOOKUP/MASTER_DETAIL fields were persisted with a **null
+`reference_target`** (only `reference_collection_id` set) — those silently lost their
+`referenceConfig`, so the worker serialized a raw FK-id attribute and `?include=<field>` resolved
+nothing. The loader now **derives the target name from `reference_collection_id`** (via
+`resolveReferenceTarget`) when `reference_target` is blank, so such fields serialize as relationships
+and resolve includes. **Consumer contract:** clients request a *forward* lookup by the **field name**
+(`?include=title`), NOT the target collection name (`?include=titles`); the end-user list/detail/
+related views build `?include=` from reference field names accordingly (see
+`ObjectListPage/listIncludes.ts`). Resolving a forward lookup's display value also needs the **target
+collection to have a display field** (`collection.display_field_id`), else the included row has no
+label to show.
+
 **Read-side field-level security** — `CerbosFieldSecurityAdvice`
 (`@ControllerAdvice`, order 10, after record-level authz) strips fields the
 caller cannot `read` from outgoing JSON:API responses. For the primary `data`

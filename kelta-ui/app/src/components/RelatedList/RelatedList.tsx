@@ -165,11 +165,11 @@ export function RelatedList({
     [visibleFields]
   )
 
-  // Build include param from reference target collection names
+  // Build include param from the reference FIELD names. The worker resolves `?include=` by field
+  // name (e.g. `title`), not by target collection name (e.g. `titles`) — see ObjectListPage.
   const includeParam = useMemo(() => {
     if (referenceFields.length === 0) return undefined
-    const uniqueTargets = [...new Set(referenceFields.map((f) => f.referenceTarget!))]
-    return uniqueTargets.join(',')
+    return [...new Set(referenceFields.map((f) => f.name))].join(',')
   }, [referenceFields])
 
   // Extract pre-loaded records from the parent's included resources when available.

@@ -174,6 +174,7 @@ export const FIELD_TYPES: FieldType[] = [
   'datetime',
   'json',
   'master_detail',
+  'lookup',
   'picklist',
   'multi_picklist',
   'currency',
@@ -292,8 +293,11 @@ export const fieldEditorSchema = z
   })
   .refine(
     (data) => {
-      // master_detail type requires referenceTarget
-      if (data.type === 'master_detail' && !data.referenceTarget) {
+      // Relationship fields (lookup / master_detail / reference) require a target collection.
+      if (
+        (data.type === 'master_detail' || data.type === 'lookup' || data.type === 'reference') &&
+        !data.referenceTarget
+      ) {
         return false
       }
       return true
@@ -666,7 +670,8 @@ export function FieldEditor({
         fieldTypeConfig = config
       }
 
-      const needsReferenceTarget = data.type === 'master_detail'
+      const needsReferenceTarget =
+        data.type === 'master_detail' || data.type === 'lookup' || data.type === 'reference'
 
       // Map validation rules to constraints object for backend
       let constraints: Record<string, unknown> | undefined = undefined
@@ -870,8 +875,10 @@ export function FieldEditor({
         )}
       </div>
 
-      {/* Reference Target (for master_detail type) */}
-      {watchedType === 'master_detail' && (
+      {/* Reference Target (for relationship types: lookup / master_detail / reference) */}
+      {(watchedType === 'master_detail' ||
+        watchedType === 'lookup' ||
+        watchedType === 'reference') && (
         <div className="flex flex-col gap-1">
           <label
             htmlFor="field-reference-target"

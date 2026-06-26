@@ -246,7 +246,7 @@ describe('FieldEditor Component', () => {
       const select = screen.getByTestId('field-type-select')
       const options = select.querySelectorAll('option')
 
-      expect(options).toHaveLength(21)
+      expect(options).toHaveLength(22)
       expect(options[0]).toHaveValue('string')
       expect(options[1]).toHaveValue('number')
       expect(options[2]).toHaveValue('boolean')
@@ -254,10 +254,10 @@ describe('FieldEditor Component', () => {
       expect(options[4]).toHaveValue('datetime')
       expect(options[5]).toHaveValue('json')
       expect(options[6]).toHaveValue('master_detail')
-      expect(options[7]).toHaveValue('picklist')
-      expect(options[8]).toHaveValue('multi_picklist')
-      expect(options[9]).toHaveValue('currency')
-      expect(options[10]).toHaveValue('percent')
+      expect(options[7]).toHaveValue('lookup')
+      expect(options[8]).toHaveValue('picklist')
+      expect(options[9]).toHaveValue('multi_picklist')
+      expect(options[10]).toHaveValue('currency')
     })
 
     it('should default to string type in create mode', () => {
@@ -271,6 +271,17 @@ describe('FieldEditor Component', () => {
       renderWithProviders(<FieldEditor {...defaultProps} collections={mockCollections} />)
 
       await user.selectOptions(screen.getByTestId('field-type-select'), 'master_detail')
+
+      expect(screen.getByTestId('field-reference-target-select')).toBeInTheDocument()
+    })
+
+    it('should show reference target dropdown when LOOKUP type is selected (regression)', async () => {
+      // Regression: a lookup field must let the user pick its target collection — previously the
+      // dropdown only appeared for master_detail, so lookups were created with a null referenceTarget.
+      const user = userEvent.setup()
+      renderWithProviders(<FieldEditor {...defaultProps} collections={mockCollections} />)
+
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'lookup')
 
       expect(screen.getByTestId('field-reference-target-select')).toBeInTheDocument()
     })

@@ -105,14 +105,54 @@ public class GatewayCacheManager {
         if (slug == null || slug.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(tenantSlugCache.getIfPresent(slug));
+        String cached = tenantSlugCache.getIfPresent(slug);
+        if (cached != null) {
+            return SLUG_NOT_FOUND.equals(cached) ? Optional.empty() : Optional.of(cached);
+        }
+
+        // Cache miss. The scheduled refresh may not have run yet (cold start, or a refresh that
+        // failed while the worker was briefly unreachable), or this is a brand-new tenant. Without a
+        // fallback, a VALID tenant 404s for up to one refresh interval — every request to
+        // /{slug}/api/** fails, so the UI can't even load. Lazily pull the slug→tenant map from the
+        // worker, merge it, and re-check (mirrors resolveCustomDomain's lazy lookup).
+        Map<String, String> mapping = fetchTenantSlugMap();
+        if (mapping != null && !mapping.isEmpty()) {
+            tenantSlugCache.putAll(mapping);
+            String resolved = mapping.get(slug);
+            if (resolved != null) {
+                return Optional.of(resolved);
+            }
+            // Fetched successfully but the slug genuinely isn't a tenant — negative-cache so an
+            // unknown slug doesn't re-fetch on every request (cleared by the next full refresh).
+            tenantSlugCache.put(slug, SLUG_NOT_FOUND);
+        }
+        // On a fetch error we intentionally do NOT negative-cache: a transient worker blip must not
+        // pin a valid tenant to "not found" — the next request retries.
+        return Optional.empty();
     }
 
     /**
-     * Checks whether the given string is a known tenant slug.
+     * Fetches the slug→tenantId map from the worker (bounded). Returns null on any failure so a
+     * transient error never poisons the cache.
+     */
+    private Map<String, String> fetchTenantSlugMap() {
+        try {
+            return webClient.get()
+                    .uri("/internal/tenants/slug-map")
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
+                    .block(Duration.ofSeconds(2));
+        } catch (Exception e) {
+            log.warn("Lazy tenant slug-map fetch failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Checks whether the given string is a known tenant slug (lazily resolving on a cache miss).
      */
     public boolean isKnownSlug(String slug) {
-        return slug != null && tenantSlugCache.getIfPresent(slug) != null;
+        return resolveTenantSlug(slug).isPresent();
     }
 
     /**
@@ -262,6 +302,12 @@ public class GatewayCacheManager {
      * Cached to avoid repeated worker API calls for regular subdomain-based tenants.
      */
     private static final String DOMAIN_NOT_FOUND = "__NOT_FOUND__";
+
+    /**
+     * Sentinel value indicating a slug was looked up against the worker and is not a known tenant.
+     * Negative-cached so an unknown slug doesn't trigger a worker fetch on every request.
+     */
+    private static final String SLUG_NOT_FOUND = "__NOT_FOUND__";
 
     /**
      * Resolves a custom domain to a tenant slug.

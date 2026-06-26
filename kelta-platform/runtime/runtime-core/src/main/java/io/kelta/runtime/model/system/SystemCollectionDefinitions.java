@@ -332,6 +332,7 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("sortField").withColumnName("sort_field"))
             .addField(FieldDefinition.string("sortDirection", 4).withColumnName("sort_direction")
                 .withDefault("ASC"))
+            .addField(FieldDefinition.json("sort"))
             .addField(FieldDefinition.integer("rowLimit").withColumnName("row_limit")
                 .withDefault(50))
             .addField(FieldDefinition.json("chartConfig").withColumnName("chart_config"))

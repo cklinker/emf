@@ -3,10 +3,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useCollectionSummaries, type CollectionSummary } from '../../hooks/useCollectionSummaries'
+import { useCollectionSchema } from '../../hooks/useCollectionSchema'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import type { CreateListViewRequest } from '@kelta/sdk'
 import { cn } from '@/lib/utils'
 import { AdminDataTable, type AdminColumn } from '@/components/AdminDataTable'
+import {
+  ColumnsEditor,
+  FilterEditor,
+  SortEditor,
+  type EditorField,
+  type FilterRow,
+  type SortRow,
+} from './ListViewEditors'
 
 interface ListView {
   id: string
@@ -20,23 +29,23 @@ interface ListView {
   updatedAt: string
   columns: string[]
   filters: Record<string, unknown>[]
+  /** Multi-field sort (V147); first entry mirrors sortField/sortDirection for back-compat. */
+  sort?: SortRow[]
 }
 
+/** Structured form state — no raw JSON. Columns/filters/sort are edited via schema-driven pickers. */
 interface ListViewFormData {
   name: string
   collectionId: string
   visibility: string
-  columns: string
-  filters: string
-  sortField: string
-  sortDirection: string
+  columns: string[]
+  filters: FilterRow[]
+  sort: SortRow[]
 }
 
 interface FormErrors {
   name?: string
   collectionId?: string
-  columns?: string
-  filters?: string
 }
 
 export interface ListViewsPageProps {
@@ -53,21 +62,49 @@ function validateForm(data: ListViewFormData): FormErrors {
   if (!data.collectionId) {
     errors.collectionId = 'Collection is required'
   }
-  if (data.columns.trim()) {
-    try {
-      JSON.parse(data.columns)
-    } catch {
-      errors.columns = 'Columns must be valid JSON'
-    }
-  }
-  if (data.filters.trim()) {
-    try {
-      JSON.parse(data.filters)
-    } catch {
-      errors.filters = 'Filters must be valid JSON'
-    }
-  }
   return errors
+}
+
+/** Map a stored list view's filters (loose objects) to the editor's {field, op, value} rows. */
+function toFilterRows(filters: Record<string, unknown>[] | undefined): FilterRow[] {
+  if (!Array.isArray(filters)) return []
+  return filters.map((f) => ({
+    field: typeof f.field === 'string' ? f.field : '',
+    op: typeof f.op === 'string' ? f.op : 'eq',
+    value: f.value == null ? '' : String(f.value),
+  }))
+}
+
+/** Seed the sort rows: prefer the multi-sort array, else the legacy single sortField/sortDirection. */
+function toSortRows(listView: ListView | undefined): SortRow[] {
+  if (listView?.sort && Array.isArray(listView.sort) && listView.sort.length > 0) {
+    return listView.sort.map((s) => ({
+      field: s.field,
+      direction: s.direction === 'DESC' ? 'DESC' : 'ASC',
+    }))
+  }
+  if (listView?.sortField) {
+    return [
+      { field: listView.sortField, direction: listView.sortDirection === 'DESC' ? 'DESC' : 'ASC' },
+    ]
+  }
+  return []
+}
+
+/**
+ * Serialize structured form data into the list-view API body: columns/filters/sort as JSON strings
+ * (matching the existing JSON-column contract), plus the legacy single `sortField`/`sortDirection`
+ * derived from the first sort row for back-compat.
+ */
+function serializeListViewBody(data: ListViewFormData) {
+  const first = data.sort[0]
+  return {
+    columns: JSON.stringify(data.columns),
+    filters: JSON.stringify(data.filters),
+    sort: JSON.stringify(data.sort),
+    sortField: first?.field ?? '',
+    sortDirection: first?.direction ?? 'ASC',
+  }
 }
 
 interface ListViewFormProps {
@@ -90,10 +127,9 @@ function ListViewForm({
     name: listView?.name ?? '',
     collectionId: listView?.collectionId ?? '',
     visibility: listView?.visibility ?? 'PRIVATE',
-    columns: listView?.columns ? JSON.stringify(listView.columns, null, 2) : '',
-    filters: listView?.filters ? JSON.stringify(listView.filters, null, 2) : '',
-    sortField: listView?.sortField ?? '',
-    sortDirection: listView?.sortDirection ?? 'ASC',
+    columns: listView?.columns ?? [],
+    filters: toFilterRows(listView?.filters),
+    sort: toSortRows(listView),
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -103,8 +139,22 @@ function ListViewForm({
     nameInputRef.current?.focus()
   }, [])
 
+  // Load the selected collection's fields so columns/filters/sort are pick-lists (no typing names).
+  const collectionName = useMemo(
+    () => collections.find((c) => c.id === formData.collectionId)?.name,
+    [collections, formData.collectionId]
+  )
+  const { fields: schemaFields } = useCollectionSchema(collectionName)
+  const editorFields: EditorField[] = useMemo(
+    () =>
+      schemaFields
+        .filter((f) => !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name))
+        .map((f) => ({ name: f.name, label: f.displayName || f.name })),
+    [schemaFields]
+  )
+
   const handleChange = useCallback(
-    (field: keyof ListViewFormData, value: string) => {
+    (field: 'name' | 'collectionId' | 'visibility', value: string) => {
       setFormData((prev) => ({ ...prev, [field]: value }))
       if (errors[field as keyof FormErrors]) {
         setErrors((prev) => ({ ...prev, [field]: undefined }))
@@ -112,6 +162,11 @@ function ListViewForm({
     },
     [errors]
   )
+
+  // Setters for the structured (non-string) editors.
+  const setColumns = useCallback((v: string[]) => setFormData((p) => ({ ...p, columns: v })), [])
+  const setFilters = useCallback((v: FilterRow[]) => setFormData((p) => ({ ...p, filters: v })), [])
+  const setSort = useCallback((v: SortRow[]) => setFormData((p) => ({ ...p, sort: v })), [])
 
   const handleBlur = useCallback(
     (field: keyof FormErrors) => {
@@ -129,7 +184,7 @@ function ListViewForm({
       e.preventDefault()
       const validationErrors = validateForm(formData)
       setErrors(validationErrors)
-      setTouched({ name: true, collectionId: true, columns: true, filters: true })
+      setTouched({ name: true, collectionId: true })
       if (Object.keys(validationErrors).length === 0) {
         onSubmit(formData)
       }
@@ -275,104 +330,18 @@ function ListViewForm({
             </div>
 
             <div>
-              <label
-                htmlFor="listview-columns"
-                className="mb-1 block text-sm font-medium text-foreground"
-              >
-                Columns
-              </label>
-              <textarea
-                id="listview-columns"
-                className={cn(
-                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
-                  touched.columns && errors.columns ? 'border-destructive' : 'border-border'
-                )}
-                value={formData.columns}
-                onChange={(e) => handleChange('columns', e.target.value)}
-                onBlur={() => handleBlur('columns')}
-                placeholder='["field1", "field2"]'
-                disabled={isSubmitting}
-                rows={3}
-                data-testid="listview-columns-input"
-              />
-              <span className="mt-1 block text-xs text-muted-foreground">
-                JSON array of column field names
-              </span>
-              {touched.columns && errors.columns && (
-                <span className="mt-1 block text-xs text-destructive" role="alert">
-                  {errors.columns}
-                </span>
-              )}
+              <span className="mb-1 block text-sm font-medium text-foreground">Columns</span>
+              <ColumnsEditor fields={editorFields} value={formData.columns} onChange={setColumns} />
             </div>
 
             <div>
-              <label
-                htmlFor="listview-filters"
-                className="mb-1 block text-sm font-medium text-foreground"
-              >
-                Filters
-              </label>
-              <textarea
-                id="listview-filters"
-                className={cn(
-                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
-                  touched.filters && errors.filters ? 'border-destructive' : 'border-border'
-                )}
-                value={formData.filters}
-                onChange={(e) => handleChange('filters', e.target.value)}
-                onBlur={() => handleBlur('filters')}
-                placeholder='[{"field": "status", "op": "eq", "value": "active"}]'
-                disabled={isSubmitting}
-                rows={3}
-                data-testid="listview-filters-input"
-              />
-              <span className="mt-1 block text-xs text-muted-foreground">
-                JSON array of filter objects
-              </span>
-              {touched.filters && errors.filters && (
-                <span className="mt-1 block text-xs text-destructive" role="alert">
-                  {errors.filters}
-                </span>
-              )}
+              <span className="mb-1 block text-sm font-medium text-foreground">Filters</span>
+              <FilterEditor fields={editorFields} value={formData.filters} onChange={setFilters} />
             </div>
 
             <div>
-              <label
-                htmlFor="listview-sortField"
-                className="mb-1 block text-sm font-medium text-foreground"
-              >
-                Sort Field
-              </label>
-              <input
-                id="listview-sortField"
-                type="text"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                value={formData.sortField}
-                onChange={(e) => handleChange('sortField', e.target.value)}
-                placeholder="Enter sort field name"
-                disabled={isSubmitting}
-                data-testid="listview-sortField-input"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="listview-sortDirection"
-                className="mb-1 block text-sm font-medium text-foreground"
-              >
-                Sort Direction
-              </label>
-              <select
-                id="listview-sortDirection"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                value={formData.sortDirection}
-                onChange={(e) => handleChange('sortDirection', e.target.value)}
-                disabled={isSubmitting}
-                data-testid="listview-sortDirection-input"
-              >
-                <option value="ASC">ASC</option>
-                <option value="DESC">DESC</option>
-              </select>
+              <span className="mb-1 block text-sm font-medium text-foreground">Sort</span>
+              <SortEditor fields={editorFields} value={formData.sort} onChange={setSort} />
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -442,10 +411,7 @@ export function ListViewsPage({
         collectionId: data.collectionId,
         name: data.name,
         visibility: data.visibility,
-        columns: data.columns.trim() || '[]',
-        filters: data.filters.trim() || '[]',
-        sortField: data.sortField,
-        sortDirection: data.sortDirection,
+        ...serializeListViewBody(data),
       }
       return keltaClient.admin.listViews.create('', '', payload as CreateListViewRequest)
     },
@@ -464,10 +430,7 @@ export function ListViewsPage({
       const payload = {
         name: data.name,
         visibility: data.visibility,
-        columns: data.columns.trim() || '[]',
-        filters: data.filters.trim() || '[]',
-        sortField: data.sortField,
-        sortDirection: data.sortDirection,
+        ...serializeListViewBody(data),
       }
       return keltaClient.admin.listViews.update(id, payload as Partial<CreateListViewRequest>)
     },

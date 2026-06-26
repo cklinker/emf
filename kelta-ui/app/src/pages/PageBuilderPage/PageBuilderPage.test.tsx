@@ -961,6 +961,58 @@ describe('PageBuilderPage', () => {
       })
     })
 
+    it('shows inspector properties for a NESTED component, not just top-level (regression)', async () => {
+      // A heading nested inside a card inside the tree — selecting it must resolve via a recursive
+      // tree walk, not a top-level `.find`, or the inspector shows the empty "select a component" state.
+      const nestedPage: UIPage = {
+        id: 'np1',
+        name: 'nested',
+        path: '/nested',
+        title: 'Nested',
+        layout: { type: 'single' },
+        components: [
+          {
+            id: 'card-1',
+            type: 'card',
+            props: {},
+            children: [
+              { id: 'nested-heading', type: 'heading', props: { text: 'Inner', level: 'h2' } },
+            ],
+          },
+        ],
+        published: false,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      }
+      mockAxios.get.mockReset()
+      mockAxios.get.mockImplementation((url: string) =>
+        url.includes('/api/ui-pages/np1')
+          ? Promise.resolve({ data: nestedPage })
+          : Promise.resolve({ data: [nestedPage] })
+      )
+
+      const user = userEvent.setup()
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+
+      await waitFor(() => {
+        expect(screen.getByText('nested')).toBeInTheDocument()
+      })
+      await user.click(screen.getByTestId('page-name-0'))
+
+      // The nested heading renders as its own selectable canvas node.
+      await waitFor(() => {
+        expect(screen.getByTestId('canvas-component-nested-heading')).toBeInTheDocument()
+      })
+
+      // Select the NESTED heading (not a top-level node).
+      await user.click(screen.getByTestId('canvas-component-nested-heading'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('property-type')).toHaveTextContent('heading')
+        expect(screen.getByTestId('property-text')).toBeInTheDocument()
+      })
+    })
+
     it('should delete component when delete button is clicked', async () => {
       const user = userEvent.setup()
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })

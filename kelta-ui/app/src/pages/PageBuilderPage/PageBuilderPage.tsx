@@ -37,7 +37,7 @@ import { RenderTree } from './widgets/renderTree'
 import { widgetRegistry } from './widgets/registry'
 import './widgets/builtins'
 import type { PageComponent as ModelPageComponent, ResponsiveSpan } from './model/pageModel'
-import { insertNode } from './model/treeOps'
+import { insertNode, findNode } from './model/treeOps'
 import { migrateTree, needsMigration } from './model/migrate'
 
 /**
@@ -556,7 +556,9 @@ export function PageBuilderPage({
   const [pageDataSources, setPageDataSources] = useState<PageDataSource[]>([])
   // Slice 1h: optional per-page access restriction (a system-permission name). `undefined` ⇒ untouched
   // (no key written); `{}` ⇒ explicitly cleared (no restriction).
-  const [pageAccess, setPageAccess] = useState<{ requiredPermission?: string } | undefined>(undefined)
+  const [pageAccess, setPageAccess] = useState<{ requiredPermission?: string } | undefined>(
+    undefined
+  )
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
 
   // Preview mode state (Requirement 7.7)
@@ -928,7 +930,14 @@ export function PageBuilderPage({
     [duplicateMutation]
   )
 
-  const selectedComponent = components.find((c) => c.id === selectedComponentId) || null
+  // Resolve the selected node anywhere in the tree (NOT just top-level) so the inspector shows
+  // properties for nested children (e.g. a heading inside a card inside a grid), matching the
+  // recursive patch/delete handlers above.
+  const selectedComponent: PageComponent | null = selectedComponentId
+    ? ((findNode(components as ModelPageComponent[], selectedComponentId)?.node as
+        | PageComponent
+        | undefined) ?? null)
+    : null
   const isSubmitting = createMutation.isPending || updateMutation.isPending
   const isPublishing = publishMutation.isPending || unpublishMutation.isPending
   const isDuplicating = duplicateMutation.isPending

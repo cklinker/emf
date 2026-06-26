@@ -58,7 +58,12 @@ export function CollectionFormPage({
     queryKey: ['collection', id],
     queryFn: async () => {
       const raw = await apiClient.get<{
-        data: { type: string; id: string; attributes: Record<string, unknown> }
+        data: {
+          type: string
+          id: string
+          attributes: Record<string, unknown>
+          relationships?: Record<string, { data?: { type: string; id: string } | null }>
+        }
         included?: { type: string; id: string; attributes: Record<string, unknown> }[]
       }>(`/api/collections/${id}?include=fields`)
 
@@ -66,6 +71,10 @@ export function CollectionFormPage({
         id: raw.data.id,
         ...(raw.data.attributes as Omit<CollectionWithFields, 'id' | 'fields'>),
       } as CollectionWithFields
+
+      // `displayFieldId` is a lookup (relationship), not an attribute — surface it so the
+      // form's Display Field select reflects the saved value and can round-trip it.
+      result.displayFieldId = raw.data.relationships?.displayFieldId?.data?.id ?? undefined
 
       if (raw.included && raw.included.length > 0) {
         result.fields = raw.included
@@ -102,7 +111,9 @@ export function CollectionFormPage({
         // Update existing collection
         const requestData: Record<string, unknown> = {
           name: data.name,
+          displayName: data.displayName,
           description: data.description || '',
+          active: data.active,
         }
         // Include displayFieldId — empty string clears it, undefined means no change
         if (data.displayFieldId !== undefined) {

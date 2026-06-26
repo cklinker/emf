@@ -110,6 +110,12 @@ public class FlowDefinitionValidator {
                     checkTransition(stateId, scopePrefix, wait.next(), wait.end(), parent, errors);
             case StateDefinition.PassState pass ->
                     checkTransition(stateId, scopePrefix, pass.next(), pass.end(), parent, errors);
+            case StateDefinition.InvokeFlowState invoke -> {
+                checkTransition(stateId, scopePrefix, invoke.next(), invoke.end(), parent, errors);
+                for (CatchPolicy catchPolicy : invoke.catchPolicies()) {
+                    checkTarget(stateId, scopePrefix, "Catch.Next", catchPolicy.next(), parent, errors);
+                }
+            }
             case StateDefinition.SucceedState ignored -> {}
             case StateDefinition.FailState ignored -> {}
         }

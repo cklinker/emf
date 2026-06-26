@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Action handler that publishes a custom event (e.g., to Kafka).
+ * Action handler that publishes a custom event (e.g., to NATS).
  *
  * <p>Config format:
  * <pre>
@@ -25,7 +25,7 @@ import java.util.Map;
  * </pre>
  *
  * <p>Publishes a message containing event data, record information, and a timestamp.
- * The message key is {@code tenantId:collectionId} for consistent partitioning.
+ * The message key is {@code tenantId:collectionId} for consistent per-record ordering.
  *
  * <p>This handler uses an {@code EventPublisher} function obtained from ModuleContext
  * extensions. If no publisher is available, the event data is logged and returned
@@ -38,7 +38,7 @@ public class PublishEventActionHandler implements ActionHandler {
     private static final Logger log = LoggerFactory.getLogger(PublishEventActionHandler.class);
 
     /**
-     * Functional interface for event publishing. Implementations can use Kafka, SNS, etc.
+     * Functional interface for event publishing. Implementations can use NATS, SNS, etc.
      */
     @FunctionalInterface
     public interface EventPublisher {

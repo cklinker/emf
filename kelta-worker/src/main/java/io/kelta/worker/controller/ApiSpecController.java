@@ -10,6 +10,9 @@ import io.kelta.worker.repository.ApiOperationRepository;
 import io.kelta.worker.service.api.ApiSpecService;
 import io.kelta.worker.service.api.ApiSpecService.ImportRequest;
 import io.kelta.worker.service.api.ApiSpecService.ImportResult;
+import io.kelta.worker.service.api.ExternalEntityMaterializer;
+import io.kelta.worker.service.api.ExternalEntityMaterializer.MaterializeRequest;
+import io.kelta.worker.service.api.ExternalEntityMaterializer.MaterializeResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -39,13 +42,16 @@ public class ApiSpecController {
     private final ApiSpecService specService;
     private final ApiOperationRepository operationRepository;
     private final OpenApiSpecParser parser;
+    private final ExternalEntityMaterializer materializer;
 
     public ApiSpecController(ApiSpecService specService,
                               ApiOperationRepository operationRepository,
-                              OpenApiSpecParser parser) {
+                              OpenApiSpecParser parser,
+                              ExternalEntityMaterializer materializer) {
         this.specService = specService;
         this.operationRepository = operationRepository;
         this.parser = parser;
+        this.materializer = materializer;
     }
 
     // ---------------------------------------------------------------------
@@ -174,6 +180,48 @@ public class ApiSpecController {
         return operationRepository.findOperation(tenantId, specId, opId)
             .<ResponseEntity<?>>map(op -> ResponseEntity.ok(detailOp(op)))
             .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Materializes a GET operation as an external-rest virtual collection (Rec 4f):
+     * creates a collection backed by {@code ExternalRestStorageAdapter} (baseUrl +
+     * operation path) with fields derived from the operation's response schema, so
+     * the external API is queryable via the standard JSON:API surface.
+     */
+    @PostMapping("/api-specs/{specId}/operations/{opId}/materialize")
+    public ResponseEntity<?> materialize(@PathVariable String specId,
+                                         @PathVariable String opId,
+                                         @RequestBody MaterializeRequest body) {
+        String tenantId = TenantContext.get();
+        if (tenantId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No tenant context"));
+        }
+        try {
+            MaterializeResult result = materializer.materialize(specId, opId, body, tenantId);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("collectionId", result.collectionId());
+            out.put("collectionName", result.collectionName());
+            out.put("fieldCount", result.fieldCount());
+            return ResponseEntity.status(HttpStatus.CREATED).body(out);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            String rootCause = rootCauseMessage(e);
+            log.error("Materialize failed for spec={} op={}: {}", specId, opId, rootCause, e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Materialize failed",
+                    "message", e.getMessage() == null ? rootCause : e.getMessage(),
+                    "cause", rootCause));
+        }
+    }
+
+    /** Walks the cause chain so the deepest (usually SQL) message surfaces in the response. */
+    private static String rootCauseMessage(Throwable t) {
+        Throwable cur = t;
+        while (cur.getCause() != null && cur.getCause() != cur) {
+            cur = cur.getCause();
+        }
+        return cur.getClass().getSimpleName() + ": " + cur.getMessage();
     }
 
     @GetMapping("/api-operations/search")

@@ -11,6 +11,15 @@
 | AWS S3 / Garage | Object storage | `aws-sdk-s3` 2.30.1 | `${KELTA_S3_ENDPOINT}` | `kelta-worker/.../service/S3StorageService.java` |
 | Keycloak | OIDC federation | Spring Security OAuth2 | Port 8180 (docker-compose) | `kelta-auth/.../federation/FederatedUserMapper.java` |
 
+### Attachment lifecycle (S3)
+
+Files attach to any record via the `attachments` system collection (backed by `file_attachment`, `S3StorageService`). The full lifecycle:
+
+1. **Upload** — `POST /api/attachments/upload-url` validates the file (type/size, per-tenant storage governor), creates a pending row, and returns a presigned S3 PUT URL. The client PUTs the bytes directly to S3, then `POST /api/attachments/{id}/finalize` verifies the object exists and records the storage key. (`AttachmentUploadController`)
+2. **List / read / download** — `attachments` is routed by `DynamicCollectionRouter` like any collection (`GET /api/attachments?filter[collectionId][eq]=…&filter[recordId][eq]=…`, get-by-id, `?include=attachments`). `AttachmentUrlEnricher` (`@ControllerAdvice`, `@ConditionalOnBean(S3StorageService)`) injects a presigned `downloadUrl` for any `attachments` resource with a `storageKey`. `FileController` (`GET /api/files/**`) streams objects server-side with `Range` support.
+3. **Delete** — `DELETE /api/attachments/{id}` (`AttachmentUploadController#deleteAttachment`) deletes the S3 object **and** the row. Its literal path beats the router's `/api/{collection}/{id}`, so the generic delete (which would orphan the S3 object) is bypassed. S3 deletion is best-effort and never blocks the metadata delete.
+4. **Cascade cleanup** — `AttachmentCleanupHook` (wildcard `afterDelete`, order 200) removes a record's `file_attachment` rows + S3 objects when the **parent** record is deleted. Lookup uses `idx_attachment_tenant_record` (Flyway V142). The `attachments` collection itself is skipped (handled by the dedicated delete above). S3 cleanup is gated on `S3StorageService.isEnabled()`; row cleanup always runs.
+
 ## Data Storage
 
 | Store | Purpose | Config Key | Details |
@@ -33,9 +42,9 @@
 | `kelta.record.changed` | Record CRUD events |
 
 Event envelope: `PlatformEvent<T>` with `eventId`, `eventType`, `tenantId`, `correlationId`, `timestamp`, `payload`
-Publishing: `PlatformEventPublisher` (replaces former KafkaTemplate usage)
+Publishing: `PlatformEventPublisher` (transport-agnostic interface; the NATS impl is `NatsEventPublisher` in `runtime-messaging-nats`. The former Kafka publisher was removed in Phase 0 — do not reintroduce Kafka.)
 Subscriptions: `NatsSubscriptionConfig` registration (broadcast consumers for config changes, queue groups for load-balanced work)
-Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/event/`
+Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/runtime/event/`
 
 ## Monitoring & Observability
 
@@ -91,6 +100,101 @@ Build order matters because `plugin-sdk` and `components` use `vite-plugin-dts` 
 2. `plugin-sdk` + `components` (depend on `formula`/`sdk`)
 
 Local dev: `cd kelta-web && npm install && npm run build` once before `cd kelta-ui/app && npm install && npm run build`.
+
+## Flows
+
+### Initial state shape
+
+Every flow execution starts with a canonical state envelope, built by
+`InitialStateBuilder` (`kelta-platform/runtime/runtime-core/.../flow/InitialStateBuilder.java`):
+
+```jsonc
+{
+  "trigger": { "type": "API_INVOCATION" | "SCHEDULED" | "RECORD_CHANGE" | "WEBHOOK", ... },
+  "input":   { ...source data... },   // present for API_INVOCATION / SCHEDULED / WEBHOOK
+  "record":  { ...record data... },   // present for RECORD_CHANGE only
+  "context": { "tenantId": "...", "flowId": "...", "executionId": "...", "userId": "..." }
+}
+```
+
+JSONPath expressions inside a flow definition (`inputPath`, `outputPath`, condition
+expressions) are evaluated against this envelope. **Always read inputs as `$.input.<key>`**
+— never `$.<key>`. Reading the bare key skips the envelope, JSONPath silently returns
+no value, and the downstream task fails with whatever generic error comes out of its
+own input resolution (often a misleading `"Provider … does not exist"` for FETCH-style
+tasks, not a clear "missing input" message).
+
+### Manual / MCP / HTTP invocation — the double-wrap rule
+
+`POST /api/flows/{flowId}/execute` (in `FlowExecutionController.executeFlow`) reads its
+input from `body.input` and passes it through to `buildFromApiInvocation`, which then
+puts it under `state.input`. So the request body itself must already be wrapped under
+`input` — the controller does **not** treat the whole body as input.
+
+That means callers double-wrap: the outer wrap is the HTTP request shape, the inner
+wrap is the value that ends up at `$.input`.
+
+HTTP:
+```bash
+curl -X POST $GW/api/flows/$FLOW_ID/execute \
+  -H 'Content-Type: application/json' \
+  -d '{ "input": { "slug": "acme" } }'
+# ⇒ state.input == { "slug": "acme" }, flow reads $.input.slug
+```
+
+MCP (`execute_flow` tool — the MCP layer passes the tool's `input` argument straight
+through as the HTTP body, so the same double-wrap applies):
+```jsonc
+execute_flow({
+  "flowId": "flow-123",
+  "input": { "input": { "slug": "acme" } }   // double wrap: outer = HTTP body, inner = $.input
+})
+```
+
+A single wrap (`input: { "slug": "acme" }`) sends `{ "slug": "acme" }` as the body,
+the controller looks for `body.input` (absent), `$.input` becomes `{}`, and every
+`$.input.slug` read returns no value.
+
+Escape hatches in the controller:
+- `body.state` — if present, the controller treats it as a pre-built initial state envelope (only `context` is auto-filled). Use this when you need to seed `record`/`headers` keys that `buildFromApiInvocation` doesn't produce.
+- `body.test: true` — runs the flow in test mode (`isTest=true`); does not change how `input` is resolved.
+
+### Page-event → flow framing (page builder, slice 2e)
+
+A page-builder `runFlow` action (a button `onClick`, etc.) rides the **same**
+`POST /api/flows/{flowId}/execute` double-wrap rule. The editor stores the **inner** input
+map on `action.input` (e.g. `{ orderId: {$bind:'record.id'} }`); the client-side action runtime
+(`kelta-ui/app/src/pages/PageBuilderPage/runtime/executeAction.ts`) resolves the `{$bind}` values
+against the live click scope and sends `{ input: <resolved action.input> }` as the HTTP body — i.e.
+it adds the **outer** wrap. So the flow reads `$.input.<key>` exactly as above; the author never
+wraps twice. The execute response is async (`200` with `attributes.status:"RUNNING"`); the execution
+id is `data.id` (read via `unwrapResource(json).id`). With `awaitResult:true` the runtime polls
+`GET /api/flows/executions/{id}` every 1.5 s (up to 60 s) until a terminal status
+(`COMPLETED`/`FAILED`/`CANCELLED`) — `FAILED`/`CANCELLED` reject and stop the action chain. This is
+the only new flow framing 2e introduces (no new endpoint or subject). No backend change.
+
+### Scheduled (cron) invocation — `triggerConfig.inputData`
+
+For SCHEDULED flows there is no per-run HTTP body, so the static payload lives on the
+flow definition itself. `ScheduledJobExecutorService` reads the flow's `trigger_config`
+column and hands it to `InitialStateBuilder.buildFromSchedule`, which copies
+`triggerConfig.inputData` into `state.input`:
+
+```jsonc
+// flow.trigger_config (stored on the flows row)
+{
+  "type":    "SCHEDULED",
+  "cron":    "0 */15 * * * *",
+  "timezone":"UTC",
+  "inputData": { "slug": "acme", "mode": "full" }
+}
+// ⇒ state.input == { "slug": "acme", "mode": "full" }, flow reads $.input.slug
+```
+
+This is the SCHEDULED-equivalent of the inner wrap in `execute_flow`: the same flow
+definition can be driven by cron or by `execute_flow` as long as the static
+`triggerConfig.inputData` and the caller-supplied `body.input` produce the same
+shape under `$.input`.
 
 ## Email (SMTP)
 

@@ -125,7 +125,7 @@ class SearchIndexListenerTest {
     }
 
     /**
-     * Builds a Kafka message in the PlatformEvent envelope format.
+     * Builds a NATS message in the PlatformEvent envelope format.
      */
     private String buildMessage(String tenantId, String collectionName, String recordId,
                                  ChangeType changeType, Map<String, Object> data) throws Exception {

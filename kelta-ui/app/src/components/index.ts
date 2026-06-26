@@ -119,6 +119,10 @@ export type { RecentItemsDropdownProps } from './RecentItemsDropdown'
 export { LookupSelect } from './LookupSelect'
 export type { LookupSelectProps, LookupOption } from './LookupSelect'
 
+// DataSourceSettings — configure an external connector on a collection (Rec 4)
+export { DataSourceSettings } from './DataSourceSettings/DataSourceSettings'
+export type { DataSourceSettingsProps } from './DataSourceSettings/DataSourceSettings'
+
 // PageLoader component for loading states
 export { PageLoader, Skeleton, ContentLoader } from './PageLoader'
 export type {

@@ -1,7 +1,7 @@
 /**
  * Event publishing hooks for collection lifecycle events.
  * 
- * <p>This package provides integration points for publishing events to Kafka:
+ * <p>This package provides integration points for publishing events to NATS:
  * <ul>
  *   <li><b>Create events</b> - Published when a record is created</li>
  *   <li><b>Update events</b> - Published when a record is updated</li>

@@ -191,6 +191,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 );
             }
 
+            // HNSW index for VECTOR fields — turns the cosine-distance (<=>) similarity
+            // search in semanticSearch() from a flat scan into an approximate-nearest-neighbour
+            // lookup. Idempotent (IF NOT EXISTS), so re-initialization is safe.
+            if (field.type() == FieldType.VECTOR) {
+                String idxName = buildBoundedIdentifier(
+                        "hnsw_", sanitizeIdentifier(getBaseTableName(definition)),
+                        sanitizeIdentifier(columnName));
+                postCreateStatements.add(buildHnswIndexStatement(idxName, qualifiedName, columnName));
+            }
+
             // FK constraints for LOOKUP and MASTER_DETAIL
             if ((field.type() == FieldType.LOOKUP || field.type() == FieldType.MASTER_DETAIL)
                     && field.referenceConfig() != null) {
@@ -219,6 +229,24 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
 
         sql.append(")");
+
+        // The pgvector extension must exist before a vector(N) column can be created. Emit it
+        // lazily — only when the collection actually has a VECTOR field — so collections without
+        // vectors never require pgvector. A failure here is surfaced with actionable guidance
+        // rather than a cryptic "type vector does not exist" on the CREATE TABLE below.
+        boolean hasVector = definition.fields().stream()
+                .anyMatch(f -> f.type() == FieldType.VECTOR);
+        if (hasVector) {
+            try {
+                jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS vector");
+            } catch (DataAccessException e) {
+                throw new StorageException(
+                        "Collection '" + definition.name() + "' has a VECTOR field but the pgvector "
+                                + "extension could not be enabled. Install pgvector on the database "
+                                + "(a pgvector-enabled image, or `CREATE EXTENSION vector` by an admin) "
+                                + "and ensure the worker's DB role may use it. Cause: " + e.getMessage(), e);
+            }
+        }
 
         try {
             try {
@@ -319,6 +347,39 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             return QueryResult.of(data, totalCount, pagination);
         } catch (DataAccessException e) {
             throw new StorageException("Failed to query collection: " + definition.name(), e);
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> semanticSearch(CollectionDefinition definition,
+                                                     String vectorColumn,
+                                                     String queryVectorLiteral,
+                                                     int limit,
+                                                     List<FilterCondition> filters) {
+        TableRef tableRef = getTableRef(definition);
+        String vectorIdent = sanitizeIdentifier(vectorColumn);
+        List<Object> params = new ArrayList<>();
+
+        // Cosine distance (<=>) to the query vector; bound first so its '?' precedes any filter '?'.
+        StringBuilder sql = new StringBuilder("SELECT ");
+        sql.append(buildSelectClause(null, definition));
+        sql.append(", (").append(vectorIdent).append(" <=> CAST(? AS vector)) AS _distance");
+        params.add(queryVectorLiteral);
+        sql.append(" FROM ").append(tableRef.toSql());
+        sql.append(" WHERE ").append(vectorIdent).append(" IS NOT NULL");
+        if (filters != null && !filters.isEmpty()) {
+            sql.append(" AND ").append(buildWhereClause(filters, definition, params));
+        }
+        sql.append(" ORDER BY _distance ASC LIMIT ?");
+        params.add(limit);
+
+        try {
+            List<Map<String, Object>> data = jdbcTemplate.queryForList(sql.toString(), params.toArray());
+            remapColumnNames(definition, data);
+            reconstructCompanionColumns(definition, data);
+            return data;
+        } catch (DataAccessException e) {
+            throw new StorageException("Failed semantic search on collection: " + definition.name(), e);
         }
     }
 
@@ -462,9 +523,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 if (SYSTEM_COLUMNS.contains(columnName)) {
                     continue; // Already handled as a system field above
                 }
-                boolean isJsonb = field.type() == FieldType.JSON || field.type() == FieldType.ARRAY;
                 columns.add(sanitizeIdentifier(columnName));
-                placeholders.add(isJsonb ? "?::jsonb" : "?");
+                placeholders.add(castPlaceholder(field.type()));
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
 
                 // Handle companion columns
@@ -576,8 +636,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 if (SYSTEM_COLUMNS.contains(columnName)) {
                     continue; // Already handled as a system field above
                 }
-                boolean isJsonb = field.type() == FieldType.JSON || field.type() == FieldType.ARRAY;
-                setClauses.add(sanitizeIdentifier(columnName) + (isJsonb ? " = ?::jsonb" : " = ?"));
+                setClauses.add(sanitizeIdentifier(columnName) + " = " + castPlaceholder(field.type()));
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
             }
         }
@@ -710,6 +769,34 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             return definition.storageConfig().tableName();
         }
         return definition.name();
+    }
+
+    /**
+     * Builds the pgvector HNSW index DDL for a {@code VECTOR} column, using the cosine operator
+     * class so the index serves the {@code <=>} distance used by {@link #semanticSearch}.
+     *
+     * @param idxName       the (already length-bounded) index name
+     * @param qualifiedName the schema-qualified table name
+     * @param column        the vector column name (sanitized here)
+     * @return a {@code CREATE INDEX IF NOT EXISTS ... USING hnsw (...)} statement
+     */
+    static String buildHnswIndexStatement(String idxName, String qualifiedName, String column) {
+        return "CREATE INDEX IF NOT EXISTS " + idxName
+                + " ON " + qualifiedName
+                + " USING hnsw (" + sanitizeIdentifier(column) + " vector_cosine_ops)";
+    }
+
+    /**
+     * The bind placeholder for a field's column, casting where PostgreSQL needs it: {@code ?::jsonb}
+     * for JSON/ARRAY (JSONB columns), {@code ?::vector} for VECTOR (pgvector parses the text
+     * literal), plain {@code ?} otherwise.
+     */
+    static String castPlaceholder(FieldType type) {
+        return switch (type) {
+            case JSON, ARRAY -> "?::jsonb";
+            case VECTOR -> "?::vector";
+            default -> "?";
+        };
     }
 
     /**
@@ -912,10 +999,22 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         FilterOperator operator = filter.operator();
         Object value = filter.value();
 
-        // Coerce string filter values to match the field's database type (e.g., "false" → Boolean.FALSE)
+        // Coerce string filter values to match the field's database type (e.g., "false" → Boolean.FALSE).
+        // For IN/ANY the value is a Collection<String>; coerce each element so UUID columns receive
+        // java.util.UUID rather than the raw string.
         FieldDefinition fieldDef = definition.getField(filter.fieldName());
-        if (fieldDef != null && value instanceof String) {
-            value = TypeCoercionService.coerceValue(value, fieldDef.type());
+        if (fieldDef != null) {
+            if (value instanceof String) {
+                value = TypeCoercionService.coerceValue(value, fieldDef.type());
+            } else if (value instanceof Collection<?> coll) {
+                List<Object> coerced = new ArrayList<>(coll.size());
+                for (Object element : coll) {
+                    coerced.add(element instanceof String s
+                            ? TypeCoercionService.coerceValue(s, fieldDef.type())
+                            : element);
+                }
+                value = coerced;
+            }
         }
 
         // Detect array-backed columns (Postgres TEXT[]) so we emit ANY(...) /
@@ -1134,6 +1233,28 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 // Value is Map with latitude/longitude; store latitude in primary column
                 if (value instanceof Map<?,?> geo) {
                     yield ((Number) geo.get("latitude")).doubleValue();
+                }
+                yield value;
+            }
+            case VECTOR -> {
+                // pgvector accepts the text literal "[v1,v2,...]" (the column placeholder is
+                // bound with ?::vector). Accept a pre-rendered string, a numeric list (JSON:API
+                // array), or a float[] (e.g. from an EmbeddingService).
+                if (value instanceof String) {
+                    yield value;
+                }
+                if (value instanceof float[] floats) {
+                    yield io.kelta.runtime.embedding.EmbeddingService.toVectorLiteral(floats);
+                }
+                if (value instanceof List<?> list) {
+                    StringBuilder sb = new StringBuilder("[");
+                    for (int i = 0; i < list.size(); i++) {
+                        if (i > 0) {
+                            sb.append(',');
+                        }
+                        sb.append(((Number) list.get(i)).floatValue());
+                    }
+                    yield sb.append(']').toString();
                 }
                 yield value;
             }

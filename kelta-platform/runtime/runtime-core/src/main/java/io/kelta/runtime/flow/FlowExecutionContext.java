@@ -20,6 +20,7 @@ public class FlowExecutionContext {
     private final String userId;
     private final FlowDefinition definition;
     private final Instant startedAt;
+    private final int invokeDepth;
     private final List<CaughtError> caughtErrors = new ArrayList<>();
 
     private Map<String, Object> stateData;
@@ -29,10 +30,19 @@ public class FlowExecutionContext {
     private boolean cancelled;
     private boolean completed;
     private String finalStatus;
+    private String finalErrorCode;
+    private String finalErrorMessage;
 
     public FlowExecutionContext(String executionId, String tenantId, String flowId,
                                 String userId, FlowDefinition definition,
                                 Map<String, Object> initialState) {
+        this(executionId, tenantId, flowId, userId, definition, initialState, 0);
+    }
+
+    public FlowExecutionContext(String executionId, String tenantId, String flowId,
+                                String userId, FlowDefinition definition,
+                                Map<String, Object> initialState,
+                                int invokeDepth) {
         this.executionId = executionId;
         this.tenantId = tenantId;
         this.flowId = flowId;
@@ -45,6 +55,7 @@ public class FlowExecutionContext {
         this.cancelled = false;
         this.completed = false;
         this.finalStatus = null;
+        this.invokeDepth = invokeDepth;
     }
 
     public String executionId() { return executionId; }
@@ -77,10 +88,18 @@ public class FlowExecutionContext {
 
     public boolean isCompleted() { return completed; }
     public String finalStatus() { return finalStatus; }
+    public String finalErrorCode() { return finalErrorCode; }
+    public String finalErrorMessage() { return finalErrorMessage; }
 
     public void markCompleted(String status) {
+        markCompleted(status, null, null);
+    }
+
+    public void markCompleted(String status, String errorCode, String errorMessage) {
         this.completed = true;
         this.finalStatus = status;
+        this.finalErrorCode = errorCode;
+        this.finalErrorMessage = errorMessage;
     }
 
     /**
@@ -120,6 +139,18 @@ public class FlowExecutionContext {
      */
     public int failedCount() {
         return failedCount;
+    }
+
+    /**
+     * Returns the recursion depth of nested {@code InvokeFlow} executions
+     * relative to the top-level run. Zero for the original execution; each
+     * synchronous sub-flow invoked via {@code InvokeFlow} increments this by
+     * one. The engine refuses to invoke when the depth would exceed
+     * {@code FlowEngine.MAX_INVOKE_DEPTH}, preventing direct or transitive
+     * self-recursion from running forever.
+     */
+    public int invokeDepth() {
+        return invokeDepth;
     }
 
     public void addFailedCount(int n) {

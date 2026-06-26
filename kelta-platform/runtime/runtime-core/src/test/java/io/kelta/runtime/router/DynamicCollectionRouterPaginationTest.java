@@ -245,6 +245,39 @@ class DynamicCollectionRouterPaginationTest {
     }
 
     @Test
+    void list_emitsBothMetaAndMetadataWithIdenticalContent() throws Exception {
+        // Regression: JSON:API spec uses `meta`; we historically only emitted
+        // `metadata`, which broke spec-compliant clients. Both keys must now
+        // be present and carry identical pagination info.
+        CollectionDefinition def = buildCustomersCollection();
+        when(registry.get("customers")).thenReturn(def);
+
+        QueryResult result = new QueryResult(
+                List.of(record("c1", "Acme")),
+                new PaginationMetadata(100, 2, 20, 5));
+        when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(result);
+
+        MvcResult mvcResult = mockMvc.perform(get("/api/customers")
+                        .param("page[number]", "2")
+                        .param("page[size]", "20"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Map<String, Object> response = objectMapper.readValue(
+                mvcResult.getResponse().getContentAsString(), Map.class);
+
+        Map<String, Object> meta = (Map<String, Object>) response.get("meta");
+        Map<String, Object> metadata = (Map<String, Object>) response.get("metadata");
+        assertNotNull(meta, "JSON:API standard `meta` key must be present");
+        assertNotNull(metadata, "legacy `metadata` alias must still be present");
+        assertEquals(metadata, meta, "`meta` and `metadata` must carry identical content");
+        assertEquals(100, ((Number) meta.get("totalCount")).intValue());
+        assertEquals(2, ((Number) meta.get("currentPage")).intValue());
+        assertEquals(20, ((Number) meta.get("pageSize")).intValue());
+        assertEquals(5, ((Number) meta.get("totalPages")).intValue());
+    }
+
+    @Test
     void list_linksPreserveNonPaginationQueryParams() throws Exception {
         CollectionDefinition def = buildCustomersCollection();
         when(registry.get("customers")).thenReturn(def);

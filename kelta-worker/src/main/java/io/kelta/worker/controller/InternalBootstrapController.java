@@ -256,6 +256,70 @@ public class InternalBootstrapController {
     }
 
     /**
+     * Returns the active SAML identity providers configured for a tenant.
+     *
+     * <p>Consumed by kelta-auth's {@code DynamicRelyingPartyRegistrationRepository}
+     * to build per-tenant SAML relying-party registrations for the SSO flow.
+     * Mirrors {@link #getOidcProvidersByTenant(String)}; the {@code saml_provider}
+     * table is FORCE-RLS, but the internal connection runs with an empty tenant
+     * context ({@code app.current_tenant_id = ''}) so the admin-bypass policy
+     * permits the read while the {@code tenant_id = ?} filter scopes the result.
+     *
+     * @param tenantId the tenant UUID
+     * @return active SAML providers (empty list if none)
+     */
+    @GetMapping("/saml/providers")
+    public ResponseEntity<List<Map<String, Object>>> getSamlProvidersByTenant(
+            @RequestParam String tenantId) {
+        log.debug("Internal lookup: SAML providers for tenant={}", tenantId);
+
+        List<Map<String, Object>> providers = repository.findActiveSamlProvidersByTenant(tenantId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> provider : providers) {
+            result.add(toSamlProviderResponse(provider));
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Resolves a single active SAML provider by its IdP entity ID within a tenant.
+     *
+     * <p>Used by kelta-auth's SAML success handler to look up the provider's
+     * attribute mappings after an assertion is validated (the assertion carries
+     * the IdP's issuer/entity ID). Returns 404 when the tenant has no active
+     * provider with that entity ID.
+     *
+     * @param entityId the IdP entity ID (SAML issuer)
+     * @param tenantId the tenant UUID
+     * @return the matching SAML provider, or 404
+     */
+    @GetMapping("/saml/by-entity-id")
+    public ResponseEntity<Map<String, Object>> getSamlProviderByEntityId(
+            @RequestParam String entityId,
+            @RequestParam String tenantId) {
+        log.debug("Internal lookup: SAML provider entityId={} tenant={}", entityId, tenantId);
+
+        return repository.findSamlProviderByEntityIdAndTenant(entityId, tenantId)
+                .map(provider -> ResponseEntity.ok(toSamlProviderResponse(provider)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private Map<String, Object> toSamlProviderResponse(Map<String, Object> provider) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("id", provider.get("id"));
+        response.put("name", provider.get("name"));
+        response.put("registrationId", provider.get("registration_id"));
+        response.put("idpEntityId", provider.get("idp_entity_id"));
+        response.put("ssoUrl", provider.get("sso_url"));
+        response.put("idpCertificate", provider.get("idp_certificate"));
+        response.put("nameIdFormat", provider.get("name_id_format"));
+        response.put("emailAttribute", provider.get("email_attribute"));
+        response.put("profileAttribute", provider.get("profile_attribute"));
+        response.put("active", provider.get("active"));
+        return response;
+    }
+
+    /**
      * Resolves a profile by display name within a tenant.
      *
      * <p>Used by kelta-auth's federated user mapper to translate the

@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * - Users with admin role can access admin-only routes
  * - Users without admin role cannot access admin-only routes
  * - Field visibility changes based on user roles
- * - Authorization policies can be updated dynamically via Kafka events
+ * - Authorization policies can be updated dynamically via NATS events
  * 
  * This test class validates that:
  * - The gateway properly enforces authorization policies
@@ -349,17 +349,17 @@ public class AuthorizationIntegrationTest extends IntegrationTestBase {
      * Test that authorization policies can be updated dynamically.
      * 
      * This test verifies that when authorization policies are updated
-     * via the control plane, the gateway receives the update via Kafka
+     * via the control plane, the gateway receives the update via NATS
      * and enforces the new policies without requiring a restart.
      * 
      * Validates:
-     * - Requirement 6.8: Authorization policies can be updated dynamically via Kafka events
+     * - Requirement 6.8: Authorization policies can be updated dynamically via NATS events
      */
     @Test
     void testDynamicAuthorizationUpdates() {
-        // This test requires Kafka event processing which may take time
+        // This test requires NATS event processing which may take time
         // For now, we verify that the gateway can process authorization updates
-        // The actual Kafka event processing is tested in separate event tests
+        // The actual NATS event processing is tested in separate event tests
         
         // Act - verify access works with current policies
         String userToken = authHelper.getUserToken();
@@ -378,7 +378,7 @@ public class AuthorizationIntegrationTest extends IntegrationTestBase {
         
         // Note: Testing actual dynamic policy updates requires:
         // 1. Creating/updating a policy via control plane
-        // 2. Waiting for Kafka event to be published
+        // 2. Waiting for NATS event to be published
         // 3. Waiting for gateway to process the event
         // 4. Verifying the new policy is enforced
         // This is covered in the event-driven configuration tests

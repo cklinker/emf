@@ -130,6 +130,7 @@
     "recordTypes": "Record Types",
     "fieldHistory": "Field History",
     "setupAudit": "Setup Audit",
+    "dataSource": "Data Source",
     "showSystem": "Show system collections"
   },
   "validationRules": {
@@ -418,6 +419,18 @@
       "selectComponent": "Select a component to edit its properties",
       "canvasEmpty": "No components added yet",
       "canvasHint": "Drag components from the palette or click to add them",
+      "columnEmpty": "Drop a widget here",
+      "spanLabel": "Width",
+      "resizeAria": "Resize column width",
+      "reorderAria": "Reorder {{type}}",
+      "unsavedConfirm": "You have unsaved changes. Discard them?",
+      "dnd": {
+        "instructions": "To pick up a widget, press space or enter. Use the arrow keys to move it. Press space or enter again to drop, or escape to cancel.",
+        "picked": "Picked up {{type}}.",
+        "over": "{{type}} is over {{container}}.",
+        "dropped": "Dropped {{type}} over {{container}}.",
+        "cancelled": "Movement cancelled. {{type}} was returned."
+      },
       "confirmDelete": "Are you sure you want to delete this page? This action cannot be undone.",
       "namePlaceholder": "e.g., dashboard",
       "nameHint": "Lowercase letters, numbers, and underscores only. Must start with a letter.",
@@ -475,6 +488,268 @@
         "labelRequired": "Label is required",
         "labelTooLong": "Label must be 100 characters or less",
         "pathFormat": "Path must start with /"
+      }
+    },
+    "palette": {
+      "addAria": "Add {{label}} component",
+      "category": {
+        "layout": "Layout",
+        "content": "Content",
+        "data": "Data",
+        "input": "Input",
+        "navigation": "Navigation",
+        "chart": "Chart"
+      }
+    },
+    "inspector": {
+      "componentType": "Component Type",
+      "id": "ID",
+      "noProperties": "No editable properties.",
+      "group": {
+        "content": "Content",
+        "data": "Data",
+        "events": "Events",
+        "layout": "Layout"
+      },
+      "bindable": {
+        "toggle": "Toggle expression mode"
+      },
+      "expression": {
+        "edit": "Edit expression",
+        "pickerTitle": "Insert field or function"
+      },
+      "dataView": {
+        "collection": "Collection",
+        "collectionPlaceholder": "orders",
+        "columns": "Columns",
+        "fields": "Fields",
+        "columnsPlaceholder": "comma-separated, e.g. id, status, total",
+        "limit": "Row limit"
+      },
+      "fieldPicker": {
+        "empty": "Select a collection first."
+      },
+      "span": {
+        "base": "Base",
+        "sm": "SM",
+        "md": "MD",
+        "lg": "LG"
+      },
+      "children": {
+        "summary": "{{count}} child component(s) — edit on canvas."
+      }
+    },
+    "events": {
+      "onClick": "On Click",
+      "onChange": "On Change",
+      "onSubmit": "On Submit",
+      "onLoad": "On Load",
+      "addAction": "Add action",
+      "removeAction": "Remove action",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "actionType": "Action type",
+      "action": {
+        "runFlow": "Run Flow",
+        "navigate": "Navigate",
+        "openUrl": "Open URL",
+        "createRecord": "Create Record",
+        "updateRecord": "Update Record",
+        "refreshData": "Refresh Data",
+        "setVar": "Set Variable",
+        "showToast": "Show Toast"
+      },
+      "toast": {
+        "info": "Info",
+        "success": "Success",
+        "error": "Error"
+      },
+      "param": {
+        "flowId": "Flow ID",
+        "to": "Path, e.g. /orders",
+        "url": "https://example.com",
+        "collection": "Collection",
+        "dataSource": "Data source",
+        "varName": "Variable name",
+        "varValue": "Value",
+        "message": "Message"
+      }
+    },
+    "actions": {
+      "runFlow": {
+        "label": "Run Flow",
+        "flowId": "Flow",
+        "awaitResult": "Await result",
+        "inputs": "Inputs",
+        "addInput": "Add input"
+      },
+      "navigate": {
+        "label": "Navigate",
+        "to": "To",
+        "params": "Params",
+        "newTab": "New tab"
+      },
+      "openUrl": {
+        "label": "Open URL",
+        "url": "URL"
+      },
+      "createRecord": {
+        "label": "Create Record"
+      },
+      "updateRecord": {
+        "label": "Update Record"
+      },
+      "record": {
+        "collection": "Collection",
+        "attributes": "Attributes",
+        "addAttribute": "Add attribute",
+        "recordId": "Record ID"
+      },
+      "refreshData": {
+        "label": "Refresh Data",
+        "dataSource": "Data source"
+      },
+      "setVar": {
+        "label": "Set Variable",
+        "name": "Name",
+        "value": "Value"
+      },
+      "showToast": {
+        "label": "Show Toast",
+        "level": "Level",
+        "message": "Message"
+      },
+      "edit": "Edit action",
+      "done": "Done",
+      "actionsInOrder": "Actions (run in order)"
+    },
+    "pageSettings": {
+      "title": "Page settings",
+      "open": "Page settings",
+      "close": "Close",
+      "access": {
+        "title": "Access",
+        "label": "Required permission",
+        "anyone": "Anyone (published)",
+        "hint": "Users without this permission get a 404 — the page is hidden, not shown as forbidden."
+      }
+    },
+    "variables": {
+      "title": "Variables",
+      "add": "Add variable",
+      "remove": "Remove variable",
+      "name": "Name",
+      "type": "Type",
+      "default": "Default",
+      "namePlaceholder": "e.g. count",
+      "empty": "No variables yet."
+    },
+    "data": {
+      "title": "Data sources",
+      "add": "Add source",
+      "remove": "Remove source",
+      "name": "Name",
+      "namePlaceholder": "e.g. accounts",
+      "collection": "Collection",
+      "collectionPlaceholder": "e.g. accounts",
+      "limit": "Limit",
+      "fields": "Fields",
+      "fieldsPlaceholder": "comma-separated, e.g. name, email",
+      "filter": "Filter",
+      "recordId": "Record id",
+      "mode": {
+        "list": "List",
+        "single": "Single"
+      },
+      "maxSources": "A page can declare at most {{max}} data sources.",
+      "empty": "No data sources yet."
+    },
+    "binding": {
+      "fx": "Expression",
+      "edit": "Edit",
+      "clear": "Clear",
+      "expression": "Expression",
+      "literal": "Literal",
+      "mode": {
+        "path": "Path",
+        "expr": "Expression"
+      }
+    },
+    "repeater": {
+      "truncated": "Showing {{shown}} of {{total}} rows."
+    },
+    "form": {
+      "label": "Form",
+      "noDataSource": "Form (no data source configured)",
+      "saved": "Saved"
+    },
+    "input": {
+      "noFieldConfigured": "Input (no field configured)",
+      "selectPlaceholder": "Select…",
+      "required": "Required"
+    },
+    "widget": {
+      "chart": {
+        "label": "Chart",
+        "empty": "No data",
+        "field": {
+          "dataView": "Data source",
+          "chartType": "Chart type",
+          "xKey": "X axis key",
+          "series": "Series",
+          "height": "Height (px)",
+          "showLegend": "Show legend",
+          "showGrid": "Show grid"
+        }
+      },
+      "tabs": {
+        "label": "Tabs",
+        "empty": "No tabs configured.",
+        "field": {
+          "tabs": "Tabs",
+          "defaultTab": "Default tab"
+        }
+      },
+      "tabPanel": {
+        "label": "Tab panel",
+        "field": {
+          "value": "Tab value"
+        }
+      },
+      "nav": {
+        "label": "Nav",
+        "empty": "No menu items.",
+        "field": {
+          "orientation": "Orientation",
+          "items": "Menu items"
+        }
+      },
+      "icon": {
+        "label": "Icon",
+        "field": {
+          "name": "Icon name",
+          "size": "Size (px)",
+          "color": "Color"
+        }
+      },
+      "link": {
+        "label": "Link",
+        "default": "Link",
+        "field": {
+          "label": "Label",
+          "to": "Internal route",
+          "href": "External URL",
+          "newTab": "Open in new tab"
+        }
+      },
+      "image": {
+        "label": "Image",
+        "empty": "No image source",
+        "field": {
+          "src": "Source URL",
+          "alt": "Alt text",
+          "objectFit": "Fit"
+        }
       }
     }
   },
@@ -671,6 +946,21 @@
     "used": "used",
     "confirmSuspend": "Are you sure you want to suspend this tenant? Users will not be able to access this tenant's data.",
     "confirmActivate": "Are you sure you want to activate this tenant?"
+  },
+  "configHealth": {
+    "title": "Configuration Health",
+    "subtitle": "Automated scan of this tenant's metadata for anti-patterns and risks.",
+    "score": "Health Score",
+    "rulesRun": "Rules evaluated",
+    "refresh": "Re-scan",
+    "refreshing": "Scanning…",
+    "noFindings": "No configuration issues found — everything looks healthy.",
+    "loadError": "Failed to load the configuration-health report.",
+    "severity": {
+      "ERROR": "Error",
+      "WARNING": "Warning",
+      "INFO": "Info"
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1066,6 +1356,7 @@
       "errors": "Errors",
       "performance": "Performance",
       "activity": "Activity",
+      "health": "Health",
       "settings": "Settings"
     },
     "overview": {
@@ -1095,6 +1386,25 @@
     "collection": "Collection",
     "assignmentStatus": "Status",
     "assignedAt": "Assigned"
+  },
+  "dataSource": {
+    "type": "Data source",
+    "physical": "Physical table (default)",
+    "rest": "External REST API",
+    "jdbc": "External database (JDBC)",
+    "help": "Back this collection with an external system instead of a Kelta table. Records are read and written through the external source.",
+    "saved": "Data source saved",
+    "field": {
+      "baseUrl": "Base URL",
+      "path": "Resource path",
+      "dataPath": "Records JSON path",
+      "idAttribute": "ID attribute",
+      "jdbcUrl": "JDBC URL",
+      "table": "Table name",
+      "idColumn": "ID column",
+      "credentialRef": "Credential",
+      "credentialRefHelp": "Name or id of a vault credential used to authenticate. Leave blank for an unauthenticated source."
+    }
   },
   "errors": {
     "generic": "An error occurred. Please try again.",

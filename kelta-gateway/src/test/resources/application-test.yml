@@ -1,19 +1,7 @@
 spring:
   application:
     name: kelta-gateway-test
-  
-  # Kafka configuration for integration tests
-  kafka:
-    bootstrap-servers: localhost:9094
-    consumer:
-      group-id: kelta-gateway-test
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-  
+
   # Redis configuration for integration tests
   data:
     redis:
@@ -32,9 +20,6 @@ spring:
 kelta:
   gateway:
     worker-service-url: http://emf-worker:80
-    kafka:
-      topics:
-        collection-changed: kelta.collection.changed
     # Rate limiting is driven by per-tenant governor limits from the worker
     security:
       permissions-enabled: true

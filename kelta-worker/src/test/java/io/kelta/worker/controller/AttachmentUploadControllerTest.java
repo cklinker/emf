@@ -194,4 +194,65 @@ class AttachmentUploadControllerTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
+
+    @Test
+    void deleteAttachment_success_deletesS3AndRow() {
+        String attachmentId = "att-1";
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", attachmentId);
+        row.put("storage_key", "tenant-1/col-1/rec-1/att-1/report.pdf");
+
+        when(jdbcTemplate.queryForList(anyString(), eq(attachmentId), eq(TENANT_ID)))
+                .thenReturn(List.of(row));
+
+        ResponseEntity<Void> response = controller.deleteAttachment(attachmentId, TENANT_ID, USER_EMAIL);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(storageService).deleteObject("tenant-1/col-1/rec-1/att-1/report.pdf");
+        verify(jdbcTemplate).update(contains("DELETE FROM file_attachment"), eq(attachmentId), eq(TENANT_ID));
+    }
+
+    @Test
+    void deleteAttachment_notFound() {
+        when(jdbcTemplate.queryForList(anyString(), eq("bad-id"), eq(TENANT_ID)))
+                .thenReturn(Collections.emptyList());
+
+        ResponseEntity<Void> response = controller.deleteAttachment("bad-id", TENANT_ID, USER_EMAIL);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(storageService, never()).deleteObject(anyString());
+    }
+
+    @Test
+    void deleteAttachment_s3Disabled_skipsS3ButDeletesRow() {
+        when(storageService.isEnabled()).thenReturn(false);
+        String attachmentId = "att-1";
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("storage_key", "tenant-1/col-1/rec-1/att-1/report.pdf");
+
+        when(jdbcTemplate.queryForList(anyString(), eq(attachmentId), eq(TENANT_ID)))
+                .thenReturn(List.of(row));
+
+        ResponseEntity<Void> response = controller.deleteAttachment(attachmentId, TENANT_ID, USER_EMAIL);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(storageService, never()).deleteObject(anyString());
+        verify(jdbcTemplate).update(contains("DELETE FROM file_attachment"), eq(attachmentId), eq(TENANT_ID));
+    }
+
+    @Test
+    void deleteAttachment_blankStorageKey_skipsS3() {
+        String attachmentId = "att-1";
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("storage_key", "");
+
+        when(jdbcTemplate.queryForList(anyString(), eq(attachmentId), eq(TENANT_ID)))
+                .thenReturn(List.of(row));
+
+        ResponseEntity<Void> response = controller.deleteAttachment(attachmentId, TENANT_ID, USER_EMAIL);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(storageService, never()).deleteObject(anyString());
+        verify(jdbcTemplate).update(contains("DELETE FROM file_attachment"), eq(attachmentId), eq(TENANT_ID));
+    }
 }

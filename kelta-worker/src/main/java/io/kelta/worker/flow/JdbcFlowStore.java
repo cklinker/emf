@@ -163,6 +163,31 @@ public class JdbcFlowStore implements FlowStore {
     }
 
     // -------------------------------------------------------------------------
+    // Flow Definition Lookup
+    // -------------------------------------------------------------------------
+
+    @Override
+    public Optional<String> findFlowDefinitionById(String tenantId, String flowId) {
+        return findDefinition("WHERE tenant_id = ? AND id = ?", tenantId, flowId);
+    }
+
+    @Override
+    public Optional<String> findFlowDefinitionByName(String tenantId, String flowName) {
+        return findDefinition("WHERE tenant_id = ? AND name = ?", tenantId, flowName);
+    }
+
+    private Optional<String> findDefinition(String whereClause, Object... args) {
+        List<String> results = jdbcTemplate.query(
+            "SELECT definition FROM flow " + whereClause + " LIMIT 1",
+            (rs, rowNum) -> {
+                Object def = rs.getObject("definition");
+                return def != null ? def.toString() : null;
+            },
+            args);
+        return results.isEmpty() ? Optional.empty() : Optional.ofNullable(results.get(0));
+    }
+
+    // -------------------------------------------------------------------------
     // Execution Queries
     // -------------------------------------------------------------------------
 

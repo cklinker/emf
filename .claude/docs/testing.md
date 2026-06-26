@@ -112,3 +112,11 @@ it('should add filter when button clicked', async () => {
   expect(onChange).toHaveBeenCalled();
 });
 ```
+
+## End-to-end (Playwright)
+
+E2E specs live in `e2e-tests/` (see `e2e-tests/README.md` for setup, auth, and subsets).
+Every new feature needs one. When a test drives a flow via `POST /api/flows/{id}/execute`
+or the `execute_flow` MCP tool, remember the **double-wrap** rule (`{ "input": { ... } }`) —
+see `integrations.md` → Flows. MCP tools are tested at the unit level with WireMock JSON-path
+matchers asserting the on-the-wire JSON:API body (see `conventions.md` → MCP tools).

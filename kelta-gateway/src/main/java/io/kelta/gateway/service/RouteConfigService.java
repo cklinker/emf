@@ -179,6 +179,7 @@ public class RouteConfigService {
                 {"list-views", "/api/list-views/**", "list-views"},
                 {"ui-pages", "/api/ui-pages/**", "ui-pages"},
                 {"ui-menus", "/api/ui-menus/**", "ui-menus"},
+                {"pages", "/api/pages/**", "pages"},
                 // Security & identity
                 {"profiles", "/api/profiles/**", "profiles"},
                 {"users", "/api/users/**", "users"},
@@ -202,6 +203,9 @@ public class RouteConfigService {
                 {"superset", "/api/superset/**", "superset"},
                 {"bulk-jobs", "/api/bulk-jobs/**", "bulk-jobs"},
                 {"migration-runs", "/api/migration-runs/**", "migration-runs"},
+                // ALM & governance
+                {"metadata", "/api/metadata/**", "metadata"},
+                {"config-health", "/api/config-health/**", "config-health"},
                 // Developer tools & media
                 {"docs", "/api/docs/**", "docs"},
                 {"files", "/api/files/**", "files"},

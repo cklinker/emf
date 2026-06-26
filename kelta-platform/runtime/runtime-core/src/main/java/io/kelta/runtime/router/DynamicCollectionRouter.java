@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -155,7 +156,7 @@ public class DynamicCollectionRouter {
     @GetMapping("/{collectionName}")
     public ResponseEntity<Map<String, Object>> list(
             @PathVariable("collectionName") String collectionName,
-            @RequestParam(required = false) Map<String, String> params,
+            @RequestParam(required = false) MultiValueMap<String, String> params,
             HttpServletRequest request) {
 
         logger.debug("List request for collection '{}' with params: {}", collectionName, params);
@@ -193,8 +194,12 @@ public class DynamicCollectionRouter {
 
             // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
             if (!includeNames.isEmpty() && !result.data().isEmpty()) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> dataResources =
+                        (List<Map<String, Object>>) response.get("data");
                 List<Map<String, Object>> included = resolveIncludes(
-                        includeNames, result.data(), collectionName, definition, request);
+                        includeNames, result.data(), dataResources,
+                        collectionName, definition, request);
                 if (!included.isEmpty()) {
                     response.put("included", included);
                 }
@@ -223,7 +228,7 @@ public class DynamicCollectionRouter {
     public ResponseEntity<Map<String, Object>> get(
             @PathVariable("collectionName") String collectionName,
             @PathVariable("id") String id,
-            @RequestParam(required = false) Map<String, String> params,
+            @RequestParam(required = false) MultiValueMap<String, String> params,
             HttpServletRequest request) {
 
         logger.debug("Get request for collection '{}', id '{}'", collectionName, id);
@@ -268,8 +273,11 @@ public class DynamicCollectionRouter {
 
             // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
             if (!includeNames.isEmpty()) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> dataResource = (Map<String, Object>) response.get("data");
                 List<Map<String, Object>> included = resolveIncludes(
-                        includeNames, List.of(record.get()), collectionName, definition, request);
+                        includeNames, List.of(record.get()), List.of(dataResource),
+                        collectionName, definition, request);
                 if (!included.isEmpty()) {
                     response.put("included", included);
                 }
@@ -513,7 +521,7 @@ public class DynamicCollectionRouter {
             @PathVariable("parentName") String parentName,
             @PathVariable("parentId") String parentId,
             @PathVariable("childName") String childName,
-            @RequestParam(required = false) Map<String, String> params,
+            @RequestParam(required = false) MultiValueMap<String, String> params,
             HttpServletRequest request) {
 
         logger.debug("List children request: parent='{}', parentId='{}', child='{}'",
@@ -1257,7 +1265,7 @@ public class DynamicCollectionRouter {
     private Map<String, Object> toJsonApiListResponse(QueryResult result, String type,
                                                        CollectionDefinition definition,
                                                        String requestPath,
-                                                       Map<String, String> params) {
+                                                       MultiValueMap<String, String> params) {
         List<Map<String, Object>> jsonApiData = new ArrayList<>();
         for (Map<String, Object> record : result.data()) {
             jsonApiData.add(toJsonApiResourceObject(record, type, definition));
@@ -1281,10 +1289,15 @@ public class DynamicCollectionRouter {
 
         Map<String, Object> response = new java.util.HashMap<>();
         response.put("data", jsonApiData);
+        // Emit the JSON:API standard `meta` key, plus the legacy `metadata`
+        // alias for backward compatibility. `metadata` is deprecated — new
+        // clients should read `meta`. Both maps share the same instance so
+        // they are guaranteed to stay in sync.
+        response.put("meta", metadata);
         response.put("metadata", metadata);
         response.put("links", PaginationLinks.build(
             requestPath,
-            params,
+            params != null ? params.toSingleValueMap() : null,
             result.metadata().currentPage(),
             effectivePageSize,
             result.metadata().totalPages()
@@ -1298,11 +1311,11 @@ public class DynamicCollectionRouter {
      * {@link Pagination#fromParams(Map)} clamped the caller's value so the
      * response can echo what was originally requested.
      */
-    private Integer parseRequestedPageSize(Map<String, String> params) {
+    private Integer parseRequestedPageSize(MultiValueMap<String, String> params) {
         if (params == null) {
             return null;
         }
-        String raw = params.get("page[size]");
+        String raw = params.getFirst("page[size]");
         if (raw == null || raw.isBlank()) {
             return null;
         }
@@ -1321,11 +1334,11 @@ public class DynamicCollectionRouter {
      * @param params the query parameters
      * @return list of include names, or empty list if not present
      */
-    private List<String> parseIncludeParam(Map<String, String> params) {
+    private List<String> parseIncludeParam(MultiValueMap<String, String> params) {
         if (params == null) {
             return List.of();
         }
-        String includeParam = params.get("include");
+        String includeParam = params.getFirst("include");
         if (includeParam == null || includeParam.isBlank()) {
             return List.of();
         }
@@ -1363,7 +1376,10 @@ public class DynamicCollectionRouter {
      * </ul>
      *
      * @param includeNames the requested include relationship names
-     * @param primaryData the primary data records
+     * @param primaryData the primary data records (raw, used to read FK values)
+     * @param primaryResources the serialized JSON:API resource objects for the primary
+     *        records (mutated in place to inject {@code relationships} entries for
+     *        field-name includes; index-aligned with {@code primaryData})
      * @param primaryCollectionName the primary collection name
      * @param primaryDefinition the primary collection definition
      * @param request the HTTP servlet request
@@ -1372,6 +1388,7 @@ public class DynamicCollectionRouter {
     private List<Map<String, Object>> resolveIncludes(
             List<String> includeNames,
             List<Map<String, Object>> primaryData,
+            List<Map<String, Object>> primaryResources,
             String primaryCollectionName,
             CollectionDefinition primaryDefinition,
             HttpServletRequest request) {
@@ -1397,7 +1414,16 @@ public class DynamicCollectionRouter {
         for (String includeName : includeNames) {
             CollectionDefinition childDef = resolveCollection(includeName, request);
             if (childDef == null) {
-                logger.debug("Include target collection '{}' not found, skipping", includeName);
+                // Fallback: treat the include name as a field on the primary collection
+                // whose referenceConfig points to another collection. This is the
+                // "lookup field" include form: ?include=title where `title` is a
+                // STRING/LOOKUP field on availabilities that stores a UUID FK.
+                if (resolveFieldInclude(includeName, primaryData, primaryResources,
+                        primaryDefinition, allIncluded, request)) {
+                    continue;
+                }
+                logger.debug("Include target '{}' not found as collection or field, skipping",
+                        includeName);
                 continue;
             }
 
@@ -1569,6 +1595,107 @@ public class DynamicCollectionRouter {
         }
 
         return allIncluded;
+    }
+
+    /**
+     * Resolves an include name as a field on the primary collection whose
+     * {@link ReferenceConfig#targetCollection()} points to another collection.
+     *
+     * <p>Used when the include name does not match a registered collection. For
+     * example, on {@code GET /availabilities?include=title} the field {@code title}
+     * stores a UUID FK to the {@code titles} collection; this method:
+     * <ol>
+     *   <li>injects a {@code relationships.<field>.data = { type, id }} entry into
+     *       each primary resource object (without removing the raw UUID from
+     *       {@code attributes} — kept for back-compat),</li>
+     *   <li>queries the target collection by id IN [fk values] and appends each
+     *       referenced record to the {@code included[]} accumulator.</li>
+     * </ol>
+     *
+     * <p>Works for any field with a non-null {@code referenceConfig}, regardless of
+     * {@link FieldType} — covers both the LOOKUP / MASTER_DETAIL / REFERENCE typed
+     * fields and legacy STRING fields that carry a {@code referenceConfig}.
+     *
+     * @return {@code true} when the include name was recognized as a reference field
+     *         on the primary collection (regardless of whether any target rows existed)
+     */
+    private boolean resolveFieldInclude(
+            String fieldIncludeName,
+            List<Map<String, Object>> primaryData,
+            List<Map<String, Object>> primaryResources,
+            CollectionDefinition primaryDefinition,
+            List<Map<String, Object>> includedAccumulator,
+            HttpServletRequest request) {
+
+        FieldDefinition fieldDef = primaryDefinition.getField(fieldIncludeName);
+        if (fieldDef == null || fieldDef.referenceConfig() == null
+                || fieldDef.referenceConfig().targetCollection() == null) {
+            return false;
+        }
+
+        String targetCollectionName = fieldDef.referenceConfig().targetCollection();
+        CollectionDefinition targetDef = resolveCollection(targetCollectionName, request);
+        if (targetDef == null) {
+            logger.debug("Field include '{}' references unknown collection '{}', skipping",
+                    fieldIncludeName, targetCollectionName);
+            // Still recognized as a field include — don't fall through to other passes.
+            return true;
+        }
+
+        // Inject relationships.<field>.data on each primary resource and collect FK values.
+        java.util.Set<Object> fkValueSet = new java.util.LinkedHashSet<>();
+        for (int i = 0; i < primaryData.size(); i++) {
+            Object fkValue = primaryData.get(i).get(fieldIncludeName);
+            Map<String, Object> resource = primaryResources.get(i);
+            injectRelationshipEntry(resource, fieldIncludeName, targetCollectionName, fkValue);
+            if (fkValue != null) {
+                fkValueSet.add(fkValue);
+            }
+        }
+
+        if (fkValueSet.isEmpty()) {
+            return true;
+        }
+
+        List<Map<String, Object>> targetRecords = queryChildRecords(
+                targetDef, "id", new ArrayList<>(fkValueSet), request);
+        for (Map<String, Object> rec : targetRecords) {
+            includedAccumulator.add(toJsonApiResourceObject(rec, targetCollectionName, targetDef));
+        }
+        logger.debug("Resolved field include '{}' -> '{}': {} FK value(s), {} record(s) hydrated",
+                fieldIncludeName, targetCollectionName, fkValueSet.size(), targetRecords.size());
+        return true;
+    }
+
+    /**
+     * Ensures a {@code relationships.<fieldName>.data} entry exists on the given
+     * JSON:API resource object. Creates the {@code relationships} block if it
+     * isn't present yet, and writes {@code { type, id }} for a non-null FK or
+     * {@code null} for a null FK. Existing entries for the same field name are
+     * left untouched — relationship metadata emitted by
+     * {@link #toJsonApiResourceObject} wins.
+     */
+    @SuppressWarnings("unchecked")
+    private void injectRelationshipEntry(Map<String, Object> resource, String fieldName,
+                                          String targetType, Object fkValue) {
+        if (resource == null) {
+            return;
+        }
+        Map<String, Object> relationships = (Map<String, Object>) resource.get("relationships");
+        if (relationships == null) {
+            relationships = new java.util.HashMap<>();
+            resource.put("relationships", relationships);
+        }
+        if (relationships.containsKey(fieldName)) {
+            return;
+        }
+        Map<String, Object> relData = new java.util.HashMap<>();
+        if (fkValue != null) {
+            relData.put("data", Map.of("type", targetType, "id", fkValue));
+        } else {
+            relData.put("data", null);
+        }
+        relationships.put(fieldName, relData);
     }
 
     /**

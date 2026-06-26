@@ -454,9 +454,9 @@ class GovernorLimitsControllerTest {
         }
 
         @Test
-        @DisplayName("Should publish Kafka event when limits are updated")
+        @DisplayName("Should publish NATS event when limits are updated")
         @SuppressWarnings("unchecked")
-        void publishesKafkaEventOnUpdate() {
+        void publishesNatsEventOnUpdate() {
             Map<String, Object> newLimits = new LinkedHashMap<>();
             newLimits.put("apiCallsPerDay", 200_000);
 
@@ -479,12 +479,12 @@ class GovernorLimitsControllerTest {
         }
 
         @Test
-        @DisplayName("Should not fail update if Kafka event publishing fails")
-        void doesNotFailIfKafkaPublishFails() {
+        @DisplayName("Should not fail update if NATS event publishing fails")
+        void doesNotFailIfNatsPublishFails() {
             Map<String, Object> newLimits = new LinkedHashMap<>();
             newLimits.put("apiCallsPerDay", 200_000);
 
-            doThrow(new RuntimeException("Kafka is down"))
+            doThrow(new RuntimeException("NATS is down"))
                     .when(recordEventPublisher).publish(any());
 
             when(repository.findEditionAndLimits("tenant-1")).thenReturn(Optional.of(new GovernorLimitsRepository.EditionAndLimits("PROFESSIONAL", "{\"apiCallsPerDay\":200000}")));

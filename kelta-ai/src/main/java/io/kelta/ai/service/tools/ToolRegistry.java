@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +41,26 @@ public class ToolRegistry {
         return handlers.values().stream()
                 .map(this::toToolUnion)
                 .toList();
+    }
+
+    /**
+     * Tool definitions restricted to {@code allowedNames} — used by the governed agent runtime to
+     * attach only the subset of tools an agent is permitted to call. Unknown names are ignored.
+     */
+    public List<ToolUnion> toolDefinitions(java.util.Collection<String> allowedNames) {
+        if (allowedNames == null || allowedNames.isEmpty()) {
+            return List.of();
+        }
+        java.util.Set<String> allowed = new HashSet<>(allowedNames);
+        return handlers.values().stream()
+                .filter(h -> allowed.contains(h.name()))
+                .map(this::toToolUnion)
+                .toList();
+    }
+
+    /** Names of all registered tools (for validating an agent's allowed-tool subset). */
+    public java.util.Set<String> toolNames() {
+        return handlers.keySet();
     }
 
     public int size() {

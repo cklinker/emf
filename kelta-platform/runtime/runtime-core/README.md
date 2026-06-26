@@ -8,7 +8,7 @@ The Kelta Runtime Core is the foundational library for the Kelta that enables dy
 - **Dual Storage Modes**: Physical tables (Mode A) or JSONB document store (Mode B)
 - **Query Engine**: Full-featured query support with pagination, sorting, filtering, and field selection
 - **Validation Engine**: Comprehensive field-level validation with multiple constraint types
-- **Event Publishing**: Kafka-based lifecycle event publishing
+- **Event Publishing**: NATS-based lifecycle event publishing
 - **Thread-Safe**: All components support concurrent access
 
 ## Quick Start
@@ -236,12 +236,12 @@ Pros:
 
 ## Event Publishing
 
-Enable Kafka event publishing for collection lifecycle events:
+Enable NATS event publishing for collection lifecycle events:
 
 ```properties
 kelta.events.enabled=true
 kelta.events.topic-prefix=kelta.events
-spring.kafka.bootstrap-servers=localhost:9092
+nats.url=nats://localhost:4222
 ```
 
 Events are published to topics: `{prefix}.{collectionName}.{eventType}`

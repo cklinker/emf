@@ -63,6 +63,26 @@
             <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
 
+        <!-- SAML 2.0 service-provider login (Rec 8). Spring Security SAML2 needs an
+             OpenSAML 5 implementation on the classpath; OpenSAML is NOT published to
+             Maven Central (licensing), so the version is pinned here to the one
+             Spring Security 7.0.4 is built against (5.1.6) and resolved from the
+             Shibboleth repository declared below. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-saml2-service-provider</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.opensaml</groupId>
+            <artifactId>opensaml-saml-api</artifactId>
+            <version>5.1.6</version>
+        </dependency>
+        <dependency>
+            <groupId>org.opensaml</groupId>
+            <artifactId>opensaml-saml-impl</artifactId>
+            <version>5.1.6</version>
+        </dependency>
+
         <!-- JDBC for Spring Authorization Server persistence -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -166,6 +186,18 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <repositories>
+        <!-- OpenSAML 5 (transitive requirement of spring-security-saml2-service-provider)
+             is published only to the Shibboleth repository, not Maven Central. Needed
+             solely for the SAML SSO dependencies above. -->
+        <repository>
+            <id>shibboleth-releases</id>
+            <url>https://build.shibboleth.net/maven/releases/</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+    </repositories>
 
     <build>
         <plugins>

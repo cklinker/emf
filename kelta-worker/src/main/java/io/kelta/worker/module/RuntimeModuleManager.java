@@ -50,6 +50,7 @@ public class RuntimeModuleManager {
     private final ObjectMapper objectMapper;
     private final ModuleJarService jarService;
     private final ModuleContext moduleContext;
+    private final ModuleSignatureVerifier signatureVerifier;
 
     /** Tracks which modules are loaded per tenant: tenantId -> Set<moduleId> */
     private final Map<String, Set<String>> loadedModules = new ConcurrentHashMap<>();
@@ -67,13 +68,27 @@ public class RuntimeModuleManager {
                                  ActionHandlerRegistry actionHandlerRegistry,
                                  ObjectMapper objectMapper,
                                  ModuleJarService jarService,
-                                 ModuleContext moduleContext) {
+                                 ModuleContext moduleContext,
+                                 ModuleSignatureVerifier signatureVerifier) {
         this.moduleStore = Objects.requireNonNull(moduleStore);
         this.actionHandlerRegistry = Objects.requireNonNull(actionHandlerRegistry);
         this.objectMapper = Objects.requireNonNull(objectMapper);
         this.manifestParser = new ModuleManifestParser(objectMapper);
         this.jarService = jarService;
         this.moduleContext = moduleContext;
+        this.signatureVerifier = signatureVerifier;
+    }
+
+    /**
+     * Creates a RuntimeModuleManager with JAR loading but no signature verifier
+     * (e.g. in tests). Equivalent to a disabled verifier — installs are not gated.
+     */
+    public RuntimeModuleManager(ModuleStore moduleStore,
+                                 ActionHandlerRegistry actionHandlerRegistry,
+                                 ObjectMapper objectMapper,
+                                 ModuleJarService jarService,
+                                 ModuleContext moduleContext) {
+        this(moduleStore, actionHandlerRegistry, objectMapper, jarService, moduleContext, null);
     }
 
     /**
@@ -82,7 +97,7 @@ public class RuntimeModuleManager {
     public RuntimeModuleManager(ModuleStore moduleStore,
                                  ActionHandlerRegistry actionHandlerRegistry,
                                  ObjectMapper objectMapper) {
-        this(moduleStore, actionHandlerRegistry, objectMapper, null, null);
+        this(moduleStore, actionHandlerRegistry, objectMapper, null, null, null);
     }
 
     /**
@@ -152,8 +167,30 @@ public class RuntimeModuleManager {
      */
     public TenantModuleData installModuleWithJar(String tenantId, String manifestJson,
                                                    byte[] jarBytes, String installedBy) {
+        return installModuleWithJar(tenantId, manifestJson, jarBytes, installedBy, null);
+    }
+
+    /**
+     * Installs a module with its JAR file, verifying the JAR's publisher signature
+     * first (Rec 9). When signature verification is enabled
+     * ({@code kelta.modules.signing.public-key} set), {@code signatureBase64} must
+     * be a valid detached signature over the JAR bytes or the install is rejected
+     * before anything is uploaded or persisted.
+     *
+     * @param signatureBase64 detached base64 signature over the JAR bytes (may be
+     *                        {@code null} when verification is disabled)
+     * @throws ModuleSignatureException if signature verification fails
+     */
+    public TenantModuleData installModuleWithJar(String tenantId, String manifestJson,
+                                                   byte[] jarBytes, String installedBy,
+                                                   String signatureBase64) {
         if (jarService == null) {
             throw new IllegalStateException("JAR upload requires S3 storage to be enabled");
+        }
+
+        // Authenticity gate — reject before any S3 upload or DB write.
+        if (signatureVerifier != null) {
+            signatureVerifier.verify(jarBytes, signatureBase64);
         }
 
         ModuleManifest manifest = manifestParser.parse(manifestJson);

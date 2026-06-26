@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Kafka listener that invalidates the worker's Cerbos field access cache
+ * NATS listener that invalidates the worker's Cerbos field access cache
  * when policies are re-synced for a tenant.
  *
  * <p>Listens to {@code kelta.cerbos.policies.changed} events published by

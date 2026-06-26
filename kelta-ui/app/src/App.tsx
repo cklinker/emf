@@ -85,6 +85,7 @@ import {
   TenantsPage,
   TenantDashboardPage,
   PicklistsPage,
+  AiAgentsPage,
   PageLayoutsPage,
   ListViewsPage,
   AnalyticsPage,
@@ -120,6 +121,7 @@ import {
   SearchSettingsPage,
   MonitoringLayout,
   MonitoringOverviewPage,
+  ConfigHealthPage,
   PasswordPolicyPage,
   MfaPolicyPage,
 } from './pages'
@@ -660,6 +662,18 @@ function TenantRoutes(): React.ReactElement {
         }
       />
 
+      {/* AI Agents route */}
+      <Route
+        path="ai-agents"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <AiAgentsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
       {/* Page Layouts route */}
       <Route
         path="layouts"
@@ -965,6 +979,7 @@ function TenantRoutes(): React.ReactElement {
         <Route path="errors" element={<ErrorDashboardPage />} />
         <Route path="performance" element={<EndpointPerformancePage />} />
         <Route path="activity" element={<UserActivityPage />} />
+        <Route path="health" element={<ConfigHealthPage />} />
         <Route
           path="settings"
           element={

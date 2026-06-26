@@ -8,7 +8,7 @@ import io.kelta.runtime.model.CollectionDefinition;
  *
  * <p>Workers implement this to fetch collection definitions from the control
  * plane when a request arrives for a collection that hasn't been loaded yet.
- * This acts as a safety net in case the startup bootstrap or Kafka events
+ * This acts as a safety net in case the startup bootstrap or NATS events
  * missed a collection.
  *
  * @since 1.0.0

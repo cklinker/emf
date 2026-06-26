@@ -16,7 +16,7 @@
 - Import order: (1) `io.kelta.*`, (2) external libs (`com.fasterxml.*`, `org.*`), (3) Java stdlib (`java.*`, `javax.*`)
 - Constructor injection preferred over field injection
 - `@Component` for beans, `@Service` for business logic, `@Repository` for data access
-- `@KafkaListener` with explicit topics and group IDs
+- NATS subscriptions registered explicitly via `NatsSubscriptionManager` (no annotation-based listeners)
 
 ### Logging
 - `private static final Logger logger = LoggerFactory.getLogger(ClassName.class)`
@@ -89,11 +89,17 @@ Endpoints that need higher caps for internal batch fetches (e.g. report executio
 
 ### Response shape
 
-Paginated list responses carry both `metadata` (numeric pagination state) and `links` (URLs for navigation):
+Paginated list responses carry pagination state under both `meta` (the JSON:API standard key) and `metadata` (legacy alias), plus a `links` block (URLs for navigation):
 
 ```json
 {
   "data": [ { "type": "customers", "id": "…", "attributes": { … } } ],
+  "meta": {
+    "totalCount": 100,
+    "currentPage": 2,
+    "pageSize": 20,
+    "totalPages": 5
+  },
   "metadata": {
     "totalCount": 100,
     "currentPage": 2,
@@ -108,6 +114,7 @@ Paginated list responses carry both `metadata` (numeric pagination state) and `l
 }
 ```
 
+- `meta` and `metadata` carry **identical content** and reference the same underlying map. New clients should read `meta` (JSON:API spec). `metadata` is **deprecated** — kept for backward compatibility with existing integrations and will be removed in a future major version.
 - `links.self` is always present.
 - `links.prev` is `null` when the response is on page 1.
 - `links.next` is `null` when the response is on (or past) the last page.
@@ -157,8 +164,20 @@ MCP tools (`query_collection`, `list_picklists`, `list_approvals`) take flat `pa
 ### Component reuse (kelta-ui/app and kelta-web)
 
 - Do not add a new shared list/table/filter/form component in `kelta-ui/app/src/components/` if one already exists for the same purpose in either `kelta-ui/app/` or `kelta-web/packages/components/`. Reuse or extend the existing one.
-- The unification target for these families (DataTable, FilterBuilder, FieldRenderer, ResourceForm, RelatedList) is the library variant under `@kelta/components`. App-side variants are being collapsed into thin re-exports — see `.claude/docs/ui-consolidation-plan.md` for the current state and migration order.
+- The unification target for these families (DataTable, FilterBuilder, FieldRenderer, ResourceForm, RelatedList) is the library variant under `@kelta/components`. **Reuse that variant or extend it — never fork a new app-side variant.** App-side variants are being collapsed into thin re-exports of `@kelta/components`.
 - `@kelta/components` is a public plugin surface. Breaking changes to its exported props need a deprecation window (additive props, `legacy*` flags) — never a hard cutover.
+
+### Page builder config v2 (`ui-pages.config` JSON)
+
+The page-builder stores its whole tree + page-level config inside the single `ui-pages.config` JSON column (`PageBuilderPage/pageConfig.ts`). The server is a pass-through and never parses it — all binding/layout resolution is client-side (preserving Cerbos/FLS). Canonical shape: the component tree lives at **`config.components`** (no `config.tree` wrapper); `variables`, `dataSources`, `access`, and `schemaVersion` are **siblings** of `components`.
+
+- **Layout vocabulary (slice 2c):** `grid`/`row` are 12-col CSS-grid tracks (`grid grid-cols-12`), `column` is a vertical stack cell, `divider` is a leaf `<hr>`. The **only persisted layout state is per-child `span: {base, sm?, md?, lg?}`** (each `1..12`, mobile-first — `base` applies at all widths, prefixes override upward), mapped to Tailwind `col-span-*` + `sm:/md:/lg:` literals (`canvas/spanClasses.ts`; the 48 class names are spelled out so the Tailwind JIT scanner can see them — never `` `col-span-${n}` ``). **No pixel/row/column coordinates are stored.** The legacy `position {row,column,width,height}` is migrated away on builder load by `model/migrate.ts` (`width → span.base`, grouped by `row` into a root `grid` of `column`s) — idempotent; a page at `schemaVersion: 2` is never re-migrated.
+- **`schemaVersion: 2`** marks a migrated/v2-authored page (slice 2c is the first writer, stamped on every save).
+- **Save-path rule (load-bearing):** `mergeConfig` overlays a key ONLY when the `handleSavePage` call passes it. Widening `mergeConfig`'s accepted keys is useless unless the call passes them — every page-level sibling (`schemaVersion`/`variables`/`dataSources`/`access`) must be passed at the save call site or it is silently dropped (and a migrated page re-migrates on every reload). Test the `updateMutation.mutate` **payload**, not just `mergeConfig`'s return.
+- **`config.layout` is inert legacy (slice 2c):** the create-form `layoutType` select still writes `config.layout.type` and it round-trips untouched, but the widget tree + `span` own layout — nothing reads `config.layout`. Removal deferred.
+- **Bindings & expressions (slice 2d):** any prop value may be a literal or a binding object `{ $bind: "<token>", mode?: "path" | "expr" }`. `$bind` holds a **bare** token (e.g. `record.name`); `{{…}}` is display-only (and may be embedded in literal strings via `interpolate`). `mode:'path'` (default) resolves a dotted/`[n]` path via `getPath`; `mode:'expr'` runs the token through `@kelta/formula` `FormulaEvaluator` — because that parser is **flat-key only** (stops at `.`), `resolveBindings` flattens the referenced scope leaves before `evaluate`. **Resolution is 100% client-side** (the server round-trips `$bind` untouched, preserving Cerbos/FLS). Authoritative namespace: `record` (current record / repeat row), `vars` (page variables), `data.<source>` (on-load data source), `page` (route params/meta), `item` (per-row `list`/`repeater` scope). `getPath` **refuses `__proto__`/`constructor`/`prototype` tokens** (prototype-pollution guard). Caps: `MAX_PAGE_DATA_SOURCES = 12`, `MAX_REPEATER_ROWS = 200` (`model/limits.ts`). The resolved-node invariant holds: a widget's `Render` receives already-resolved props and must not re-resolve — the sole exception is `list`/`repeater`, which re-resolves children under each per-row `item` scope.
+- **Typed inputs (slice 2f):** page-builder typed inputs **reuse** `LookupSelect`/`MultiPicklistSelect`/`RichTextEditor`/`ResourceForm` — never re-implement a typed control. The `form` widget renders via `@kelta/components` `ResourceForm`, upgraded through `setComponentRegistry` (`registerFormFieldRenderers.ts`) rather than a fork. Picklist source resolution is canonical: `fieldTypeConfig.globalPicklistId` present → `GLOBAL` source (`sourceId = globalPicklistId`), else `FIELD` (`sourceId = field.id`) — shared in `usePicklistOptions` (handles `fieldTypeConfig` as object **or** JSON string). **Client (Zod) validation is advisory only** — the worker validates required/type/unique on write and is the source of truth. **HTML-bearing output (`rich_text`, bound HTML) is sanitized through the same `FieldRenderer` `rich_text` path (`stripHtml`) — never `dangerouslySetInnerHTML` on unsanitized bound HTML.** All new widget strings go through `useI18n` (`builder.*`).
+- **DnD convention:** the **page canvas** uses `@dnd-kit` (`PageBuilderPage/canvas/*`), scoped to that surface only. `PageLayoutsPage`/`MenuBuilderPage`/`FlowDesignerPage` stay on **native HTML5 DnD** — do not migrate them, and do not mix the two libs in one tree.
 
 ## MCP tools (kelta-mcp)
 

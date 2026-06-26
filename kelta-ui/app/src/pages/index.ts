@@ -119,6 +119,10 @@ export type { UserDetailPageProps } from './UserDetailPage'
 export { PicklistsPage } from './PicklistsPage'
 export type { PicklistsPageProps } from './PicklistsPage'
 
+// AiAgentsPage - Governed AI agents management page
+export { AiAgentsPage } from './AiAgentsPage'
+export type { AiAgentsPageProps } from './AiAgentsPage'
+
 // HomePage - User-centric landing page
 export { HomePage } from './HomePage'
 export type { HomePageProps } from './HomePage'
@@ -260,6 +264,10 @@ export type { EndpointPerformancePageProps } from './EndpointPerformancePage'
 // ObservabilitySettingsPage - Observability retention settings
 export { ObservabilitySettingsPage } from './ObservabilitySettingsPage'
 export type { ObservabilitySettingsPageProps } from './ObservabilitySettingsPage'
+
+// ConfigHealthPage - Configuration-health dashboard (Rec 6)
+export { ConfigHealthPage } from './ConfigHealthPage'
+export type { ConfigHealthPageProps } from './ConfigHealthPage'
 
 // MonitoringPage - Monitoring hub layout and overview
 export { MonitoringLayout, MonitoringOverviewPage } from './MonitoringPage'

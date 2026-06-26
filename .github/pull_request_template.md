@@ -14,13 +14,16 @@
 
 ## Docs touched
 
-<!-- Mark which .claude/docs files this PR updates, and why. Empty list is OK only for pure refactors / bug fixes that change no public surface. -->
+<!-- Required by CLAUDE.md → "Keeping Docs Current". Mark which docs this PR updates, and why. Empty list is OK only for pure refactors / bug fixes that change no documented surface. -->
 
-- [ ] `.claude/docs/architecture.md` — new endpoint / entity / data flow
-- [ ] `.claude/docs/conventions.md` — new pattern worth codifying
-- [ ] `.claude/docs/integrations.md` — new external dependency / SDK
-- [ ] `.claude/docs/concerns.md` — new risk / known issue
-- [ ] `.claude/docs/testing.md` — new test pattern
+- [ ] `.claude/docs/status.md` — capability moved (stub→working, added, removed)
+- [ ] `.claude/docs/architecture.md` — new endpoint / data flow / filter / layer
+- [ ] `.claude/docs/conventions.md` — new pattern / error / pagination / reuse rule
+- [ ] `.claude/docs/integrations.md` — new external dependency / SDK / flow contract / NATS subject
+- [ ] `.claude/docs/ci-cd.md` — CI workflow / build / deploy change
+- [ ] `.claude/docs/concerns.md` — new risk / known issue / resolved item
+- [ ] `.claude/docs/testing.md` — new test framework / pattern
+- [ ] `CLAUDE.md` / module `CLAUDE.md` / `README.md` — version bump, new module, command change
 - [ ] None — pure bug fix / internal refactor (explain why no doc update)
 
 ## Migration

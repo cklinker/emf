@@ -79,6 +79,7 @@ class McpApplicationTest {
                 "query_collection",
                 "get_record",
                 "search",
+                "semantic_search",
                 "describe_api",
                 "create_record",
                 "update_record",
@@ -143,7 +144,8 @@ class McpApplicationTest {
                 // automation admin + integrations (Phase 8)
                 "create_flow",
                 "update_flow",
-                "import_api_spec");
+                "import_api_spec",
+                "materialize_api_collection");
     }
 
     @Test

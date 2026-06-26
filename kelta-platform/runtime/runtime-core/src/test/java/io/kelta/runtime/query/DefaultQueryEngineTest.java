@@ -778,7 +778,7 @@ class DefaultQueryEngineTest {
                     .thenReturn(io.kelta.runtime.validation.ValidationResult.success());
             when(storageAdapter.create(eq(testCollection), any()))
                     .thenAnswer(invocation -> invocation.getArgument(1));
-            doThrow(new RuntimeException("Kafka is down"))
+            doThrow(new RuntimeException("NATS is down"))
                     .when(recordEventPublisher).publish(any());
 
             // Should not throw despite publisher failure

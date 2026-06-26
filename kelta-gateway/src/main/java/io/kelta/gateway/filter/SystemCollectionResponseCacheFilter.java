@@ -45,7 +45,7 @@ import java.util.regex.Pattern;
  * <p>Only caches GET requests to known system collection API paths that return
  * a 200 OK response with JSON content.
  *
- * <p>Cache invalidation is driven by Kafka events consumed by
+ * <p>Cache invalidation is driven by NATS events consumed by
  * {@link io.kelta.gateway.listener.SystemCollectionRouteListener}.
  *
  * @since 1.0.0
@@ -104,7 +104,7 @@ public class SystemCollectionResponseCacheFilter implements GlobalFilter, Ordere
         // For mutating requests (POST, PATCH, PUT, DELETE) on cacheable collections,
         // evict the gateway cache eagerly so the next GET returns fresh data.
         // This avoids the race condition where the UI refetches before the async
-        // Kafka cache-eviction event is consumed.
+        // NATS cache-eviction event is consumed.
         if (exchange.getRequest().getMethod() != HttpMethod.GET) {
             if (collectionName != null && CACHEABLE_COLLECTIONS.contains(collectionName)) {
                 log.debug("Mutating request on cacheable collection '{}', evicting gateway cache", collectionName);

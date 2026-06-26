@@ -46,7 +46,7 @@ In-flight workers in tmux keep running to completion; no new tasks are claimed. 
 
 ## Manual contributions
 
-You can still work the old-fashioned way — branch off `main`, push, open a PR. Just don't add the `autopilot` label unless the PR was produced by a worker. See [`.claude/docs/workflow.md`](.claude/docs/workflow.md) for branch naming, commit style, and the pre-PR checklist.
+You can still work the old-fashioned way — branch off `main`, push, open a PR. Just don't add the `autopilot` label unless the PR was produced by a worker. See the **Task Workflow** section of [`CLAUDE.md`](CLAUDE.md) for branch naming, commit style, and the pre-PR checklist.
 
 ## Hard rules
 

@@ -9,6 +9,7 @@ import io.kelta.runtime.workflow.module.ModuleContext;
 import io.kelta.worker.module.JdbcModuleStore;
 import io.kelta.worker.module.ModuleConfigEventPublisher;
 import io.kelta.worker.module.ModuleJarService;
+import io.kelta.worker.module.ModuleSignatureVerifier;
 import io.kelta.worker.module.RuntimeModuleManager;
 import io.kelta.worker.service.S3StorageService;
 import tools.jackson.databind.ObjectMapper;
@@ -69,7 +70,8 @@ public class ModuleConfig {
                                                        @Nullable ModuleJarService jarService,
                                                        QueryEngine queryEngine,
                                                        CollectionRegistry collectionRegistry,
-                                                       @Nullable FormulaEvaluator formulaEvaluator) {
+                                                       @Nullable FormulaEvaluator formulaEvaluator,
+                                                       ModuleSignatureVerifier signatureVerifier) {
         ModuleContext moduleContext = new ModuleContext(
             queryEngine, collectionRegistry, formulaEvaluator,
             objectMapper, actionHandlerRegistry, null);
@@ -81,7 +83,7 @@ public class ModuleConfig {
         }
 
         return new RuntimeModuleManager(moduleStore, actionHandlerRegistry, objectMapper,
-            jarService, moduleContext);
+            jarService, moduleContext, signatureVerifier);
     }
 
     @Bean

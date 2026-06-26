@@ -44,16 +44,75 @@ Microservices + Event-Driven + Dynamic Configuration Platform. Multi-tenant with
 
 ## Gateway Filter Chain (ordered)
 
+Order values below are the live `getOrder()` returns from source (lower runs first):
+
 | Order | Filter | Purpose |
 |-------|--------|---------|
-| -250 | TenantSlugExtractionFilter | Extract tenant from URL |
-| -200 | TenantResolutionFilter | Resolve tenant ID |
+| -310 | CustomDomainFilter | Map custom domain → tenant |
+| -300 | TenantSlugExtractionFilter | Extract tenant slug from URL |
+| -200 | TenantResolutionFilter | Resolve slug → tenant ID |
+| -150 | IpRateLimitFilter | Per-IP rate limiting |
 | -100 | JwtAuthenticationFilter | Validate JWT |
-| 0 | DynamicRouteLocator | Match route from RouteRegistry |
-| — | RouteAuthorizationFilter | Cerbos permission check |
-| — | HeaderTransformationFilter | Add tenant headers for worker |
+| -99 | PatAuthenticationFilter | Validate PAT (`klt_`) as JWT alternative |
+| -50 | RateLimitFilter / UserIdentityResolutionFilter | Per-tenant rate limit; user identity |
+| 0 | RouteAuthorizationFilter | Cerbos object-level permission check (DynamicRouteLocator then forwards to worker) |
+| 50 | HeaderTransformationFilter | Inject `X-Tenant-*` headers for worker |
+| 100 | SecurityHeadersFilter | Response security headers |
+| 200 | SecurityAuditFilter | Record final response status |
 
-Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
+Cross-cutting (off main path): `ObservabilityContextFilter (-90)`, `HttpBodyCaptureFilter
+(-80)`, `SystemCollectionResponseCacheFilter (-10)`, `RequestLoggingFilter (MAX)`. `?include=`
+resolution is done by `IncludeResolver` (`jsonapi` package), not a numbered filter; read-side
+FLS is enforced in the worker (`CerbosFieldSecurityAdvice`), not the gateway.
+
+Key files: `kelta-gateway/src/main/java/io/kelta/gateway/{filter,auth,authz,ratelimit}/`
+
+### Authorizing a new endpoint (read before adding one)
+
+Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
+
+- **Collection API routes** (`/{tenant}/{collection}`): the gateway `RouteAuthorizationFilter`
+  (order 0) runs the per-resource Cerbos object check, and the worker
+  `CerbosRecordAuthorizationAdvice` + FLS advices add record/field checks.
+- **Static routes** (`/api/admin/**`, `/api/me/**`, `/api/_search/**`, `/api/metrics/**`):
+  `RouteAuthorizationFilter` **skips** ids starting `static-` — they get only the blanket
+  `API_ACCESS` system-permission check. The worker advices **exclude** `/api/admin/`. So a new
+  `/api/admin/...` endpoint is, by default, reachable by **any** authenticated user with API
+  access. To put a *specific* permission on it, **enforce it inside the controller/service**
+  (see "Worker-side system-permission check" below — inject `CerbosPermissionResolver` and
+  check `profile_system_permission`).
+- **New top-level path**: a brand-new `/api/<x>/**` segment must be registered as a static
+  route in `kelta-gateway/.../service/RouteConfigService.registerStaticRoutes()` (and
+  `config/RouteInitializer.registerStaticRoutes()`) or the gateway returns **404**. Sub-paths
+  under an existing segment need no new route.
+
+**Worker-side system-permission check — how (use the existing pattern, don't reinvent):**
+- Enforce a specific system permission **in the controller/service** with a DB lookup against
+  `profile_system_permission` (`profile_id`, `permission_name`, `granted = true`). The reusable
+  callable building block is `BootstrapRepository.findProfileSystemPermissions(profileId)` (also
+  used by `UserPermissionsController`); `SupersetGuestTokenService.hasSystemPermission` shows the
+  same query inline but is `private` — copy the pattern, don't call it. On deny, throw
+  `ResponseStatusException(HttpStatus.FORBIDDEN, …)` (existing admin controllers tend to *degrade*
+  on missing identity rather than hard-deny, so write the explicit deny yourself). The worker
+  does **not** make a Cerbos call for system permissions — Cerbos `system_feature` policies back
+  the *gateway's* blanket `API_ACCESS` check; per-endpoint admin gating is the DB check above.
+- Identity: inject **`CerbosPermissionResolver`** and read `getProfileId(request)`,
+  `getEmail(request)`, `getProfileName(request)`, `getTenantId(request)`, `hasIdentity(request)`.
+  The gateway's `RouteAuthorizationFilter.forwardWithHeaders` sets `X-User-Profile-Id`,
+  `X-User-Email`, `X-User-Profile-Name`, `X-Cerbos-Scope` on **every** forwarded request —
+  including `/api/admin/**` — so `profileId` **is** available; don't re-resolve it.
+- Permission **names** are `profile_system_permission.permission_name` values; the canonical
+  catalog lives in the frontend `SystemPermissionChecklist.tsx` (`VIEW_SETUP`, `MANAGE_USERS`,
+  `API_ACCESS`, `VIEW_ALL_DATA`, …) — no Java enum. A new permission only gates once it is
+  granted on the relevant profiles (rows in `profile_system_permission`).
+
+### Tenant context in the worker
+
+Per-request tenant is **already bound** by `kelta-worker/.../filter/TenantContextFilter` from
+the gateway's `X-Tenant-ID` / `X-Tenant-Slug` headers (as `ScopedValue`s). In a worker
+controller, **read** `TenantContext` (or accept `@RequestHeader("X-Tenant-ID")`) — do **not**
+call `TenantContext.runWithTenant(...)` on a request path; that's for background / cross-tenant
+jobs. RLS then scopes every query automatically.
 
 ## Worker Layers
 
@@ -67,7 +126,7 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 
 - **Model**: CollectionDefinition, FieldDefinition, FieldType, ReferenceConfig, ValidationRules — `runtime-core/.../model/`
 - **Query Engine**: DefaultQueryEngine — pagination, sorting, filtering, field selection, virtual fields — `runtime-core/.../query/`
-- **Storage**: PhysicalTableStorageAdapter — PostgreSQL with dynamic schema — `runtime-core/.../storage/`
+- **Storage**: `StorageAdapter` SPI — `DispatchingStorageAdapter` (`@Primary`) routes each op to the adapter backing the target collection, keyed by `storageConfig().adapterConfig().get("adapterType")` (absent/unknown → `PhysicalTableStorageAdapter`, the PostgreSQL dynamic-schema default). External backends implement the `ExternalStorageAdapter` marker (so the dispatcher can collect them as `List<ExternalStorageAdapter>` without a circular bean ref) and override `storageType()`. Consumers that inject `PhysicalTableStorageAdapter` concretely (e.g. unique-constraint checks) bypass routing. `ExternalRestStorageAdapter` (`storageType=external-rest`) maps CRUD/query to a remote REST API over the tiny injectable `RestExecutor` HTTP seam (config in `adapterConfig`: `baseUrl`/`path`/`dataPath`/`idAttribute`/`bearerToken`); pagination + sort + `EQ` filters push down best-effort. `ExternalJdbcStorageAdapter` (`storageType=external-jdbc`) maps CRUD/query to SQL on a foreign table via an injectable `ExternalJdbcConnectionProvider` (config: `jdbcUrl`/`table`/`idColumn`); values bind as params and all identifiers are pattern-validated before interpolation. — `runtime-core/.../storage/`
 - **Flow Engine**: Flow execution, node processing, branching — `runtime-core/.../flow/`
 - **Modules**: Action handlers (CreateRecord, UpdateRecord, QueryRecords, DeleteRecord, TriggerFlow, Decision, LogMessage) — `runtime-module-core/.../module/core/`
 
@@ -81,7 +140,7 @@ Key files: `kelta-gateway/src/main/java/io/kelta/filter/`
 
 ### Component layering — admin app vs. plugin library
 
-`kelta-ui/app/src/components/` and `kelta-web/packages/components/src/` have grown overlapping families of components (data tables, filter builders, field renderers, forms). The consolidation strategy — which variant becomes the base, what features fold in, dependency order, and breaking-change risk for the public `@kelta/components` plugin API — is tracked in `.claude/docs/ui-consolidation-plan.md`. Consult that document before adding a new shared list/form/filter component on either side; reuse a unified component or extend it rather than forking a new variant.
+`kelta-ui/app/src/components/` and `kelta-web/packages/components/src/` have grown overlapping families of components (data tables, filter builders, field renderers, forms). The rule (see `conventions.md` → Component reuse): **reuse the unified `@kelta/components` variant or extend it — never fork a new app-side variant.** This protects the public `@kelta/components` plugin API. Consult `conventions.md` before adding a new shared list/form/filter component on either side.
 
 ## Data Flow
 
@@ -108,6 +167,40 @@ precedence; request-supplied entries fill the gaps. This keeps a stable
 "follow-up by id" shape for `create_record` / `update_record` callers so they
 don't need a second GET to discover related-record IDs.
 
+**Read-side include resolution** — `GET /api/{collection}[/{id}]?include=<name>`
+on `DynamicCollectionRouter#resolveIncludes` follows three resolution paths
+per include name, in order: (1) collection-name has-many — the named
+collection has an FK pointing to the primary; (2) collection-name belongs-to —
+the primary has FK(s) pointing to the named collection (covers `created_by` /
+`updated_by` → `users`); (3) **field-name lookup** — the include name is a
+field on the primary collection with a non-null `referenceConfig`. The
+field-name path covers both LOOKUP-typed fields and the legacy
+"STRING-with-refConfig" form where the FK UUID is stored on `attributes`
+(e.g. `availability.attributes.title`); it injects `relationships.<field>.data
+= { type, id }` on each primary resource and hydrates the referenced rows
+into top-level `included[]`. The raw UUID stays on `attributes` for
+back-compat. FK values are deduplicated before the single `id IN (…)` query
+to the target collection. A separate **transitive pass** then resolves
+grandchild includes via already-resolved direct children (e.g.
+`page-layouts ?include=layout-sections,layout-fields` queries `layout-fields`
+by `sectionId IN (section ids)` after `layout-sections` resolves directly).
+Includes are skipped silently when the target is unresolvable — `200` with
+no `included` entry — never `5xx`.
+
+**Read-side field-level security** — `CerbosFieldSecurityAdvice`
+(`@ControllerAdvice`, order 10, after record-level authz) strips fields the
+caller cannot `read` from outgoing JSON:API responses. For the primary `data`
+and every `included[]` resource (grouped by type — JSON:API flattens all
+include depths into one array, so one batched Cerbos check per type covers
+them), it removes denied keys from **both** `attributes` and **to-one
+`relationships`** (lookup / master-detail fields are serialized into
+`relationships.<field>.data = { type, id }`, so an attributes-only strip would
+leak a hidden FK's id). Has-many inverse relationships (`data` is a list) are
+not collection fields and are preserved. System audit fields (`createdAt`,
+`updatedAt`, `createdBy`, `updatedBy`) are never stripped; `meta` (pagination)
+is untouched. Metadata/admin paths (`/api/collections`, `/api/admin/**`, etc.)
+are skipped. Gated by `kelta.gateway.security.permissions-enabled`.
+
 **Pagination contract** — every paginated REST endpoint uses JSON:API
 bracket syntax (`page[number]` / `page[size]`). Parsing lives in
 `runtime-core/.../query/Pagination.fromParams`, which clamps `page[size]`
@@ -116,10 +209,12 @@ the absolute constructor ceiling that internal services (report execution,
 data export, include resolution) build `Pagination` records against
 directly. When the caller's `page[size]` exceeds the cap,
 `DynamicCollectionRouter.toJsonApiListResponse` echoes the modification as
-`metadata.requestedPageSize=<caller value>` and `metadata.pageSizeClamped=true`
+`meta.requestedPageSize=<caller value>` and `meta.pageSizeClamped=true`
 so clients can detect the clamp without inferring it from `data.length`
-vs. `metadata.pageSize` — preventing the "200 + populated `totalCount` +
-empty `data`" misread that previously cost debugging time. List responses
+vs. `meta.pageSize` — preventing the "200 + populated `totalCount` +
+empty `data`" misread that previously cost debugging time. The same map
+is also emitted under the legacy top-level `metadata` key (deprecated
+alias retained for backward compatibility with pre-`meta` clients). List responses
 also carry a `links` block (`self` / `prev` / `next`) built by
 `runtime-jsonapi/.../PaginationLinks#build`; URLs are relative paths so
 cached system-collection responses remain reusable across hosts and behind
@@ -187,6 +282,11 @@ controller after the mutation rather than via the BeforeSaveHook registry.
 | TenantContext | ThreadLocal tenant isolation | `runtime-core/.../context/TenantContext.java` |
 | BootstrapConfig | Gateway startup config (collections, routes, limits) | `kelta-gateway/.../config/BootstrapConfig.java` |
 | CompositeUniqueConstraintService | Issues `CREATE UNIQUE INDEX` over multi-column tuples; constraint state lives in Postgres (no separate registry) | `runtime-core/.../storage/CompositeUniqueConstraintService.java` |
+| MetadataDependencyService | Builds a per-tenant metadata dependency graph on demand (collections/fields/flows/layouts/rules/record-types/list-views/constraints/perms) for impact analysis + cycle detection; not persisted, so always current. Endpoints: `GET /api/metadata/impact`, `GET /api/metadata/graph`, `POST /api/metadata/deployment-plan`. The deployment plan topologically orders a change set (`MetadataDependencyGraph.topologicalOrder`, Kahn — a node's dependencies precede it) so it can be applied safely; nodes in a cycle are flagged, not ordered. Edge direction: from dependent → dependency | `kelta-worker/.../service/MetadataDependencyService.java`, `.../dependency/MetadataDependencyGraph.java` |
+| EmbeddingService | SPI turning text → a fixed-dimension normalized vector for semantic search over `VECTOR` fields. Default `HashingEmbeddingService` (feature-hashing, dependency-free, deterministic) is registered `@ConditionalOnMissingBean` so a deployment can plug in an external/local embedding model. `toVectorLiteral` renders a pgvector `[...]` literal for `<=>` queries | `runtime-core/.../embedding/EmbeddingService.java`, `.../embedding/HashingEmbeddingService.java` |
+| ConfigHealthAnalyzer | Scans a tenant's config for anti-patterns via pluggable `HealthRule` beans (circular master-detail — reuses the dependency graph; collections without layouts/fields; orphan fields; flows without error handling; over-permissive profiles) and returns a 0–100 score + findings. On-demand, read-only. Endpoint: `GET /api/config-health` | `kelta-worker/.../health/ConfigHealthAnalyzer.java`, `.../health/rule/*` |
+| PageRenderService | Resolves a published custom page to a **versioned render contract** (`PageRenderContract{version,slug,title,path,variables,dataSources,tree}` — `version "2.0"`, slice 1g) for the end-user shell. Looks up the `ui-pages` record by `slug` that is `published`+`active` in the tenant (via `QueryEngine`; RLS-scoped) and **projects its `config` JSON** as a **pure pass-through**: `tree` is the whole `config` map verbatim (FE reads `tree.components`), and the page-level `variables`/`dataSources` are surfaced as sibling fields (empty for legacy pages). **It resolves no `$bind` bindings and executes no `dataSources` server-side** — that would fetch records outside the JSON:API path and bypass Cerbos/FLS; the client resolves them over the authorized API. Draft/unknown slugs → 404. Endpoint: `GET /api/pages/{slug}/render` (gateway static route `/api/pages/**`). **Authz:** published+active+tenant is the base visibility gate. **Per-page restriction (slice 1h):** a page may set `config.access.requiredPermission` — `render(slug, profileId)` then checks that system permission via `BootstrapRepository.findProfileSystemPermissions(profileId)` (the **same in-controller `profile_system_permission` DB lookup `/api/admin/**` controllers use — NOT a Cerbos PDP call**); `profileId` is resolved by `CerbosPermissionResolver.getProfileId` from the gateway-forwarded `X-User-Profile-Id`. A denial returns `Optional.empty()` → **404, not 403** (deliberate: routed through the same branch as an unknown slug so a restricted page's existence is not leaked). Absent key ⇒ no permission lookup, behavior unchanged | `kelta-worker/.../service/PageRenderService.java`, `.../controller/PageRenderController.java` |
+| ChangesService (offline sync, Rec 2B) | Offline-sync changes feed: `GET /api/{collection}/_changes?since=<ISO>` returns record **deletions** since the cursor + a fresh cursor. Deletions come from `record_tombstone` (V143), written by the wildcard `RecordTombstoneHook` (after-delete, user collections only) — so the hot delete path keeps hard-delete semantics (no soft-delete). **Upserts** are fetched by the client via the normal `GET /api/{collection}?filter[updatedAt][gt]=<cursor>&sort=updatedAt` (reuses the authorized, FLS-enforced filter path). `_changes` is a literal sub-path under the collection's existing route — no new gateway route | `kelta-worker/.../service/ChangesService.java`, `.../controller/ChangesController.java`, `.../listener/RecordTombstoneHook.java` |
 
 ### Unique constraints
 
@@ -227,6 +327,30 @@ small). The MCP `add_field` tool exposes a top-level `dimension` argument
 that the gateway stamps into `fieldTypeConfig`. Until pgvector is
 provisioned on a tenant DB, `CREATE TABLE` / `ALTER TABLE` for a VECTOR
 column will fail at execution time — there is no startup probe.
+
+**Governed agent runtime authz + audit.** `AgentRuntimeService` (kelta-ai) runs an
+agent as a bounded tool-use loop. Authorization is layered: the agent definition
+fixes the *allowed tool subset* (the loop offers only those and refuses any other
+even if requested); each tool then calls the worker carrying the **invoking user's**
+`X-User-Id` (runs require it), so the worker's per-record Cerbos + FLS advice applies
+downstream — the agent never exceeds its caller's permissions. Every run, including
+refusals (disabled agent, exhausted monthly quota), is written to `ai_agent_execution`
+with its tool-call trace, token usage and status, surfaced at
+`GET /api/ai/agents/{id}/executions`. Tool results are passed through
+`PiiMaskingService` (email / SSN / 16-digit card / NANP phone → `[REDACTED_*]`)
+before they reach the model or the audit trail — platform data the agent pulls is
+masked; the caller's own prompt is not.
+
+**Embed-on-write.** A VECTOR field may also carry `fieldTypeConfig` key
+`"embeddingSource"` naming a text field on the same collection. The wildcard
+`EmbeddingOnWriteHook` (worker, before-save, order 120) then auto-populates the
+vector on create/update: it embeds the source text with the configured
+`EmbeddingService` and writes the pgvector literal. It is a no-op unless the
+source field is present in the payload (so partial updates that don't touch the
+source keep the existing vector), respects a caller-supplied vector (no
+overwrite), and skips with a warning if the field's `dimension` differs from the
+provider's `dimensions()`. Without `embeddingSource`, vectors must be written
+explicitly by the caller.
 
 ### Email template resolution — tenant override → system default
 
@@ -315,9 +439,11 @@ that user-facing config to the `scheduled_job` table (which the
 
 ## CI/CD
 
-- **PR checks** (`.github/workflows/ci.yml`): test-java (build runtime + test gateway, worker) + test-frontend → quality-gate
-- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): test → build-and-push (gateway, worker, UI images) → deploy → smoke-test
-- Custom K8s runner for CI
+Canonical detail: [`ci-cd.md`](ci-cd.md). Summary:
+
+- **PR checks** (`.github/workflows/ci.yml`): change-detection → test-java (build runtime + test gateway, worker, auth, ai, mcp) + test-frontend + integration-tests (Testcontainers) + e2e (Playwright) → quality-gate.
+- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): test → build-and-push to `harbor.rzware.com/emf/emf-*` (gateway, worker, worker-migrate, auth, ui, ai, mcp) → deploy (kustomize → ArgoCD) → smoke-test → auto-rollback on failure → post-deploy e2e.
+- Custom self-hosted K8s runner for CI.
 
 ## Kubernetes
 

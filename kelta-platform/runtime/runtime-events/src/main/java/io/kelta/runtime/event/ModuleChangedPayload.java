@@ -1,7 +1,7 @@
 package io.kelta.runtime.event;
 
 /**
- * Payload for module lifecycle change events published to Kafka.
+ * Payload for module lifecycle change events published to NATS.
  * Propagates module install/enable/disable/uninstall events to all worker pods.
  *
  * @since 1.0.0

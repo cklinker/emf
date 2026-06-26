@@ -46,6 +46,14 @@ export default defineConfig({
       // different React module instance than the test renderer's React.
       react: resolve(__dirname, 'node_modules/react'),
       'react-dom': resolve(__dirname, 'node_modules/react-dom'),
+      // Same singleton requirement for react-router (mirrors vite.config.ts'
+      // dedupe): @kelta/components' Navigation calls router hooks
+      // (useNavigate/useLocation). A duplicate router copy reads a different
+      // (null) NavigationContext via @kelta/components' hoisted React and
+      // throws "Cannot read properties of null (reading 'useContext')". Forcing
+      // the app's copy keeps one router context for the Navigation widget tests.
+      'react-router-dom': resolve(__dirname, 'node_modules/react-router-dom'),
+      'react-router': resolve(__dirname, 'node_modules/react-router'),
     },
   },
 })

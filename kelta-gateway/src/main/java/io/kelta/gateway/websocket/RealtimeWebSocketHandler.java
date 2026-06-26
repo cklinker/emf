@@ -22,7 +22,7 @@ import java.util.Map;
  * WebSocket handler for realtime record change subscriptions.
  *
  * <p>Authenticates connections via JWT query parameter, processes subscribe/unsubscribe
- * messages, and delivers Kafka-bridged events to subscribed sessions.
+ * messages, and delivers NATS-bridged events to subscribed sessions.
  *
  * @since 1.0.0
  */

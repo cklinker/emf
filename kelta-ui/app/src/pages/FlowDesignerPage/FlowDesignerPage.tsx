@@ -6,6 +6,7 @@ import type { Node, Edge } from '@xyflow/react'
 
 import { useApi } from '../../context/ApiContext'
 import type { CreateFlowRequest } from '@kelta/sdk'
+import { unwrapResource } from '../../utils/jsonapi'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
 import { FlowToolbar } from './components/FlowToolbar'
@@ -156,13 +157,14 @@ export function FlowDesignerPage() {
         body: JSON.stringify({ state, test: true }),
       })
       if (!resp.ok) throw new Error('Failed to start test execution')
-      return (await resp.json()) as { executionId: string }
+      // JSON:API envelope ({ data: { type: 'flow-executions', id, attributes } }) — id is `data.id`.
+      return unwrapResource<{ id: string }>(await resp.json())
     },
     onSuccess: (data) => {
-      if (data?.executionId) {
+      if (data?.id) {
         showToast('Test execution started', 'success')
         setTestDialogOpen(false)
-        handleViewExecution(data.executionId)
+        handleViewExecution(data.id)
       }
     },
     onError: (err: Error) => {

@@ -1,11 +1,56 @@
+import { webcrypto } from 'node:crypto'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+
+// vite-plugin-pwa (Workbox) hashes precache entries with the Web Crypto API.
+// Node 18 — the version the kelta-ui Docker image builds with — does not expose
+// `crypto` as a global, so `npx vite build` throws "ReferenceError: crypto is not
+// defined" once the PWA plugin runs. Polyfill it for the build process.
+if (!globalThis.crypto) {
+  globalThis.crypto = webcrypto as unknown as Crypto
+}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    // Progressive Web App: installable end-user shell + offline app-shell precache.
+    // Read-only first (Rec 2A) — API requests stay network-only (no runtimeCaching for
+    // /api): offline *data* (IndexedDB replica + outbox) is the separate Rec 2B slice.
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg', 'logo.svg'],
+      manifest: {
+        name: 'Kelta',
+        short_name: 'Kelta',
+        description: 'Kelta application platform',
+        theme_color: '#0f172a',
+        background_color: '#ffffff',
+        display: 'standalone',
+        start_url: '/',
+        icons: [{ src: 'logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        // The app's main bundle is a few MB; raise the precache size limit so it's cached
+        // for offline use (default is 2 MiB). Code-splitting to shrink it is a separate task.
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        // SPA fallback to index.html for client routes, but never for backend paths.
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [
+          /^\/api/,
+          /^\/control/,
+          /^\/internal/,
+          /^\/actuator/,
+          /^\/openapi/,
+        ],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -1,6 +1,7 @@
 package io.kelta.auth.controller;
 
 import io.kelta.auth.federation.DynamicClientRegistrationRepository;
+import io.kelta.auth.federation.DynamicRelyingPartyRegistrationRepository;
 import io.kelta.auth.service.AuthDomainResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,9 +12,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistrationRepository;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -42,6 +45,15 @@ class LoginControllerTest {
         lenient().when(domainResolver.resolveTenantSlug(anyString())).thenReturn(Optional.empty());
     }
 
+    /** An ObjectProvider yielding the given SAML repo (or none when null). */
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<RelyingPartyRegistrationRepository> samlProvider(
+            RelyingPartyRegistrationRepository repo) {
+        ObjectProvider<RelyingPartyRegistrationRepository> provider = mock(ObjectProvider.class);
+        lenient().when(provider.getIfAvailable()).thenReturn(repo);
+        return provider;
+    }
+
     @Nested
     @DisplayName("With DynamicClientRegistrationRepository")
     class WithDynamicRepo {
@@ -50,7 +62,7 @@ class LoginControllerTest {
 
         @BeforeEach
         void setUp() {
-            controller = new LoginController(dynamicRepo, domainResolver);
+            controller = new LoginController(dynamicRepo, domainResolver, samlProvider(null));
         }
 
         @Test
@@ -143,6 +155,47 @@ class LoginControllerTest {
     }
 
     @Nested
+    @DisplayName("With SAML federation")
+    class WithSamlRepo {
+        @Mock private ClientRegistrationRepository oidcRepo; // plain → OIDC branch skipped
+        @Mock private DynamicRelyingPartyRegistrationRepository samlRepo;
+        private LoginController controller;
+
+        @BeforeEach
+        void setUp() {
+            controller = new LoginController(oidcRepo, domainResolver, samlProvider(samlRepo));
+        }
+
+        @Test
+        void shouldLoadSamlProvidersWhenTenantInSession() {
+            when(session.getAttribute("tenantId")).thenReturn("tenant-9");
+            when(samlRepo.findButtonsByTenantId("tenant-9")).thenReturn(List.of(
+                    new DynamicRelyingPartyRegistrationRepository.SamlButton("tenant-9:saml-1", "Acme IdP")));
+
+            Model model = new ConcurrentModel();
+            String view = controller.login(model, request);
+
+            assertThat(view).isEqualTo("login");
+            @SuppressWarnings("unchecked")
+            var providers = (List<LoginController.SsoProviderInfo>) model.getAttribute("samlProviders");
+            assertThat(providers).hasSize(1);
+            assertThat(providers.get(0).registrationId()).isEqualTo("tenant-9:saml-1");
+            assertThat(providers.get(0).name()).isEqualTo("Acme IdP");
+        }
+
+        @Test
+        void shouldNotAddSamlProvidersWhenNoTenant() {
+            when(session.getAttribute("tenantId")).thenReturn(null);
+            when(request.getParameter("tenant")).thenReturn(null);
+
+            Model model = new ConcurrentModel();
+            controller.login(model, request);
+
+            assertThat(model.containsAttribute("samlProviders")).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("With plain ClientRegistrationRepository")
     class WithPlainRepo {
         @Mock private ClientRegistrationRepository plainRepo;
@@ -150,7 +203,7 @@ class LoginControllerTest {
 
         @BeforeEach
         void setUp() {
-            controller = new LoginController(plainRepo, domainResolver);
+            controller = new LoginController(plainRepo, domainResolver, samlProvider(null));
         }
 
         @Test

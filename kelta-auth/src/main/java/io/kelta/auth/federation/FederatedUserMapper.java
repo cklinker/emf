@@ -5,9 +5,11 @@ import tools.jackson.databind.ObjectMapper;
 import io.kelta.auth.model.KeltaUserDetails;
 import io.kelta.auth.service.WorkerClient;
 import io.kelta.auth.service.WorkerClient.OidcProviderInfo;
+import io.kelta.auth.service.WorkerClient.SamlProviderInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.saml2.provider.service.authentication.Saml2AuthenticatedPrincipal;
 import io.kelta.crypto.EncryptionService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
@@ -74,24 +76,75 @@ public class FederatedUserMapper {
         String firstName = extractFirstName(oidcUser, displayName);
         String lastName = extractLastName(oidcUser, displayName);
 
-        // Resolve profile from groups, falling back to the "Minimum Access"
-        // seed profile so unmapped federated users can still log in.
+        // Resolve profile from groups (fallback to Minimum Access happens in the
+        // shared provisioning tail).
         List<String> groups = extractGroups(oidcUser, provider.groupsClaim());
         String profileId = resolveProfileFromGroups(groups, provider.groupsProfileMapping(), tenantId);
+
+        log.info("Federated user mapping (OIDC): email={} groups={} profileId={} tenant={}",
+                email, groups, profileId, tenantId);
+
+        return provisionAndBuild(email, firstName, lastName, displayName, profileId, tenantId);
+    }
+
+    /**
+     * Maps a validated SAML 2.0 assertion principal to an internal
+     * {@link KeltaUserDetails} via the same JIT provisioning used for OIDC.
+     *
+     * <p>Email is read from the provider's configured {@code emailAttribute}
+     * (falling back to common attribute names and finally the NameID). If the
+     * provider configures a {@code profileAttribute}, its value is treated as a
+     * profile <em>name</em> and resolved to a profile ID; otherwise the shared
+     * tail assigns the seeded {@value #FALLBACK_PROFILE_NAME} profile.
+     *
+     * @param principal the authenticated SAML principal (assertion attributes)
+     * @param tenantId  the tenant this user belongs to
+     * @param provider  the SAML provider config (for attribute mappings)
+     * @return KeltaUserDetails for token minting, or empty if provisioning failed
+     */
+    public Optional<KeltaUserDetails> mapSamlUser(Saml2AuthenticatedPrincipal principal,
+                                                  String tenantId, SamlProviderInfo provider) {
+        String email = resolveSamlEmail(principal, provider);
+        if (email == null) {
+            log.warn("No email found in SAML assertion for provider {}", provider.id());
+            return Optional.empty();
+        }
+
+        String firstName = firstAttribute(principal, "firstName", "givenName",
+                "urn:oid:2.5.4.42", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname");
+        String lastName = firstAttribute(principal, "lastName", "surname", "sn",
+                "urn:oid:2.5.4.4", "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname");
+        String displayName = firstAttribute(principal, "displayName", "name", "cn");
+        if (displayName == null) {
+            displayName = joinName(firstName, lastName, email);
+        }
+
+        String profileId = resolveSamlProfile(principal, provider, tenantId);
+
+        log.info("Federated user mapping (SAML): email={} profileId={} tenant={}",
+                email, profileId, tenantId);
+
+        return provisionAndBuild(email, firstName, lastName, displayName, profileId, tenantId);
+    }
+
+    /**
+     * Shared JIT provisioning + KeltaUserDetails construction for both OIDC and
+     * SAML federation. Applies the {@value #FALLBACK_PROFILE_NAME} fallback when
+     * no profile was resolved, JIT-provisions the user, sends the invite email on
+     * first creation, and enforces the PENDING_ACTIVATION / ACTIVE status gates.
+     */
+    private Optional<KeltaUserDetails> provisionAndBuild(String email, String firstName, String lastName,
+                                                         String displayName, String profileId, String tenantId) {
         if (profileId == null) {
             profileId = workerClient.findProfileByName(FALLBACK_PROFILE_NAME, tenantId)
                     .map(WorkerClient.ProfileInfo::id)
                     .orElse(null);
             if (profileId != null) {
-                log.info("No group-based profile match for email={} — assigning {} fallback",
+                log.info("No mapped profile for email={} — assigning {} fallback",
                         email, FALLBACK_PROFILE_NAME);
             }
         }
 
-        log.info("Federated user mapping: email={} groups={} profileId={} tenant={}",
-                email, groups, profileId, tenantId);
-
-        // JIT provision the user
         Optional<WorkerClient.JitProvisionResult> result =
                 workerClient.jitProvisionUser(email, tenantId, firstName, lastName, profileId);
 
@@ -138,6 +191,63 @@ public class FederatedUserMapper {
                 false, // not locked
                 false  // forceChangePassword is never true for SSO
         ));
+    }
+
+    private String resolveSamlEmail(Saml2AuthenticatedPrincipal principal, SamlProviderInfo provider) {
+        if (provider.emailAttribute() != null && !provider.emailAttribute().isBlank()) {
+            String mapped = principal.getFirstAttribute(provider.emailAttribute());
+            if (mapped != null && !mapped.isBlank()) {
+                return mapped;
+            }
+        }
+        String common = firstAttribute(principal, "email", "emailAddress", "mail",
+                "urn:oid:0.9.2342.19200300.100.1.3",
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress");
+        if (common != null) {
+            return common;
+        }
+        // Last resort: the NameID is frequently the user's email (emailAddress format).
+        String nameId = principal.getName();
+        return (nameId != null && nameId.contains("@")) ? nameId : null;
+    }
+
+    private String resolveSamlProfile(Saml2AuthenticatedPrincipal principal,
+                                      SamlProviderInfo provider, String tenantId) {
+        if (provider.profileAttribute() == null || provider.profileAttribute().isBlank()) {
+            return null;
+        }
+        String profileName = principal.getFirstAttribute(provider.profileAttribute());
+        if (profileName == null || profileName.isBlank()) {
+            return null;
+        }
+        return workerClient.findProfileByName(profileName, tenantId)
+                .map(WorkerClient.ProfileInfo::id)
+                .orElseGet(() -> {
+                    log.warn("SAML profileAttribute resolved to profile '{}' not present in tenant {}",
+                            profileName, tenantId);
+                    return null;
+                });
+    }
+
+    /** Returns the first non-blank attribute value among the given candidate names. */
+    private String firstAttribute(Saml2AuthenticatedPrincipal principal, String... names) {
+        for (String name : names) {
+            String value = principal.getFirstAttribute(name);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String joinName(String firstName, String lastName, String fallback) {
+        if (firstName != null && lastName != null) {
+            return firstName + " " + lastName;
+        }
+        if (firstName != null) {
+            return firstName;
+        }
+        return fallback;
     }
 
     private String extractClaim(OidcUser oidcUser, String configuredClaim, String defaultClaim) {

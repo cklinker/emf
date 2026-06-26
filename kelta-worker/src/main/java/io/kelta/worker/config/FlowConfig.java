@@ -294,6 +294,16 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.UIPageSlugHook uiPageSlugHook(
+            BeforeSaveHookRegistry hookRegistry,
+            JdbcTemplate jdbcTemplate) {
+        io.kelta.worker.listener.UIPageSlugHook hook =
+                new io.kelta.worker.listener.UIPageSlugHook(jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public FieldConfigEventPublisher fieldConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher,
@@ -446,6 +456,16 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.UIPageConfigEventPublisher uiPageConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.UIPageConfigEventPublisher hook =
+                new io.kelta.worker.listener.UIPageConfigEventPublisher(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public LayoutSectionRefreshHook layoutSectionRefreshHook(
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher) {
@@ -498,11 +518,44 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.AttachmentCleanupHook attachmentCleanupHook(
+            BeforeSaveHookRegistry hookRegistry,
+            JdbcTemplate jdbcTemplate,
+            io.kelta.worker.service.S3StorageService storageService) {
+        io.kelta.worker.listener.AttachmentCleanupHook hook =
+                new io.kelta.worker.listener.AttachmentCleanupHook(jdbcTemplate, storageService);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public io.kelta.worker.listener.RecordTombstoneHook recordTombstoneHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.repository.RecordTombstoneRepository tombstoneRepository,
+            CollectionRegistry collectionRegistry) {
+        io.kelta.worker.listener.RecordTombstoneHook hook =
+                new io.kelta.worker.listener.RecordTombstoneHook(tombstoneRepository, collectionRegistry);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public RecordTypeEnforcementHook recordTypeEnforcementHook(
             BeforeSaveHookRegistry hookRegistry,
             JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper) {
         RecordTypeEnforcementHook hook = new RecordTypeEnforcementHook(jdbcTemplate, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public io.kelta.worker.listener.EmbeddingOnWriteHook embeddingOnWriteHook(
+            BeforeSaveHookRegistry hookRegistry,
+            CollectionRegistry collectionRegistry,
+            io.kelta.runtime.embedding.EmbeddingService embeddingService) {
+        io.kelta.worker.listener.EmbeddingOnWriteHook hook =
+                new io.kelta.worker.listener.EmbeddingOnWriteHook(collectionRegistry, embeddingService);
         hookRegistry.register(hook);
         return hook;
     }

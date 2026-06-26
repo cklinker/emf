@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 
  * This test extends IntegrationTestBase and tests against the actual running Docker services,
  * not mocked backends. It validates the complete integration of all platform components:
- * Gateway, Control Plane, Sample Service, Keycloak, PostgreSQL, Redis, and Kafka.
+ * Gateway, Control Plane, Sample Service, Keycloak, PostgreSQL, Redis, and NATS.
  * 
  * Validates: Requirements 10.1-10.8
  */

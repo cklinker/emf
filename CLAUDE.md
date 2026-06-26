@@ -1,55 +1,321 @@
-# Kelta Enterprise Platform
+# Kelta Platform — AI Agent Guide
 
-Multi-tenant enterprise platform with configurable objects and workflows. All changes require a PR — never commit directly to `main`.
+Multi-tenant, metadata-driven enterprise application platform. Collections (tables),
+fields, relationships, validation, security, and workflows are all defined and changed
+**at runtime** — no redeploy. This file is the entry point for an AI agent writing or
+maintaining code here. Deep detail lives in the reference docs indexed at the bottom;
+read the relevant one before substantial work in its area.
 
-## Project Structure
+> Global rules in `~/.claude/CLAUDE.md` also apply (never commit to `main`, branch +
+> PR, conventional commits). This file is source-verified against the codebase; if code
+> and this doc disagree, **trust the code and fix this doc**.
+
+---
+
+## Agent Operating Procedure (start here)
+
+Follow this loop on every task — without being prompted:
+
+1. **Classify the task** → open the matching recipe in [`.claude/docs/playbooks.md`](.claude/docs/playbooks.md) (flow action handler, worker endpoint, admin UI page, MCP tool, system collection, field type). It lists the exact files + registration steps.
+2. **Check reality** → [`.claude/docs/status.md`](.claude/docs/status.md): is the subsystem Complete, a UI-only stub, or already built? Don't rebuild what exists; don't assume a 🔴 stub works end-to-end.
+3. **Check hazards** → [`.claude/docs/concerns.md`](.claude/docs/concerns.md): is a file you'll touch fragile or oversized? Plan around it.
+4. **Read the local map** → the `CLAUDE.md` of the module you're editing (e.g. `kelta-worker/CLAUDE.md`) + the relevant reference doc.
+5. **Plan**, then **implement** following existing patterns (Critical Rules below + `conventions.md`). Don't invent when a pattern exists.
+6. **Test** — unit tests for new logic; Playwright e2e for new UI/feature behavior.
+7. **Update docs in the same change** — see [Keeping Docs Current](#keeping-docs-current-mandatory-every-pr).
+8. **`/verify`** until fully green.
+9. **Commit** (conventional) + **`/pr`**.
+
+Then run the **Definition of Done** check (in Task Workflow) before declaring done.
+
+---
+
+## Critical Rules (do not violate)
+
+1. **Multi-pod NATS config rule.** Never mutate an in-memory registry/cache on one pod
+   only. Any change to configuration data (collections, fields, layouts, flows,
+   features, domains, credentials) MUST be broadcast via NATS JetStream so every pod
+   refreshes. Pattern:
+   - Add a `BeforeSaveHook` for the system collection (in `kelta-worker/.../listener/`).
+   - In `afterCreate`/`afterUpdate`/`afterDelete`, publish via `PlatformEventPublisher`
+     to a `kelta.config.<resource>.changed.<id>` subject.
+   - All pods consume it (registered in `NatsSubscriptionConfig`) and refresh local state.
+   - **Never** call `lifecycleManager.refreshX()` from a hook *as a substitute* for the
+     broadcast — that leaves other pods stale.
+   - **Read-after-write exception (#910):** a hook MAY *additionally* call
+     `CollectionLifecycleManager.refreshOrInitializeLocally(...)` for same-pod
+     consistency — **only when it also publishes the NATS event**.
+   Reference impl: `kelta-worker/.../listener/CollectionConfigEventPublisher.java`,
+   `FieldConfigEventPublisher.java`.
+
+2. **Persistence is JDBC, not JPA.** This codebase does **not** use Spring Data JPA,
+   `@Entity`, or a `BaseEntity` base class for service data. Models are **Java records**;
+   repositories use **`JdbcTemplate` with hand-written SQL** (see `kelta-ai/.../repository/`,
+   `kelta-worker/.../repository/`). `runtime-core` defines the metadata model as records
+   (`CollectionDefinition`, `FieldDefinition`, `FieldType`). User-collection *data* tables
+   are created dynamically by `PhysicalTableStorageAdapter`, not mapped entities. Match the
+   surrounding repository idiom; do not introduce JPA.
+
+3. **Tenant isolation is mandatory.** Every data path runs under a tenant. Use
+   `TenantContext.runWithTenant(...)` / `callWithTenant(...)` (ScopedValue, virtual-thread
+   safe). Cross-tenant/system work uses `TenantContext.runAsPlatform(...)`. Postgres RLS
+   enforces it via the transaction-scoped `app.current_tenant_id` (PgBouncer-safe).
+   Never bypass with raw queries that drop the tenant filter.
+
+4. **Never commit to `main`.** Feature branch + PR + `/verify` green before review.
+
+5. **Security tasks are never auto-merged.** See `SECURITY.md`.
+
+6. **Docs are part of the change — keep them current in the SAME PR.** If your change
+   alters anything documented here, update the relevant doc in the same commit. A PR that
+   changes behavior but not its docs is incomplete. Never let this file or the reference
+   docs drift from the code. See **Keeping Docs Current** below for the change→doc map.
+
+---
+
+## Module Map
 
 ```
-kelta-platform/runtime/runtime-core   # Core runtime library (models, query, storage, flows)
-kelta-platform/runtime/runtime-events # Shared event classes (PlatformEvent<T>)
-kelta-platform/runtime/runtime-jsonapi # JSON:API response formatting
-kelta-platform/runtime/runtime-module-core # CRUD action handlers
-kelta-gateway                         # Spring Cloud Gateway (auth, routing, rate limiting)
-kelta-auth                            # Internal OIDC provider, identity brokering, MFA
-kelta-worker                          # Worker service (owns DB migrations, workflow exec)
-kelta-ai                              # AI assistant service (Anthropic Claude integration)
-kelta-web                             # Frontend SDK monorepo (sdk, components, plugin-sdk)
-kelta-ui/app                          # Admin/builder UI (React/Vite)
-e2e-tests                             # Playwright E2E tests
+kelta-platform/runtime/
+  runtime-core            Core runtime: model, query engine, storage adapters, flow engine,
+                          registries, hooks (BeforeSaveHook), TenantContext, validation
+  runtime-events          PlatformEvent<T>, PlatformEventPublisher, payload records
+  runtime-jsonapi         JSON:API response model
+  runtime-module-core     CRUD/flow action handlers (CreateRecord, UpdateRecord, Decision, ...)
+  runtime-module-integration  Integration handlers (HTTP callout, email, script SPI, delay)
+  runtime-module-schema   Schema lifecycle hooks for system collections
+  runtime-messaging-nats  NATS JetStream impl (NatsEventPublisher, subscription manager)
+kelta-gateway   Spring Cloud Gateway (WebFlux): auth (JWT+PAT), tenant resolution,
+                dynamic routing, Cerbos authz, rate limiting, WebSocket realtime
+kelta-auth      Internal OIDC provider (Spring Authorization Server), federation, MFA
+kelta-worker    Owns Flyway migrations, CRUD, flow execution, schema lifecycle, integrations
+kelta-ai        Anthropic Claude integration (chat, proposals, token tracking); SSE streaming
+kelta-mcp       MCP server — kelta-admin + kelta-user toolsets over HTTP, PAT auth, stateless
+kelta-web       Frontend SDK monorepo: @kelta/{sdk,components,plugin-sdk,cli,formula}
+kelta-ui/app    Admin/builder + end-user UI (React 19 + Vite)
+kelta-marketing Astro marketing site (not part of platform deploy)
+kelta-test-harness  Cross-service integration tests (Testcontainers full mini-stack)
+e2e-tests       Playwright end-to-end tests
 ```
 
-Stack: Java 25, Spring Boot 4.x, Maven, PostgreSQL + Flyway, NATS JetStream, Redis, React 19, Vite, Vitest. Check `kelta-platform/pom.xml` for current framework versions.
+Each backend service has its own `CLAUDE.md` (`kelta-{ai,auth,gateway,mcp,worker}/CLAUDE.md`),
+and the `runtime-module-core` / `runtime-module-integration` submodules have one too (flow
+action-handler SPI) — each with package layout, idioms, reference-impl tables, and single-test
+commands. **Read the module's CLAUDE.md when working inside it.** `kelta-ui/DESIGN.md` is the UI
+visual system.
 
-## Critical Rules
+---
 
-**Multi-pod NATS rule**: Never use in-process-only state changes for configuration data. Any change to in-memory registries or caches must be broadcast via NATS JetStream so all pods receive the update.
+## Glossary
 
-**Pattern**: When a system collection record changes and affects an in-memory registry:
-1. Create a `BeforeSaveHook` for the system collection
-2. In after-create/update/delete, publish via `PlatformEventPublisher` (e.g., to subject `kelta.config.collection.changed`)
-3. All pods consume the event and refresh their local registries
+| Term | Meaning |
+|------|---------|
+| **Collection** | Runtime-defined table (object). **User collection** = tenant business data. **System collection** = platform metadata (collections, fields, flows, profiles…) declared in `SystemCollectionDefinitions`. |
+| **Field / FieldType** | A column on a collection; the `FieldType` enum defines the kinds. |
+| **Record** | A row in a collection, served as JSON:API. |
+| **Flow / action handler** | A state-machine automation (Step-Functions style); an action handler is a Task node's executable unit. |
+| **Module (`KeltaModule`)** | Compile-time bundle of action handlers + before-save hooks. |
+| **BeforeSaveHook** | Lifecycle hook on a (usually system) collection — the NATS-broadcast trigger point. |
+| **Profile / Permission set / Group** | RBAC layers; resolved most-permissive-wins, enforced by Cerbos. |
+| **Governor limit** | Per-tenant resource quota (API/day, storage, users, collections…). |
+| **Layout / List view / Record type** | UI metadata: page layout · saved list config · collection subtype. |
+| **Tenant** | Isolated customer; resolved by URL slug or custom domain; enforced by Postgres RLS via `app.current_tenant_id`. |
+| **Cell** | (Planned) tenant-sharding unit; runtime does not yet route by `cell_id`. |
+| **PAT** | Personal access token (`klt_…`) for programmatic API auth. |
 
-Do NOT call `lifecycleManager.refreshX()` directly from a hook **as a substitute for** the broadcast — that only updates the local pod and leaves every other pod stale.
+---
 
-**Read-after-write exception (issue #910)**: a hook MAY *additionally* call a synchronous local refresh (e.g. `CollectionLifecycleManager.refreshOrInitializeLocally`) so the originating pod is consistent for an immediate same-pod read-after-write — **only when it also publishes the NATS config event** for all other pods. Skipping the broadcast is still forbidden.
+## Stack (source-verified)
 
-**Coding patterns**:
-- All new entities extend `BaseEntity` (UUID id, createdAt, updatedAt)
-- All new JPA repositories extend `JpaRepository`
-- Events use `ConfigEventPublisher` / `PlatformEventPublisher` pattern (NATS JetStream)
-- Flyway migrations: check `kelta-worker/src/main/resources/db/migration/` for next sequential number
+| Layer | Tech | Version | Source of truth |
+|-------|------|---------|-----------------|
+| Language | Java | **25** (GraalVM Community 25.0.2) | `.tool-versions`, `kelta-platform/pom.xml` |
+| Framework | Spring Boot | **4.0.5** | `kelta-platform/pom.xml` |
+| Gateway | Spring Cloud | **2025.1.1** | `kelta-gateway/pom.xml` |
+| Build | Maven | 3.9.9 (no wrapper) | CI `JAVA_VERSION`/`MAVEN_VERSION` |
+| DB | PostgreSQL | 15 (RLS, per-tenant schemas) | `docker-compose.yml` |
+| Cache | Redis | 7 | `docker-compose.yml` |
+| Messaging | NATS JetStream | 2.10 | `docker-compose.yml` |
+| Authz | Cerbos PDP | 0.40.0 (SDK 0.12.0) | `docker-compose.yml`, poms |
+| Search/Audit | OpenSearch | 2.17.1 | `integrations.md` |
+| AI | `anthropic-java` SDK | 2.18.0 (model via `AI_DEFAULT_MODEL`) | `kelta-ai/pom.xml`, `application.yml` |
+| Frontend | React | 19.2 | `kelta-ui/app/package.json` |
+| Frontend build | Vite / Vitest | web 5.1/1.3, ui 7.2/4.0 | package.json (npm, Node 18 in CI) |
+| E2E | Playwright | 1.50 | `e2e-tests/package.json` |
+| Migrations | Flyway | head **V146**, next **V147** | `kelta-worker/.../db/migration/` |
 
-## Verification
+Check the relevant `pom.xml` / `package.json` for exact current versions before pinning.
 
-Before any PR, run `/verify` to build and test all modules. CI runs the same checks. Use `/test-java` or `/test-frontend` for targeted testing.
+---
 
-## Reference Docs
+## Coding Patterns (verified — follow these)
 
-Read these on demand when doing substantial work in the relevant area:
+- **System-collection change → BeforeSaveHook + NATS broadcast.** See Critical Rule 1.
+- **Service models = Java records; repositories = `JdbcTemplate` + raw SQL.** See Critical Rule 2.
+- **Flow action handlers** live in `runtime-module-*/.../handlers/`; implement the action
+  handler interface, receive action def + flow context, return result/error.
+- **Gateway filters** are reactive `WebFilter`/`GlobalFilter`s — **never block**. State is
+  passed via exchange attributes. Ordered chain (lower `getOrder()` runs first): custom-domain
+  (-310) → tenant-slug extraction (-300) → tenant resolution (-200) → JWT auth (-100) →
+  per-tenant rate limit (-50) → Cerbos route authz (0) → header transform for worker (50).
+  Full table in `architecture.md`. Don't duplicate tenant/auth logic across filters.
+- **Field-Level Security** is enforced read-side by `CerbosFieldSecurityAdvice`
+  (`@ControllerAdvice`) — strips denied keys from JSON:API `attributes` **and to-one
+  `relationships`**; preserves has-many and system audit fields. Write-side:
+  `CerbosFieldWriteSecurityAdvice`. Add Cerbos policy rules for new field permissions.
+- **Flow inputs:** read as `$.input.<key>` against the state envelope; manual/MCP/HTTP
+  invocation double-wraps (`{ "input": { ... } }`). See `integrations.md` → Flows.
+- **Pagination:** HTTP page size clamps at `MAX_HTTP_PAGE_SIZE = 200`; internal at
+  `MAX_PAGE_SIZE = 1000`. JSON:API error envelope shape is owned by `conventions.md`.
 
-- `.claude/docs/architecture.md` — Service descriptions, layers, data flows, CI/CD, K8s access
-- `.claude/docs/conventions.md` — Java and TypeScript naming, style, import order, error handling
-- `.claude/docs/testing.md` — Test frameworks, structure, mocking patterns, coverage thresholds
-- `.claude/docs/integrations.md` — External services (Cerbos, Svix, Superset, S3), data stores, NATS subjects, monitoring
-- `.claude/docs/concerns.md` — Security risks, known bugs, tech debt, fragile areas, test gaps
-- `.claude/docs/workflow.md` — Full task workflow, branch naming, PR template, pre-PR checklist
+---
+
+## Pitfalls — never do these
+
+Each maps to a real mistake an agent has made here. Violating one usually compiles but is wrong.
+
+- ❌ Introduce Spring Data JPA / `@Entity` / `BaseEntity` → ✅ records + `JdbcTemplate` (Rule 2).
+- ❌ Update an in-memory registry without the NATS broadcast → ✅ BeforeSaveHook + publish (Rule 1).
+- ❌ Block in a gateway filter → ✅ reactive `Mono`/`Flux` only.
+- ❌ Call `runWithTenant` on a worker request path → ✅ context is pre-bound by `TenantContextFilter`; just read `TenantContext`.
+- ❌ Assume `/api/admin/**` is Cerbos-protected per-resource → it gets only `API_ACCESS`; enforce specific permissions in-controller (`architecture.md` → Authorizing a new endpoint).
+- ❌ Register a flow `ActionHandler` as `@Component` → ✅ wire it in the module's `onStartup()` (`playbooks.md`). The `@Component` Javadoc is wrong.
+- ❌ Hand-write MCP `server.addTool(...)` → ✅ implement the `AdminTool`/`UserTool` marker; `McpServerConfig` auto-registers.
+- ❌ Add `/api/<new-segment>/**` without a gateway static route → 404. Register in `RouteConfigService.registerStaticRoutes()`.
+- ❌ Reuse or skip a Flyway version → check the migration dir for the head number first.
+- ❌ Fork a new shared table/filter/form component → ✅ reuse/extend `@kelta/components`.
+- ❌ Read a flow input as `$.<key>` → ✅ `$.input.<key>` (manual/MCP/HTTP double-wraps).
+- ❌ Reintroduce Kafka → messaging is NATS JetStream only.
+- ❌ Leave docs stale → update them in the same PR (Rule 6).
+
+---
+
+## Messaging — NATS subjects
+
+| Subject | Meaning |
+|---------|---------|
+| `kelta.config.collection.changed.<tenantId>` | Collection schema changed |
+| `kelta.config.field.changed.<tenantId>` | Field changed |
+| `kelta.config.layout.changed.<layoutId>` | Page layout changed |
+| `kelta.config.page.changed.<pageId>` | UI page (screen builder) changed |
+| `kelta.config.flow.changed.<tenantId>` | Flow definition changed |
+| `kelta.config.feature.changed.<tenantId>` | System feature toggled |
+| `kelta.config.domain.changed.<domainId>` | Custom domain changed |
+| `kelta.config.credential.changed.*` | Credential changed |
+| `kelta.config.api-spec.changed.<tenantId>` | API spec changed |
+| `kelta.config.tenant.email.changed.<tenantId>` | Tenant SMTP config changed |
+| `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime) |
+
+Envelope: `PlatformEvent<T>` (`eventId`, `eventType`, `tenantId`, `correlationId`, `userId`,
+`timestamp`, `payload`). Subscriptions registered in each service's `NatsSubscriptionConfig`.
+Kafka is fully removed — do not reintroduce.
+
+---
+
+## Build, Test, Verify
+
+**Build runtime libs first** (required before building any service or IDE run):
+
+```bash
+mvn clean install -DskipTests -f kelta-platform/pom.xml \
+  -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,\
+runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema,\
+runtime/runtime-messaging-nats -am -B
+```
+
+| Task | Command / Skill |
+|------|-----------------|
+| Full pre-PR build + tests (all modules) | `/verify` |
+| Java service tests | `/test-java` · or `mvn verify -f kelta-<svc>/pom.xml -B` |
+| Integration tests (Testcontainers) | `mvn verify -f kelta-test-harness/pom.xml -Pintegration-tests` |
+| Frontend lint/type/test | `/test-frontend` · or in `kelta-web`/`kelta-ui/app`: `npm run lint && npm run typecheck && npm run test:run` |
+| Single Java test | `mvn test -f kelta-<svc>/pom.xml -Dtest=ClassName` |
+| Run full local stack | `make up` (then `make seed`) — see `README.md` |
+
+Java tests: surefire runs `*Test`/`*Tests`/`*Properties` in parallel; failsafe runs
+`*IntegrationTest` only under `-Pintegration-tests`. Frontend coverage gate: 80% in
+`kelta-web`. **Run `/verify` and get it green before opening a PR.** Full pipeline detail:
+`.claude/docs/ci-cd.md`.
+
+---
+
+## Database Migrations
+
+- Location: `kelta-worker/src/main/resources/db/migration/`
+- Naming: `V<n>__<snake_description>.sql`. **Head is V145; next new migration is V146.**
+  Check the directory for the true highest number before creating one — never reuse/skip.
+- Flyway runs at worker startup. Migrations execute under the platform sentinel tenant.
+
+---
+
+## Task Workflow
+
+```bash
+git checkout main && git pull origin main
+git checkout -b <type>/<short-kebab-desc>      # feat|fix|refactor|test|chore|docs
+# implement (unit + integration tests for backend; unit + e2e for features)
+# update docs in the same change — see "Keeping Docs Current" above
+/verify                                          # must be fully green
+git commit -m "<type>(<scope>): <description>"   # conventional commits
+/pr                                              # creates PR + enables auto-merge (squash)
+git checkout main && git pull origin main        # after merge
+```
+
+Every feature needs UI configuration + unit tests + e2e (Playwright) coverage **and its
+doc updates** (see Keeping Docs Current). Pre-PR the `/verify` skill runs Java build/tests
+and frontend lint + typecheck + `format:check` + `test:coverage`. CONTRIBUTING.md documents
+the autopilot dispatcher that drives queued tasks.
+
+### Definition of Done (self-check before declaring a task complete)
+
+- [ ] Followed the matching `playbooks.md` recipe + Critical Rules; violated no Pitfall.
+- [ ] Unit tests added for new logic; Playwright e2e for new UI/feature behavior.
+- [ ] `/verify` fully green (Java build/tests + frontend lint/typecheck/format/coverage).
+- [ ] Docs updated in this same change per Keeping Docs Current (incl. `status.md` if a capability moved).
+- [ ] Flyway migration numbering sequential (if any added).
+- [ ] No stale doc left behind — code and docs agree.
+
+---
+
+## Keeping Docs Current (mandatory, every PR)
+
+Docs are source-verified and must stay that way. Before opening a PR, check whether your
+change touches any row below and update that doc **in the same PR**. This is enforced by
+the pre-PR checklist — a behavior/config change without its doc update fails review.
+
+| If your change… | Update |
+|-----------------|--------|
+| Adds/changes/removes a feature, or moves it from stub → working | `.claude/docs/status.md` — move the row to the right section (✅/🟡/🔴/⚪) |
+| Bumps a framework/lib/tool version (Java, Spring, React, Vite, Cerbos, etc.) | `CLAUDE.md` Stack table + the affected module `README.md` |
+| Adds/renames a module, service, or runtime submodule | `CLAUDE.md` Module Map + module's own `CLAUDE.md`/`README.md` |
+| Adds/changes a NATS subject or event payload | `CLAUDE.md` Messaging table + `integrations.md` |
+| Changes a coding convention, error envelope, pagination, or component-reuse rule | `conventions.md` |
+| Adds/changes an external integration (Cerbos, Svix, Superset, S3, SMTP) or a flow contract | `integrations.md` |
+| Changes the gateway filter chain, worker layers, or a data-flow contract | `architecture.md` |
+| Adds a new top-level `/api/<x>/**` path or changes endpoint authorization | `architecture.md` → Authorizing a new endpoint (+ gateway static route) |
+| Changes a build mechanic (handler SPI, MCP tool registration, route/nav wiring) | `playbooks.md` + the affected module `CLAUDE.md` |
+| Changes CI workflows, build/deploy, Harbor/ArgoCD, or the verify steps | `ci-cd.md` (+ `CLAUDE.md` Build/Verify if commands change) |
+| Adds a known risk, fragile area, or resolves one | `concerns.md` |
+| Adds/changes a test framework, harness, or mocking pattern | `testing.md` |
+| Adds a Flyway migration | none (docs say "check the directory for the head") — just keep numbering sequential |
+| Changes local-dev setup, ports, Makefile targets, or env vars | `README.md` |
+
+If a doc claim is now wrong, fix it even if it's outside your feature's scope — stale docs
+are bugs. When in doubt, trust the code and correct the doc to match.
+
+## Reference Docs (`.claude/docs/`) — read before deep work
+
+| Doc | When to read |
+|-----|--------------|
+| `playbooks.md` | **Before building anything** — end-to-end recipes (exact files + registration) for handler/endpoint/UI page/MCP tool/system collection/field type |
+| `architecture.md` | System map, gateway/worker layers, data-flow contracts (includes, FLS, cron), authorizing a new endpoint, where to add code |
+| `conventions.md` | Java/TS naming, import order, JSON:API error envelope + pagination (canonical), UI component-reuse rule, MCP tool style |
+| `integrations.md` | External services (Cerbos, Svix, Superset, S3, SMTP), S3 attachment lifecycle, NATS, **Flows input/double-wrap rules** |
+| `testing.md` | Test frameworks, integration harness, mocking patterns (JdbcTemplate races, InOrder) |
+| `concerns.md` | Known risks, fragile files (don't bloat), tech debt, test gaps, Postgres connection sizing |
+| `ci-cd.md` | GitHub Actions pipeline, Harbor/ArgoCD deploy, smoke/rollback, container builds |
+| `status.md` | **Capability map: what's Complete vs UI-only-stub vs Planned** — check before touching a subsystem |
+| `specs/` | **Forward-looking feature specs** (multi-slice efforts). `specs/page-builder-parity.md` is the parent for the page-builder→OutSystems-parity work; per-slice specs (contracts, UI samples, migrations, file-by-file changes) live in `specs/page-builder/`. Read the relevant slice spec before implementing it. |
+
+Module-level: `kelta-{ai,auth,gateway,mcp,worker}/CLAUDE.md`, `kelta-ui/DESIGN.md`.
+Human-facing: `README.md` (local dev, ports, Makefile), `CONTRIBUTING.md`, `SECURITY.md`.

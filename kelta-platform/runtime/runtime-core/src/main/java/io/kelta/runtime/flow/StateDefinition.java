@@ -148,6 +148,39 @@ public sealed interface StateDefinition {
     }
 
     /**
+     * Invokes another flow synchronously and merges its result back into this
+     * flow's state data.
+     * <p>
+     * Exactly one of {@code flowId} or {@code flowName} must be set — the
+     * target flow is loaded from the tenant's flow registry at execution time.
+     * The {@code input} map is resolved against the current state data
+     * (template expressions like {@code ${$.path}} are substituted, the same
+     * way Task {@code Parameters} are) and passed as the initial state of the
+     * sub-execution. The sub-flow's final state data is then merged at
+     * {@code resultPath}.
+     * <p>
+     * Recursion depth is bounded by {@code FlowEngine.MAX_INVOKE_DEPTH} so a
+     * flow that invokes itself (directly or transitively) cannot run forever.
+     */
+    record InvokeFlowState(
+        String name,
+        String comment,
+        String flowId,
+        String flowName,
+        Map<String, Object> input,
+        String inputPath,
+        String outputPath,
+        String resultPath,
+        String next,
+        boolean end,
+        List<RetryPolicy> retry,
+        List<CatchPolicy> catchPolicies
+    ) implements StateDefinition {
+        @Override
+        public String type() { return "InvokeFlow"; }
+    }
+
+    /**
      * Terminal state indicating successful completion.
      */
     record SucceedState(

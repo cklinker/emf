@@ -105,6 +105,7 @@
     "deleteCollection": "Delete Collection",
     "collectionName": "Collection Name",
     "displayName": "Display Name",
+    "displayField": "Display Field",
     "description": "Description",
     "status": "Status",
     "active": "Active",
@@ -1438,6 +1439,8 @@
     "descriptionPlaceholder": "Enter a description for this collection...",
     "nameHint": "Lowercase letters, numbers, and underscores only. Must start with a letter.",
     "activeHint": "Inactive collections are hidden from the resource browser but data is preserved.",
+    "displayFieldNone": "Auto-detect",
+    "displayFieldHint": "The field shown when records appear in lookup dropdowns. If not set, defaults to a field named \"name\" or the first text field.",
     "validation": {
       "nameRequired": "Collection name is required",
       "nameTooLong": "Collection name must be 50 characters or less",

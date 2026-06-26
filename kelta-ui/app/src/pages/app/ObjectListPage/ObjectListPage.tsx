@@ -45,6 +45,7 @@ import { useCollectionRecords } from '@/hooks/useCollectionRecords'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
+import { REFERENCE_FIELD_TYPES, referenceIncludeParam } from './listIncludes'
 import type { SortState, FilterCondition, CollectionRecord } from '@/hooks/useCollectionRecords'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
@@ -144,9 +145,6 @@ function parseListViewParams(searchParams: URLSearchParams): {
   }
 }
 
-/** Reference field types that indicate a foreign key to another collection */
-const REFERENCE_FIELD_TYPES = new Set(['master_detail', 'lookup', 'reference'])
-
 export function ObjectListPage(): React.ReactElement {
   const { tenantSlug, collection: collectionName } = useParams<{
     tenantSlug: string
@@ -203,12 +201,8 @@ export function ObjectListPage(): React.ReactElement {
     [visibleFields]
   )
 
-  // Build include param from reference target collection names (deduplicated)
-  const includeParam = useMemo(() => {
-    if (referenceFields.length === 0) return undefined
-    const uniqueTargets = [...new Set(referenceFields.map((f) => f.referenceTarget!))]
-    return uniqueTargets.join(',')
-  }, [referenceFields])
+  // Build the JSON:API `include` param from the reference FIELD names (see referenceIncludeParam).
+  const includeParam = useMemo(() => referenceIncludeParam(referenceFields), [referenceFields])
 
   // Fetch records with includes for reference fields
   const {

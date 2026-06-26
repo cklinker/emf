@@ -12,6 +12,7 @@ import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -67,11 +68,15 @@ public class CollectionLifecycleManager {
 
     private static final String SELECT_FIELDS_BY_COLLECTION = """
             SELECT name, type, required, unique_constraint, indexed, default_value,
-                   constraints, field_type_config, reference_target, relationship_type,
-                   relationship_name, cascade_delete, field_order, column_name, immutable,
-                   searchable
+                   constraints, field_type_config, reference_target, reference_collection_id,
+                   relationship_type, relationship_name, cascade_delete, field_order, column_name,
+                   immutable, searchable
             FROM field WHERE collection_id = ? AND active = true
             ORDER BY field_order
+            """;
+
+    private static final String SELECT_COLLECTION_NAME_BY_ID = """
+            SELECT name FROM collection WHERE id = ? AND active = true
             """;
 
     private static final String SELECT_SEARCHABLE_FIELDS = """
@@ -518,6 +523,31 @@ public class CollectionLifecycleManager {
     }
 
     /**
+     * Resolves a relationship field's target collection NAME. Prefers the denormalized
+     * {@code reference_target} column; when it is null/blank, derives the name from
+     * {@code reference_collection_id} so fields persisted without the denormalized name still build a
+     * {@link ReferenceConfig}. Package-private for unit testing.
+     *
+     * @param referenceTarget     the denormalized target collection name (may be null/blank)
+     * @param referenceCollectionId the FK to the target collection (may be null)
+     * @return the resolved target collection name, or {@code null} if neither source yields one
+     */
+    String resolveReferenceTarget(String referenceTarget, Object referenceCollectionId) {
+        if (referenceTarget != null && !referenceTarget.isBlank()) {
+            return referenceTarget;
+        }
+        if (referenceCollectionId == null) {
+            return null;
+        }
+        try {
+            return jdbcTemplate.queryForObject(
+                    SELECT_COLLECTION_NAME_BY_ID, String.class, referenceCollectionId.toString());
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    /**
      * Loads field definitions from the database for a given collection.
      */
     private List<FieldDefinition> loadFieldsFromDb(String collectionId) {
@@ -540,10 +570,19 @@ public class CollectionLifecycleManager {
             boolean immutable = Boolean.TRUE.equals(row.get("immutable"));
             String columnName = (String) row.get("column_name");
 
-            // Parse reference config
+            // Parse reference config. `reference_target` (the denormalized target collection NAME)
+            // is the primary source, but many relationship fields were persisted with only
+            // `reference_collection_id` set and a NULL `reference_target` — in that case the field
+            // would otherwise lose its ReferenceConfig entirely, so the JSON:API serializer emits a
+            // raw FK id attribute (no relationship, no `include` resolution). Derive the target name
+            // from `reference_collection_id` so those fields still resolve. (#lookup-display)
             ReferenceConfig refConfig = null;
-            String referenceTarget = (String) row.get("reference_target");
             String relationshipType = (String) row.get("relationship_type");
+            if (relationshipType == null && fieldType != null && fieldType.isRelationship()) {
+                relationshipType = fieldType.name();
+            }
+            String referenceTarget = resolveReferenceTarget(
+                    (String) row.get("reference_target"), row.get("reference_collection_id"));
             if (referenceTarget != null && !referenceTarget.isBlank()) {
                 String relationshipName = (String) row.get("relationship_name");
                 if ("MASTER_DETAIL".equals(relationshipType)) {

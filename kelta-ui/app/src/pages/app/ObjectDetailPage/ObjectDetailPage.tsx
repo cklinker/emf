@@ -265,9 +265,10 @@ export function ObjectDetailPage(): React.ReactElement {
   const includeParam = useMemo(() => {
     const includes = new Set<string>()
 
-    // Forward includes from reference fields on this collection
+    // Forward includes from reference fields on this collection — by FIELD name (the worker resolves
+    // forward `include` by field name, not target collection name; reverse/nested below use names).
     for (const f of referenceFields) {
-      includes.add(f.referenceTarget!)
+      includes.add(f.name)
     }
 
     // Always include users for createdBy/updatedBy display name resolution

@@ -258,6 +258,48 @@ class GatewayCacheManagerTest {
             assertThat(cacheManager.resolveTenantSlug("globex")).contains("tenant-id-2");
             assertThat(cacheManager.tenantSlugCacheSize()).isEqualTo(2);
         }
+
+        @Test
+        void resolveLazilyFetchesFromWorkerOnCacheMiss() {
+            // Cold cache (scheduled refresh hasn't run): a valid tenant must still resolve.
+            stubRefreshResponse(Mono.just(Map.of("couchpicks", "tenant-cp")));
+
+            assertThat(cacheManager.resolveTenantSlug("couchpicks")).contains("tenant-cp");
+
+            // The lazy fetch warmed the cache — a second resolve hits it, no further worker call.
+            reset(webClient);
+            assertThat(cacheManager.resolveTenantSlug("couchpicks")).contains("tenant-cp");
+            verifyNoInteractions(webClient);
+        }
+
+        @Test
+        void resolveNegativeCachesUnknownSlugAfterLazyFetch() {
+            stubRefreshResponse(Mono.just(Map.of("acme", "tenant-id-1")));
+
+            assertThat(cacheManager.resolveTenantSlug("ghost")).isEmpty();
+
+            // A genuinely-unknown slug is negative-cached — no repeat worker fetch.
+            reset(webClient);
+            assertThat(cacheManager.resolveTenantSlug("ghost")).isEmpty();
+            verifyNoInteractions(webClient);
+        }
+
+        @Test
+        void resolveDoesNotPinValidTenantToNotFoundOnFetchError() {
+            // A transient worker error must NOT poison a valid tenant to "not found".
+            stubRefreshResponse(Mono.error(new RuntimeException("worker down")));
+            assertThat(cacheManager.resolveTenantSlug("couchpicks")).isEmpty();
+
+            // Worker recovers — the retry resolves.
+            stubRefreshResponse(Mono.just(Map.of("couchpicks", "tenant-cp")));
+            assertThat(cacheManager.resolveTenantSlug("couchpicks")).contains("tenant-cp");
+        }
+
+        @Test
+        void isKnownSlugLazilyResolvesOnCacheMiss() {
+            stubRefreshResponse(Mono.just(Map.of("acme", "tenant-id-1")));
+            assertThat(cacheManager.isKnownSlug("acme")).isTrue();
+        }
     }
 
     // ── Governor Limit Cache Tests ────────────────────────────────────

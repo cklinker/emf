@@ -144,6 +144,15 @@ jobs. RLS then scopes every query automatically.
 
 ## Data Flow
 
+**Tenant-slug resolution (cold-cache safe).** `TenantSlugExtractionFilter` resolves the URL slug via
+`GatewayCacheManager.resolveTenantSlug`, backed by a Caffeine cache refreshed from the worker
+(`/internal/tenants/slug-map`) every 60s. On a **cache miss** it now **lazily fetches** the map from
+the worker (bounded 2s), merges it, and negative-caches a still-missing slug (mirroring
+`resolveCustomDomain`) — so a valid tenant resolves immediately during the cold-cache window
+(gateway restart, or a refresh that failed while the worker was briefly unreachable) instead of
+returning `404 TENANT_NOT_FOUND` for every `/{slug}/api/**` request (which strands the UI before it
+can even reach login). A fetch error never negative-caches a valid slug; the next request retries.
+
 **HTTP Request (Client -> Gateway -> Worker):**
 1. Client sends request (e.g., GET /api/contacts)
 2. TenantSlugExtractionFilter extracts tenant from URL

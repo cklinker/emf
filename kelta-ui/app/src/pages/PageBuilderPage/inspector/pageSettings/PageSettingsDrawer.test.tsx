@@ -17,14 +17,17 @@ function Harness({
   initialDataSources = [],
   onVariablesChange,
   onDataSourcesChange,
+  onIsHomePageChange,
 }: {
   initialVariables?: PageVariable[]
   initialDataSources?: PageDataSource[]
   onVariablesChange?: (v: PageVariable[]) => void
   onDataSourcesChange?: (d: PageDataSource[]) => void
+  onIsHomePageChange?: (v: boolean) => void
 }) {
   const [variables, setVariables] = useState<PageVariable[]>(initialVariables)
   const [dataSources, setDataSources] = useState<PageDataSource[]>(initialDataSources)
+  const [isHomePage, setIsHomePage] = useState(false)
   return (
     <I18nProvider>
       <PageSettingsDrawer
@@ -41,6 +44,11 @@ function Harness({
           onDataSourcesChange?.(d)
         }}
         onRequiredPermissionChange={() => {}}
+        isHomePage={isHomePage}
+        onIsHomePageChange={(v) => {
+          setIsHomePage(v)
+          onIsHomePageChange?.(v)
+        }}
       />
     </I18nProvider>
   )
@@ -52,6 +60,17 @@ describe('PageSettingsDrawer', () => {
     await waitFor(() => expect(screen.getByTestId('page-settings-drawer')).toBeInTheDocument())
     expect(screen.getByTestId('page-settings-variables')).toBeInTheDocument()
     expect(screen.getByTestId('page-settings-data-sources')).toBeInTheDocument()
+  })
+
+  it('toggles "set as app home" and emits the change', async () => {
+    const user = userEvent.setup()
+    const onIsHomePageChange = vi.fn()
+    render(<Harness onIsHomePageChange={onIsHomePageChange} />)
+    const checkbox = await screen.findByTestId('page-home-checkbox')
+    expect(checkbox).not.toBeChecked()
+    await user.click(checkbox)
+    expect(onIsHomePageChange).toHaveBeenCalledWith(true)
+    expect(checkbox).toBeChecked()
   })
 
   it('adds, edits and removes a variable', async () => {

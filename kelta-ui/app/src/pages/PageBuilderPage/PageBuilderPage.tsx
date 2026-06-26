@@ -559,6 +559,8 @@ export function PageBuilderPage({
   const [pageAccess, setPageAccess] = useState<{ requiredPermission?: string } | undefined>(
     undefined
   )
+  // Whether this page overrides the app's default landing page (`config.isHomePage`).
+  const [pageIsHomePage, setPageIsHomePage] = useState<boolean>(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
 
   // Preview mode state (Requirement 7.7)
@@ -593,6 +595,7 @@ export function PageBuilderPage({
     setPageVariables(cfg.variables ?? [])
     setPageDataSources(cfg.dataSources ?? [])
     setPageAccess(cfg.access)
+    setPageIsHomePage(cfg.isHomePage === true)
     setHasUnsavedChanges(false)
   }
 
@@ -613,6 +616,7 @@ export function PageBuilderPage({
       setPageVariables(cfg.variables ?? [])
       setPageDataSources(cfg.dataSources ?? [])
       setPageAccess(cfg.access)
+      setPageIsHomePage(cfg.isHomePage === true)
       setViewMode('editor')
     },
     onError: (error: Error) => {
@@ -870,6 +874,8 @@ export function PageBuilderPage({
           // Slice 1h: persist the per-page access restriction. `undefined` is skipped by `mergeConfig`
           // (untouched page keeps no key); `{}` writes an explicit "no restriction".
           access: pageAccess,
+          // Whether this page overrides the app's default landing page.
+          isHomePage: pageIsHomePage,
           schemaVersion: 2,
         }),
       } as unknown as Partial<UIPage>,
@@ -881,6 +887,7 @@ export function PageBuilderPage({
     pageVariables,
     pageDataSources,
     pageAccess,
+    pageIsHomePage,
     updateMutation,
   ])
 
@@ -897,6 +904,10 @@ export function PageBuilderPage({
     // A selected permission stores `{requiredPermission}`; "Anyone (published)" stores `{}` to
     // explicitly clear any previously-set restriction on save.
     setPageAccess(permission ? { requiredPermission: permission } : {})
+    setHasUnsavedChanges(true)
+  }, [])
+  const handleIsHomePageChange = useCallback((next: boolean) => {
+    setPageIsHomePage(next)
     setHasUnsavedChanges(true)
   }, [])
 
@@ -1108,6 +1119,8 @@ export function PageBuilderPage({
           onDataSourcesChange={handleDataSourcesChange}
           requiredPermission={pageAccess?.requiredPermission}
           onRequiredPermissionChange={handleRequiredPermissionChange}
+          isHomePage={pageIsHomePage}
+          onIsHomePageChange={handleIsHomePageChange}
         />
 
         {/* Preview mode overlay (Requirement 7.7, 12.5) */}

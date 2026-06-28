@@ -375,6 +375,23 @@ overwrite), and skips with a warning if the field's `dimension` differs from the
 provider's `dimensions()`. Without `embeddingSource`, vectors must be written
 explicitly by the caller.
 
+**Formula compute on write.** Read-side, FORMULA fields are computed on every
+`get` by `DefaultQueryEngine.computeVirtualFields`. Write-side, the wildcard
+`FormulaComputeHook` (worker, before-save, order 250) also evaluates every
+FORMULA field on create/update so the computed value is visible to downstream
+hooks and the response payload without an extra read. The hook merges the
+record with the previous state (so partial updates see prior values), parses
+each formula's expression into a `FormulaAst`, and topologically sorts the
+FORMULA fields by inter-formula `FieldRef`s — Kahn's algorithm with
+alphabetical tie-breaking so sibling fields resolve deterministically. Fields
+that participate in a cycle (including self-references) are short-circuited:
+they get `"#ERROR"` when their `fieldTypeConfig.returnType` is `TEXT`, `null`
+for `NUMBER` / `BOOLEAN`. The same fallback rule applies to runtime evaluation
+failures (parse error, missing function, division by zero), matching the
+read-path behaviour. Formula values are *not* persisted — storage adapters
+skip fields whose `FieldType.hasPhysicalColumn()` returns false — they only
+ride along in the in-flight record map.
+
 ### Email template resolution — tenant override → system default
 
 System-level email templates are seeded under the sentinel `tenant_id = 'system'`

@@ -65,6 +65,14 @@ Where errors are constructed:
 - Required for public classes and methods
 - Include `@param`, `@returns`, `@throws`
 
+### BeforeSaveHook signatures
+
+`BeforeSaveHook` exposes two parallel signatures for each lifecycle method: the **legacy** form without a collection name (`beforeCreate(record, tenantId)`, `beforeUpdate(id, record, previous, tenantId)`, `afterCreate(record, tenantId)`, …) and the **collection-name-aware** form that takes `collectionName` as the first argument. Both `BeforeSaveHookRegistry.evaluateBeforeCreate/Update` and `invokeAfterCreate/Update/Delete` dispatch the collection-name-aware variant, whose default delegates to the legacy variant — so existing hooks remain source-compatible.
+
+- **Collection-specific hook** — override the legacy form. The collection name is already implicit from `getCollectionName()`.
+- **Wildcard hook** (`getCollectionName() == "*"`) — override the collection-name-aware form when behaviour depends on which collection triggered the call (e.g. routing audit events by collection).
+- Never override **both** variants on the same hook — the collection-name-aware default already calls through, so duplicating logic risks running it twice if the registry contract ever changes.
+
 ## REST API: pagination
 
 Every paginated REST endpoint MUST use **JSON:API bracket syntax** — `page[number]` and `page[size]`. The flat forms `pageNumber` / `pageSize` are not honored and a request that sends them silently falls back to defaults.

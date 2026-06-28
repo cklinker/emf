@@ -61,6 +61,23 @@ public interface BeforeSaveHook {
     }
 
     /**
+     * Called before a new record is created, with the collection name provided.
+     * This variant is useful for wildcard hooks that need to know which collection
+     * triggered the hook.
+     *
+     * <p>The default implementation delegates to {@link #beforeCreate(Map, String)}.
+     *
+     * @param collectionName the collection the record is being created in
+     * @param record the record data being created
+     * @param tenantId the tenant ID
+     * @return the result (OK to proceed, field updates, or validation errors)
+     */
+    default BeforeSaveResult beforeCreate(String collectionName, Map<String, Object> record,
+                                           String tenantId) {
+        return beforeCreate(record, tenantId);
+    }
+
+    /**
      * Called before an existing record is updated. Can validate data,
      * enforce constraints, or return field updates.
      *
@@ -73,6 +90,27 @@ public interface BeforeSaveHook {
     default BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
                                            Map<String, Object> previous, String tenantId) {
         return BeforeSaveResult.ok();
+    }
+
+    /**
+     * Called before an existing record is updated, with the collection name provided.
+     * This variant is useful for wildcard hooks that need to know which collection
+     * triggered the hook.
+     *
+     * <p>The default implementation delegates to
+     * {@link #beforeUpdate(String, Map, Map, String)}.
+     *
+     * @param collectionName the collection the record belongs to
+     * @param id the record ID
+     * @param record the update data
+     * @param previous the previous record data
+     * @param tenantId the tenant ID
+     * @return the result (OK to proceed, field updates, or validation errors)
+     */
+    default BeforeSaveResult beforeUpdate(String collectionName, String id,
+                                           Map<String, Object> record,
+                                           Map<String, Object> previous, String tenantId) {
+        return beforeUpdate(id, record, previous, tenantId);
     }
 
     /**

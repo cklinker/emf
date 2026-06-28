@@ -152,7 +152,7 @@ public class BeforeSaveHookRegistry {
 
         Map<String, Object> mergedUpdates = new HashMap<>();
         for (BeforeSaveHook hook : collectionHooks) {
-            BeforeSaveResult result = hook.beforeCreate(record, tenantId);
+            BeforeSaveResult result = hook.beforeCreate(collectionName, record, tenantId);
             if (!result.isSuccess()) {
                 return result;
             }
@@ -187,7 +187,7 @@ public class BeforeSaveHookRegistry {
 
         Map<String, Object> mergedUpdates = new HashMap<>();
         for (BeforeSaveHook hook : collectionHooks) {
-            BeforeSaveResult result = hook.beforeUpdate(id, record, previous, tenantId);
+            BeforeSaveResult result = hook.beforeUpdate(collectionName, id, record, previous, tenantId);
             if (!result.isSuccess()) {
                 return result;
             }

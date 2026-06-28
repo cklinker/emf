@@ -456,6 +456,106 @@ class BeforeSaveHookRegistryTest {
         assertEquals("tracked", result.getFieldUpdates().get("audit"));
     }
 
+    @Test
+    @DisplayName("Should invoke before-create with collection-name-aware variant")
+    void shouldInvokeBeforeCreateWithCollectionNameVariant() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        var capturedCollection = new String[1];
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "*"; }
+            @Override
+            public BeforeSaveResult beforeCreate(String collectionName, Map<String, Object> record,
+                                                  String tenantId) {
+                capturedCollection[0] = collectionName;
+                return BeforeSaveResult.withFieldUpdates(Map.of("seen", collectionName));
+            }
+        });
+
+        Map<String, Object> record = new HashMap<>(Map.of("name", "Test"));
+        BeforeSaveResult result = registry.evaluateBeforeCreate("users", record, "t1");
+
+        assertTrue(result.isSuccess());
+        assertEquals("users", capturedCollection[0]);
+        assertEquals("users", result.getFieldUpdates().get("seen"));
+    }
+
+    @Test
+    @DisplayName("Should invoke before-update with collection-name-aware variant")
+    void shouldInvokeBeforeUpdateWithCollectionNameVariant() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        var capturedCollection = new String[1];
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "*"; }
+            @Override
+            public BeforeSaveResult beforeUpdate(String collectionName, String id,
+                                                  Map<String, Object> record,
+                                                  Map<String, Object> previous, String tenantId) {
+                capturedCollection[0] = collectionName;
+                return BeforeSaveResult.withFieldUpdates(Map.of("seen", collectionName));
+            }
+        });
+
+        Map<String, Object> record = new HashMap<>(Map.of("name", "Updated"));
+        Map<String, Object> previous = Map.of("name", "Original");
+        BeforeSaveResult result = registry.evaluateBeforeUpdate("fields", "id1", record, previous, "t1");
+
+        assertTrue(result.isSuccess());
+        assertEquals("fields", capturedCollection[0]);
+        assertEquals("fields", result.getFieldUpdates().get("seen"));
+    }
+
+    @Test
+    @DisplayName("Collection-name-aware default should delegate to legacy beforeCreate")
+    void shouldDelegateCollectionNameDefaultToLegacyBeforeCreate() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        AtomicBoolean legacyCalled = new AtomicBoolean(false);
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "users"; }
+            @Override
+            public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+                legacyCalled.set(true);
+                return BeforeSaveResult.withFieldUpdates(Map.of("status", "ACTIVE"));
+            }
+        });
+
+        BeforeSaveResult result = registry.evaluateBeforeCreate("users", new HashMap<>(), "t1");
+
+        assertTrue(result.isSuccess());
+        assertTrue(legacyCalled.get());
+        assertEquals("ACTIVE", result.getFieldUpdates().get("status"));
+    }
+
+    @Test
+    @DisplayName("Collection-name-aware default should delegate to legacy beforeUpdate")
+    void shouldDelegateCollectionNameDefaultToLegacyBeforeUpdate() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        AtomicBoolean legacyCalled = new AtomicBoolean(false);
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "users"; }
+            @Override
+            public BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
+                                                  Map<String, Object> previous, String tenantId) {
+                legacyCalled.set(true);
+                return BeforeSaveResult.error("status", "Cannot deactivate admin");
+            }
+        });
+
+        BeforeSaveResult result = registry.evaluateBeforeUpdate(
+                "users", "id1", new HashMap<>(), Map.of(), "t1");
+
+        assertFalse(result.isSuccess());
+        assertTrue(legacyCalled.get());
+        assertEquals("status", result.getErrors().get(0).field());
+    }
+
     private BeforeSaveHook stubHook(String collectionName, int order) {
         return new BeforeSaveHook() {
             @Override

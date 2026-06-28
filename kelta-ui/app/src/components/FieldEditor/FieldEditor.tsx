@@ -25,13 +25,15 @@
  * - Accessible with keyboard navigation and ARIA attributes
  */
 
-import React, { useEffect, useCallback, useMemo, useState } from 'react'
+import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Braces } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../LoadingSpinner'
+import { FieldExpressionPicker } from '../FieldExpressionPicker'
 
 /**
  * Field type enumeration
@@ -118,6 +120,12 @@ export interface PicklistSummary {
  * Aggregate function options for rollup_summary fields.
  */
 export type RollupAggregateFunction = 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX'
+
+/**
+ * Return type options for formula fields. Immutable once the field exists,
+ * because the dynamically-created column type depends on it.
+ */
+export type FormulaReturnType = 'TEXT' | 'NUMBER' | 'BOOLEAN'
 
 /**
  * Minimal field info exposed to the rollup config picker.
@@ -286,6 +294,8 @@ export const fieldEditorSchema = z
     rollupForeignKey: z.string().optional().or(z.literal('')),
     rollupFunction: z.enum(['COUNT', 'SUM', 'AVG', 'MIN', 'MAX']).optional(),
     rollupField: z.string().optional().or(z.literal('')),
+    formulaExpression: z.string().optional().or(z.literal('')),
+    formulaReturnType: z.enum(['TEXT', 'NUMBER', 'BOOLEAN']).optional(),
     description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
     trackHistory: z.boolean(),
     searchable: z.boolean(),
@@ -361,6 +371,26 @@ export const fieldEditorSchema = z
       path: ['rollupField'],
     }
   )
+  .refine(
+    (data) => {
+      if (data.type !== 'formula') return true
+      return !!data.formulaExpression && data.formulaExpression.trim().length > 0
+    },
+    {
+      message: 'validation.formulaExpressionRequired',
+      path: ['formulaExpression'],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.type !== 'formula') return true
+      return !!data.formulaReturnType
+    },
+    {
+      message: 'validation.formulaReturnTypeRequired',
+      path: ['formulaReturnType'],
+    }
+  )
 
 /**
  * Type inferred from the Zod schema
@@ -396,8 +426,7 @@ const errorInputClasses = 'border-destructive focus:border-destructive focus:rin
  * FieldEditor Component
  */
 export function FieldEditor({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  collectionId: _collectionId,
+  collectionId,
   collectionName,
   field,
   collections = [],
@@ -434,6 +463,7 @@ export function FieldEditor({
     handleSubmit,
     reset,
     watch,
+    setValue,
     control,
     formState: { errors, isDirty },
   } = useForm<FieldEditorFormData>({
@@ -456,6 +486,8 @@ export function FieldEditor({
       rollupForeignKey: (parsedConfig.foreignKeyField as string) ?? '',
       rollupFunction: (parsedConfig.aggregateFunction as RollupAggregateFunction) ?? undefined,
       rollupField: (parsedConfig.aggregateField as string) ?? '',
+      formulaExpression: (parsedConfig.expression as string) ?? '',
+      formulaReturnType: (parsedConfig.returnType as FormulaReturnType) ?? undefined,
       description: field?.description ?? '',
       trackHistory: field?.trackHistory ?? false,
       searchable: field?.searchable ?? false,
@@ -507,6 +539,11 @@ export function FieldEditor({
   // foreign-key and aggregate-field dropdowns.
   const [childFields, setChildFields] = useState<RollupChildField[]>([])
   const [childFieldsLoading, setChildFieldsLoading] = useState(false)
+
+  // Formula expression picker (modal) + ref so click-to-insert can splice the
+  // token at the textarea's current caret position.
+  const [formulaPickerOpen, setFormulaPickerOpen] = useState(false)
+  const formulaTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
     if (watchedType !== 'rollup_summary' || !watchedRollupChild || !fetchCollectionFields) {
@@ -577,6 +614,8 @@ export function FieldEditor({
         rollupForeignKey: (parsedConfig.foreignKeyField as string) ?? '',
         rollupFunction: (parsedConfig.aggregateFunction as RollupAggregateFunction) ?? undefined,
         rollupField: (parsedConfig.aggregateField as string) ?? '',
+        formulaExpression: (parsedConfig.expression as string) ?? '',
+        formulaReturnType: (parsedConfig.returnType as FormulaReturnType) ?? undefined,
         description: field.description ?? '',
         trackHistory: field.trackHistory ?? false,
         searchable: field.searchable ?? false,
@@ -668,6 +707,11 @@ export function FieldEditor({
           config.aggregateField = data.rollupField
         }
         fieldTypeConfig = config
+      } else if (data.type === 'formula') {
+        fieldTypeConfig = {
+          expression: data.formulaExpression,
+          returnType: data.formulaReturnType,
+        }
       }
 
       const needsReferenceTarget =
@@ -723,6 +767,26 @@ export function FieldEditor({
       return errorKey
     },
     [t]
+  )
+
+  // Click-to-insert from the FieldExpressionPicker — splice the token at the
+  // textarea's caret, then keep focus and place the cursor after the inserted
+  // text so the user can keep typing.
+  const handleFormulaInsert = useCallback(
+    (token: string) => {
+      const el = formulaTextareaRef.current
+      const start = el?.selectionStart ?? el?.value.length ?? 0
+      const end = el?.selectionEnd ?? el?.value.length ?? 0
+      const current = el?.value ?? ''
+      const next = current.slice(0, start) + token + current.slice(end)
+      setValue('formulaExpression', next, { shouldDirty: true, shouldValidate: true })
+      setFormulaPickerOpen(false)
+      requestAnimationFrame(() => {
+        el?.focus()
+        el?.setSelectionRange(start + token.length, start + token.length)
+      })
+    },
+    [setValue]
   )
 
   // Add a new validation rule
@@ -1248,6 +1312,149 @@ export function FieldEditor({
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Formula Config */}
+      {watchedType === 'formula' && (
+        <div
+          className="flex flex-col gap-4 p-4 bg-secondary border border-border rounded-md"
+          data-testid="formula-config"
+        >
+          <h4 className="m-0 text-base font-medium text-foreground">
+            {t('fieldEditor.formula.title')}
+          </h4>
+
+          {/* Return type */}
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="field-formula-return-type"
+              className="flex items-center gap-1 text-sm font-medium text-foreground"
+            >
+              {t('fieldEditor.formula.returnType')}
+              <span className="text-destructive font-semibold" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <select
+              id="field-formula-return-type"
+              className={cn(
+                selectClasses,
+                errors.formulaReturnType && errorInputClasses,
+                isEditMode && 'pointer-events-none opacity-60'
+              )}
+              disabled={isSubmitting}
+              tabIndex={isEditMode ? -1 : undefined}
+              aria-required="true"
+              aria-disabled={isEditMode || undefined}
+              aria-invalid={!!errors.formulaReturnType}
+              aria-describedby={
+                errors.formulaReturnType
+                  ? 'field-formula-return-type-error'
+                  : 'field-formula-return-type-hint'
+              }
+              data-testid="field-formula-return-type-select"
+              {...register('formulaReturnType')}
+            >
+              <option value="">{t('fieldEditor.formula.selectReturnType')}</option>
+              <option value="TEXT">{t('fieldEditor.formula.returnTypeText')}</option>
+              <option value="NUMBER">{t('fieldEditor.formula.returnTypeNumber')}</option>
+              <option value="BOOLEAN">{t('fieldEditor.formula.returnTypeBoolean')}</option>
+            </select>
+            {errors.formulaReturnType && (
+              <span
+                id="field-formula-return-type-error"
+                className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
+                role="alert"
+                data-testid="field-formula-return-type-error"
+              >
+                {getErrorMessage(errors.formulaReturnType.message)}
+              </span>
+            )}
+            <span
+              id="field-formula-return-type-hint"
+              className="text-xs text-muted-foreground mt-1"
+            >
+              {t('fieldEditor.formula.returnTypeHint')}
+            </span>
+          </div>
+
+          {/* Expression */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="field-formula-expression"
+                className="flex items-center gap-1 text-sm font-medium text-foreground"
+              >
+                {t('fieldEditor.formula.expression')}
+                <span className="text-destructive font-semibold" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setFormulaPickerOpen(true)}
+                disabled={isSubmitting}
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                data-testid="field-formula-insert-field"
+              >
+                <Braces className="h-3.5 w-3.5" />
+                {t('fieldEditor.formula.insertField')}
+              </button>
+            </div>
+            {(() => {
+              const { ref: rhfRef, ...rest } = register('formulaExpression')
+              return (
+                <textarea
+                  id="field-formula-expression"
+                  ref={(el) => {
+                    rhfRef(el)
+                    formulaTextareaRef.current = el
+                  }}
+                  className={cn(
+                    inputClasses,
+                    'resize-y font-mono text-sm min-h-24',
+                    errors.formulaExpression && errorInputClasses
+                  )}
+                  placeholder={t('fieldEditor.formula.expressionPlaceholder')}
+                  disabled={isSubmitting}
+                  rows={5}
+                  aria-required="true"
+                  aria-invalid={!!errors.formulaExpression}
+                  aria-describedby={
+                    errors.formulaExpression
+                      ? 'field-formula-expression-error'
+                      : 'field-formula-expression-hint'
+                  }
+                  data-testid="field-formula-expression-input"
+                  {...rest}
+                />
+              )
+            })()}
+            {errors.formulaExpression && (
+              <span
+                id="field-formula-expression-error"
+                className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
+                role="alert"
+                data-testid="field-formula-expression-error"
+              >
+                {getErrorMessage(errors.formulaExpression.message)}
+              </span>
+            )}
+            <span id="field-formula-expression-hint" className="text-xs text-muted-foreground mt-1">
+              {t('fieldEditor.formula.expressionHint')}
+            </span>
+          </div>
+
+          <FieldExpressionPicker
+            open={formulaPickerOpen}
+            onOpenChange={setFormulaPickerOpen}
+            rootCollectionId={collectionId}
+            mode="expression"
+            onInsert={handleFormulaInsert}
+            title={t('fieldEditor.formula.pickerTitle')}
+            testId="field-formula-picker"
+          />
         </div>
       )}
 

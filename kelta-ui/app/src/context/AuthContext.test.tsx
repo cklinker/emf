@@ -480,7 +480,7 @@ describe('AuthContext', () => {
       global.fetch = vi.fn(async () => ({
         ok: false,
         statusText: 'Internal Server Error',
-      })) as typeof fetch
+      })) as unknown as typeof fetch
 
       renderWithAuth()
 

@@ -62,6 +62,7 @@ const mockBootstrapConfig: BootstrapConfig = {
       id: 'provider-1',
       name: 'Test Provider',
       issuer: 'https://auth.example.com',
+      clientId: 'test-client-id',
     },
   ],
 }

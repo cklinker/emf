@@ -248,7 +248,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
     refetch,
   } = useQuery({
     queryKey: ['profiles'],
-    queryFn: () => keltaClient.admin.profiles.list() as Promise<SecurityProfile[]>,
+    queryFn: () => keltaClient.admin.profiles.list() as unknown as Promise<SecurityProfile[]>,
   })
 
   const profileList = profiles ?? []
@@ -256,7 +256,9 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
   // Mutations
   const createMutation = useMutation({
     mutationFn: (data: ProfileFormData) =>
-      keltaClient.admin.profiles.create(data as CreateProfileRequest) as Promise<SecurityProfile>,
+      keltaClient.admin.profiles.create(
+        data as CreateProfileRequest
+      ) as unknown as Promise<SecurityProfile>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile created successfully', 'success')
@@ -272,7 +274,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
       keltaClient.admin.profiles.update(
         id,
         data as UpdateProfileRequest
-      ) as Promise<SecurityProfile>,
+      ) as unknown as Promise<SecurityProfile>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile updated successfully', 'success')

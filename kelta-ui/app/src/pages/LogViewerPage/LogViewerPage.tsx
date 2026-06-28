@@ -36,7 +36,7 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
   const pageSize = 50
 
   // Debounce the search query to avoid firing on every keystroke
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
       setDebouncedQuery(queryInput)

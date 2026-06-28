@@ -62,7 +62,7 @@ export function ApiTokensPage({
       queryClient.invalidateQueries({ queryKey: ['personal-tokens'] })
       showToast('Token created successfully', 'success')
       setIsFormOpen(false)
-      setCreatedToken(result.token)
+      setCreatedToken((result as { token: string }).token)
     },
     onError: (err: Error) => {
       showToast(err.message || 'Failed to create token', 'error')

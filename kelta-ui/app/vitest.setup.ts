@@ -14,7 +14,7 @@ vi.mock('axios', async () => {
   return {
     ...actual,
     default: {
-      ...(actual as Record<string, unknown>).default,
+      ...((actual as Record<string, unknown>).default as Record<string, unknown>),
       create: vi.fn(() => mockAxios),
       isAxiosError: (error: unknown) =>
         error !== null &&

@@ -49,7 +49,7 @@ function generateSessionId(): string {
  * show up in the same Grafana dashboards that filter on those labels.
  */
 export function initTelemetry(): void {
-  const env = (import.meta as Record<string, Record<string, string>>).env
+  const env = (import.meta as unknown as Record<string, Record<string, string>>).env
 
   // Use the gateway origin (VITE_API_BASE_URL) for OTEL traces, not window.location.origin.
   // The UI is served from kelta.io but the OTEL route is on the gateway.

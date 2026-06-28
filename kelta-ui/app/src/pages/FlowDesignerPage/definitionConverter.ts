@@ -104,13 +104,14 @@ function choiceRuleToConfig(rule: ChoiceRuleUI): ChoiceRuleConfig {
 
   // Determine the correct typed value
   const op = rule.operator
+  const cfg = config as Record<string, unknown>
   if (op.startsWith('Numeric')) {
-    config[op] = parseFloat(rule.value) || 0
+    cfg[op] = parseFloat(rule.value) || 0
   } else if (op === 'BooleanEquals' || op === 'IsPresent' || op === 'IsNull') {
-    config[op] = rule.value === 'true'
+    cfg[op] = rule.value === 'true'
   } else {
     // String comparisons
-    config[op] = rule.value
+    cfg[op] = rule.value
   }
 
   return config

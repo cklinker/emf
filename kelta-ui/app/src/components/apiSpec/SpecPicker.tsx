@@ -38,7 +38,7 @@ export function SpecPicker({
     queryFn: () => keltaClient.admin.apiSpecs.list(),
   })
 
-  const specs = data ?? []
+  const specs = (data ?? []) as ApiSpecSummary[]
 
   return (
     <div className={className ?? 'space-y-1'}>

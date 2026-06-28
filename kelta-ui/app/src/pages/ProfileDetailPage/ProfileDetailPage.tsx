@@ -155,7 +155,7 @@ export function ProfileDetailPage({
     if (!fieldsData) return []
     const data = (fieldsData as { data?: unknown[] })?.data
     if (!Array.isArray(data)) return []
-    return data.map((f: Record<string, unknown>) => ({
+    return (data as Record<string, unknown>[]).map((f) => ({
       id: (f.id as string) ?? '',
       name: ((f.attributes as Record<string, unknown>)?.name as string) ?? '',
       type: ((f.attributes as Record<string, unknown>)?.type as string) ?? '',

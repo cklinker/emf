@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
-import type { SearchIndexStats } from '@kelta/sdk'
+import type { SearchIndexStats, SearchIndexCollectionStats } from '@kelta/sdk'
 
 export interface SearchSettingsPageProps {
   testId?: string
@@ -12,7 +12,7 @@ export interface SearchSettingsPageProps {
 
 export function SearchSettingsPage({
   testId = 'search-settings-page',
-}: SearchSettingsPageProps): JSX.Element {
+}: SearchSettingsPageProps): React.ReactElement {
   const { t } = useI18n()
   const { keltaClient } = useApi()
   const queryClient = useQueryClient()
@@ -33,8 +33,9 @@ export function SearchSettingsPage({
     mutationFn: (collectionName?: string) =>
       keltaClient.admin.searchReindex.reindex(collectionName),
     onSuccess: (data) => {
-      showToast(data.message || t('searchSettings.reindexStarted'), 'success')
-      setReindexingCollection(data.collection)
+      const result = data as { message?: string; collection?: string }
+      showToast(result.message || t('searchSettings.reindexStarted'), 'success')
+      setReindexingCollection(result.collection ?? null)
       // Poll for updated stats
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['search-index-stats'] })
@@ -138,7 +139,7 @@ export function SearchSettingsPage({
             </thead>
             <tbody>
               {stats?.collections && stats.collections.length > 0 ? (
-                stats.collections.map((col) => (
+                stats.collections.map((col: SearchIndexCollectionStats) => (
                   <tr key={col.collectionId} className="border-b border-border last:border-b-0">
                     <td className="px-5 py-3 font-medium text-foreground">{col.collectionName}</td>
                     <td className="px-5 py-3 text-right text-foreground tabular-nums">

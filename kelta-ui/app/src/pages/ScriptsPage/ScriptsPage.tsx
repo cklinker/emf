@@ -426,7 +426,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
     queryFn: () => keltaClient.admin.scripts.list(),
   })
 
-  const scriptList: Script[] = scripts ?? []
+  const scriptList: Script[] = (scripts ?? []) as unknown as Script[]
 
   const createMutation = useMutation({
     mutationFn: (data: ScriptFormData) =>
@@ -705,7 +705,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
           title="Script Execution Logs"
           subtitle={_logsItemName}
           columns={logColumns}
-          data={logs ?? []}
+          data={(logs ?? []) as unknown as ScriptExecutionLog[]}
           isLoading={logsLoading}
           error={logsError instanceof Error ? logsError : null}
           onClose={() => setLogsItemId(null)}

@@ -153,7 +153,7 @@ function syntaxError(formula: string): string | null {
     evaluator.validate(formula)
     return null
   } catch (err) {
-    return err instanceof FormulaException ? err.message : 'Invalid formula'
+    return err instanceof FormulaException ? (err as FormulaException).message : 'Invalid formula'
   }
 }
 

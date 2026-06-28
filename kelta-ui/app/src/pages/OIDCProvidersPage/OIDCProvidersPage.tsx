@@ -91,6 +91,7 @@ interface FormErrors {
   nameClaim?: string
   groupsClaim?: string
   groupsProfileMapping?: string
+  [key: string]: string | undefined
 }
 
 /**
@@ -1126,7 +1127,7 @@ export function OIDCProvidersPage({
               </tr>
             </thead>
             <tbody>
-              {providers.map((provider, index) => (
+              {(providers as OIDCProvider[]).map((provider: OIDCProvider, index: number) => (
                 <tr
                   key={provider.id}
                   role="row"

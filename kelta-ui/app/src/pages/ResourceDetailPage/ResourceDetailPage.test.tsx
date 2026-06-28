@@ -257,7 +257,7 @@ function toJsonApiWithFields(schema: {
   id: string
   name: string
   displayName: string
-  fields: Array<Record<string, unknown>>
+  fields: ReadonlyArray<Record<string, unknown> | object>
 }) {
   return {
     data: {
@@ -268,7 +268,8 @@ function toJsonApiWithFields(schema: {
         displayName: schema.displayName,
       },
     },
-    included: (schema.fields || []).map((f, i) => {
+    included: (schema.fields || []).map((rawF, i) => {
+      const f = rawF as Record<string, unknown>
       // Spread ALL field properties into attributes to preserve validation, order, etc.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { id: _id, referenceCollectionId: _ref, ...rest } = f
@@ -279,7 +280,7 @@ function toJsonApiWithFields(schema: {
           ...rest,
           type: (f.type as string).toUpperCase(),
           required: f.required ?? false,
-          fieldOrder: (f as Record<string, unknown>).order ?? i + 1,
+          fieldOrder: f.order ?? i + 1,
           active: true,
         },
         relationships: {
@@ -287,7 +288,7 @@ function toJsonApiWithFields(schema: {
           ...(f.referenceCollectionId
             ? {
                 referenceCollectionId: {
-                  data: { type: 'collections', id: f.referenceCollectionId },
+                  data: { type: 'collections', id: f.referenceCollectionId as string },
                 },
               }
             : {}),

@@ -18,7 +18,8 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { FieldEditor, FieldDefinition, CollectionSummary } from './FieldEditor'
+import { FieldEditor } from './FieldEditor'
+import type { FieldDefinition, CollectionSummary, FetchCollectionFields } from './FieldEditor'
 import { I18nProvider } from '../../context/I18nContext'
 import { ToastProvider } from '../Toast'
 
@@ -965,7 +966,7 @@ describe('FieldEditor Integration', () => {
           {...defaultProps}
           collectionName="orders"
           collections={mockCollections}
-          fetchCollectionFields={fetcher}
+          fetchCollectionFields={fetcher as unknown as FetchCollectionFields}
           onSave={onSave}
         />
       )

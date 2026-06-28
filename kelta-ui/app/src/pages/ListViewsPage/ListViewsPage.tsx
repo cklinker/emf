@@ -403,7 +403,7 @@ export function ListViewsPage({
     return map
   }, [collections])
 
-  const listViewList: ListView[] = listViews ?? []
+  const listViewList: ListView[] = (listViews ?? []) as unknown as ListView[]
 
   const createMutation = useMutation({
     mutationFn: (data: ListViewFormData) => {

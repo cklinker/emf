@@ -41,6 +41,7 @@ import { MultiPicklistSelect, normalizeMultiPicklistValue } from '@/components/M
 import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
 import { LayoutFormSections } from '@/components/LayoutFormSections'
+import type { LayoutFormFieldDefinition } from '@/components/LayoutFormSections/LayoutFormSections'
 import { useLayoutRules } from '@kelta/components'
 import { dtosToLayoutRules } from '@/utils/layoutRules'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
@@ -661,10 +662,10 @@ function ObjectFormBody({
         <div data-testid="form-fields">
           <LayoutFormSections
             sections={layout.sections}
-            schemaFields={displayFields}
+            schemaFields={displayFields as unknown as LayoutFormFieldDefinition[]}
             record={formData}
             isComputed={ruleEngine.isComputed}
-            renderField={(field) => {
+            renderField={(field: LayoutFormFieldDefinition) => {
               const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
               const layoutReadOnly = !!field.readOnly
               return (

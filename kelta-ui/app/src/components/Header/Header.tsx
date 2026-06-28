@@ -10,7 +10,7 @@
  * - 2.6: Clear tokens and redirect on logout (via onLogout callback)
  */
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ArrowLeft } from 'lucide-react'
 import type { BrandingConfig } from '../../types/config'
@@ -37,7 +37,7 @@ export interface HeaderProps {
 /**
  * Header component provides the top navigation bar with branding and user menu.
  */
-export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
+export function Header({ branding, user, onLogout }: HeaderProps): React.ReactElement {
   const navigate = useNavigate()
   const tenantSlug = getTenantSlug()
   const [searchOpen, setSearchOpen] = useState(false)

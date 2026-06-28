@@ -5,7 +5,7 @@
  * Appears when clicking the clock icon button.
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -20,7 +20,7 @@ export interface RecentItemsDropdownProps {
 
 export function RecentItemsDropdown({
   testId = 'recent-items-dropdown',
-}: RecentItemsDropdownProps): JSX.Element {
+}: RecentItemsDropdownProps): React.ReactElement {
   const { t } = useI18n()
   const { user } = useAuth()
   const navigate = useNavigate()

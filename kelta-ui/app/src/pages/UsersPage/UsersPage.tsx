@@ -281,7 +281,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
     })
   }, [confirmDialog, statusMutation])
 
-  const users = data?.content ?? []
+  const users = (data?.content ?? []) as PlatformUser[]
   const totalPages = data?.totalPages ?? 0
 
   if (error) {
@@ -374,7 +374,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
+                {users.map((user: PlatformUser) => (
                   <tr key={user.id} className="hover:bg-muted">
                     <td className="border-b border-border p-3">
                       <button
@@ -390,7 +390,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                       <StatusBadge status={user.status} />
                     </td>
                     <td className="border-b border-border p-3">
-                      {user.lastLoginAt ? formatDate(user.lastLoginAt) : t('users.never')}
+                      {user.lastLoginAt ? formatDate(new Date(user.lastLoginAt)) : t('users.never')}
                     </td>
                     <td className="border-b border-border p-3">
                       <div className="flex gap-2">
@@ -407,14 +407,14 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                           >
                             {t('users.deactivate')}
                           </button>
-                        ) : user.status !== 'ACTIVE' ? (
+                        ) : (
                           <button
                             className="cursor-pointer rounded border-none bg-emerald-500 px-2 py-1 text-xs text-white hover:bg-emerald-600"
                             onClick={() => handleStatusAction(user, 'activate')}
                           >
                             {t('users.activate')}
                           </button>
-                        ) : null}
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -73,7 +73,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
     queryFn: () => keltaClient.admin.flows.list(),
   })
 
-  const flowList: Flow[] = flows ?? []
+  const flowList: Flow[] = (flows ?? []) as unknown as Flow[]
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => keltaClient.admin.flows.delete(id),

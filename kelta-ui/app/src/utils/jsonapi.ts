@@ -69,7 +69,7 @@ function unwrapJsonbValue(val: unknown): unknown {
  * Input:  { id: "1", type: "product", attributes: { name: "Test", price: 10 } }
  * Output: { id: "1", name: "Test", price: 10 }
  */
-export function flattenResource<T extends Record<string, unknown> = Record<string, unknown>>(
+export function flattenResource<T extends object = Record<string, unknown>>(
   resource: JsonApiResource
 ): T {
   const result: Record<string, unknown> = {
@@ -108,9 +108,7 @@ export function flattenResource<T extends Record<string, unknown> = Record<strin
  * Input:  { data: { id: "1", type: "product", attributes: { name: "Test" } } }
  * Output: { id: "1", name: "Test" }
  */
-export function unwrapResource<T extends Record<string, unknown> = Record<string, unknown>>(
-  response: unknown
-): T {
+export function unwrapResource<T extends object = Record<string, unknown>>(response: unknown): T {
   // If the response has a `data` property with `type` and `attributes`, it's JSON:API
   if (
     response &&
@@ -221,7 +219,7 @@ export function wrapResource(
  *
  * Output: { data: [{ id: "1", name: "Test" }], total: 1, page: 1, pageSize: 20 }
  */
-export function unwrapCollection<T extends Record<string, unknown> = Record<string, unknown>>(
+export function unwrapCollection<T extends object = Record<string, unknown>>(
   response: unknown
 ): { data: T[]; total: number; page: number; pageSize: number } {
   if (
@@ -237,7 +235,7 @@ export function unwrapCollection<T extends Record<string, unknown> = Record<stri
     const flatItems =
       items.length > 0 && 'type' in items[0] && 'attributes' in items[0]
         ? items.map((item) => flattenResource<T>(item))
-        : (items as T[])
+        : (items as unknown as T[])
 
     // Extract pagination from metadata envelope (runtime format) or top-level fields
     const meta = jsonApiResponse.metadata
@@ -267,7 +265,7 @@ export function unwrapCollection<T extends Record<string, unknown> = Record<stri
  * Input:  extractIncluded(response, "profiles")
  * Output: [{ id: "p1", name: "Admin", ... }, { id: "p2", name: "User", ... }]
  */
-export function extractIncluded<T extends Record<string, unknown> = Record<string, unknown>>(
+export function extractIncluded<T extends object = Record<string, unknown>>(
   response: unknown,
   type: string
 ): T[] {

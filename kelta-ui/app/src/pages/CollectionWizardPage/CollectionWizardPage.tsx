@@ -238,13 +238,16 @@ export function CollectionWizardPage({
     queryFn: () => keltaClient.admin.profiles.list(),
   })
 
-  const profiles = useMemo(() => profilesData ?? [], [profilesData])
+  const profiles = useMemo(
+    () => (profilesData ?? []) as Array<{ id: string; name: string }>,
+    [profilesData]
+  )
 
   // Initialize profile permissions when profiles are loaded
   useMemo(() => {
     if (profiles.length > 0 && profilePermissions.length === 0) {
       setProfilePermissions(
-        profiles.map((p) => ({
+        profiles.map((p: { id: string; name: string }) => ({
           profileId: p.id,
           profileName: p.name,
           canCreate: false,
@@ -1266,10 +1269,12 @@ export function CollectionWizardPage({
                 name: c.name,
                 displayName: c.displayName || c.name,
               }))}
-              picklists={globalPicklists.map((p) => ({
-                id: p.id,
-                name: p.name,
-              }))}
+              picklists={(globalPicklists as Array<{ id: string; name: string }>).map(
+                (p: { id: string; name: string }) => ({
+                  id: p.id,
+                  name: p.name,
+                })
+              )}
               onSave={handleFieldSave}
               onCancel={handleFieldCancel}
             />

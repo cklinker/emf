@@ -2,7 +2,6 @@
  * Metric widget tests — live collection count via PageResponse.totalElements (meta.totalCount),
  * number/compact formatting, editor sample, and the error fallback.
  */
-import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

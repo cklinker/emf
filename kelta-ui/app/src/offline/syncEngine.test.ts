@@ -4,8 +4,10 @@ import { SyncEngine, type SyncApi } from './syncEngine'
 import type { ChangesFeed, ReplicaRecord } from './types'
 
 class ApiStatusError extends Error {
-  constructor(public readonly status: number) {
+  readonly status: number
+  constructor(status: number) {
     super(`status ${status}`)
+    this.status = status
   }
 }
 
@@ -22,7 +24,10 @@ class FakeApi implements SyncApi {
     void url
     return { id: 'x', ...(data as object) }
   })
-  del = vi.fn(async () => undefined)
+  del = vi.fn(async (url: string) => {
+    void url
+    return undefined
+  })
 
   async get<T>(url: string): Promise<T> {
     this.calls.push(`GET ${url}`)

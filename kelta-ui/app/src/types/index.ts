@@ -10,7 +10,16 @@ export * from './common'
 export * from './config'
 export * from './collections'
 export * from './authorization'
-export * from './auth'
+export type {
+  User as AuthUser,
+  TokenResponse,
+  StoredTokens,
+  OIDCProviderConfig,
+  OIDCDiscoveryDocument,
+  AuthState,
+  AuthContextValue,
+  AuthProviderProps,
+} from './auth'
 export * from './plugin'
 
 // Additional type exports will be added as they are implemented:

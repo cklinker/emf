@@ -27,6 +27,18 @@ interface AiConfig {
   aiEnabled: string
 }
 
+interface AiUsageHistoryEntry {
+  inputTokens: number
+  outputTokens: number
+  requestCount: number
+}
+
+interface AiUsage {
+  currentMonthUsage: number
+  tokenLimit: number
+  history: Record<string, AiUsageHistoryEntry>
+}
+
 const AVAILABLE_MODELS = [
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
   { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
@@ -61,9 +73,9 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
     queryFn: () => keltaClient.admin.ai.config.get(),
   })
 
-  const { data: usage, isLoading: usageLoading } = useQuery({
+  const { data: usage, isLoading: usageLoading } = useQuery<AiUsage>({
     queryKey: ['ai-usage'],
-    queryFn: () => keltaClient.admin.ai.usage(),
+    queryFn: () => keltaClient.admin.ai.usage() as Promise<AiUsage>,
     refetchInterval: 60000,
   })
 
@@ -81,7 +93,7 @@ export function AiSettingsPage({ className }: AiSettingsPageProps): React.ReactE
   })
 
   if (configLoading) return <LoadingSpinner />
-  if (configError) return <ErrorMessage message="Failed to load AI configuration" />
+  if (configError) return <ErrorMessage error="Failed to load AI configuration" />
 
   const currentConfig = editConfig ?? config
   const isEditing = editConfig !== null

@@ -434,7 +434,7 @@ function AttemptTable({ attempts }: { attempts: ReturnType<typeof useEndpointMes
                   <AttemptStatusBadge status={attempt.status} />
                 </td>
                 <td className="px-4 py-2 text-foreground">
-                  {attempt.msgEventId ?? attempt.msg?.eventType ?? '-'}
+                  {attempt.msg?.eventId ?? attempt.msg?.eventType ?? '-'}
                 </td>
                 <td className="px-4 py-2 text-foreground">{attempt.responseStatusCode ?? '-'}</td>
                 <td className="px-4 py-2 text-muted-foreground">
@@ -628,27 +628,29 @@ function CreateEndpointDialog({
                 Only receive events for selected collections. Leave empty for all collections.
               </p>
               <div className="max-h-[200px] space-y-1 overflow-y-auto rounded-md border p-3">
-                {collections.map((col) => (
-                  <label
-                    key={col.id}
-                    className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                  >
-                    <input
-                      type="checkbox"
-                      className="rounded border-input"
-                      checked={selectedChannels.includes(col.name)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedChannels([...selectedChannels, col.name])
-                        } else {
-                          setSelectedChannels(selectedChannels.filter((n) => n !== col.name))
-                        }
-                      }}
-                    />
-                    <span className="text-foreground">{col.displayName || col.name}</span>
-                    <span className="text-xs text-muted-foreground">({col.name})</span>
-                  </label>
-                ))}
+                {(collections as Array<{ id: string; name: string; displayName?: string }>).map(
+                  (col) => (
+                    <label
+                      key={col.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                    >
+                      <input
+                        type="checkbox"
+                        className="rounded border-input"
+                        checked={selectedChannels.includes(col.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedChannels([...selectedChannels, col.name])
+                          } else {
+                            setSelectedChannels(selectedChannels.filter((n) => n !== col.name))
+                          }
+                        }}
+                      />
+                      <span className="text-foreground">{col.displayName || col.name}</span>
+                      <span className="text-xs text-muted-foreground">({col.name})</span>
+                    </label>
+                  )
+                )}
               </div>
             </div>
           )}

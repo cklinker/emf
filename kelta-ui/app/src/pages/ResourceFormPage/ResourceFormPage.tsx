@@ -24,6 +24,7 @@ import type { LookupOption } from '../../components'
 import { useAuth } from '../../context/AuthContext'
 import { usePageLayout } from '../../hooks/usePageLayout'
 import { LayoutFormSections } from '../../components/LayoutFormSections/LayoutFormSections'
+import type { LayoutFormFieldDefinition } from '../../components/LayoutFormSections/LayoutFormSections'
 import { useLayoutRules } from '@kelta/components'
 import { dtosToLayoutRules } from '../../utils/layoutRules'
 import { unwrapResource, extractIncluded, wrapResource } from '../../utils/jsonapi'
@@ -1720,8 +1721,13 @@ export function ResourceFormPage({
         {layout && layout.sections.length > 0 ? (
           <LayoutFormSections
             sections={layout.sections}
-            schemaFields={sortedFields}
-            renderField={renderField}
+            schemaFields={sortedFields as unknown as LayoutFormFieldDefinition[]}
+            renderField={
+              renderField as unknown as (
+                field: LayoutFormFieldDefinition,
+                index: number
+              ) => React.ReactNode
+            }
             record={formData}
             isComputed={ruleEngine.isComputed}
           />

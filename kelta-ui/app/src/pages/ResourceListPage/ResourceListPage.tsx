@@ -808,8 +808,8 @@ export function ResourceListPage({
       }
       const view = savedViews.views.find((v) => v.id === viewId)
       if (!view) return
-      setFilters(view.filters)
-      setPendingFilters(view.filters)
+      setFilters(view.filters as unknown as FilterCondition[])
+      setPendingFilters(view.filters as unknown as FilterCondition[])
       setSort(view.sortField ? { field: view.sortField, direction: view.sortDirection } : undefined)
       setVisibleColumnOverrides(new Set(view.visibleColumns))
       setPageSize(view.pageSize)

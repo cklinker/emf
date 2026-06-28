@@ -14,7 +14,7 @@
  * - Click outside to close
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import type { SavedView } from '../../hooks/useSavedViews'
 
@@ -36,7 +36,7 @@ export function ViewSelector({
   onDeleteView,
   onRenameView,
   onSetDefault,
-}: ViewSelectorProps): JSX.Element {
+}: ViewSelectorProps): React.ReactElement {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveName, setSaveName] = useState('')

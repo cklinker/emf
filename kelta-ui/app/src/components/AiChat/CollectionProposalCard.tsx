@@ -81,7 +81,7 @@ export function CollectionProposalCard({
             {data.name as string}
           </Badge>
         </div>
-        {data.description && (
+        {Boolean(data.description) && (
           <p className="text-xs text-muted-foreground">{data.description as string}</p>
         )}
       </CardHeader>

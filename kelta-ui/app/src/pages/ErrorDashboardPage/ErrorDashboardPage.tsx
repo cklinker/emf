@@ -29,7 +29,12 @@ export function ErrorDashboardPage({ className }: ErrorDashboardPageProps) {
   if (isLoading) return <LoadingSpinner />
   if (error) return <ErrorMessage error={t('errorDashboard.loadError')} />
 
-  const errors = data?.errors ?? []
+  interface ErrorEntry {
+    path: string
+    count: number
+    statusCodes?: Record<string, number>
+  }
+  const errors = (data?.errors ?? []) as ErrorEntry[]
 
   return (
     <div className={cn('mx-auto max-w-[1400px]', className)} data-testid="error-dashboard-page">
@@ -55,7 +60,7 @@ export function ErrorDashboardPage({ className }: ErrorDashboardPageProps) {
             {t('errorDashboard.totalErrors')}
           </div>
           <div className="text-2xl font-bold text-foreground">
-            {errors.reduce((sum, e) => sum + e.count, 0).toLocaleString()}
+            {errors.reduce((sum: number, e: ErrorEntry) => sum + e.count, 0).toLocaleString()}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card p-5">
@@ -92,7 +97,7 @@ export function ErrorDashboardPage({ className }: ErrorDashboardPageProps) {
               </tr>
             </thead>
             <tbody>
-              {errors.map((err, idx) => (
+              {errors.map((err: ErrorEntry, idx: number) => (
                 <tr
                   key={idx}
                   data-testid={`error-dashboard-row-${idx}`}

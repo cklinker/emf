@@ -115,15 +115,21 @@ function TriggerFormRouter({
   onChange: (config: Partial<TriggerConfig>) => void
   flowId?: string
 }) {
+  // The discriminated union of TriggerConfig means each form variant accepts
+  // a specialized Partial; we trust the runtime flowType discriminant.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c = config as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const onC = onChange as any
   switch (flowType) {
     case 'RECORD_TRIGGERED':
-      return <RecordTriggerForm config={config} onChange={onChange} />
+      return <RecordTriggerForm config={c} onChange={onC} />
     case 'SCHEDULED':
-      return <ScheduledTriggerForm config={config} onChange={onChange} />
+      return <ScheduledTriggerForm config={c} onChange={onC} />
     case 'AUTOLAUNCHED':
-      return <AutolaunchedTriggerForm config={config} onChange={onChange} flowId={flowId} />
+      return <AutolaunchedTriggerForm config={c} onChange={onC} flowId={flowId} />
     case 'KAFKA_TRIGGERED':
-      return <KafkaTriggerForm config={config} onChange={onChange} />
+      return <KafkaTriggerForm config={c} onChange={onC} />
     default:
       return <div className="text-sm text-muted-foreground">Unknown flow type: {flowType}</div>
   }

@@ -65,9 +65,7 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
     return []
   }, [modulesResponse])
 
-  const activeModules = modules.filter(
-    (m) => m.status === 'ACTIVE' && m.actions.length > 0
-  )
+  const activeModules = modules.filter((m) => m.status === 'ACTIVE' && m.actions.length > 0)
 
   const moduleActionMap = React.useMemo(() => {
     const map = new Map<string, ModuleAction>()

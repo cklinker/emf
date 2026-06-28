@@ -22,7 +22,8 @@ import {
   resetMockAxios,
   createAxiosError,
 } from '../../test/testUtils'
-import { ResourceListPage, CollectionSchema, Resource } from './ResourceListPage'
+import { ResourceListPage } from './ResourceListPage'
+import type { CollectionSchema, Resource } from './ResourceListPage'
 import { escapeCSVValue, recordsToCSV, recordsToJSON } from './ResourceListPage'
 
 // Mock useNavigate
@@ -614,10 +615,10 @@ describe('ResourceListPage', () => {
       const checkboxes = within(dropdown).getAllByRole('checkbox')
 
       // Toggle a checkbox
-      const initialChecked = checkboxes[0].checked
+      const initialChecked = (checkboxes[0] as HTMLInputElement).checked
       await user.click(checkboxes[0])
 
-      expect(checkboxes[0].checked).toBe(!initialChecked)
+      expect((checkboxes[0] as HTMLInputElement).checked).toBe(!initialChecked)
     })
   })
 

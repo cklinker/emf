@@ -5,4 +5,5 @@
  */
 
 export { ResourceBrowserPage, default } from './ResourceBrowserPage'
-export type { ResourceBrowserPageProps, CollectionSummary } from './ResourceBrowserPage'
+export type { ResourceBrowserPageProps } from './ResourceBrowserPage'
+export type { CollectionSummary } from '../../hooks/useCollectionSummaries'

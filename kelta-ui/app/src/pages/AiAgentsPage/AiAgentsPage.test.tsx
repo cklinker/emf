@@ -3,7 +3,6 @@
  * API calls flow through the SDK's mocked Axios instance (see testUtils.mockAxios).
  */
 
-import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'

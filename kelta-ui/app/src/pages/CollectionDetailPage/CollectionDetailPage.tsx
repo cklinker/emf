@@ -18,7 +18,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage, DataSourceSettings } from '../../components'
+import {
+  useToast,
+  ConfirmDialog,
+  LoadingSpinner,
+  ErrorMessage,
+  DataSourceSettings,
+} from '../../components'
 import {
   FieldEditor,
   type FieldDefinition as FieldEditorDefinition,
@@ -1156,24 +1162,24 @@ export function CollectionDetailPage({
               !(collection as { systemCollection?: boolean } | undefined)?.systemCollection
           )
           .map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            className={cn(
-              'px-4 py-2 text-sm font-medium text-muted-foreground bg-transparent border-none border-b-2 border-transparent -mb-[2px] cursor-pointer transition-colors duration-200 motion-reduce:transition-none whitespace-nowrap',
-              'hover:text-foreground focus:outline-2 focus:outline-primary focus:-outline-offset-2',
-              activeTab === tab.key && 'text-primary border-b-primary'
-            )}
-            onClick={() => handleTabChange(tab.key)}
-            aria-selected={activeTab === tab.key}
-            aria-controls={`${tab.id}-panel`}
-            id={`${tab.id}-tab`}
-            data-testid={`${tab.id}-tab`}
-          >
-            {tab.label}
-          </button>
-        ))}
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              className={cn(
+                'px-4 py-2 text-sm font-medium text-muted-foreground bg-transparent border-none border-b-2 border-transparent -mb-[2px] cursor-pointer transition-colors duration-200 motion-reduce:transition-none whitespace-nowrap',
+                'hover:text-foreground focus:outline-2 focus:outline-primary focus:-outline-offset-2',
+                activeTab === tab.key && 'text-primary border-b-primary'
+              )}
+              onClick={() => handleTabChange(tab.key)}
+              aria-selected={activeTab === tab.key}
+              aria-controls={`${tab.id}-panel`}
+              id={`${tab.id}-tab`}
+              data-testid={`${tab.id}-tab`}
+            >
+              {tab.label}
+            </button>
+          ))}
       </div>
 
       {/* Fields Panel */}

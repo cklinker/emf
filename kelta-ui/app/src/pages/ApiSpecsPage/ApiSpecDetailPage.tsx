@@ -56,10 +56,10 @@ export function ApiSpecDetailPage({ className }: ApiSpecDetailPageProps): React.
   }
 
   const spec = specQuery.data
-  const operations = operationsQuery.data ?? []
+  const operations = (operationsQuery.data ?? []) as ApiOperationSummary[]
   const filtered = filter
     ? operations.filter(
-        (op) =>
+        (op: ApiOperationSummary) =>
           op.pathTemplate.toLowerCase().includes(filter.toLowerCase()) ||
           (op.summary?.toLowerCase().includes(filter.toLowerCase()) ?? false) ||
           op.httpMethod.toLowerCase().includes(filter.toLowerCase())
@@ -68,7 +68,7 @@ export function ApiSpecDetailPage({ className }: ApiSpecDetailPageProps): React.
 
   const grouped = groupByTag(filtered)
   const selectedOp = selected
-    ? (operations.find((op) => op.syntheticOpId === selected) ?? null)
+    ? (operations.find((op: ApiOperationSummary) => op.syntheticOpId === selected) ?? null)
     : null
 
   return (

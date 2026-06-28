@@ -900,7 +900,7 @@ describe('CollectionDetailPage', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('tablist')).toBeInTheDocument()
-        expect(screen.getAllByRole('tab')).toHaveLength(7)
+        expect(screen.getAllByRole('tab')).toHaveLength(8)
         expect(screen.getByRole('tabpanel')).toBeInTheDocument()
       })
     })

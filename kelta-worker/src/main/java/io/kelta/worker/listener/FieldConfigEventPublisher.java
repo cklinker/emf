@@ -9,12 +9,14 @@ import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
 import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CollectionLifecycleManager;
+import io.kelta.worker.service.FormulaRecomputeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Before-save hook for the "fields" system collection that publishes
@@ -40,15 +42,18 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
     private final JdbcTemplate jdbcTemplate;
     private final CollectionLifecycleManager lifecycleManager;
     private final CerbosAuthorizationService cerbosAuthorizationService;
+    private final FormulaRecomputeService formulaRecomputeService;
 
     public FieldConfigEventPublisher(PlatformEventPublisher eventPublisher,
                                       JdbcTemplate jdbcTemplate,
                                       CollectionLifecycleManager lifecycleManager,
-                                      CerbosAuthorizationService cerbosAuthorizationService) {
+                                      CerbosAuthorizationService cerbosAuthorizationService,
+                                      FormulaRecomputeService formulaRecomputeService) {
         this.eventPublisher = eventPublisher;
         this.jdbcTemplate = jdbcTemplate;
         this.lifecycleManager = lifecycleManager;
         this.cerbosAuthorizationService = cerbosAuthorizationService;
+        this.formulaRecomputeService = formulaRecomputeService;
     }
 
     @Override
@@ -65,12 +70,18 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
     @Override
     public void afterCreate(Map<String, Object> record, String tenantId) {
         publishCollectionUpdated(record, tenantId);
+        if (isFormulaField(record) && expressionOf(record) != null) {
+            scheduleFormulaRecompute(record, tenantId);
+        }
     }
 
     @Override
     public void afterUpdate(String id, Map<String, Object> record,
                              Map<String, Object> previous, String tenantId) {
         publishCollectionUpdated(record, tenantId);
+        if (isFormulaField(record) && expressionChanged(record, previous)) {
+            scheduleFormulaRecompute(record, tenantId);
+        }
     }
 
     @Override
@@ -139,5 +150,43 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
     private String getString(Map<String, Object> map, String key) {
         Object value = map.get(key);
         return value != null ? value.toString() : null;
+    }
+
+    private static boolean isFormulaField(Map<String, Object> record) {
+        Object type = record.get("type");
+        return type instanceof String s && "FORMULA".equalsIgnoreCase(s);
+    }
+
+    private static String expressionOf(Map<String, Object> record) {
+        Object config = record.get("fieldTypeConfig");
+        if (config instanceof Map<?, ?> m) {
+            Object expression = m.get("expression");
+            if (expression instanceof String s && !s.isBlank()) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    private static boolean expressionChanged(Map<String, Object> record, Map<String, Object> previous) {
+        String current = expressionOf(record);
+        String prior = previous == null ? null : expressionOf(previous);
+        return !Objects.equals(current, prior);
+    }
+
+    private void scheduleFormulaRecompute(Map<String, Object> record, String tenantId) {
+        if (formulaRecomputeService == null) {
+            return;
+        }
+        String collectionId = getString(record, "collectionId");
+        String fieldName = getString(record, "name");
+        if (collectionId == null || fieldName == null || fieldName.isBlank()) {
+            return;
+        }
+        String collectionName = resolveCollectionName(collectionId);
+        if (collectionName == null) {
+            return;
+        }
+        formulaRecomputeService.recomputeAsync(tenantId, collectionName, fieldName);
     }
 }

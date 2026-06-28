@@ -5,6 +5,7 @@ import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CollectionLifecycleManager;
+import io.kelta.worker.service.FormulaRecomputeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class FieldConfigEventPublisherTest {
     private JdbcTemplate jdbcTemplate;
     private CollectionLifecycleManager lifecycleManager;
     private CerbosAuthorizationService cerbosAuthorizationService;
+    private FormulaRecomputeService formulaRecomputeService;
     private FieldConfigEventPublisher publisher;
 
     @BeforeEach
@@ -37,8 +39,9 @@ class FieldConfigEventPublisherTest {
         jdbcTemplate = mock(JdbcTemplate.class);
         lifecycleManager = mock(CollectionLifecycleManager.class);
         cerbosAuthorizationService = mock(CerbosAuthorizationService.class);
+        formulaRecomputeService = mock(FormulaRecomputeService.class);
         publisher = new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager,
-                cerbosAuthorizationService);
+                cerbosAuthorizationService, formulaRecomputeService);
     }
 
     @Test
@@ -171,6 +174,114 @@ class FieldConfigEventPublisherTest {
         verify(eventPublisher, never()).publish(anyString(), any());
         verifyNoInteractions(jdbcTemplate);
         verifyNoInteractions(lifecycleManager);
+    }
+
+    @Test
+    @DisplayName("Should schedule recompute when a FORMULA field is created with an expression")
+    void shouldScheduleRecomputeOnFormulaCreate() {
+        when(jdbcTemplate.queryForList(anyString(), eq("col-1")))
+                .thenReturn(List.of(Map.of("name", "invoices")));
+
+        Map<String, Object> record = new HashMap<>(Map.of(
+            "id", "field-1",
+            "name", "total",
+            "type", "FORMULA",
+            "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("expression", "amount * 2", "returnType", "NUMBER")
+        ));
+
+        publisher.afterCreate(record, "tenant-1");
+
+        verify(formulaRecomputeService).recomputeAsync("tenant-1", "invoices", "total");
+    }
+
+    @Test
+    @DisplayName("Should not schedule recompute for non-FORMULA field creates")
+    void shouldNotScheduleRecomputeForNonFormulaCreate() {
+        when(jdbcTemplate.queryForList(anyString(), eq("col-1")))
+                .thenReturn(List.of(Map.of("name", "invoices")));
+
+        Map<String, Object> record = new HashMap<>(Map.of(
+            "id", "field-1",
+            "name", "status",
+            "type", "STRING",
+            "collectionId", "col-1"
+        ));
+
+        publisher.afterCreate(record, "tenant-1");
+
+        verifyNoInteractions(formulaRecomputeService);
+    }
+
+    @Test
+    @DisplayName("Should not schedule recompute when formula has blank expression")
+    void shouldNotScheduleRecomputeForBlankExpression() {
+        when(jdbcTemplate.queryForList(anyString(), eq("col-1")))
+                .thenReturn(List.of(Map.of("name", "invoices")));
+
+        Map<String, Object> record = new HashMap<>(Map.of(
+            "id", "field-1",
+            "name", "total",
+            "type", "FORMULA",
+            "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("expression", "", "returnType", "NUMBER")
+        ));
+
+        publisher.afterCreate(record, "tenant-1");
+
+        verifyNoInteractions(formulaRecomputeService);
+    }
+
+    @Test
+    @DisplayName("Should schedule recompute when a FORMULA field's expression changes")
+    void shouldScheduleRecomputeOnExpressionChange() {
+        when(jdbcTemplate.queryForList(anyString(), eq("col-1")))
+                .thenReturn(List.of(Map.of("name", "invoices")));
+
+        Map<String, Object> record = new HashMap<>(Map.of(
+            "id", "field-1",
+            "name", "total",
+            "type", "FORMULA",
+            "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("expression", "amount * 3", "returnType", "NUMBER")
+        ));
+        Map<String, Object> previous = new HashMap<>(Map.of(
+            "id", "field-1",
+            "name", "total",
+            "type", "FORMULA",
+            "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("expression", "amount * 2", "returnType", "NUMBER")
+        ));
+
+        publisher.afterUpdate("field-1", record, previous, "tenant-1");
+
+        verify(formulaRecomputeService).recomputeAsync("tenant-1", "invoices", "total");
+    }
+
+    @Test
+    @DisplayName("Should not schedule recompute when expression is unchanged on update")
+    void shouldNotScheduleRecomputeWhenExpressionUnchanged() {
+        when(jdbcTemplate.queryForList(anyString(), eq("col-1")))
+                .thenReturn(List.of(Map.of("name", "invoices")));
+
+        Map<String, Object> record = new HashMap<>(Map.of(
+            "id", "field-1",
+            "name", "total",
+            "type", "FORMULA",
+            "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("expression", "amount * 2", "returnType", "NUMBER")
+        ));
+        Map<String, Object> previous = new HashMap<>(Map.of(
+            "id", "field-1",
+            "name", "total",
+            "type", "FORMULA",
+            "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("expression", "amount * 2", "returnType", "NUMBER")
+        ));
+
+        publisher.afterUpdate("field-1", record, previous, "tenant-1");
+
+        verifyNoInteractions(formulaRecomputeService);
     }
 
     @SuppressWarnings("unchecked")

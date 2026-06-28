@@ -30,7 +30,8 @@ import {
   resetMockAxios,
   createAxiosError,
 } from '../../test/testUtils'
-import { CollectionsPage, Collection } from './CollectionsPage'
+import { CollectionsPage } from './CollectionsPage'
+import type { Collection } from './CollectionsPage'
 
 /**
  * Convert flat Collection objects to a JSON:API list response shape.

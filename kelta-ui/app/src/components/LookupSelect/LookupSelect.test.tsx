@@ -13,10 +13,10 @@ const mockOptions: LookupOption[] = [
 ]
 
 describe('LookupSelect', () => {
-  let onChange: ReturnType<typeof vi.fn>
+  let onChange: (value: string) => void
 
   beforeEach(() => {
-    onChange = vi.fn()
+    onChange = vi.fn() as unknown as (value: string) => void
   })
 
   describe('Rendering', () => {

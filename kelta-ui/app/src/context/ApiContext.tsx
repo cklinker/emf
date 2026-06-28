@@ -63,27 +63,30 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
     })
 
     // Add a 401 response interceptor: attempt token refresh + retry before redirecting
-    client.getAxiosInstance().interceptors.response.use(
-      (response) => response,
-      async (error) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(client.getAxiosInstance() as any).interceptors.response.use(
+      (response: unknown) => response,
+      async (error: unknown) => {
+        const err = error as {
+          response?: { status?: number }
+          config?: Record<string, unknown> & { headers?: Record<string, unknown> }
+        }
         if (
-          error &&
-          typeof error === 'object' &&
-          'response' in error &&
-          error.response &&
-          typeof error.response === 'object' &&
-          'status' in error.response &&
-          error.response.status === 401 &&
-          error.config &&
-          !(error.config as Record<string, unknown>).__retried
+          err &&
+          typeof err === 'object' &&
+          err.response &&
+          typeof err.response === 'object' &&
+          err.response.status === 401 &&
+          err.config &&
+          !err.config.__retried
         ) {
           // Try refreshing the token and retrying the request once
           try {
             const newToken = await getAccessToken()
             const retryConfig = {
-              ...error.config,
+              ...err.config,
               __retried: true,
-              headers: { ...error.config.headers, Authorization: `Bearer ${newToken}` },
+              headers: { ...err.config.headers, Authorization: `Bearer ${newToken}` },
             }
             return await client.getAxiosInstance().request(retryConfig)
           } catch {
@@ -105,7 +108,16 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
     return client
   }, [baseUrl, getAccessToken, login])
 
-  const apiClient = useMemo(() => new ApiClient(keltaClient.getAxiosInstance()), [keltaClient])
+  const apiClient = useMemo(
+    () =>
+      new ApiClient(
+        // The SDK has its own copy of axios in its node_modules; ours is structurally
+        // identical so we cast through unknown to bridge the duplicate-types divide.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        keltaClient.getAxiosInstance() as any
+      ),
+    [keltaClient]
+  )
 
   const contextValue = useMemo<ApiContextValue>(
     () => ({

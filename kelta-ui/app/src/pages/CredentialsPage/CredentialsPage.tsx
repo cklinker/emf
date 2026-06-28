@@ -115,10 +115,11 @@ export function CredentialsPage({ className }: CredentialsPageProps): React.Reac
   const testMutation = useMutation({
     mutationFn: (id: string) => keltaClient.admin.credentials.test(id),
     onSuccess: (result, id) => {
+      const r = result as { ok: boolean; message?: string }
       queryClient.invalidateQueries({ queryKey: ['credentials'] })
       showToast(
-        result.ok ? 'Connection succeeded' : `Connection failed: ${result.message}`,
-        result.ok ? 'success' : 'error'
+        r.ok ? 'Connection succeeded' : `Connection failed: ${r.message}`,
+        r.ok ? 'success' : 'error'
       )
       void id
     },

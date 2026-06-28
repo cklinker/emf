@@ -577,7 +577,7 @@ export function ConnectedAppsPage({
     queryFn: () => keltaClient.admin.connectedApps.list(),
   })
 
-  const appList: ConnectedApp[] = connectedApps ?? []
+  const appList: ConnectedApp[] = (connectedApps ?? []) as unknown as ConnectedApp[]
 
   const { data: tokens, isLoading: tokensLoading } = useQuery({
     queryKey: ['connected-app-tokens', tokensAppId],
@@ -987,7 +987,15 @@ export function ConnectedAppsPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {(tokens ?? []).map((token) => (
+                    {(
+                      (tokens ?? []) as Array<{
+                        id: string
+                        scopes?: string
+                        issuedAt?: string
+                        expiresAt?: string
+                        revoked?: boolean
+                      }>
+                    ).map((token) => (
                       <tr key={token.id} className="border-b border-border last:border-0">
                         <td className="px-3 py-2">{token.scopes || '-'}</td>
                         <td className="px-3 py-2">
@@ -1098,7 +1106,13 @@ export function ConnectedAppsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {(auditEntries ?? []).map((entry, i) => (
+                  {(
+                    (auditEntries ?? []) as Array<{
+                      action?: unknown
+                      created_at?: unknown
+                      performed_by?: unknown
+                    }>
+                  ).map((entry, i: number) => (
                     <tr key={i} className="border-b border-border last:border-0">
                       <td className="px-3 py-2">
                         <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">

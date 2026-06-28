@@ -39,7 +39,7 @@ export interface ExecutionLogModalProps<T> {
   emptyMessage?: string
 }
 
-export function ExecutionLogModal<T extends Record<string, unknown>>({
+export function ExecutionLogModal<T extends object>({
   title,
   subtitle,
   columns,
@@ -106,22 +106,28 @@ export function ExecutionLogModal<T extends Record<string, unknown>>({
                 </tr>
               </thead>
               <tbody>
-                {data.map((row, rowIndex) => (
-                  <tr
-                    key={((row as Record<string, unknown>).id as string) ?? rowIndex}
-                    className="hover:bg-muted/50 transition-colors"
-                  >
-                    {columns.map((col) => (
-                      <td key={col.key} className="px-3 py-2 text-left border-b whitespace-nowrap">
-                        {col.render
-                          ? col.render(row[col.key], row)
-                          : row[col.key] != null
-                            ? String(row[col.key])
-                            : '-'}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {data.map((row, rowIndex) => {
+                  const rowRecord = row as Record<string, unknown>
+                  return (
+                    <tr
+                      key={(rowRecord.id as string) ?? rowIndex}
+                      className="hover:bg-muted/50 transition-colors"
+                    >
+                      {columns.map((col) => (
+                        <td
+                          key={col.key}
+                          className="px-3 py-2 text-left border-b whitespace-nowrap"
+                        >
+                          {col.render
+                            ? col.render(rowRecord[col.key], row)
+                            : rowRecord[col.key] != null
+                              ? String(rowRecord[col.key])
+                              : '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}

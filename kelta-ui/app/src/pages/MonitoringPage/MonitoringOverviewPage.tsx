@@ -111,7 +111,8 @@ function formatValue(value: number, unit?: string): string {
 function mergeSeriesData(
   allSeries: Map<string, MetricsTimeSeries[]>
 ): { timestamp: number; [key: string]: number }[] {
-  const pointMap = new Map<number, Record<string, number>>()
+  type Point = { timestamp: number; [key: string]: number }
+  const pointMap = new Map<number, Point>()
   for (const [metricName, seriesList] of allSeries) {
     for (const series of seriesList) {
       const labelParts = Object.entries(series.labels)
@@ -145,7 +146,7 @@ function generateZeroFilledData(
 
   const points: { timestamp: number; [key: string]: number }[] = []
   for (let ts = startSec; ts <= endSec; ts += stepSec) {
-    const point: Record<string, number> = { timestamp: ts }
+    const point: { timestamp: number; [key: string]: number } = { timestamp: ts }
     for (const name of metricNames) point[name] = 0
     points.push(point)
   }
@@ -225,7 +226,11 @@ export function MonitoringOverviewPage(): React.ReactElement {
   if (summaryLoading) return <LoadingSpinner />
   if (summaryError) return <ErrorMessage error={t('metrics.loadError')} />
 
-  const topErrors = errorsData?.errors ?? []
+  const topErrors = (errorsData?.errors ?? []) as Array<{
+    path: string
+    count: number
+    statusCodes?: Record<string, number>
+  }>
   const topEndpoints = [...(endpointsData?.endpoints ?? [])]
     .sort((a, b) => (b.p95 ?? 0) - (a.p95 ?? 0))
     .slice(0, 5)
@@ -570,7 +575,7 @@ function ChartPanel({
               <YAxis tickFormatter={(v) => formatValue(v, unit)} className="text-xs" width={80} />
               <Tooltip
                 labelFormatter={(ts) => formatTimestamp(ts as number)}
-                formatter={(value: number) => [formatValue(value, unit), '']}
+                formatter={(value) => [formatValue(value as number, unit), ''] as [string, '']}
               />
               <Legend />
               {seriesKeys.map((key, i) => (
@@ -592,7 +597,7 @@ function ChartPanel({
               <YAxis tickFormatter={(v) => formatValue(v, unit)} className="text-xs" width={80} />
               <Tooltip
                 labelFormatter={(ts) => formatTimestamp(ts as number)}
-                formatter={(value: number) => [formatValue(value, unit), '']}
+                formatter={(value) => [formatValue(value as number, unit), ''] as [string, '']}
               />
               <Legend />
               {seriesKeys.map((key, i) => (

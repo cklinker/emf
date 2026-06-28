@@ -48,11 +48,12 @@ export class SyncEngine {
   private readonly idGen: () => string
   private readonly now: () => string
 
-  constructor(
-    private readonly store: OfflineStore,
-    private readonly api: SyncApi,
-    opts: SyncEngineOptions = {}
-  ) {
+  private readonly store: OfflineStore
+  private readonly api: SyncApi
+
+  constructor(store: OfflineStore, api: SyncApi, opts: SyncEngineOptions = {}) {
+    this.store = store
+    this.api = api
     this.policy = opts.conflictPolicy ?? 'last-write-wins'
     this.pageSize = opts.pageSize ?? 200
     this.idGen = opts.idGen ?? (() => globalThis.crypto.randomUUID())

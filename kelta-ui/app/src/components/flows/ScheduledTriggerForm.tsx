@@ -124,9 +124,7 @@ export function ScheduledTriggerForm({ config, onChange }: ScheduledTriggerFormP
         </div>
       )}
 
-      {validating && (
-        <p className="text-xs text-muted-foreground">Validating...</p>
-      )}
+      {validating && <p className="text-xs text-muted-foreground">Validating...</p>}
       {!validating && validation && (
         <p
           className={

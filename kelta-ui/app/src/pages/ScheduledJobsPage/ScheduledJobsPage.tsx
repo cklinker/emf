@@ -454,7 +454,7 @@ export function ScheduledJobsPage({
     queryFn: () => keltaClient.admin.scheduledJobs.list(),
   })
 
-  const scheduledJobList: ScheduledJob[] = scheduledJobs ?? []
+  const scheduledJobList: ScheduledJob[] = (scheduledJobs ?? []) as unknown as ScheduledJob[]
 
   const createMutation = useMutation({
     mutationFn: (data: ScheduledJobFormData) =>
@@ -790,7 +790,7 @@ export function ScheduledJobsPage({
           title="Scheduled Job Logs"
           subtitle={_logsItemName}
           columns={logColumns}
-          data={logs ?? []}
+          data={(logs ?? []) as unknown as JobExecutionLog[]}
           isLoading={logsLoading}
           error={logsError instanceof Error ? logsError : null}
           onClose={() => setLogsItemId(null)}

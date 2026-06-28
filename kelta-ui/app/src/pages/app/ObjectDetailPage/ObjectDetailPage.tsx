@@ -49,7 +49,12 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/detail'
-import type { RecordHeaderAction, RecordHeaderMetaField, MetadataRow } from '@/components/detail'
+import type {
+  RecordHeaderAction,
+  RecordHeaderMetaField,
+  MetadataRow,
+  FieldSectionRenderContext,
+} from '@/components/detail'
 import type { LayoutRelatedListDto } from '@/hooks/usePageLayout'
 import { useInspectMode } from '@/hooks/useInspectMode'
 import { cn } from '@/lib/utils'
@@ -763,7 +768,11 @@ export function ObjectDetailPage(): React.ReactElement {
                 record={record}
                 lookupDisplayMap={lookupDisplayMap}
                 persistKey={collectionName ? `${collectionName}.details` : undefined}
-                renderField={({ field, value, displayLabel }) => (
+                renderField={({
+                  field,
+                  value,
+                  displayLabel,
+                }: FieldSectionRenderContext<FieldDefinition>) => (
                   <FieldRenderer
                     type={field.type}
                     value={value}

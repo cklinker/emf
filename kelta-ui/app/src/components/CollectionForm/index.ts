@@ -10,5 +10,6 @@ export type {
   CollectionFormData,
   CollectionFormSchema,
   Collection,
+  AvailableField,
 } from './CollectionForm'
 export { default } from './CollectionForm'

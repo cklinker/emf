@@ -1691,7 +1691,7 @@ describe('PageBuilderPage', () => {
           return Promise.resolve({
             data: {
               content: duplicatedPage,
-              totalElements: duplicatedPage.length,
+              totalElements: 1,
               totalPages: 1,
               size: 1000,
               number: 0,
@@ -1703,7 +1703,7 @@ describe('PageBuilderPage', () => {
       mockAxios.post.mockResolvedValueOnce({
         data: {
           content: duplicatedPage,
-          totalElements: duplicatedPage.length,
+          totalElements: 1,
           totalPages: 1,
           size: 1000,
           number: 0,
@@ -1742,7 +1742,7 @@ describe('PageBuilderPage', () => {
           return Promise.resolve({
             data: {
               content: duplicatedPage,
-              totalElements: duplicatedPage.length,
+              totalElements: 1,
               totalPages: 1,
               size: 1000,
               number: 0,
@@ -1757,7 +1757,7 @@ describe('PageBuilderPage', () => {
       mockAxios.post.mockResolvedValueOnce({
         data: {
           content: duplicatedPage,
-          totalElements: duplicatedPage.length,
+          totalElements: 1,
           totalPages: 1,
           size: 1000,
           number: 0,
@@ -1809,7 +1809,7 @@ describe('PageBuilderPage', () => {
           return Promise.resolve({
             data: {
               content: duplicatedPage,
-              totalElements: duplicatedPage.length,
+              totalElements: 1,
               totalPages: 1,
               size: 1000,
               number: 0,
@@ -1821,7 +1821,7 @@ describe('PageBuilderPage', () => {
       mockAxios.post.mockResolvedValueOnce({
         data: {
           content: duplicatedPage,
-          totalElements: duplicatedPage.length,
+          totalElements: 1,
           totalPages: 1,
           size: 1000,
           number: 0,

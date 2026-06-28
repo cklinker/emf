@@ -46,15 +46,25 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
   if (isLoading) return <LoadingSpinner />
   if (error || !data) return <ErrorMessage error={t('requestLog.detail.loadError')} />
 
-  const spans = data.spans || []
+  interface Span {
+    spanID?: string
+    operationName?: string
+    duration?: number
+    startTimeMillis?: number
+    startTime?: number
+    tagMap?: Record<string, unknown>
+    references?: Array<{ spanID?: string }>
+    process?: { serviceName?: string }
+  }
+  const spans = ((data as { spans?: Span[] }).spans || []) as Span[]
   // Find the root span: the span whose parent is not in the result set.
   // Jaeger stores parent references in the 'references' array, not in the flat tagMap.
   const rootSpan =
-    spans.find((s) => {
+    spans.find((s: Span) => {
       const parentSpanId = s.references?.[0]?.spanID
-      return !parentSpanId || !spans.some((p) => p.spanID === parentSpanId)
+      return !parentSpanId || !spans.some((p: Span) => p.spanID === parentSpanId)
     }) || spans[0]
-  const childSpans = spans.filter((s) => s !== rootSpan)
+  const childSpans = spans.filter((s: Span) => s !== rootSpan)
 
   const tags = rootSpan?.tagMap || {}
   const httpMethod = String(tags['http.request.method'] ?? '')
@@ -207,7 +217,7 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
                         <td className="p-2 font-mono text-xs text-muted-foreground">
                           {k.replace('http.request.header.', '')}
                         </td>
-                        <td className="p-2 font-mono text-xs">{v}</td>
+                        <td className="p-2 font-mono text-xs">{String(v)}</td>
                       </tr>
                     ))}
                   {Object.entries(tags).filter(([k]) => k.startsWith('http.request.header.'))
@@ -277,7 +287,7 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
               <p className="text-sm text-muted-foreground">{t('requestLog.detail.noChildSpans')}</p>
             ) : (
               <div className="space-y-2">
-                {childSpans.map((span, idx) => {
+                {childSpans.map((span: Span, idx: number) => {
                   const spanDur = span.duration ? (span.duration / 1000).toFixed(0) : '?'
                   const spanTags = span.tagMap || {}
                   const spanService = String(
@@ -311,26 +321,36 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
               <p className="text-sm text-muted-foreground">{t('requestLog.detail.noLogs')}</p>
             ) : (
               <div className="space-y-2">
-                {logsData.hits.map((log, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded border border-border p-3"
-                    data-testid={`request-detail-log-${idx}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(log['@timestamp']).toLocaleTimeString()}
-                      </span>
-                      <LogLevelBadge level={log.level} />
-                      <span className="flex-1 font-mono text-xs">{log.message}</span>
+                {logsData.hits.map(
+                  (
+                    log: {
+                      '@timestamp': string
+                      level: string
+                      message: string
+                      stack_trace?: string
+                    },
+                    idx: number
+                  ) => (
+                    <div
+                      key={idx}
+                      className="rounded border border-border p-3"
+                      data-testid={`request-detail-log-${idx}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(log['@timestamp']).toLocaleTimeString()}
+                        </span>
+                        <LogLevelBadge level={log.level} />
+                        <span className="flex-1 font-mono text-xs">{log.message}</span>
+                      </div>
+                      {log.stack_trace && (
+                        <pre className="mt-2 max-h-[200px] overflow-auto rounded bg-muted p-2 font-mono text-xs text-red-600 dark:text-red-400">
+                          {log.stack_trace}
+                        </pre>
+                      )}
                     </div>
-                    {log.stack_trace && (
-                      <pre className="mt-2 max-h-[200px] overflow-auto rounded bg-muted p-2 font-mono text-xs text-red-600 dark:text-red-400">
-                        {log.stack_trace}
-                      </pre>
-                    )}
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             )}
           </div>
@@ -347,9 +367,17 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
               </p>
             ) : (
               <div className="space-y-2">
-                {auditData.hits
+                {(
+                  auditData.hits as Array<{
+                    traceId?: string
+                    timestamp?: string
+                    action?: string
+                    entity_type?: string
+                    entity_name?: string
+                  }>
+                )
                   .filter((a) => a.traceId === traceId)
-                  .map((audit, idx) => (
+                  .map((audit, idx: number) => (
                     <div
                       key={idx}
                       className="rounded border border-border p-3"

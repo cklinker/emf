@@ -48,7 +48,7 @@ export function OperationPicker({
       }),
   })
 
-  const operations = data ?? []
+  const operations = (data ?? []) as ApiOperationSummary[]
 
   return (
     <div className={className ?? 'space-y-2'}>

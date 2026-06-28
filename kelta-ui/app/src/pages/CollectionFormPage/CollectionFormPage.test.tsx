@@ -6,7 +6,6 @@
  *  - the edit query read only `attributes`, never the `displayFieldId` relationship, so the saved
  *    display field reset to "Auto-detect" on reload and looked unsaved.
  */
-import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

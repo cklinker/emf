@@ -89,7 +89,7 @@ export function useIncludedResources(
  * // profiles = [{ id: "p1", name: "Admin", ... }, { id: "p2", name: "User", ... }]
  * ```
  */
-export function useExtractIncluded<T extends Record<string, unknown> = Record<string, unknown>>(
+export function useExtractIncluded<T extends object = Record<string, unknown>>(
   response: unknown,
   type: string
 ): T[] {

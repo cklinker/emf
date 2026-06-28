@@ -10,7 +10,7 @@ import path from 'path'
 // `crypto` as a global, so `npx vite build` throws "ReferenceError: crypto is not
 // defined" once the PWA plugin runs. Polyfill it for the build process.
 if (!globalThis.crypto) {
-  globalThis.crypto = webcrypto as unknown as Crypto
+  ;(globalThis as { crypto?: unknown }).crypto = webcrypto
 }
 
 // https://vite.dev/config/

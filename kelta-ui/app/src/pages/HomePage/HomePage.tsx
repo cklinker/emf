@@ -6,7 +6,7 @@
  * as the default route.
  */
 
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
@@ -33,7 +33,7 @@ interface ApprovalInstance {
   submittedAt: string
 }
 
-export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
+export function HomePage({ testId = 'home-page' }: HomePageProps): React.ReactElement {
   const { t } = useI18n()
   const { apiClient } = useApi()
   const { user } = useAuth()

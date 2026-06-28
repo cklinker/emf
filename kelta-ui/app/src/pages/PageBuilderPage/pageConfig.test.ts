@@ -28,7 +28,11 @@ describe('pageConfig', () => {
 
   describe('readConfig', () => {
     it('returns the config object or {}', () => {
-      expect(readConfig({ config: { layout: { type: 'single' } } })).toEqual({
+      expect(
+        readConfig({ config: { layout: { type: 'single' } } } as unknown as Parameters<
+          typeof readConfig
+        >[0])
+      ).toEqual({
         layout: { type: 'single' },
       })
       expect(readConfig({})).toEqual({})

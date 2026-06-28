@@ -314,7 +314,7 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
     refetchInterval: 5000,
   })
 
-  const jobList: BulkJob[] = bulkJobs ?? []
+  const jobList: BulkJob[] = (bulkJobs ?? []) as unknown as BulkJob[]
 
   const createMutation = useMutation({
     mutationFn: (data: BulkJobFormData) =>

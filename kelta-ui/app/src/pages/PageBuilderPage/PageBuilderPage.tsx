@@ -574,7 +574,7 @@ export function PageBuilderPage({
     refetch: refetchPages,
   } = useQuery({
     queryKey: ['ui-pages'],
-    queryFn: () => keltaClient.admin.ui.listPages() as Promise<UIPage[]>,
+    queryFn: () => keltaClient.admin.ui.listPages() as unknown as Promise<UIPage[]>,
     enabled: viewMode === 'list',
   })
 
@@ -604,7 +604,7 @@ export function PageBuilderPage({
     mutationFn: (data: Partial<UIPage>) =>
       keltaClient.admin.ui.createPage(
         data as unknown as import('@kelta/sdk').UIPage
-      ) as Promise<UIPage>,
+      ) as unknown as Promise<UIPage>,
     onSuccess: (newPage) => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       showToast(t('success.created', { item: t('builder.pages.page') }), 'success')

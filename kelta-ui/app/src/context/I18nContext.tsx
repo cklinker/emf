@@ -49,8 +49,12 @@ export interface I18nContextValue {
   locale: string
   /** Set the current locale */
   setLocale: (locale: string) => void
-  /** Translate a key with optional parameter interpolation */
-  t: (key: string, params?: Record<string, string | number>) => string
+  /**
+   * Translate a key with optional parameter interpolation.
+   * The second arg may be either an interpolation params object, or a string
+   * fallback (used when the key is missing from the translation tables).
+   */
+  t: (key: string, paramsOrFallback?: Record<string, string | number> | string) => string
   /** Format a date according to the current locale */
   formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) => string
   /** Format a number according to the current locale */
@@ -318,7 +322,9 @@ export function I18nProvider({
    * Requirement 15.5: Update all UI text without page reload when language changes
    */
   const t = useCallback(
-    (key: string, params?: Record<string, string | number>): string => {
+    (key: string, paramsOrFallback?: Record<string, string | number> | string): string => {
+      const inlineFallback = typeof paramsOrFallback === 'string' ? paramsOrFallback : undefined
+      const params = typeof paramsOrFallback === 'object' ? paramsOrFallback : undefined
       const translation = getNestedValue(translations, key)
 
       if (translation === undefined) {
@@ -329,7 +335,10 @@ export function I18nProvider({
           return interpolate(fallback, params)
         }
 
-        // Return the key itself if no translation found
+        // Return the inline fallback if provided, otherwise the key
+        if (inlineFallback !== undefined) {
+          return interpolate(inlineFallback, params)
+        }
         console.warn(`[I18n] Translation key not found: "${key}"`)
         return key
       }

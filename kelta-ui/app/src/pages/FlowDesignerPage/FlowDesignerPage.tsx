@@ -6,6 +6,7 @@ import type { Node, Edge } from '@xyflow/react'
 
 import { useApi } from '../../context/ApiContext'
 import type { CreateFlowRequest } from '@kelta/sdk'
+import type { Flow } from './types'
 import { unwrapResource } from '../../utils/jsonapi'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
@@ -96,7 +97,7 @@ export function FlowDesignerPage() {
             ? JSON.parse(flow.triggerConfig)
             : flow.triggerConfig
           : null,
-      } as Partial<CreateFlowRequest>)
+      } as unknown as Partial<CreateFlowRequest>)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flow', flowId] })
@@ -275,7 +276,7 @@ export function FlowDesignerPage() {
         isDirty={isDirty}
         isSaving={saveMutation.isPending}
         showJson={showJson}
-        publishedVersion={flow.publishedVersion}
+        publishedVersion={(flow as unknown as { publishedVersion?: number }).publishedVersion}
         currentVersion={flow.version}
         onSave={() => saveMutation.mutate()}
         onToggleJson={() => setShowJson((v) => !v)}
@@ -387,7 +388,7 @@ export function FlowDesignerPage() {
           collapsed={propertiesCollapsed}
           onToggle={() => setPropertiesCollapsed((v) => !v)}
           onNodeUpdate={handleNodeUpdate}
-          flow={flow}
+          flow={flow as unknown as Flow}
           allNodeIds={allNodeIds}
           onEditTrigger={() => setTriggerSheetOpen(true)}
         />
@@ -406,7 +407,11 @@ export function FlowDesignerPage() {
         />
       )}
 
-      <TriggerEditSheet open={triggerSheetOpen} onOpenChange={setTriggerSheetOpen} flow={flow} />
+      <TriggerEditSheet
+        open={triggerSheetOpen}
+        onOpenChange={setTriggerSheetOpen}
+        flow={flow as unknown as Flow}
+      />
 
       <GenerateFlowDialog
         open={generateDialogOpen}

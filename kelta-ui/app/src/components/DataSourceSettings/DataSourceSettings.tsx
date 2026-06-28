@@ -63,7 +63,7 @@ export function DataSourceSettings({ collectionId }: DataSourceSettingsProps) {
   })
 
   if (isLoading) return <LoadingSpinner />
-  if (error) return <ErrorMessage message={(error as Error).message} />
+  if (error) return <ErrorMessage error={(error as Error).message} />
 
   // Keyed so the form re-initialises if the collection changes.
   return (

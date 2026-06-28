@@ -461,7 +461,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
     queryFn: () => keltaClient.admin.tenants.list(0, 100),
   })
 
-  const tenants = tenantsPage?.content ?? []
+  const tenants = (tenantsPage?.content ?? []) as Tenant[]
 
   // Create mutation
   const createMutation = useMutation({
@@ -676,7 +676,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
               </tr>
             </thead>
             <tbody>
-              {tenants.map((tenant, index) => (
+              {tenants.map((tenant: Tenant, index: number) => (
                 <tr
                   key={tenant.id}
                   role="row"

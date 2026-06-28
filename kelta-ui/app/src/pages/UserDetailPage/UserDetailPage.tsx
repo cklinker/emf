@@ -548,7 +548,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
                   <>
                     {mfaStatus.enrolledAt && (
                       <p className="text-xs text-muted-foreground">
-                        Enrolled: {formatDate(mfaStatus.enrolledAt)}
+                        Enrolled: {formatDate(new Date(mfaStatus.enrolledAt))}
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">

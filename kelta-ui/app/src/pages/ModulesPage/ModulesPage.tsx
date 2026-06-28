@@ -425,11 +425,11 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
 
       {/* Delete Confirmation */}
       <ConfirmDialog
-        isOpen={deleteDialogOpen}
+        open={deleteDialogOpen}
         title="Uninstall Module"
         message={`Are you sure you want to uninstall "${moduleToDelete?.name}"? This will remove all its action handlers. Flows using these handlers will need to be updated.`}
         confirmLabel="Uninstall"
-        confirmVariant="destructive"
+        variant="danger"
         onConfirm={() => {
           if (moduleToDelete) {
             uninstallMutation.mutate(moduleToDelete.moduleId)
@@ -439,7 +439,6 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
           setDeleteDialogOpen(false)
           setModuleToDelete(null)
         }}
-        isProcessing={uninstallMutation.isPending}
       />
     </div>
   )

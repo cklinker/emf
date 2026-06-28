@@ -116,11 +116,11 @@ export interface MigrationsPageProps {
 
 // API functions using apiClient / keltaClient
 async function fetchMigrationHistory(keltaClient: KeltaClient): Promise<MigrationRun[]> {
-  return keltaClient.admin.migrations.listRuns() as Promise<MigrationRun[]>
+  return keltaClient.admin.migrations.listRuns() as unknown as Promise<MigrationRun[]>
 }
 
 async function fetchMigrationDetails(keltaClient: KeltaClient, id: string): Promise<MigrationRun> {
-  return keltaClient.admin.migrations.getRun(id) as Promise<MigrationRun>
+  return keltaClient.admin.migrations.getRun(id) as unknown as Promise<MigrationRun>
 }
 
 async function fetchCollectionVersions(
@@ -194,7 +194,7 @@ async function getMigrationRunStatus(
   keltaClient: KeltaClient,
   runId: string
 ): Promise<MigrationRun> {
-  return keltaClient.admin.migrations.getRun(runId) as Promise<MigrationRun>
+  return keltaClient.admin.migrations.getRun(runId) as unknown as Promise<MigrationRun>
 }
 
 /**

@@ -525,7 +525,8 @@ export function ApprovalProcessesPage({
     queryFn: () => keltaClient.admin.approvals.listProcesses(),
   })
 
-  const approvalProcessList: ApprovalProcess[] = approvalProcesses ?? []
+  const approvalProcessList: ApprovalProcess[] = (approvalProcesses ??
+    []) as unknown as ApprovalProcess[]
 
   const createMutation = useMutation({
     mutationFn: (data: ApprovalProcessFormData) =>
@@ -583,8 +584,8 @@ export function ApprovalProcessesPage({
     enabled: !!instancesItemId,
   })
 
-  const filteredInstances = (allInstances ?? []).filter(
-    (i) => i.approvalProcessId === instancesItemId
+  const filteredInstances = ((allInstances ?? []) as ApprovalInstance[]).filter(
+    (i: ApprovalInstance) => i.approvalProcessId === instancesItemId
   )
   void filteredInstances
 

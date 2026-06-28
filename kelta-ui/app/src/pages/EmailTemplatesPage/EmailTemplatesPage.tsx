@@ -697,7 +697,9 @@ export function EmailTemplatesPage({
     enabled: !!logsItemId,
   })
 
-  const filteredLogs = (allEmailLogs ?? []).filter((log) => log.templateId === logsItemId)
+  const filteredLogs = ((allEmailLogs ?? []) as EmailLog[]).filter(
+    (log: EmailLog) => log.templateId === logsItemId
+  )
   void filteredLogs
 
   const logColumns: LogColumn<EmailLog>[] = [
@@ -740,7 +742,13 @@ export function EmailTemplatesPage({
   })
 
   const collections: CollectionOption[] = useMemo(() => {
-    return (collectionsData ?? []).map((c) => ({
+    return (
+      (collectionsData ?? []) as Array<{
+        id?: string
+        name: string
+        displayName?: string
+      }>
+    ).map((c) => ({
       id: c.id ?? '',
       name: c.name,
       displayName: c.displayName ?? c.name,

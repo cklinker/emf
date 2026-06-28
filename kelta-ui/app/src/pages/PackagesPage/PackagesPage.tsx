@@ -159,7 +159,7 @@ async function fetchMenus(apiClient: ApiClient): Promise<SelectableItem[]> {
 }
 
 async function exportPackage(apiClient: ApiClient, options: ExportOptions): Promise<Blob> {
-  return apiClient.postResource('/api/packages/export', options, { responseType: 'blob' })
+  return apiClient.postResource('/api/packages/export', options)
 }
 
 async function previewImport(apiClient: ApiClient, file: File): Promise<ImportPreview> {

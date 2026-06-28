@@ -146,32 +146,34 @@ function toJsonApiWithFields(schema: CollectionSchema) {
         description: schema.description,
       },
     },
-    included: (schema.fields || []).map((f: Record<string, unknown>, i: number) => {
-      // Spread ALL field properties into attributes to preserve validation, order, etc.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id: _id, referenceCollectionId: _ref, ...rest } = f as Record<string, unknown>
-      return {
-        type: 'fields',
-        id: f.id,
-        attributes: {
-          ...rest,
-          type: (f.type as string).toUpperCase(),
-          required: f.required ?? false,
-          fieldOrder: (f as Record<string, unknown>).order ?? i + 1,
-          active: true,
-        },
-        relationships: {
-          collectionId: { data: { type: 'collections', id: schema.id } },
-          ...(f.referenceCollectionId
-            ? {
-                referenceCollectionId: {
-                  data: { type: 'collections', id: f.referenceCollectionId },
-                },
-              }
-            : {}),
-        },
+    included: ((schema.fields || []) as unknown as Record<string, unknown>[]).map(
+      (f: Record<string, unknown>, i: number) => {
+        // Spread ALL field properties into attributes to preserve validation, order, etc.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, referenceCollectionId: _ref, ...rest } = f as Record<string, unknown>
+        return {
+          type: 'fields',
+          id: f.id,
+          attributes: {
+            ...rest,
+            type: (f.type as string).toUpperCase(),
+            required: f.required ?? false,
+            fieldOrder: (f as Record<string, unknown>).order ?? i + 1,
+            active: true,
+          },
+          relationships: {
+            collectionId: { data: { type: 'collections', id: schema.id } },
+            ...(f.referenceCollectionId
+              ? {
+                  referenceCollectionId: {
+                    data: { type: 'collections', id: f.referenceCollectionId },
+                  },
+                }
+              : {}),
+          },
+        }
       }
-    }),
+    ),
   }
 }
 

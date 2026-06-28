@@ -74,6 +74,7 @@ vi.mock('./context/TenantContext', () => ({
   getTenantSlug: () => 'test-tenant',
   setResolvedTenantId: vi.fn(),
   getResolvedTenantId: () => null,
+  isCustomDomainHost: () => false,
 }))
 
 // Mock the AuthContext
@@ -330,6 +331,8 @@ vi.mock('./pages', () => ({
   CredentialsPage: () => <div data-testid="credentials-page">Credentials Page</div>,
   ApiSpecsPage: () => <div data-testid="api-specs-page">API Specs Page</div>,
   ApiSpecDetailPage: () => <div data-testid="api-spec-detail-page">API Spec Detail Page</div>,
+  AiAgentsPage: () => <div data-testid="ai-agents-page">AI Agents Page</div>,
+  ConfigHealthPage: () => <div data-testid="config-health-page">Config Health Page</div>,
   NotFoundPage: () => <div data-testid="not-found-page">Not Found Page</div>,
 }))
 

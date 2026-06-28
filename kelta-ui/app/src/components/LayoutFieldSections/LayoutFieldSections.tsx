@@ -11,6 +11,7 @@
 
 import React, { useMemo } from 'react'
 import { FieldSection } from '@/components/detail'
+import type { FieldSectionRenderContext } from '@/components/detail'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import type { LayoutSectionDto, LayoutFieldPlacementDto } from '@/hooks/usePageLayout'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
@@ -70,7 +71,7 @@ function mapPlacementsToFields(
   }
 
   return interleaved
-    .map((placement) => {
+    .map<FieldDefinition | null>((placement) => {
       // Try to find the schema field by ID first, then by name
       const schemaField =
         schemaFieldsById.get(placement.fieldId) || schemaFieldsByName.get(placement.fieldName)
@@ -132,7 +133,11 @@ export function LayoutFieldSections({
             defaultCollapsed={section.collapsed}
             columns={(section.columns as 1 | 2 | 3 | 4) || 2}
             persistKey={persistKeyPrefix ? `${persistKeyPrefix}.${section.id}` : undefined}
-            renderField={({ field, value, displayLabel }) => (
+            renderField={({
+              field,
+              value,
+              displayLabel,
+            }: FieldSectionRenderContext<FieldDefinition>) => (
               <FieldRenderer
                 type={field.type}
                 value={value}

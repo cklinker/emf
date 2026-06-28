@@ -112,14 +112,8 @@ export function ConfirmDialog({
   const descriptionId = `${dialogId}-description`
 
   const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) {
+    if (!isOpen && closeOnOverlayClick) {
       onCancel()
-    }
-  }
-
-  const handleInteractOutside = (e: Event) => {
-    if (!closeOnOverlayClick) {
-      e.preventDefault()
     }
   }
 
@@ -135,7 +129,6 @@ export function ConfirmDialog({
         data-testid="confirm-dialog"
         data-variant={variant}
         className={cn('max-w-md', variant === 'danger' && 'border-destructive/20')}
-        onInteractOutside={handleInteractOutside}
         onEscapeKeyDown={handleEscapeKeyDown}
       >
         <AlertDialogHeader>

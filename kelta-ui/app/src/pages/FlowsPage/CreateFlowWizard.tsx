@@ -70,7 +70,11 @@ export function CreateFlowWizard({ open, onOpenChange }: CreateFlowWizardProps) 
         definition: MINIMAL_DEFINITION,
         triggerConfig: Object.keys(triggerConfig).length > 0 ? triggerConfig : null,
       }
-      const resp = await keltaClient.admin.flows.create('', '', payload as CreateFlowRequest)
+      const resp = await keltaClient.admin.flows.create(
+        '',
+        '',
+        payload as unknown as CreateFlowRequest
+      )
       return resp
     },
     onSuccess: (data) => {

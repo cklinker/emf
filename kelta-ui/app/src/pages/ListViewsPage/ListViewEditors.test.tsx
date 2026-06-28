@@ -1,7 +1,7 @@
 /**
  * Tests for the schema-driven List View editors (columns / filters / sort).
  */
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import {

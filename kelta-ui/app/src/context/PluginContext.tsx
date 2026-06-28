@@ -135,7 +135,10 @@ export function PluginProvider({
         return next
       })
       // Sync to singleton componentRegistry for consumers like CustomPage
-      componentRegistry.registerFieldRenderer(type, renderer as ComponentType<never>)
+      componentRegistry.registerFieldRenderer(
+        type,
+        renderer as unknown as Parameters<typeof componentRegistry.registerFieldRenderer>[1]
+      )
       console.info(`[Plugin] Registered field renderer for type: ${type}`)
     },
     []
@@ -154,7 +157,10 @@ export function PluginProvider({
         return next
       })
       // Sync to singleton componentRegistry
-      componentRegistry.registerPageComponent(name, component as ComponentType<never>)
+      componentRegistry.registerPageComponent(
+        name,
+        component as unknown as Parameters<typeof componentRegistry.registerPageComponent>[1]
+      )
       console.info(`[Plugin] Registered page component: ${name}`)
     },
     []

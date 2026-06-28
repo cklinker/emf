@@ -467,7 +467,7 @@ export function FieldEditor({
     control,
     formState: { errors, isDirty },
   } = useForm<FieldEditorFormData>({
-    resolver: zodResolver(fieldEditorSchema),
+    resolver: zodResolver(fieldEditorSchema) as never,
     defaultValues: {
       name: field?.name ?? '',
       displayName: field?.displayName ?? '',
@@ -748,7 +748,7 @@ export function FieldEditor({
         description: data.description || undefined,
         trackHistory: data.trackHistory,
         searchable: data.searchable,
-        constraints,
+        constraints: constraints ? JSON.stringify(constraints) : undefined,
       }
 
       await onSave(fieldData)

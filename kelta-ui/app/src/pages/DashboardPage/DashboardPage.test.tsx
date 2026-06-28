@@ -255,7 +255,7 @@ describe('DashboardPage', () => {
       mockAxios.get.mockResolvedValue({
         data: {
           content: mockDashboardData,
-          totalElements: mockDashboardData.length,
+          totalElements: 1,
           totalPages: 1,
           size: 1000,
           number: 0,
@@ -461,7 +461,7 @@ describe('DashboardPage', () => {
       mockAxios.get.mockResolvedValue({
         data: {
           content: mockDashboardData,
-          totalElements: mockDashboardData.length,
+          totalElements: 1,
           totalPages: 1,
           size: 1000,
           number: 0,
@@ -523,7 +523,7 @@ describe('DashboardPage', () => {
       mockAxios.get.mockResolvedValue({
         data: {
           content: mockDashboardData,
-          totalElements: mockDashboardData.length,
+          totalElements: 1,
           totalPages: 1,
           size: 1000,
           number: 0,
@@ -548,7 +548,7 @@ describe('DashboardPage', () => {
       mockAxios.get.mockResolvedValue({
         data: {
           content: mockDashboardData,
-          totalElements: mockDashboardData.length,
+          totalElements: 1,
           totalPages: 1,
           size: 1000,
           number: 0,

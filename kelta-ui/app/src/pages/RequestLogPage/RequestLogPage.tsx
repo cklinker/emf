@@ -95,7 +95,15 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
   if (isLoading) return <LoadingSpinner />
   if (error) return <ErrorMessage error={t('requestLog.loadError')} />
 
-  const hits = data?.hits ?? []
+  interface RequestLogHit {
+    traceID?: string
+    operationName?: string
+    duration?: number
+    startTimeMillis?: number
+    startTime?: number
+    tagMap?: Record<string, unknown>
+  }
+  const hits = (data?.hits ?? []) as RequestLogHit[]
   const totalHits = data?.totalHits ?? 0
   const totalPages = Math.max(1, Math.ceil(totalHits / pageSize))
 
@@ -258,7 +266,7 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {hits.map((hit, idx) => {
+                {hits.map((hit: RequestLogHit, idx: number) => {
                   const tags = hit.tagMap || {}
                   const statusCode = String(tags['http.response.status_code'] ?? '')
                   const httpMethod = String(tags['http.request.method'] ?? '')

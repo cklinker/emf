@@ -6,7 +6,7 @@
  * Built on shadcn Dialog + Command (cmdk) with Tailwind CSS styling.
  */
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Clock, FileText, ClipboardList } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
@@ -147,7 +147,7 @@ function saveSearchHistory(history: string[]): void {
   }
 }
 
-export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | null {
+export function SearchModal({ open, onClose }: SearchModalProps): React.ReactElement | null {
   const { t } = useI18n()
   const { apiClient } = useApi()
   const { user } = useAuth()
@@ -158,7 +158,7 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
   const [searchHistory, setSearchHistory] = useState<string[]>(loadSearchHistory)
   const [recordResults, setRecordResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const tenantSlug = getTenantSlug()
   const basePath = `/${tenantSlug}/app`

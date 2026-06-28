@@ -1,6 +1,28 @@
 import React, { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { EmailSettings, EmailSettingsUpdate } from '@kelta/sdk'
+// EmailSettings types are not exported from the SDK; define locally to match the worker DTO.
+interface EmailSettings {
+  hasOverride: boolean
+  fromName?: string | null
+  fromAddress?: string | null
+  smtp?: {
+    host?: string
+    port?: number
+    useStartTls?: boolean
+  }
+  autoInviteOnCreate: boolean
+}
+interface EmailSettingsUpdate {
+  host?: string
+  port?: number
+  username?: string
+  password?: string
+  useStartTls?: boolean
+  fromAddress?: string | null
+  fromName?: string | null
+  autoInviteOnCreate?: boolean
+  clear?: boolean
+}
 import { useApi } from '../../context/ApiContext'
 import { useSystemPermissions } from '../../hooks/useSystemPermissions'
 import { useToast } from '../../components/Toast'
@@ -69,11 +91,13 @@ export function EmailSettingsPage({ className }: EmailSettingsPageProps): React.
   })
 
   useEffect(() => {
-    setForm(settingsToForm(data))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForm(settingsToForm(data as unknown as EmailSettings | undefined))
   }, [data])
 
   const save = useMutation({
-    mutationFn: (update: EmailSettingsUpdate) => keltaClient.admin.emailSettings.update(update),
+    mutationFn: (update: EmailSettingsUpdate) =>
+      keltaClient.admin.emailSettings.update(update as never),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-settings'] })
       showToast('Email settings saved', 'success')
@@ -82,7 +106,7 @@ export function EmailSettingsPage({ className }: EmailSettingsPageProps): React.
   })
 
   const clear = useMutation({
-    mutationFn: () => keltaClient.admin.emailSettings.update({ clear: true }),
+    mutationFn: () => keltaClient.admin.emailSettings.update({ clear: true } as never),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-settings'] })
       showToast('Reverted to platform default', 'success')
@@ -111,7 +135,7 @@ export function EmailSettingsPage({ className }: EmailSettingsPageProps): React.
   }
 
   if (isLoading) return <LoadingSpinner />
-  if (error) return <ErrorMessage message="Failed to load email settings" />
+  if (error) return <ErrorMessage error="Failed to load email settings" />
 
   const hasOverride = data?.hasOverride
 

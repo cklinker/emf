@@ -21,7 +21,11 @@ interface ModuleActionParamsProps {
   onUpdate: (params: Record<string, unknown>) => void
 }
 
-export function ModuleActionParams({ configSchema, parameters, onUpdate }: ModuleActionParamsProps) {
+export function ModuleActionParams({
+  configSchema,
+  parameters,
+  onUpdate,
+}: ModuleActionParamsProps) {
   const schema = React.useMemo<JsonSchema | null>(() => {
     if (!configSchema) return null
     try {

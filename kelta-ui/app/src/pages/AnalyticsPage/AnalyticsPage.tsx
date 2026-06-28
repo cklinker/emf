@@ -14,7 +14,7 @@ export interface AnalyticsPageProps {
 
 function getSupersetUrl(): string {
   return (
-    ((window as Record<string, unknown>).__SUPERSET_URL__ as string | undefined) ||
+    ((window as unknown as Record<string, unknown>).__SUPERSET_URL__ as string | undefined) ||
     `${window.location.protocol}//superset.rzware.com`
   )
 }
@@ -115,7 +115,7 @@ export function AnalyticsPage({
 
       {!isLoading && !error && dashboards && dashboards.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {dashboards.map((dashboard) => (
+          {dashboards.map((dashboard: SupersetDashboard) => (
             <button
               key={dashboard.id}
               onClick={() => setSelectedDashboard(dashboard)}

@@ -4,6 +4,9 @@ import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.events.RecordEventPublisher;
+import io.kelta.runtime.formula.BuiltInFunctions;
+import io.kelta.runtime.formula.FormulaEvaluator;
+import io.kelta.runtime.formula.FormulaFunction;
 import io.kelta.runtime.model.*;
 import io.kelta.runtime.storage.StorageAdapter;
 import io.kelta.runtime.validation.CustomValidationRuleEngine;
@@ -1063,6 +1066,119 @@ class DefaultQueryEngineTest {
 
             engineWithHooks.delete(testCollection, id);
             assertTrue(afterHookCalled.get(), "After-delete hook should have been called");
+        }
+    }
+
+    @Nested
+    @DisplayName("Formula Field Evaluation Tests")
+    class FormulaFieldTests {
+
+        private FormulaEvaluator formulaEvaluator;
+        private DefaultQueryEngine engineWithFormula;
+        private CollectionDefinition orderCollection;
+
+        @BeforeEach
+        void setUp() {
+            List<FormulaFunction> functions = List.of(
+                    new BuiltInFunctions.If(),
+                    new BuiltInFunctions.IsBlank(),
+                    new BuiltInFunctions.BlankValue());
+            formulaEvaluator = new FormulaEvaluator(functions);
+            engineWithFormula = new DefaultQueryEngine(
+                    storageAdapter, validationEngine, null, null,
+                    formulaEvaluator, null, null);
+
+            orderCollection = new CollectionDefinitionBuilder()
+                    .name("orders")
+                    .displayName("Orders")
+                    .addField(new FieldDefinitionBuilder()
+                            .name("amount").type(FieldType.DOUBLE).nullable(false).build())
+                    .addField(new FieldDefinitionBuilder()
+                            .name("quantity").type(FieldType.INTEGER).nullable(false).build())
+                    .addField(new FieldDefinitionBuilder()
+                            .name("total")
+                            .type(FieldType.FORMULA)
+                            .fieldTypeConfig(Map.of(
+                                    "expression", "amount * quantity",
+                                    "returnType", "DOUBLE"))
+                            .build())
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Should compute formula value on getById")
+        void shouldComputeFormulaValueOnGetById() {
+            String id = "order-1";
+            Map<String, Object> stored = new HashMap<>();
+            stored.put("id", id);
+            stored.put("amount", 25.0);
+            stored.put("quantity", 4);
+            stored.put("total", null);
+
+            when(storageAdapter.getById(orderCollection, id)).thenReturn(Optional.of(stored));
+
+            Optional<Map<String, Object>> result = engineWithFormula.getById(orderCollection, id);
+
+            assertTrue(result.isPresent());
+            assertEquals(100.0, ((Number) result.get().get("total")).doubleValue(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Should return #ERROR when formula evaluation fails")
+        void shouldReturnErrorWhenEvaluationFails() {
+            String id = "order-2";
+            Map<String, Object> stored = new HashMap<>();
+            stored.put("id", id);
+            stored.put("amount", 10.0);
+            stored.put("quantity", 0);
+            stored.put("total", null);
+
+            CollectionDefinition divisionCollection = new CollectionDefinitionBuilder()
+                    .name("orders_div")
+                    .displayName("Orders Div")
+                    .addField(new FieldDefinitionBuilder()
+                            .name("amount").type(FieldType.DOUBLE).nullable(false).build())
+                    .addField(new FieldDefinitionBuilder()
+                            .name("quantity").type(FieldType.INTEGER).nullable(false).build())
+                    .addField(new FieldDefinitionBuilder()
+                            .name("total")
+                            .type(FieldType.FORMULA)
+                            .fieldTypeConfig(Map.of("expression", "amount / quantity"))
+                            .build())
+                    .build();
+
+            when(storageAdapter.getById(divisionCollection, id)).thenReturn(Optional.of(stored));
+
+            Optional<Map<String, Object>> result = engineWithFormula.getById(divisionCollection, id);
+
+            assertTrue(result.isPresent());
+            assertEquals("#ERROR", result.get().get("total"));
+        }
+
+        @Test
+        @DisplayName("Should return null when formula expression is missing")
+        void shouldReturnNullWhenExpressionMissing() {
+            CollectionDefinition emptyConfigCollection = new CollectionDefinitionBuilder()
+                    .name("orders_blank")
+                    .displayName("Orders Blank")
+                    .addField(new FieldDefinitionBuilder()
+                            .name("amount").type(FieldType.DOUBLE).nullable(false).build())
+                    .addField(new FieldDefinitionBuilder()
+                            .name("total").type(FieldType.FORMULA).build())
+                    .build();
+
+            String id = "order-3";
+            Map<String, Object> stored = new HashMap<>();
+            stored.put("id", id);
+            stored.put("amount", 50.0);
+            stored.put("total", "previously-stored");
+
+            when(storageAdapter.getById(emptyConfigCollection, id)).thenReturn(Optional.of(stored));
+
+            Optional<Map<String, Object>> result = engineWithFormula.getById(emptyConfigCollection, id);
+
+            assertTrue(result.isPresent());
+            assertNull(result.get().get("total"));
         }
     }
 

@@ -768,9 +768,7 @@ public class DefaultQueryEngine implements QueryEngine {
         for (Map<String, Object> record : records) {
             for (FieldDefinition field : definition.fields()) {
                 if (field.type() == FieldType.FORMULA && formulaEvaluator != null) {
-                    // FORMULA wiring tracked separately; same fieldTypeConfig path will host
-                    // the expression once the formula DSL stabilizes.
-                    logger.debug("Skipping formula field '{}' — config not available on FieldDefinition", field.name());
+                    record.put(field.name(), computeFormulaValue(definition, field, record));
                 } else if (field.type() == FieldType.ROLLUP_SUMMARY) {
                     if (rollupSummaryService == null) {
                         logger.info("Rollup field '{}' on '{}' skipped: RollupSummaryService bean is null",
@@ -786,6 +784,28 @@ public class DefaultQueryEngine implements QueryEngine {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Evaluates a FORMULA field's expression against the record. On any
+     * exception we return {@code "#ERROR"} so the UI surfaces the failure
+     * rather than the raw stored value (which is never persisted for
+     * computed fields). A missing or blank expression yields {@code null}.
+     */
+    private Object computeFormulaValue(CollectionDefinition definition, FieldDefinition field,
+                                       Map<String, Object> record) {
+        Map<String, Object> cfg = field.fieldTypeConfig();
+        String expression = cfg == null ? null : (String) cfg.get("expression");
+        if (expression == null || expression.isBlank()) {
+            return null;
+        }
+        try {
+            return formulaEvaluator.evaluate(expression, record);
+        } catch (RuntimeException e) {
+            logger.warn("Formula evaluation failed for field '{}' on collection '{}': {}",
+                    field.name(), definition.name(), e.getMessage());
+            return "#ERROR";
         }
     }
 

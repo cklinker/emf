@@ -456,6 +456,137 @@ class BeforeSaveHookRegistryTest {
         assertEquals("tracked", result.getFieldUpdates().get("audit"));
     }
 
+    // ==================== Collection-name-aware variant tests ====================
+
+    @Test
+    @DisplayName("Should pass collection name to before-create hooks")
+    void shouldPassCollectionNameToBeforeCreate() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        var captured = new String[1];
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "*"; }
+            @Override
+            public BeforeSaveResult beforeCreate(String collectionName,
+                                                  Map<String, Object> record, String tenantId) {
+                captured[0] = collectionName;
+                return BeforeSaveResult.ok();
+            }
+        });
+
+        BeforeSaveResult result = registry.evaluateBeforeCreate(
+            "invoices", new HashMap<>(Map.of("name", "Test")), "t1");
+
+        assertTrue(result.isSuccess());
+        assertEquals("invoices", captured[0]);
+    }
+
+    @Test
+    @DisplayName("Should pass collection name to before-update hooks")
+    void shouldPassCollectionNameToBeforeUpdate() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        var captured = new String[1];
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "*"; }
+            @Override
+            public BeforeSaveResult beforeUpdate(String collectionName, String id,
+                                                  Map<String, Object> record,
+                                                  Map<String, Object> previous, String tenantId) {
+                captured[0] = collectionName;
+                return BeforeSaveResult.ok();
+            }
+        });
+
+        BeforeSaveResult result = registry.evaluateBeforeUpdate(
+            "invoices", "id1",
+            new HashMap<>(Map.of("name", "New")), Map.of("name", "Old"), "t1");
+
+        assertTrue(result.isSuccess());
+        assertEquals("invoices", captured[0]);
+    }
+
+    @Test
+    @DisplayName("Legacy beforeCreate(record, tenantId) should still receive the call via default delegation")
+    void legacyBeforeCreateStillReceivesCall() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        AtomicBoolean legacyCalled = new AtomicBoolean(false);
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "users"; }
+            @Override
+            public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+                legacyCalled.set(true);
+                return BeforeSaveResult.withFieldUpdates(Map.of("status", "ACTIVE"));
+            }
+        });
+
+        Map<String, Object> record = new HashMap<>(Map.of("name", "Test"));
+        BeforeSaveResult result = registry.evaluateBeforeCreate("users", record, "t1");
+
+        assertTrue(legacyCalled.get());
+        assertTrue(result.hasFieldUpdates());
+        assertEquals("ACTIVE", result.getFieldUpdates().get("status"));
+    }
+
+    @Test
+    @DisplayName("Legacy beforeUpdate(id, record, previous, tenantId) should still receive the call via default delegation")
+    void legacyBeforeUpdateStillReceivesCall() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        AtomicBoolean legacyCalled = new AtomicBoolean(false);
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "users"; }
+            @Override
+            public BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
+                                                  Map<String, Object> previous, String tenantId) {
+                legacyCalled.set(true);
+                return BeforeSaveResult.withFieldUpdates(Map.of("version", 2));
+            }
+        });
+
+        BeforeSaveResult result = registry.evaluateBeforeUpdate(
+            "users", "id1",
+            new HashMap<>(Map.of("name", "New")), Map.of("name", "Old"), "t1");
+
+        assertTrue(legacyCalled.get());
+        assertTrue(result.hasFieldUpdates());
+        assertEquals(2, result.getFieldUpdates().get("version"));
+    }
+
+    @Test
+    @DisplayName("Collection-name-aware override should take precedence over legacy method")
+    void collectionNameAwareOverridePrecedence() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        AtomicBoolean legacyCalled = new AtomicBoolean(false);
+        var captured = new String[1];
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "users"; }
+            @Override
+            public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+                legacyCalled.set(true);
+                return BeforeSaveResult.ok();
+            }
+            @Override
+            public BeforeSaveResult beforeCreate(String collectionName,
+                                                  Map<String, Object> record, String tenantId) {
+                captured[0] = collectionName;
+                return BeforeSaveResult.ok();
+            }
+        });
+
+        registry.evaluateBeforeCreate("users", new HashMap<>(), "t1");
+
+        assertEquals("users", captured[0]);
+        assertFalse(legacyCalled.get(), "Legacy beforeCreate must not run when override is provided");
+    }
+
     private BeforeSaveHook stubHook(String collectionName, int order) {
         return new BeforeSaveHook() {
             @Override

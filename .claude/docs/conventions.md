@@ -61,6 +61,11 @@ Where errors are constructed:
 - `io.kelta.jsonapi.JsonApiResponseBuilder.error(...)` — utility for one-off error documents in controllers; the 3-arg overload derives `code` from `title` so existing callers stay compliant
 - `io.kelta.jsonapi.JsonApiError` — POJO used by the handlers; `@JsonInclude(NON_NULL)` keeps absent fields out of the wire format
 
+### BeforeSaveHook overloads
+- `BeforeSaveHook` exposes both no-collection-name (`beforeCreate(record, tenantId)`, `beforeUpdate(id, record, previous, tenantId)`, `afterCreate/Update/Delete(...)`) and collection-name-aware overloads (`beforeCreate(collectionName, ...)`, `beforeUpdate(collectionName, ...)`, `afterCreate(collectionName, ...)`, …). The aware variants default to delegating to the legacy ones — preserving backward compatibility for existing hooks.
+- `BeforeSaveHookRegistry` always dispatches to the **collection-name-aware** overloads. New hooks that need to vary behavior by collection (wildcard hooks, formula-field evaluation, generic audit hooks) should override the aware variant; legacy single-collection hooks continue to override the no-name variant unchanged.
+- Do not invoke the legacy overload directly from new dispatch code paths — go through the registry so wildcard / collection-scoped routing stays consistent.
+
 ### Javadoc
 - Required for public classes and methods
 - Include `@param`, `@returns`, `@throws`

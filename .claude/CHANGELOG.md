@@ -53,4 +53,5 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 
 ## 2026-06-18
 
-- 2026-06-18 feat(runtime): wire formula evaluation into `DefaultQueryEngine.computeVirtualFields()` — FORMULA fields now invoke `FormulaEvaluator.evaluate(expression, record)` on read (`getById`/`executeQuery`) using the `expression` key from `field_type_config`; missing/blank expression yields `null`, evaluation failures yield `"#ERROR"` so the UI always shows a live-computed value (TASK-2026-06-18-0004)
+- 2026-06-18 feat(field-editor): formula field config UI — when `type=formula`, the editor surfaces a `TEXT`/`NUMBER`/`BOOLEAN` return-type selector (locked in edit mode, since the dynamic column type can't change) and an expression `<textarea>` wired to `FieldExpressionPicker` for click-to-insert; submit builds `fieldTypeConfig = { expression, returnType }` (TASK-2026-06-18-0006)
+- 2026-06-18 feat(field-editor): formula field config UI — when `type=formula`, the editor surfaces a `TEXT`/`NUMBER`/`BOOLEAN` return-type selector (locked in edit mode, since the dynamic column type can't change) and an expression `<textarea>` wired to `FieldExpressionPicker` for click-to-insert; submit builds `fieldTypeConfig = { expression, returnType }` (TASK-2026-06-18-0006)

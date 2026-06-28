@@ -1536,6 +1536,20 @@
       "fieldHint": "Field on the child collection to aggregate. Numeric for SUM/AVG; numeric or date for MIN/MAX.",
       "selectField": "Select a field..."
     },
+    "formula": {
+      "title": "Formula Configuration",
+      "returnType": "Return Type",
+      "selectReturnType": "Select a return type...",
+      "returnTypeText": "Text",
+      "returnTypeNumber": "Number",
+      "returnTypeBoolean": "Boolean",
+      "returnTypeHint": "Return type is immutable after the field is created.",
+      "expression": "Expression",
+      "expressionPlaceholder": "e.g., amount * quantity",
+      "expressionHint": "Reference fields by name (e.g. amount) and use functions like IF, CONCAT, ROUND.",
+      "insertField": "Insert field",
+      "pickerTitle": "Insert field or function"
+    },
     "validation": {
       "nameRequired": "Field name is required",
       "nameTooLong": "Field name must be 50 characters or less",
@@ -1548,6 +1562,8 @@
       "rollupForeignKeyRequired": "Foreign key field is required for rollup fields",
       "rollupFunctionRequired": "Aggregate function is required for rollup fields",
       "rollupFieldRequired": "Aggregate field is required for SUM, AVG, MIN, and MAX",
+      "formulaExpressionRequired": "Expression is required for formula fields",
+      "formulaReturnTypeRequired": "Return type is required for formula fields",
       "descriptionTooLong": "Description must be 500 characters or less"
     }
   },

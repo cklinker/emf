@@ -1092,4 +1092,116 @@ describe('FieldEditor Integration', () => {
       expect(styles.content || '').not.toContain('u26A0')
     })
   })
+
+  describe('Formula configuration', () => {
+    const formulaProps = {
+      collectionId: 'col-formula-1',
+      onSave: vi.fn().mockResolvedValue(undefined),
+      onCancel: vi.fn(),
+    }
+
+    it('renders no formula config block by default', () => {
+      renderWithProviders(<FieldEditor {...formulaProps} />)
+      expect(screen.queryByTestId('formula-config')).not.toBeInTheDocument()
+    })
+
+    it('reveals the formula config inputs when type=formula is selected', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<FieldEditor {...formulaProps} />)
+
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'formula')
+
+      expect(screen.getByTestId('formula-config')).toBeInTheDocument()
+      expect(screen.getByTestId('field-formula-return-type-select')).toBeInTheDocument()
+      expect(screen.getByTestId('field-formula-expression-input')).toBeInTheDocument()
+      expect(screen.getByTestId('field-formula-insert-field')).toBeInTheDocument()
+    })
+
+    it('blocks submit when expression is missing', async () => {
+      const onSave = vi.fn().mockResolvedValue(undefined)
+      const user = userEvent.setup()
+      renderWithProviders(<FieldEditor {...formulaProps} onSave={onSave} />)
+
+      await user.type(screen.getByTestId('field-name-input'), 'total')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'formula')
+      await user.selectOptions(screen.getByTestId('field-formula-return-type-select'), 'NUMBER')
+      await user.click(screen.getByTestId('field-editor-submit'))
+
+      await waitFor(() =>
+        expect(screen.getByTestId('field-formula-expression-error')).toBeInTheDocument()
+      )
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('blocks submit when return type is missing', async () => {
+      const onSave = vi.fn().mockResolvedValue(undefined)
+      const user = userEvent.setup()
+      renderWithProviders(<FieldEditor {...formulaProps} onSave={onSave} />)
+
+      await user.type(screen.getByTestId('field-name-input'), 'total')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'formula')
+      await user.type(screen.getByTestId('field-formula-expression-input'), 'amount * 2')
+      await user.click(screen.getByTestId('field-editor-submit'))
+
+      await waitFor(() =>
+        expect(screen.getByTestId('field-formula-return-type-error')).toBeInTheDocument()
+      )
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('builds fieldTypeConfig with expression and returnType on submit', async () => {
+      const onSave = vi.fn().mockResolvedValue(undefined)
+      const user = userEvent.setup()
+      renderWithProviders(<FieldEditor {...formulaProps} onSave={onSave} />)
+
+      await user.type(screen.getByTestId('field-name-input'), 'total')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'formula')
+      await user.selectOptions(screen.getByTestId('field-formula-return-type-select'), 'NUMBER')
+      await user.type(screen.getByTestId('field-formula-expression-input'), 'amount * 2')
+      await user.click(screen.getByTestId('field-editor-submit'))
+
+      await waitFor(() => expect(onSave).toHaveBeenCalled())
+      const submitted = onSave.mock.calls[0][0]
+      expect(submitted.type).toBe('formula')
+      expect(submitted.fieldTypeConfig).toEqual({
+        expression: 'amount * 2',
+        returnType: 'NUMBER',
+      })
+    })
+
+    it('disables the return type select in edit mode', () => {
+      const existing: FieldDefinition = {
+        id: 'formula-1',
+        name: 'doubled',
+        type: 'formula',
+        required: false,
+        unique: false,
+        indexed: false,
+        order: 0,
+        fieldTypeConfig: { expression: 'amount * 2', returnType: 'NUMBER' },
+      }
+      renderWithProviders(<FieldEditor {...formulaProps} field={existing} />)
+
+      const select = screen.getByTestId('field-formula-return-type-select')
+      expect(select).toHaveAttribute('aria-disabled', 'true')
+      expect(select).toHaveAttribute('tabindex', '-1')
+    })
+
+    it('pre-populates expression and return type from existing fieldTypeConfig', () => {
+      const existing: FieldDefinition = {
+        id: 'formula-1',
+        name: 'doubled',
+        type: 'formula',
+        required: false,
+        unique: false,
+        indexed: false,
+        order: 0,
+        fieldTypeConfig: { expression: 'amount * 2', returnType: 'NUMBER' },
+      }
+      renderWithProviders(<FieldEditor {...formulaProps} field={existing} />)
+
+      expect(screen.getByTestId('field-formula-expression-input')).toHaveValue('amount * 2')
+      expect(screen.getByTestId('field-formula-return-type-select')).toHaveValue('NUMBER')
+    })
+  })
 })

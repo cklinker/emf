@@ -561,6 +561,17 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.FormulaComputeHook formulaComputeHook(
+            BeforeSaveHookRegistry hookRegistry,
+            CollectionRegistry collectionRegistry,
+            FormulaEvaluator formulaEvaluator) {
+        io.kelta.worker.listener.FormulaComputeHook hook =
+                new io.kelta.worker.listener.FormulaComputeHook(collectionRegistry, formulaEvaluator);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public SubmitForApprovalActionHandler submitForApprovalActionHandler(
             ActionHandlerRegistry actionHandlerRegistry,
             ApprovalService approvalService,

@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FieldRenderer } from '@/components/FieldRenderer'
+import { InlineFieldValue } from '@/components/record/InlineFieldValue'
 import { useTableKeyboardNav } from '@/hooks/useTableKeyboardNav'
 import { cn } from '@/lib/utils'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
@@ -70,6 +71,14 @@ export interface ObjectDataTableProps {
   onDelete?: (record: CollectionRecord) => void
   /** Lookup display map: { fieldName: { recordId: displayLabel } } */
   lookupDisplayMap?: Record<string, Record<string, string>>
+  /**
+   * Opt-in in-place cell editing (unified record experience, slice 3). When true AND
+   * `onCellCommit` is provided, editable-type cells become click-to-edit via `InlineFieldValue`.
+   * When false/omitted the grid is read-only exactly as before.
+   */
+  editable?: boolean
+  /** Persist a single edited cell (partial PATCH). Rejects surface inline in the cell. */
+  onCellCommit?: (recordId: string, fieldName: string, value: unknown) => Promise<void>
 }
 
 /**
@@ -125,6 +134,8 @@ function DataRow({
   onSelectRow,
   onEdit,
   onDelete,
+  editable,
+  onCellCommit,
 }: {
   record: CollectionRecord
   fields: FieldDefinition[]
@@ -141,7 +152,10 @@ function DataRow({
   onSelectRow: (id: string) => void
   onEdit?: (record: CollectionRecord) => void
   onDelete?: (record: CollectionRecord) => void
+  editable?: boolean
+  onCellCommit?: (recordId: string, fieldName: string, value: unknown) => Promise<void>
 }) {
+  const inlineEditing = !!editable && !!onCellCommit
   return (
     <TableRow
       key={record.id}
@@ -173,6 +187,25 @@ function DataRow({
           isLookup && lookupDisplayMap?.[field.name]
             ? lookupDisplayMap[field.name][String(fieldValue)] || undefined
             : undefined
+
+        if (inlineEditing) {
+          return (
+            <TableCell
+              key={field.name}
+              className="max-w-[300px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <InlineFieldValue
+                field={field}
+                value={fieldValue}
+                displayLabel={displayLabel}
+                tenantSlug={tenantSlug}
+                editable
+                onCommit={(fieldName, value) => onCellCommit!(record.id, fieldName, value)}
+              />
+            </TableCell>
+          )
+        }
 
         return (
           <TableCell key={field.name} className="max-w-[300px]">
@@ -237,6 +270,8 @@ export function ObjectDataTable({
   onEdit,
   onDelete,
   lookupDisplayMap,
+  editable,
+  onCellCommit,
 }: ObjectDataTableProps): React.ReactElement {
   const { tenantSlug } = useParams<{ tenantSlug: string }>()
   const navigate = useNavigate()
@@ -462,6 +497,8 @@ export function ObjectDataTable({
           onSelectRow={handleSelectRow}
           onEdit={onEdit}
           onDelete={onDelete}
+          editable={editable}
+          onCellCommit={onCellCommit}
         />
       )
     })

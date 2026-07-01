@@ -2,6 +2,7 @@ package io.kelta.runtime.router;
 
 import io.kelta.jsonapi.JsonApiError;
 import io.kelta.runtime.query.InvalidQueryException;
+import io.kelta.runtime.storage.StaleWriteException;
 import io.kelta.runtime.storage.StorageException;
 import io.kelta.runtime.storage.UniqueConstraintViolationException;
 import io.kelta.runtime.validation.RecordValidationException;
@@ -160,6 +161,25 @@ public class GlobalExceptionHandler {
             ex.getMessage() != null ? ex.getMessage() : "Unique constraint violation");
         error.setSource(Map.of("pointer", "/data/attributes/" + ex.getFieldName()));
         error.setMeta(Map.of("requestId", requestId));
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("errors", List.of(error)));
+    }
+
+    /**
+     * Handles optimistic-locking conflicts (stale {@code If-Match}).
+     * Returns 409 Conflict in JSON:API format so the client can reload and retry.
+     */
+    @ExceptionHandler(StaleWriteException.class)
+    public ResponseEntity<Map<String, Object>> handleStaleWrite(
+            StaleWriteException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Stale write [requestId={}]: {}", requestId, ex.getMessage());
+
+        JsonApiError error = new JsonApiError(
+            "409", "STALE_WRITE", "Conflict",
+            "This record was modified since you opened it. Reload the latest version and try again.");
+        error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("errors", List.of(error)));
     }

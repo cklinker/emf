@@ -27,8 +27,9 @@ import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTime
 import { useRecordContext } from '../../hooks/useRecordContext'
 import { usePageLayout } from '../../hooks/usePageLayout'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
-import { LayoutFieldSections } from '../../components/LayoutFieldSections/LayoutFieldSections'
 import { DetailTabBar } from './DetailTabBar'
+import { RecordShell } from '../../components/record/RecordShell'
+import { RecordDetailBody } from '../../components/record/RecordDetailBody'
 import { unwrapResource, extractIncluded } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
 
@@ -781,256 +782,265 @@ export function ResourceDetailPage({
   }
 
   return (
-    <div
-      className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+    <RecordShell
+      variant="admin"
       data-testid={testId}
-    >
-      {/* Breadcrumb Navigation */}
-      <nav
-        className="flex items-center gap-1 text-sm text-muted-foreground max-md:flex-wrap"
-        aria-label="Breadcrumb"
-      >
-        <Link
-          to={`/${getTenantSlug()}/resources`}
-          className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
+      className="p-6 max-lg:p-4 max-md:p-2"
+      breadcrumb={
+        <nav
+          className="flex items-center gap-1 text-sm text-muted-foreground max-md:flex-wrap"
+          aria-label="Breadcrumb"
         >
-          {t('resources.title')}
-        </Link>
-        <span className="mx-1 text-muted-foreground/60" aria-hidden="true">
-          /
-        </span>
-        <Link
-          to={`/${getTenantSlug()}/resources/${collectionName}`}
-          className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
-        >
-          {schema.displayName}
-        </Link>
-        <span className="mx-1 text-muted-foreground/60" aria-hidden="true">
-          /
-        </span>
-        <span className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap font-medium text-foreground max-md:max-w-[150px]">
-          {resource.id}
-        </span>
-      </nav>
-
-      {/* Record Header (T9) */}
-      <RecordHeader
-        record={
-          resource as Record<string, unknown> & {
-            id: string
-            createdAt?: string
-            updatedAt?: string
-          }
-        }
-        schema={schema}
-        collectionName={collectionName}
-      />
-
-      {/* Record Actions Bar (T8) */}
-      <RecordActionsBar
-        collectionName={collectionName}
-        recordId={resourceId}
-        onEdit={handleEdit}
-        onDelete={handleDeleteClick}
-        onBack={handleBack}
-        isFavorite={recordIsFavorite}
-        onToggleFavorite={handleToggleFavorite}
-        apiClient={apiClient}
-      />
-
-      {/* Field Values Section — use page layout sections when available */}
-      {layout && layout.sections.length > 0 ? (
-        <LayoutFieldSections
-          sections={layout.sections}
-          schemaFields={schema.fields}
-          record={resource as Record<string, unknown> & { id: string }}
-          tenantSlug={getTenantSlug()}
-          lookupDisplayMap={lookupDisplayMap}
-          editable
-          onFieldCommit={handleFieldCommit}
-        />
-      ) : (
-        <section
-          className="rounded-md border border-border bg-card p-6 max-md:p-4"
-          aria-labelledby="fields-heading"
-        >
-          <h2 id="fields-heading" className="m-0 mb-4 text-lg font-semibold text-foreground">
-            {t('collections.fields')}
-          </h2>
-
-          {sortedFields.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
-              data-testid="no-fields"
-            >
-              <p className="m-0 text-base">{t('common.noData')}</p>
-            </div>
-          ) : (
-            <div
-              className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6 max-lg:grid-cols-[repeat(auto-fill,minmax(250px,1fr))] max-md:grid-cols-1"
-              data-testid="fields-grid"
-            >
-              {sortedFields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="flex flex-col gap-1"
-                  data-testid={`field-item-${index}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      {field.displayName || field.name}
-                    </span>
-                    <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                      {getFieldTypeLabel(field.type)}
-                    </span>
-                  </div>
-                  <div
-                    className="min-h-[1.5em] break-words text-base text-foreground"
-                    data-testid={`field-value-${field.name}`}
-                  >
-                    {formatFieldValue(resource[field.name], field)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Sharing Section */}
-      <section
-        className="rounded-md border border-border bg-card p-6 max-md:p-4"
-        aria-labelledby="sharing-heading"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="sharing-heading" className="m-0 text-lg font-semibold text-foreground">
-            Sharing
-          </h2>
-          <button
-            type="button"
-            className="inline-flex cursor-pointer items-center rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
-            onClick={() => setShareModalOpen(true)}
-            data-testid="share-button"
+          <Link
+            to={`/${getTenantSlug()}/resources`}
+            className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
           >
-            {t('sharing.shareRecord')}
-          </button>
+            {t('resources.title')}
+          </Link>
+          <span className="mx-1 text-muted-foreground/60" aria-hidden="true">
+            /
+          </span>
+          <Link
+            to={`/${getTenantSlug()}/resources/${collectionName}`}
+            className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
+          >
+            {schema.displayName}
+          </Link>
+          <span className="mx-1 text-muted-foreground/60" aria-hidden="true">
+            /
+          </span>
+          <span className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap font-medium text-foreground max-md:max-w-[150px]">
+            {resource.id}
+          </span>
+        </nav>
+      }
+      header={
+        <div className="space-y-6 max-md:space-y-4">
+          {/* Record Header (T9) */}
+          <RecordHeader
+            record={
+              resource as Record<string, unknown> & {
+                id: string
+                createdAt?: string
+                updatedAt?: string
+              }
+            }
+            schema={schema}
+            collectionName={collectionName}
+          />
+
+          {/* Record Actions Bar (T8) */}
+          <RecordActionsBar
+            collectionName={collectionName}
+            recordId={resourceId}
+            onEdit={handleEdit}
+            onDelete={handleDeleteClick}
+            onBack={handleBack}
+            isFavorite={recordIsFavorite}
+            onToggleFavorite={handleToggleFavorite}
+            apiClient={apiClient}
+          />
         </div>
-        {sharesList.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
-            data-testid="no-shares"
-          >
-            <p className="m-0 text-base">{t('sharing.noShares')}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table
-              className="w-full border-collapse text-sm"
-              role="grid"
-              aria-label="Record shares"
-            >
-              <thead>
-                <tr>
-                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
-                    {t('sharing.sharedWith')}
-                  </th>
-                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
-                    {t('sharing.sharedWithType')}
-                  </th>
-                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
-                    {t('sharing.accessLevel')}
-                  </th>
-                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
-                    Reason
-                  </th>
-                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
-                    {t('common.actions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sharesList.map((share) => (
-                  <tr key={share.id}>
-                    <td className="border-b border-border px-4 py-2 font-mono text-sm">
-                      {share.sharedWithId}
-                    </td>
-                    <td className="border-b border-border px-4 py-2">
-                      <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-primary">
-                        {share.sharedWithType}
-                      </span>
-                    </td>
-                    <td className="border-b border-border px-4 py-2">
-                      <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-primary">
-                        {share.accessLevel}
-                      </span>
-                    </td>
-                    <td className="border-b border-border px-4 py-2">{share.reason || '-'}</td>
-                    <td className="border-b border-border px-4 py-2">
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded border border-red-200 bg-transparent px-2 py-1 text-xs font-medium text-red-600 transition-colors duration-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950 motion-reduce:transition-none"
-                        onClick={() => deleteShareMutation.mutate(share.id)}
-                        disabled={deleteShareMutation.isPending}
-                        aria-label={`Remove share for ${share.sharedWithId}`}
+      }
+      body={
+        <div className="space-y-6 max-md:space-y-4">
+          {/* Field Values — layout sections when available, else the admin grid */}
+          <RecordDetailBody
+            sections={layout?.sections}
+            schemaFields={schema.fields}
+            record={resource as Record<string, unknown> & { id: string }}
+            tenantSlug={getTenantSlug()}
+            lookupDisplayMap={lookupDisplayMap}
+            editable
+            onFieldCommit={handleFieldCommit}
+            fallback={
+              <section
+                className="rounded-md border border-border bg-card p-6 max-md:p-4"
+                aria-labelledby="fields-heading"
+              >
+                <h2 id="fields-heading" className="m-0 mb-4 text-lg font-semibold text-foreground">
+                  {t('collections.fields')}
+                </h2>
+
+                {sortedFields.length === 0 ? (
+                  <div
+                    className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
+                    data-testid="no-fields"
+                  >
+                    <p className="m-0 text-base">{t('common.noData')}</p>
+                  </div>
+                ) : (
+                  <div
+                    className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6 max-lg:grid-cols-[repeat(auto-fill,minmax(250px,1fr))] max-md:grid-cols-1"
+                    data-testid="fields-grid"
+                  >
+                    {sortedFields.map((field, index) => (
+                      <div
+                        key={field.id}
+                        className="flex flex-col gap-1"
+                        data-testid={`field-item-${index}`}
                       >
-                        {t('sharing.removeShare')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-muted-foreground">
+                            {field.displayName || field.name}
+                          </span>
+                          <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                            {getFieldTypeLabel(field.type)}
+                          </span>
+                        </div>
+                        <div
+                          className="min-h-[1.5em] break-words text-base text-foreground"
+                          data-testid={`field-value-${field.name}`}
+                        >
+                          {formatFieldValue(resource[field.name], field)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            }
+          />
 
-      {/* Bottom tab bar: related lists + Notes + Attachments + System Information */}
-      <DetailTabBar
-        relatedLists={layout?.relatedLists ?? []}
-        recordId={resourceId}
-        collectionId={schema.id}
-        tenantSlug={getTenantSlug()}
-        resource={resource as Record<string, unknown> & { id: string }}
-        notes={notes}
-        attachments={attachments}
-        apiClient={apiClient}
-        invalidateRecordContext={invalidateRecordContext}
-        getUserDisplay={getUserDisplay}
-        editable
-        onRelatedChange={refetchResource}
-      />
-
-      {/* Activity Timeline (T7) */}
-      <ActivityTimeline
-        collectionId={schema.id}
-        collectionName={collectionName}
-        recordId={resourceId}
-        recordCreatedAt={(resource.created_at || resource.createdAt) as string | undefined}
-        recordUpdatedAt={(resource.updated_at || resource.updatedAt) as string | undefined}
-        apiClient={apiClient}
-      />
-
-      {/* Share Modal */}
-      {shareModalOpen && (
-        <ShareForm
-          onSubmit={(data) => createShareMutation.mutate(data)}
-          onCancel={() => setShareModalOpen(false)}
-          isSubmitting={createShareMutation.isPending}
+          {/* Sharing Section */}
+          <section
+            className="rounded-md border border-border bg-card p-6 max-md:p-4"
+            aria-labelledby="sharing-heading"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="sharing-heading" className="m-0 text-lg font-semibold text-foreground">
+                Sharing
+              </h2>
+              <button
+                type="button"
+                className="inline-flex cursor-pointer items-center rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
+                onClick={() => setShareModalOpen(true)}
+                data-testid="share-button"
+              >
+                {t('sharing.shareRecord')}
+              </button>
+            </div>
+            {sharesList.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
+                data-testid="no-shares"
+              >
+                <p className="m-0 text-base">{t('sharing.noShares')}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table
+                  className="w-full border-collapse text-sm"
+                  role="grid"
+                  aria-label="Record shares"
+                >
+                  <thead>
+                    <tr>
+                      <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                        {t('sharing.sharedWith')}
+                      </th>
+                      <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                        {t('sharing.sharedWithType')}
+                      </th>
+                      <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                        {t('sharing.accessLevel')}
+                      </th>
+                      <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                        Reason
+                      </th>
+                      <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                        {t('common.actions')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sharesList.map((share) => (
+                      <tr key={share.id}>
+                        <td className="border-b border-border px-4 py-2 font-mono text-sm">
+                          {share.sharedWithId}
+                        </td>
+                        <td className="border-b border-border px-4 py-2">
+                          <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-primary">
+                            {share.sharedWithType}
+                          </span>
+                        </td>
+                        <td className="border-b border-border px-4 py-2">
+                          <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-primary">
+                            {share.accessLevel}
+                          </span>
+                        </td>
+                        <td className="border-b border-border px-4 py-2">{share.reason || '-'}</td>
+                        <td className="border-b border-border px-4 py-2">
+                          <button
+                            type="button"
+                            className="cursor-pointer rounded border border-red-200 bg-transparent px-2 py-1 text-xs font-medium text-red-600 transition-colors duration-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950 motion-reduce:transition-none"
+                            onClick={() => deleteShareMutation.mutate(share.id)}
+                            disabled={deleteShareMutation.isPending}
+                            aria-label={`Remove share for ${share.sharedWithId}`}
+                          >
+                            {t('sharing.removeShare')}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      }
+      tabBar={
+        <DetailTabBar
+          relatedLists={layout?.relatedLists ?? []}
+          recordId={resourceId}
+          collectionId={schema.id}
+          tenantSlug={getTenantSlug()}
+          resource={resource as Record<string, unknown> & { id: string }}
+          notes={notes}
+          attachments={attachments}
+          apiClient={apiClient}
+          invalidateRecordContext={invalidateRecordContext}
+          getUserDisplay={getUserDisplay}
+          editable
+          onRelatedChange={refetchResource}
         />
-      )}
+      }
+      belowTabs={
+        <ActivityTimeline
+          collectionId={schema.id}
+          collectionName={collectionName}
+          recordId={resourceId}
+          recordCreatedAt={(resource.created_at || resource.createdAt) as string | undefined}
+          recordUpdatedAt={(resource.updated_at || resource.updatedAt) as string | undefined}
+          apiClient={apiClient}
+        />
+      }
+      dialogs={
+        <>
+          {/* Share Modal */}
+          {shareModalOpen && (
+            <ShareForm
+              onSubmit={(data) => createShareMutation.mutate(data)}
+              onCancel={() => setShareModalOpen(false)}
+              isSubmitting={createShareMutation.isPending}
+            />
+          )}
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        title={t('resources.deleteRecord')}
-        message={t('resources.confirmDelete')}
-        confirmLabel={t('common.delete')}
-        cancelLabel={t('common.cancel')}
-        onConfirm={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
-        variant="danger"
-      />
-    </div>
+          {/* Delete Confirmation Dialog */}
+          <ConfirmDialog
+            open={deleteDialogOpen}
+            title={t('resources.deleteRecord')}
+            message={t('resources.confirmDelete')}
+            confirmLabel={t('common.delete')}
+            cancelLabel={t('common.cancel')}
+            onConfirm={handleDeleteConfirm}
+            onCancel={handleDeleteCancel}
+            variant="danger"
+          />
+        </>
+      }
+    />
   )
 }
 

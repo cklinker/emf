@@ -81,6 +81,14 @@ export function dtoToLayoutRule(dto: LayoutRuleDto, tenantId: string): LayoutRul
         transform,
       }
     }
+    case 'SCRIPT':
+      return {
+        ...baseFields,
+        kind: 'script',
+        target: dto.targetField ?? undefined,
+        expression: String(body.expression ?? ''),
+        message: typeof body.message === 'string' ? body.message : undefined,
+      }
     default:
       return null
   }

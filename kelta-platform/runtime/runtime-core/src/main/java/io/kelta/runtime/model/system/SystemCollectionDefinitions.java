@@ -1242,7 +1242,7 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.requiredString("kind", 20)
-                .withEnumValues(List.of("COMPUTE", "VALIDATE", "DEFAULT", "TRANSFORM")))
+                .withEnumValues(List.of("COMPUTE", "VALIDATE", "DEFAULT", "TRANSFORM", "SCRIPT")))
             .addField(FieldDefinition.bool("active").withDefault(true))
             .addField(FieldDefinition.requiredJson("whenEvents")
                 .withColumnName("when_events"))

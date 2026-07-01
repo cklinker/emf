@@ -135,6 +135,36 @@ describe('RulesEditor', () => {
     expect(envelope.data.attributes.targetField).toBe('line_total')
     expect(envelope.data.attributes.body.formula).toBe('(quantity * unit_price) - discount')
   })
+
+  it('saves a new SCRIPT rule with expression + message body (no target required)', async () => {
+    apiClientMock.post.mockResolvedValue({})
+    const user = userEvent.setup()
+    renderWithProviders(
+      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={['discount']} onClose={() => {}} />
+    )
+    await waitFor(() => screen.getByTestId('rules-editor-add-script'))
+    await user.click(screen.getByTestId('rules-editor-add-script'))
+
+    fireEvent.change(screen.getByTestId('rule-name-input'), { target: { value: 'Discount guard' } })
+    fireEvent.change(screen.getByTestId('rule-formula-input'), {
+      target: { value: 'IF(discount > 0.5, "Too high", "")' },
+    })
+    fireEvent.change(screen.getByTestId('rule-script-message-input'), {
+      target: { value: 'Needs approval' },
+    })
+
+    await waitFor(() => {
+      const save = screen.getByTestId('rules-editor-save') as HTMLButtonElement
+      expect(save.disabled).toBe(false)
+    })
+    await user.click(screen.getByTestId('rules-editor-save'))
+    await waitFor(() => expect(apiClientMock.post).toHaveBeenCalledTimes(1))
+    const envelope = apiClientMock.post.mock.calls[0][1]
+    expect(envelope.data.attributes.kind).toBe('SCRIPT')
+    expect(envelope.data.attributes.targetField).toBeNull()
+    expect(envelope.data.attributes.body.expression).toBe('IF(discount > 0.5, "Too high", "")')
+    expect(envelope.data.attributes.body.message).toBe('Needs approval')
+  })
 })
 
 import { afterEach } from 'vitest'

@@ -5,6 +5,7 @@ import type {
   ValidateLayoutRule,
   DefaultLayoutRule,
   TransformLayoutRule,
+  ScriptLayoutRule,
   CollectionValidationRule,
   LayoutRuleEvent,
 } from '@kelta/sdk';
@@ -26,6 +27,7 @@ const RULE_KIND_LABEL: Record<LayoutRule['kind'], string> = {
   validate: 'Validate',
   default: 'Default',
   transform: 'Transform',
+  script: 'Script',
 };
 
 export interface RuleEngineOptions {
@@ -204,6 +206,37 @@ export class RuleEngine {
       }
     }
 
+    // Layout-scoped SCRIPT rules configured for onBeforeSave — a non-empty
+    // message blocks the submit. Fail-open on a runtime error: the server
+    // record-event hook (slice 7) is authoritative.
+    for (const prepared of this.active) {
+      const rule = prepared.rule;
+      if (rule.kind !== 'script') continue;
+      if (!rule.when.includes('onBeforeSave')) continue;
+      let message: string | null = null;
+      try {
+        message = this.evaluateScript(rule, form);
+      } catch (err) {
+        this.diagnostics.push({
+          ruleId: rule.id,
+          ruleName: rule.name,
+          level: 'warning',
+          message: `Script rule failed at runtime: ${(err as Error).message}`,
+        });
+        continue;
+      }
+      if (message) {
+        violations.push({
+          ruleId: rule.id,
+          ruleName: rule.name,
+          field: rule.target,
+          message,
+          severity: 'error',
+        });
+        form.setError(rule.target ?? '_form', message);
+      }
+    }
+
     return {
       blocked: violations.some((v) => v.severity === 'error'),
       violations,
@@ -268,6 +301,15 @@ export class RuleEngine {
         case 'transform':
           this.applyTransform(rule, form);
           return;
+        case 'script': {
+          const message = this.evaluateScript(rule, form);
+          if (message) {
+            form.setError(rule.target ?? '_form', message);
+          } else if (rule.target) {
+            form.clearError(rule.target);
+          }
+          return;
+        }
       }
     } catch (err) {
       this.diagnostics.push({
@@ -337,6 +379,21 @@ export class RuleEngine {
     };
   }
 
+  /**
+   * Evaluate a SCRIPT rule's expression and coerce the result into a message.
+   * Falsy results (empty string, null, undefined, false, 0) mean "no problem"
+   * and return null. A boolean `true` uses the rule's static `message`; any
+   * other value is stringified. Strictly expression-based via `@kelta/formula`
+   * — no `eval`/`window` reach (parser guarantee).
+   */
+  private evaluateScript(rule: ScriptLayoutRule, form: FormBinding): string | null {
+    const raw = this.evaluator.evaluate(rule.expression, form.getValues());
+    if (!raw) return null;
+    if (raw === true) return rule.message ?? 'Invalid value';
+    const message = typeof raw === 'string' ? raw : String(raw);
+    return message.trim() === '' ? null : message;
+  }
+
   private evaluateCollectionValidation(
     rule: CollectionValidationRule,
     form: FormBinding
@@ -388,6 +445,8 @@ export class RuleEngine {
           return this.evaluator.extractFieldRefs(rule.transform.formula);
         }
         return [rule.target];
+      case 'script':
+        return this.evaluator.extractFieldRefs(rule.expression);
     }
   }
 

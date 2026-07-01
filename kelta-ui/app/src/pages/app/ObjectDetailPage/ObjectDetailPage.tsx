@@ -389,6 +389,17 @@ export function ObjectDetailPage(): React.ReactElement {
     },
   })
 
+  // In-place inline field edit (unified record experience, slice 2): partial PATCH of one field.
+  const handleFieldCommit = useCallback(
+    async (fieldName: string, value: unknown): Promise<void> => {
+      if (!recordId) return
+      await mutations.patch.mutateAsync({ id: recordId, data: { [fieldName]: value } })
+      invalidateRecordContext()
+      announce(`${fieldName} updated`)
+    },
+    [recordId, mutations.patch, invalidateRecordContext, announce]
+  )
+
   // Collection label
   const collectionLabel =
     schema?.displayName ||
@@ -718,6 +729,8 @@ export function ObjectDetailPage(): React.ReactElement {
               tenantSlug={tenantSlug}
               lookupDisplayMap={lookupDisplayMap}
               persistKeyPrefix={collectionName}
+              editable={permissions.canEdit}
+              onFieldCommit={handleFieldCommit}
             />
           </div>
         ) : (

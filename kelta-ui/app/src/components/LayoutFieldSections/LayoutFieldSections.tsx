@@ -13,9 +13,13 @@ import React, { useMemo } from 'react'
 import { FieldSection } from '@/components/detail'
 import type { FieldSectionRenderContext } from '@/components/detail'
 import { FieldRenderer } from '@/components/FieldRenderer'
+import { InlineFieldValue } from '@/components/record/InlineFieldValue'
 import type { LayoutSectionDto, LayoutFieldPlacementDto } from '@/hooks/usePageLayout'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
+
+/** Placement-level overrides keyed by field name (read-only / required from the layout). */
+type PlacementOverrides = Map<string, { readOnly?: boolean; required?: boolean }>
 
 export interface LayoutFieldSectionsProps {
   /** Sections from the resolved page layout */
@@ -34,6 +38,14 @@ export interface LayoutFieldSectionsProps {
    * the collection name.
    */
   persistKeyPrefix?: string
+  /**
+   * Opt-in in-place editing. When true AND `onFieldCommit` is provided, each field renders as a
+   * click-to-edit `InlineFieldValue` (honoring per-placement read-only). When false/omitted the
+   * behavior is unchanged (read-only `FieldRenderer`), so existing callers are untouched.
+   */
+  editable?: boolean
+  /** Persist a single committed field value (partial PATCH). Rejects surface inline. */
+  onFieldCommit?: (fieldName: string, value: unknown) => Promise<void>
 }
 
 /**
@@ -86,6 +98,20 @@ function mapPlacementsToFields(
     .filter((f): f is FieldDefinition => f !== null)
 }
 
+/** Collect per-placement read-only / required overrides across all sections, keyed by field name. */
+function buildPlacementOverrides(sections: LayoutSectionDto[]): PlacementOverrides {
+  const overrides: PlacementOverrides = new Map()
+  for (const section of sections) {
+    for (const p of section.fields) {
+      overrides.set(p.fieldName, {
+        readOnly: p.readOnlyOnLayout,
+        required: p.requiredOnLayout,
+      })
+    }
+  }
+  return overrides
+}
+
 export function LayoutFieldSections({
   sections,
   schemaFields,
@@ -93,7 +119,11 @@ export function LayoutFieldSections({
   tenantSlug,
   lookupDisplayMap,
   persistKeyPrefix,
+  editable,
+  onFieldCommit,
 }: LayoutFieldSectionsProps): React.ReactElement {
+  const inlineEditing = !!editable && !!onFieldCommit
+  const placementOverrides = useMemo(() => buildPlacementOverrides(sections), [sections])
   // Build lookup maps once for efficient field resolution
   const { schemaFieldsByName, schemaFieldsById } = useMemo(() => {
     const byName = new Map<string, FieldDefinition>()
@@ -137,18 +167,31 @@ export function LayoutFieldSections({
               field,
               value,
               displayLabel,
-            }: FieldSectionRenderContext<FieldDefinition>) => (
-              <FieldRenderer
-                type={field.type}
-                value={value}
-                fieldName={field.name}
-                displayName={field.displayName || field.name}
-                tenantSlug={tenantSlug}
-                targetCollection={field.referenceTarget}
-                displayLabel={displayLabel}
-                truncate={false}
-              />
-            )}
+            }: FieldSectionRenderContext<FieldDefinition>) =>
+              inlineEditing ? (
+                <InlineFieldValue
+                  field={field}
+                  value={value}
+                  displayLabel={displayLabel}
+                  tenantSlug={tenantSlug}
+                  editable
+                  readOnly={placementOverrides.get(field.name)?.readOnly}
+                  required={placementOverrides.get(field.name)?.required}
+                  onCommit={onFieldCommit}
+                />
+              ) : (
+                <FieldRenderer
+                  type={field.type}
+                  value={value}
+                  fieldName={field.name}
+                  displayName={field.displayName || field.name}
+                  tenantSlug={tenantSlug}
+                  targetCollection={field.referenceTarget}
+                  displayLabel={displayLabel}
+                  truncate={false}
+                />
+              )
+            }
           />
         )
       })}

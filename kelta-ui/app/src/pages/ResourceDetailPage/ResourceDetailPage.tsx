@@ -395,6 +395,22 @@ export function ResourceDetailPage({
     },
   })
 
+  // In-place inline field edit (unified record experience, slice 2): partial PATCH of one field.
+  const handleFieldCommit = useCallback(
+    async (fieldName: string, value: unknown): Promise<void> => {
+      await apiClient.patch(`/api/${collectionName}/${resourceId}`, {
+        data: {
+          type: collectionName,
+          id: resourceId,
+          attributes: { [fieldName]: value },
+        },
+      })
+      await refetchResource()
+      invalidateRecordContext()
+    },
+    [apiClient, collectionName, resourceId, refetchResource, invalidateRecordContext]
+  )
+
   // Sharing: fetch shares for this record
   // The sharing endpoint may not be implemented yet — return empty array on error
   const { data: shares } = useQuery({
@@ -813,6 +829,8 @@ export function ResourceDetailPage({
           record={resource as Record<string, unknown> & { id: string }}
           tenantSlug={getTenantSlug()}
           lookupDisplayMap={lookupDisplayMap}
+          editable
+          onFieldCommit={handleFieldCommit}
         />
       ) : (
         <section

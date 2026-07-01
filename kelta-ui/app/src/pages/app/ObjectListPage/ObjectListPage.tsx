@@ -269,6 +269,15 @@ export function ObjectListPage(): React.ReactElement {
     },
   })
 
+  // In-place cell edit in the list grid (unified record experience, slice 3).
+  const handleCellCommit = useCallback(
+    async (recordId: string, fieldName: string, value: unknown): Promise<void> => {
+      await mutations.patch.mutateAsync({ id: recordId, data: { [fieldName]: value } })
+      await refetch()
+    },
+    [mutations.patch, refetch]
+  )
+
   // Collection label
   const collectionLabel =
     schema?.displayName ||
@@ -531,6 +540,8 @@ export function ObjectListPage(): React.ReactElement {
         onEdit={permissions.canEdit ? handleEdit : undefined}
         onDelete={permissions.canDelete ? handleDeleteClick : undefined}
         lookupDisplayMap={lookupDisplayMap}
+        editable={permissions.canEdit}
+        onCellCommit={handleCellCommit}
       />
 
       {/* Pagination */}

@@ -175,6 +175,13 @@ MCP tools (`query_collection`, `list_picklists`, `list_approvals`) take flat `pa
 - The unification target for these families (DataTable, FilterBuilder, FieldRenderer, ResourceForm, RelatedList) is the library variant under `@kelta/components`. **Reuse that variant or extend it — never fork a new app-side variant.** App-side variants are being collapsed into thin re-exports of `@kelta/components`.
 - `@kelta/components` is a public plugin surface. Breaking changes to its exported props need a deprecation window (additive props, `legacy*` flags) — never a hard cutover.
 
+### FieldControl registry (unified record experience, slice 1)
+
+- **How a field type renders in view/edit/inline is owned by ONE registry** — `getFieldControl(type)` returns `{ View, Edit, InlineEdit, coerce, validate, editable }` (keyed by `FieldType`). Do not add per-page field switch/if-chains for rendering or editing a value; go through the registry. Lives at `kelta-ui/app/src/components/fieldControl/` in slice 1 (promoted to `@kelta/components` in slice 2).
+- `View` **delegates to `FieldRenderer`** (parity + plugin override for free — `FieldRenderer` already consults `componentRegistry.getFieldRenderer`). `Edit`/`InlineEdit` **reuse** `LookupSelect`/`MultiPicklistSelect`/`RichTextEditor` (never re-implement a typed control). `InlineEdit` = `Edit` wrapped with commit-on-Enter/blur + cancel-on-Escape.
+- `coerce` maps a raw editor value to the API payload; **returns `undefined` to OMIT a field** — server-computed types (`formula`/`rollup_summary`/`auto_number`/`encrypted`) are `editable:false` and never round-trip. `validate` mirrors `DefaultValidationEngine` (required, number, enum membership, json parse, geo range) and is **advisory only — the worker is the source of truth.**
+- Plugins/consumers override any member via `registerFieldControl(type, partial)`; unknown types fall back to the string control.
+
 ### Page builder config v2 (`ui-pages.config` JSON)
 
 The page-builder stores its whole tree + page-level config inside the single `ui-pages.config` JSON column (`PageBuilderPage/pageConfig.ts`). The server is a pass-through and never parses it — all binding/layout resolution is client-side (preserving Cerbos/FLS). Canonical shape: the component tree lives at **`config.components`** (no `config.tree` wrapper); `variables`, `dataSources`, `access`, and `schemaVersion` are **siblings** of `components`.

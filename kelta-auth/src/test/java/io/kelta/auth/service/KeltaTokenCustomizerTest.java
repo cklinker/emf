@@ -42,9 +42,12 @@ class KeltaTokenCustomizerTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
+    @Mock
+    private ConnectedAppTokenRecorder tokenRecorder;
+
     @BeforeEach
     void setUp() {
-        customizer = new KeltaTokenCustomizer(jdbcTemplate);
+        customizer = new KeltaTokenCustomizer(jdbcTemplate, tokenRecorder);
     }
 
     @Test
@@ -120,6 +123,72 @@ class KeltaTokenCustomizerTest {
         assertEquals("connected-app-1", claims.getClaim("connected_app_id"));
         assertEquals("[\"api\",\"read:records\"]", claims.getClaim("app_scopes"));
         assertEquals("connected_app", claims.getClaim("auth_method"));
+    }
+
+    @Test
+    void customize_clientCredentialsToken_enrichesClaimsSetsJtiAndRecordsToken() {
+        RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("couchpicks-web")
+                .clientSecret("{noop}secret")
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .scope("api")
+                .build();
+
+        when(context.getAuthorizationGrantType()).thenReturn(AuthorizationGrantType.CLIENT_CREDENTIALS);
+        when(context.getTokenType()).thenReturn(new OAuth2TokenType("access_token"));
+        when(context.getRegisteredClient()).thenReturn(registeredClient);
+
+        Map<String, Object> appRow = new HashMap<>();
+        appRow.put("id", "connected-app-1");
+        appRow.put("tenant_id", "tenant-1");
+        appRow.put("scopes", "[\"api\"]");
+        when(jdbcTemplate.queryForList(
+                eq("SELECT id, tenant_id, scopes FROM connected_app WHERE client_id = ? AND active = true"),
+                eq("couchpicks-web")
+        )).thenReturn(List.of(appRow));
+
+        JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
+                .issuer("http://localhost")
+                .subject("couchpicks-web")
+                .issuedAt(Instant.now());
+        when(context.getClaims()).thenReturn(claimsBuilder);
+
+        customizer.customize(context);
+
+        JwtClaimsSet claims = claimsBuilder.build();
+        assertEquals("tenant-1", claims.getClaim("tenant_id"));
+        assertEquals("connected-app-1", claims.getClaim("connected_app_id"));
+        assertEquals("api_key", claims.getClaim("auth_method"));
+        assertEquals("[\"api\"]", claims.getClaim("app_scopes"));
+        assertNotNull(claims.getId(), "jti should be pinned for the recorded token");
+
+        verify(tokenRecorder).recordIssuedToken(
+                eq("connected-app-1"), eq("tenant-1"), eq("[\"api\"]"),
+                eq(claims.getId()), any());
+        // client_credentials must not touch the user-principal path
+        verify(context, never()).getPrincipal();
+    }
+
+    @Test
+    void customize_clientCredentialsUnknownClient_doesNotRecord() {
+        RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("ghost-client")
+                .clientSecret("{noop}secret")
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .scope("api")
+                .build();
+
+        when(context.getAuthorizationGrantType()).thenReturn(AuthorizationGrantType.CLIENT_CREDENTIALS);
+        when(context.getTokenType()).thenReturn(new OAuth2TokenType("access_token"));
+        when(context.getRegisteredClient()).thenReturn(registeredClient);
+        when(jdbcTemplate.queryForList(
+                eq("SELECT id, tenant_id, scopes FROM connected_app WHERE client_id = ? AND active = true"),
+                eq("ghost-client")
+        )).thenReturn(List.of());
+
+        customizer.customize(context);
+
+        verify(tokenRecorder, never()).recordIssuedToken(anyString(), anyString(), anyString(), anyString(), any());
     }
 
     @Test

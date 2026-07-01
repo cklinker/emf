@@ -20,9 +20,11 @@ public class KeltaTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCo
     private static final Logger log = LoggerFactory.getLogger(KeltaTokenCustomizer.class);
 
     private final JdbcTemplate jdbcTemplate;
+    private final ConnectedAppTokenRecorder tokenRecorder;
 
-    public KeltaTokenCustomizer(JdbcTemplate jdbcTemplate) {
+    public KeltaTokenCustomizer(JdbcTemplate jdbcTemplate, ConnectedAppTokenRecorder tokenRecorder) {
         this.jdbcTemplate = jdbcTemplate;
+        this.tokenRecorder = tokenRecorder;
     }
 
     @Override
@@ -59,21 +61,36 @@ public class KeltaTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCo
                 clientId
         );
 
-        if (!results.isEmpty()) {
-            Map<String, Object> app = results.get(0);
-            context.getClaims().claims(claims -> {
-                claims.put("tenant_id", app.get("tenant_id"));
-                claims.put("connected_app_id", app.get("id"));
-                claims.put("auth_method", "api_key");
-                Object scopes = app.get("scopes");
-                if (scopes != null) {
-                    claims.put("app_scopes", scopes.toString());
-                }
-            });
-            log.debug("Enriched client_credentials token for app {} (client_id={})", app.get("id"), clientId);
-        } else {
+        if (results.isEmpty()) {
             log.warn("No active connected app found for client_id={}", clientId);
+            return;
         }
+
+        Map<String, Object> app = results.get(0);
+        String appId = String.valueOf(app.get("id"));
+        String tenantId = app.get("tenant_id") != null ? app.get("tenant_id").toString() : null;
+        Object scopes = app.get("scopes");
+        String scopesJson = scopes != null ? scopes.toString() : null;
+
+        // Pin a stable jti so the recorded token row and a later revoke can reference the same id.
+        String jti = java.util.UUID.randomUUID().toString();
+
+        context.getClaims().claims(claims -> {
+            claims.put("tenant_id", app.get("tenant_id"));
+            claims.put("connected_app_id", app.get("id"));
+            claims.put("auth_method", "api_key");
+            if (scopesJson != null) {
+                claims.put("app_scopes", scopesJson);
+            }
+        });
+        context.getClaims().id(jti);
+        log.debug("Enriched client_credentials token for app {} (client_id={})", appId, clientId);
+
+        // Record the issued token so it appears in the app's token list, refreshes
+        // last_used_at, and leaves an audit trail. Best-effort — never blocks issuance.
+        var tokenSettings = context.getRegisteredClient().getTokenSettings();
+        java.time.Duration accessTtl = tokenSettings != null ? tokenSettings.getAccessTokenTimeToLive() : null;
+        tokenRecorder.recordIssuedToken(appId, tenantId, scopesJson, jti, accessTtl);
     }
 
     private void customizeIdToken(JwtEncodingContext context, KeltaUserDetails userDetails) {

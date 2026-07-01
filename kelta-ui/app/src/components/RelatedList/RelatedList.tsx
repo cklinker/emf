@@ -2,20 +2,26 @@
  * RelatedList Component
  *
  * Displays a compact table of related (child) records for a given
- * parent record. Used on the ObjectDetailPage to show master-detail
- * relationships.
+ * parent record. Used on the ObjectDetailPage/ResourceDetailPage (via the
+ * shared DetailTabBar) to show master-detail relationships.
  *
  * Features:
- * - Compact 5-row table of related records
- * - "+ New" button to create a new related record (pre-fills parent lookup)
- * - "View All" link to navigate to the full list filtered by parent
+ * - Compact table of related records
  * - Field type-aware rendering via FieldRenderer
+ * - "View All" link to navigate to the full list filtered by parent
  * - Loading skeleton and empty state
+ * - Opt-in inline CRUD (unified record slice 4): when `editable` and the child
+ *   collection's permissions allow, cells become click-to-edit via the
+ *   FieldControl registry (`InlineFieldValue`), rows can be deleted, and a new
+ *   child can be created inline with the parent FK pre-filled. Child mutations
+ *   are owned here (`useRecordMutation`) and refresh both the API-fetch path
+ *   (`refetch`) and the parent-included path (`onChanged`). Mass-edit is a
+ *   documented follow-up (needs a bulk backend — see concerns.md).
  */
 
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, ExternalLink } from 'lucide-react'
+import { Plus, ExternalLink, Trash2, Check, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,9 +35,14 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { FieldRenderer } from '@/components/FieldRenderer'
+import { InlineFieldValue } from '@/components/record/InlineFieldValue'
+import { getFieldControl } from '@/components/fieldControl'
+import type { FieldControlContext } from '@/components/fieldControl'
 import { useRelatedRecords } from '@/hooks/useRelatedRecords'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useObjectPermissions } from '@/hooks/useObjectPermissions'
+import { useRecordMutation } from '@/hooks/useRecordMutation'
+import { useToast } from '@/components'
 import { buildIncludedDisplayMap, extractIncluded } from '@/utils/jsonapi'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
@@ -96,6 +107,18 @@ export interface RelatedListProps {
    * outside the list itself.
    */
   onTotalChange?: (total: number) => void
+  /**
+   * Opt-in inline CRUD (slice 4). When true AND the child collection's
+   * permissions allow, cells become inline-editable, rows can be deleted, and
+   * a new child can be created inline. Defaults to false (read-only).
+   */
+  editable?: boolean
+  /**
+   * Called after any inline child mutation (create/edit/delete). Containers
+   * pass the parent record's refetch so the `includedData` path refreshes; the
+   * API-fetch path refreshes itself.
+   */
+  onChanged?: () => void
 }
 
 /**
@@ -117,6 +140,115 @@ function RelatedListSkeleton({ columns }: { columns: number }) {
   )
 }
 
+/** Build a FieldControl context for a related-list field (matches InlineFieldValue). */
+function fieldContext(
+  field: FieldDefinition,
+  tenantSlug: string,
+  displayLabel?: string
+): FieldControlContext {
+  return {
+    fieldName: field.name,
+    displayName: field.displayName || field.name,
+    tenantSlug,
+    targetCollection: field.referenceTarget,
+    displayLabel,
+    enumValues: field.enumValues,
+    referenceOptions: field.lookupOptions,
+    required: field.required,
+  }
+}
+
+/**
+ * Inline "add row" — a controlled row of FieldControl Edit inputs that POSTs a
+ * new child with the parent FK pre-filled. Options-dependent types (picklist /
+ * reference) edit only when their options are present in the schema field.
+ */
+function RelatedCreateRow({
+  fields,
+  tenantSlug,
+  columnCount,
+  saving,
+  onSubmit,
+  onCancel,
+}: {
+  fields: FieldDefinition[]
+  tenantSlug: string
+  columnCount: number
+  saving: boolean
+  onSubmit: (values: Record<string, unknown>) => void
+  onCancel: () => void
+}): React.ReactElement {
+  const [values, setValues] = useState<Record<string, unknown>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const submit = () => {
+    const nextErrors: Record<string, string> = {}
+    const payload: Record<string, unknown> = {}
+    for (const field of fields) {
+      const control = getFieldControl(field.type)
+      const ctx = fieldContext(field, tenantSlug)
+      const coerced = control.coerce(values[field.name])
+      const err = control.validate(coerced, ctx)
+      if (err) nextErrors[field.name] = err
+      if (coerced !== undefined) payload[field.name] = coerced
+    }
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
+    onSubmit(payload)
+  }
+
+  return (
+    <TableRow data-testid="related-create-row">
+      {fields.map((field) => {
+        const control = getFieldControl(field.type)
+        const Edit = control.Edit
+        const ctx = fieldContext(field, tenantSlug)
+        return (
+          <TableCell key={field.name} className="py-2 align-top">
+            <Edit
+              type={field.type}
+              value={values[field.name]}
+              ctx={ctx}
+              onChange={(next) => setValues((prev) => ({ ...prev, [field.name]: next }))}
+              error={errors[field.name]}
+              id={`related-create-${field.name}`}
+            />
+            {errors[field.name] && (
+              <p className="mt-1 text-xs text-destructive" role="alert">
+                {errors[field.name]}
+              </p>
+            )}
+          </TableCell>
+        )
+      })}
+      <TableCell className="py-2 text-right align-top whitespace-nowrap" colSpan={columnCount}>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={submit}
+            disabled={saving}
+            aria-label="Save new row"
+            data-testid="related-create-save"
+          >
+            <Check className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onCancel}
+            disabled={saving}
+            aria-label="Cancel new row"
+            data-testid="related-create-cancel"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
 export function RelatedList({
   collectionName,
   foreignKeyField,
@@ -129,16 +261,22 @@ export function RelatedList({
   sortDirection,
   includedData,
   onTotalChange,
+  editable = false,
+  onChanged,
 }: RelatedListProps): React.ReactElement {
   const navigate = useNavigate()
   const basePath = `/${tenantSlug}/app`
   const collectionStore = useCollectionStore()
+  const { showToast } = useToast()
 
   // Fetch schema for the related collection
   const { schema, fields, isLoading: schemaLoading } = useCollectionSchema(collectionName)
 
   // Fetch permissions for the related collection
   const { permissions } = useObjectPermissions(collectionName)
+
+  const [creating, setCreating] = useState(false)
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
 
   // Determine visible columns. When `displayColumns` is provided, render exactly
   // those fields in that order (configured in the page layout). Otherwise fall
@@ -212,6 +350,7 @@ export function RelatedList({
     total: fetchedTotal,
     isLoading: recordsLoading,
     rawResponse,
+    refetch,
   } = useRelatedRecords({
     collectionName,
     foreignKeyField,
@@ -221,6 +360,19 @@ export function RelatedList({
     sortField,
     sortDirection,
     enabled: !schemaLoading && !hasPreloadedData,
+  })
+
+  // Refresh after any inline mutation: the API path refetches itself; the
+  // preloaded path is refreshed by the parent via `onChanged`.
+  const refreshAfterMutation = () => {
+    if (!hasPreloadedData) void refetch()
+    onChanged?.()
+  }
+
+  const mutations = useRecordMutation({
+    collectionName,
+    onSuccess: refreshAfterMutation,
+    onError: (err) => showToast(err.message || 'Operation failed', 'error'),
   })
 
   // Use pre-loaded data if available, otherwise fall back to fetched data
@@ -263,17 +415,46 @@ export function RelatedList({
     onTotalChange(total)
   }, [total, isLoading, onTotalChange])
 
+  // Inline-CRUD gates (require opt-in + child-collection permission).
+  const canInlineEdit = editable && permissions.canEdit
+  const canDeleteRows = editable && permissions.canDelete
+  const canInlineCreate = editable && permissions.canCreate
+  // Extra trailing column for row actions (delete).
+  const actionColumns = canDeleteRows ? 1 : 0
+  const totalColumns = visibleFields.length + actionColumns
+
   // Handle row click → navigate to record detail
   const handleRowClick = (record: CollectionRecord) => {
     navigate(`${basePath}/o/${collectionName}/${record.id}`)
   }
 
-  // Handle "+ New" → navigate to new form with parent pre-filled
+  // Handle "+ New" → inline create row when editable, else navigate to the full
+  // form with the parent pre-filled.
   const handleNew = () => {
+    if (canInlineCreate) {
+      setCreating(true)
+      return
+    }
     const params = new URLSearchParams()
     params.set(foreignKeyField, parentRecordId)
     navigate(`${basePath}/o/${collectionName}/new?${params.toString()}`)
   }
+
+  const commitEdit = async (recordId: string, fieldName: string, value: unknown): Promise<void> => {
+    await mutations.patch.mutateAsync({ id: recordId, data: { [fieldName]: value } })
+  }
+
+  const commitCreate = async (values: Record<string, unknown>): Promise<void> => {
+    await mutations.create.mutateAsync({ ...values, [foreignKeyField]: parentRecordId })
+    setCreating(false)
+  }
+
+  const confirmDelete = async (recordId: string): Promise<void> => {
+    await mutations.remove.mutateAsync(recordId)
+    setConfirmingDeleteId(null)
+  }
+
+  const showCreateButton = (canInlineCreate || permissions.canCreate) && !creating
 
   return (
     <Card>
@@ -304,8 +485,14 @@ export function RelatedList({
               </Link>
             </Button>
           )}
-          {permissions.canCreate && (
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleNew}>
+          {showCreateButton && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={handleNew}
+              data-testid="related-list-new"
+            >
               <Plus className="mr-1 h-3 w-3" />
               New
             </Button>
@@ -331,7 +518,7 @@ export function RelatedList({
               </TableBody>
             </Table>
           </div>
-        ) : records.length === 0 ? (
+        ) : records.length === 0 && !creating ? (
           <p className="py-4 text-center text-sm text-muted-foreground">
             No related {displayLabel.toLowerCase()} found.
           </p>
@@ -345,6 +532,11 @@ export function RelatedList({
                       {field.displayName || field.name}
                     </TableHead>
                   ))}
+                  {actionColumns > 0 && (
+                    <TableHead className="w-px text-right text-xs">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -357,31 +549,97 @@ export function RelatedList({
                     {visibleFields.map((field) => {
                       const value = record[field.name]
                       const isRef = REFERENCE_FIELD_TYPES.has(field.type)
-                      const displayLabel =
+                      const refLabel =
                         isRef && lookupDisplayMap?.[field.name]
                           ? lookupDisplayMap[field.name][String(value)] || undefined
                           : undefined
 
                       return (
                         <TableCell key={field.name} className="max-w-[200px] py-2">
-                          <FieldRenderer
-                            type={field.type}
-                            value={value}
-                            fieldName={field.name}
-                            displayName={field.displayName || field.name}
-                            tenantSlug={tenantSlug}
-                            targetCollection={field.referenceTarget}
-                            displayLabel={displayLabel}
-                            truncate
-                          />
+                          {canInlineEdit ? (
+                            <InlineFieldValue
+                              field={field}
+                              value={value}
+                              displayLabel={refLabel}
+                              tenantSlug={tenantSlug}
+                              editable
+                              editOn="pencil"
+                              onCommit={(name, v) => commitEdit(record.id, name, v)}
+                            />
+                          ) : (
+                            <FieldRenderer
+                              type={field.type}
+                              value={value}
+                              fieldName={field.name}
+                              displayName={field.displayName || field.name}
+                              tenantSlug={tenantSlug}
+                              targetCollection={field.referenceTarget}
+                              displayLabel={refLabel}
+                              truncate
+                            />
+                          )}
                         </TableCell>
                       )
                     })}
+                    {actionColumns > 0 && (
+                      <TableCell
+                        className="w-px py-2 text-right whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {confirmingDeleteId === record.id ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              className="text-destructive"
+                              onClick={() => void confirmDelete(record.id)}
+                              disabled={mutations.remove.isPending}
+                              aria-label="Confirm delete"
+                              data-testid={`related-delete-confirm-${record.id}`}
+                            >
+                              <Check className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => setConfirmingDeleteId(null)}
+                              aria-label="Cancel delete"
+                            >
+                              <X className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                          </span>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => setConfirmingDeleteId(record.id)}
+                            aria-label={`Delete ${displayLabel} row`}
+                            data-testid={`related-delete-${record.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
+                {creating && (
+                  <RelatedCreateRow
+                    fields={visibleFields}
+                    tenantSlug={tenantSlug}
+                    columnCount={Math.max(actionColumns, 1)}
+                    saving={mutations.create.isPending}
+                    onSubmit={(values) => void commitCreate(values)}
+                    onCancel={() => setCreating(false)}
+                  />
+                )}
               </TableBody>
             </Table>
           </div>
+        )}
+        {creating && totalColumns === 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">No editable columns configured.</p>
         )}
       </CardContent>
     </Card>

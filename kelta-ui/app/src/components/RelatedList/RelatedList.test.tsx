@@ -1,21 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RelatedList } from './RelatedList'
 
 // Mock API context
 const mockGet = vi.fn()
+const mockPost = vi.fn()
+const mockPatch = vi.fn()
+const mockDelete = vi.fn()
 vi.mock('@/context/ApiContext', () => ({
   useApi: vi.fn(() => ({
     apiClient: {
       get: mockGet,
-      post: vi.fn(),
+      post: mockPost,
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
+      patch: mockPatch,
+      delete: mockDelete,
     },
   })),
+}))
+
+// useToast lives on the @/components barrel; RelatedList uses it for CRUD errors.
+vi.mock('@/components', () => ({
+  useToast: () => ({ showToast: vi.fn() }),
 }))
 
 // Mock collection store context
@@ -56,6 +65,9 @@ describe('RelatedList', () => {
     // Drop any queued mockResolvedValueOnce values left over from a prior test.
     // clearAllMocks only clears call history, not the implementation queue.
     mockGet.mockReset()
+    mockPost.mockReset()
+    mockPatch.mockReset()
+    mockDelete.mockReset()
   })
 
   it('shows empty state when no related records found', async () => {
@@ -378,6 +390,127 @@ describe('RelatedList', () => {
 
     await waitFor(() => {
       expect(screen.getByText('New')).toBeDefined()
+    })
+  })
+
+  describe('inline CRUD (slice 4)', () => {
+    // useCollectionSchema fetches `/api/collections/{name}?include=fields` (JSON:API).
+    function mockSchema(fieldNames: string[]) {
+      mockGet.mockResolvedValueOnce({
+        data: {
+          id: 'col-1',
+          type: 'collections',
+          attributes: { name: 'contacts', displayName: 'Contacts' },
+        },
+        included: fieldNames.map((name, i) => ({
+          id: `f-${i}`,
+          type: 'fields',
+          attributes: {
+            name,
+            displayName: name,
+            type: 'STRING',
+            required: false,
+            active: true,
+            fieldOrder: i,
+          },
+        })),
+      })
+    }
+    // Persistent (not -Once) so the post-mutation `refetch()` also resolves —
+    // the schema GET is queued -Once first and takes priority.
+    function mockRecords(records: Array<Record<string, unknown>>) {
+      mockGet.mockResolvedValue({
+        data: records,
+        metadata: {
+          totalCount: records.length,
+          currentPage: 1,
+          pageSize: 5,
+          totalPages: 1,
+        },
+      })
+    }
+
+    it('deletes a row after inline confirm (DELETE child by id)', async () => {
+      mockSchema(['name'])
+      mockRecords([{ id: 'rec-1', accountId: 'rec-123', name: 'Ada' }])
+      mockDelete.mockResolvedValue(undefined)
+
+      const user = userEvent.setup()
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['name']}
+            editable
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => expect(screen.getByTestId('related-delete-rec-1')).toBeDefined())
+      await user.click(screen.getByTestId('related-delete-rec-1'))
+      await user.click(screen.getByTestId('related-delete-confirm-rec-1'))
+
+      await waitFor(() => expect(mockDelete).toHaveBeenCalledTimes(1))
+      expect(String(mockDelete.mock.calls[0][0])).toBe('/api/contacts/rec-1')
+    })
+
+    it('creates a child inline with the parent FK pre-filled (POST)', async () => {
+      mockSchema(['name'])
+      mockRecords([])
+      mockPost.mockResolvedValue({ data: { id: 'new-1', type: 'contacts', attributes: {} } })
+
+      const user = userEvent.setup()
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['name']}
+            editable
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => expect(screen.getByTestId('related-list-new')).toBeDefined())
+      await user.click(screen.getByTestId('related-list-new'))
+      await waitFor(() => expect(screen.getByTestId('related-create-row')).toBeDefined())
+
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Grace' } })
+      await user.click(screen.getByTestId('related-create-save'))
+
+      await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1))
+      expect(String(mockPost.mock.calls[0][0])).toBe('/api/contacts')
+      const body = mockPost.mock.calls[0][1] as { data: { attributes: Record<string, unknown> } }
+      expect(body.data.attributes.name).toBe('Grace')
+      // Parent FK pre-filled from the relationship's foreignKeyField.
+      expect(body.data.attributes.accountId).toBe('rec-123')
+    })
+
+    it('hides inline CRUD affordances when not editable', async () => {
+      mockSchema(['name'])
+      mockRecords([{ id: 'rec-1', accountId: 'rec-123', name: 'Ada' }])
+
+      render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['name']}
+          />
+        </TestWrapper>
+      )
+
+      await waitFor(() => expect(screen.getByText('Ada')).toBeDefined())
+      // No delete control and no inline-edit pencil when read-only.
+      expect(screen.queryByTestId('related-delete-rec-1')).toBeNull()
+      expect(screen.queryByTestId('inline-field-name')).toBeNull()
     })
   })
 })

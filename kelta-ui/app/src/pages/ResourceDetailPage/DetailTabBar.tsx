@@ -65,6 +65,14 @@ export interface DetailTabBarProps {
   invalidateRecordContext: () => void
   /** Resolve a userId to a display name + link, or null when not yet resolved */
   getUserDisplay: (userId: string) => UserDisplay | null
+  /**
+   * Enable inline related-list CRUD (slice 4). The RelatedList still gates each
+   * action on the child collection's own permissions. Defaults to false.
+   */
+  editable?: boolean
+  /** Refetch the parent record after a related-list mutation (refreshes the
+   *  `includedData` path + tab counts). */
+  onRelatedChange?: () => void
 }
 
 function normalizeSortDirection(raw: string | null | undefined): 'asc' | 'desc' {
@@ -138,6 +146,8 @@ interface RelatedListTabContentProps {
   tenantSlug: string
   includedData?: unknown
   onTotalChange: (n: number) => void
+  editable: boolean
+  onChanged?: () => void
 }
 
 function RelatedListTabContent({
@@ -146,6 +156,8 @@ function RelatedListTabContent({
   tenantSlug,
   includedData,
   onTotalChange,
+  editable,
+  onChanged,
 }: RelatedListTabContentProps): React.ReactElement | null {
   const { collectionName, relationshipFieldName } = useResolvedRelatedCollection(rl)
   if (!collectionName || !relationshipFieldName) return null
@@ -161,6 +173,8 @@ function RelatedListTabContent({
       sortDirection={normalizeSortDirection(rl.sortDirection)}
       includedData={includedData}
       onTotalChange={onTotalChange}
+      editable={editable}
+      onChanged={onChanged}
     />
   )
 }
@@ -177,6 +191,8 @@ export function DetailTabBar({
   apiClient,
   invalidateRecordContext,
   getUserDisplay,
+  editable = false,
+  onRelatedChange,
 }: DetailTabBarProps): React.ReactElement {
   const { t, formatDate } = useI18n()
   const { showToast } = useToast()
@@ -254,6 +270,8 @@ export function DetailTabBar({
               tenantSlug={tenantSlug}
               includedData={includedData}
               onTotalChange={(n) => setCount(rl.id, n)}
+              editable={editable}
+              onChanged={onRelatedChange}
             />
           </TabsContent>
         ))}

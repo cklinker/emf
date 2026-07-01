@@ -996,6 +996,8 @@ export function ResourceDetailPage({
         apiClient={apiClient}
         invalidateRecordContext={invalidateRecordContext}
         getUserDisplay={getUserDisplay}
+        editable
+        onRelatedChange={refetchResource}
       />
 
       {/* Activity Timeline (T7) */}

@@ -409,6 +409,16 @@ public class FlowConfig {
         return hook;
     }
 
+    @Bean
+    public io.kelta.worker.listener.TenantIpAllowlistConfigEventPublisher tenantIpAllowlistConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.TenantIpAllowlistConfigEventPublisher hook =
+                new io.kelta.worker.listener.TenantIpAllowlistConfigEventPublisher(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     // ---------------------------------------------------------------------------
     // OpenAPI spec library — parser bean + NATS broadcast on spec changes
     // ---------------------------------------------------------------------------

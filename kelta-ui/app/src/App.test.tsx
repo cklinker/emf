@@ -328,6 +328,7 @@ vi.mock('./pages', () => ({
   PasswordPolicyPage: () => <div data-testid="password-policy-page">Password Policy Page</div>,
   MfaPolicyPage: () => <div data-testid="mfa-policy-page">MFA Policy Page</div>,
   MapSettingsPage: () => <div data-testid="map-settings-page">Map Settings Page</div>,
+  NetworkAccessPage: () => <div data-testid="network-access-page">Network Access Page</div>,
   CredentialsPage: () => <div data-testid="credentials-page">Credentials Page</div>,
   ApiSpecsPage: () => <div data-testid="api-specs-page">API Specs Page</div>,
   ApiSpecDetailPage: () => <div data-testid="api-spec-detail-page">API Spec Detail Page</div>,

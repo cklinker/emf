@@ -57,15 +57,32 @@ public class InternalBootstrapController {
 
         List<Map<String, Object>> collections = loadCollections();
         Map<String, Map<String, Object>> governorLimits = loadGovernorLimits();
+        Map<String, Map<String, Object>> ipAllowlists = loadIpAllowlists();
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("collections", collections);
         response.put("governorLimits", governorLimits);
+        response.put("ipAllowlists", ipAllowlists);
 
-        log.info("Returning bootstrap config: {} collections, {} tenant governor limits",
-                collections.size(), governorLimits.size());
+        log.info("Returning bootstrap config: {} collections, {} tenant governor limits, {} ip allowlists",
+                collections.size(), governorLimits.size(), ipAllowlists.size());
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Returns per-tenant IP allowlist configuration for the gateway to refresh its
+     * cache after a {@code kelta.config.tenant.ip-allowlist.changed.*} event, without
+     * re-fetching the full bootstrap payload.
+     *
+     * @return map of tenantId to {@code {enabled: boolean, cidrs: [String]}}
+     */
+    @GetMapping("/ip-allowlists")
+    public ResponseEntity<Map<String, Map<String, Object>>> getIpAllowlistsMap() {
+        log.debug("REST request to get tenant IP allowlists map");
+        Map<String, Map<String, Object>> allowlists = loadIpAllowlists();
+        log.info("Returning IP allowlists map with {} entries", allowlists.size());
+        return ResponseEntity.ok(allowlists);
     }
 
     /**
@@ -534,5 +551,64 @@ public class InternalBootstrapController {
         }
 
         return governorLimits;
+    }
+
+    /**
+     * Loads per-tenant IP allowlist config as {@code tenantId → {enabled, cidrs[]}}.
+     * The {@code ip_allowlist_cidrs} column is JSONB; the JDBC driver returns it as a
+     * {@code PGobject}/String, so we parse it to a list of strings defensively.
+     */
+    private Map<String, Map<String, Object>> loadIpAllowlists() {
+        List<Map<String, Object>> rows = repository.findTenantIpAllowlists();
+
+        Map<String, Map<String, Object>> allowlists = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            String tenantId = (String) row.get("id");
+            if (tenantId == null) {
+                continue;
+            }
+
+            boolean enabled = Boolean.TRUE.equals(row.get("ip_allowlist_enabled"));
+            List<String> cidrs = parseCidrList(row.get("ip_allowlist_cidrs"), tenantId);
+
+            Map<String, Object> config = new LinkedHashMap<>();
+            config.put("enabled", enabled);
+            config.put("cidrs", cidrs);
+            allowlists.put(tenantId, config);
+        }
+
+        return allowlists;
+    }
+
+    private List<String> parseCidrList(Object raw, String tenantId) {
+        if (raw == null) {
+            return List.of();
+        }
+        if (raw instanceof List<?> list) {
+            List<String> result = new ArrayList<>();
+            for (Object o : list) {
+                if (o != null) {
+                    result.add(o.toString());
+                }
+            }
+            return result;
+        }
+        String json = raw.toString();
+        if (json.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<?> parsed = objectMapper.readValue(json, List.class);
+            List<String> result = new ArrayList<>();
+            for (Object o : parsed) {
+                if (o != null) {
+                    result.add(o.toString());
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("Failed to parse ip_allowlist_cidrs for tenant {}: {}", tenantId, e.getMessage());
+            return List.of();
+        }
     }
 }

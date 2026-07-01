@@ -9,6 +9,9 @@
 export { flattenResource, unwrapResource, unwrapCollection } from './jsonapi'
 export type { JsonApiResource, JsonApiResponse, JsonApiCollectionResponse } from './jsonapi'
 
+// CIDR validation for the tenant IP allowlist editor
+export { isValidCidr } from './cidr'
+
 // Export utility functions as they are implemented
 // Example exports:
 // export { formatDate, formatNumber, formatCurrency } from './formatters';

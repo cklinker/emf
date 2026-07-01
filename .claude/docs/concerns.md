@@ -12,6 +12,16 @@ at the bottom so reviewers can see what's already been addressed.
   bypass mitigated by K8s NetworkPolicy + service-mesh mTLS, not by app code.
   Verify on cluster: `kubectl get networkpolicy -n kelta`.
 
+**Tenant IP allowlist — `X-Forwarded-For` trust (accepted trade-off):**
+- `TenantIpAllowlistFilter` allows a request when **any** IP in the chain (socket +
+  every `X-Forwarded-For` hop + `X-Real-IP`) matches an allowed CIDR. This is
+  deliberately topology-resilient but means a non-admin could inject an allowed IP via
+  `X-Forwarded-For` to bypass the restriction. Chosen by the tenant/operator; tighten to
+  socket-only with `kelta.gateway.ip-allowlist.trust-forwarded-for=false` where the proxy
+  hop count is known. The filter is **fail-open** by design (missing config, disabled, or
+  `MANAGE_TENANTS` holder → allow), so it hardens access but is not a hard security
+  boundary on its own — pair it with the network-level controls above.
+
 ## Known Bugs
 
 (No open bugs from the original audit. See Resolved → Bugs.)

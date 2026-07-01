@@ -28,28 +28,30 @@ export interface UseRecordMutationReturn {
     mutateAsync: (data: Record<string, unknown>) => Promise<CollectionRecord>
     isPending: boolean
   }
-  /** Full update (PUT) of a record */
+  /** Full update (PUT) of a record. Pass `ifMatch` (record ETag) for optimistic locking. */
   update: {
-    mutate: (params: { id: string; data: Record<string, unknown> }) => void
+    mutate: (params: { id: string; data: Record<string, unknown>; ifMatch?: string }) => void
     mutateAsync: (params: {
       id: string
       data: Record<string, unknown>
+      ifMatch?: string
     }) => Promise<CollectionRecord>
     isPending: boolean
   }
-  /** Partial update (PATCH) of a record */
+  /** Partial update (PATCH) of a record. Pass `ifMatch` (record ETag) for optimistic locking. */
   patch: {
-    mutate: (params: { id: string; data: Record<string, unknown> }) => void
+    mutate: (params: { id: string; data: Record<string, unknown>; ifMatch?: string }) => void
     mutateAsync: (params: {
       id: string
       data: Record<string, unknown>
+      ifMatch?: string
     }) => Promise<CollectionRecord>
     isPending: boolean
   }
-  /** Delete a record by ID */
+  /** Delete a record by ID (or `{id, ifMatch}` for optimistic locking). */
   remove: {
-    mutate: (id: string) => void
-    mutateAsync: (id: string) => Promise<void>
+    mutate: (idOrParams: string | { id: string; ifMatch?: string }) => void
+    mutateAsync: (idOrParams: string | { id: string; ifMatch?: string }) => Promise<void>
     isPending: boolean
   }
   /** Bulk delete records by IDs */
@@ -96,9 +98,17 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
   })
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
+    mutationFn: async ({
+      id,
+      data,
+      ifMatch,
+    }: {
+      id: string
+      data: Record<string, unknown>
+      ifMatch?: string
+    }) => {
       const body = wrapResource(collectionName, data, id)
-      const response = await apiClient.put(`/api/${collectionName}/${id}`, body)
+      const response = await apiClient.put(`/api/${collectionName}/${id}`, body, ifMatch)
       return unwrapResource<CollectionRecord>(response)
     },
     onSuccess: () => {
@@ -109,9 +119,17 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
   })
 
   const patchMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
+    mutationFn: async ({
+      id,
+      data,
+      ifMatch,
+    }: {
+      id: string
+      data: Record<string, unknown>
+      ifMatch?: string
+    }) => {
       const body = wrapResource(collectionName, data, id)
-      const response = await apiClient.patch(`/api/${collectionName}/${id}`, body)
+      const response = await apiClient.patch(`/api/${collectionName}/${id}`, body, ifMatch)
       return unwrapResource<CollectionRecord>(response)
     },
     onSuccess: () => {
@@ -122,8 +140,10 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
   })
 
   const removeMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiClient.delete(`/api/${collectionName}/${id}`)
+    mutationFn: async (idOrParams: string | { id: string; ifMatch?: string }) => {
+      const { id, ifMatch } =
+        typeof idOrParams === 'string' ? { id: idOrParams, ifMatch: undefined } : idOrParams
+      await apiClient.delete(`/api/${collectionName}/${id}`, ifMatch)
     },
     onSuccess: () => {
       invalidateRecords()

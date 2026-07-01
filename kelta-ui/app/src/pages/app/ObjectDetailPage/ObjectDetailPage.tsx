@@ -844,6 +844,8 @@ export function ObjectDetailPage(): React.ReactElement {
             apiClient={apiClient}
             invalidateRecordContext={invalidateRecordContext}
             getUserDisplay={getUserDisplay}
+            editable={permissions.canEdit}
+            onRelatedChange={refetchRecord}
           />
         </div>
       )}

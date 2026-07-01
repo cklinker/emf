@@ -88,7 +88,9 @@ export function RecordShell({
       {header}
       <div
         className={cn(
-          'grid grid-cols-1 gap-6',
+          // gap-4 matches the pre-convergence end-user grid so the record-detail
+          // visual-regression baseline stays pixel-stable (admin is single-column).
+          'grid grid-cols-1 gap-4',
           rail && 'lg:grid-cols-[minmax(0,1fr)_340px]'
         )}
       >

@@ -67,7 +67,7 @@ export interface LayoutRuleDto {
   layoutId: string
   name: string
   description: string | null
-  kind: 'COMPUTE' | 'VALIDATE' | 'DEFAULT' | 'TRANSFORM'
+  kind: 'COMPUTE' | 'VALIDATE' | 'DEFAULT' | 'TRANSFORM' | 'SCRIPT'
   active: boolean
   whenEvents: string[] | string
   targetField: string | null

@@ -444,4 +444,127 @@ describe('RuleEngine', () => {
       expect(form.getValue('total')).toBeCloseTo(107);
     });
   });
+
+  describe('script', () => {
+    const discountGuard: LayoutRule = {
+      ...baseRule,
+      id: 's1',
+      name: 'Discount guard',
+      kind: 'script',
+      target: 'discount',
+      expression: 'IF(discount > 0.5, "Discount over 50% needs approval", "")',
+      when: ['onChange', 'onBeforeSave'],
+      sortOrder: 10,
+    };
+
+    it('blocks onBeforeSave when the expression returns a non-empty message', () => {
+      const engine = new RuleEngine({ layoutRules: [discountGuard] });
+      const form = new TestForm({ discount: 0.75 });
+      const result = engine.runBeforeSave(form);
+      expect(result.blocked).toBe(true);
+      expect(result.violations).toHaveLength(1);
+      expect(result.violations[0].message).toBe('Discount over 50% needs approval');
+      expect(result.violations[0].field).toBe('discount');
+      expect(form.getErrors().discount).toBe('Discount over 50% needs approval');
+    });
+
+    it('does not block when the expression returns an empty string', () => {
+      const engine = new RuleEngine({ layoutRules: [discountGuard] });
+      const form = new TestForm({ discount: 0.25 });
+      const result = engine.runBeforeSave(form);
+      expect(result.blocked).toBe(false);
+      expect(result.violations).toHaveLength(0);
+    });
+
+    it('surfaces the message live on onChange and clears it when valid', () => {
+      const engine = new RuleEngine({ layoutRules: [discountGuard] });
+      const form = new TestForm({ discount: 0.75 });
+      engine.onFieldChange('discount', form);
+      expect(form.getErrors().discount).toBe('Discount over 50% needs approval');
+      form.setValue('discount', 0.1);
+      engine.onFieldChange('discount', form);
+      expect(form.getErrors().discount).toBeUndefined();
+    });
+
+    it('fires on onLoad', () => {
+      const engine = new RuleEngine({
+        layoutRules: [{ ...discountGuard, when: ['onLoad'] }],
+      });
+      const form = new TestForm({ discount: 0.9 });
+      engine.onLoad(form);
+      expect(form.getErrors().discount).toBe('Discount over 50% needs approval');
+    });
+
+    it('uses the static message when the expression returns boolean true', () => {
+      const boolGuard: LayoutRule = {
+        ...baseRule,
+        id: 's2',
+        name: 'Positive amount',
+        kind: 'script',
+        target: 'amount',
+        expression: 'amount < 0',
+        message: 'Amount must not be negative',
+        when: ['onBeforeSave'],
+        sortOrder: 10,
+      };
+      const engine = new RuleEngine({ layoutRules: [boolGuard] });
+      const blocked = engine.runBeforeSave(new TestForm({ amount: -5 }));
+      expect(blocked.blocked).toBe(true);
+      expect(blocked.violations[0].message).toBe('Amount must not be negative');
+      const ok = engine.runBeforeSave(new TestForm({ amount: 5 }));
+      expect(ok.blocked).toBe(false);
+    });
+
+    it('attaches to _form when no target is set', () => {
+      const formLevel: LayoutRule = {
+        ...baseRule,
+        id: 's3',
+        name: 'Form guard',
+        kind: 'script',
+        expression: 'IF(total > limit, "Over limit", "")',
+        when: ['onBeforeSave'],
+        sortOrder: 10,
+      };
+      const engine = new RuleEngine({ layoutRules: [formLevel] });
+      const form = new TestForm({ total: 100, limit: 50 });
+      const result = engine.runBeforeSave(form);
+      expect(result.blocked).toBe(true);
+      expect(result.violations[0].field).toBeUndefined();
+      expect(form.getErrors()._form).toBe('Over limit');
+    });
+
+    it('is sandboxed — a bare `window` reference resolves from scope, not the JS global', () => {
+      // The AST evaluator has no reach to real globals: `window` is treated as
+      // a field ref, absent from scope → undefined → falsy → no block. If it
+      // reached the real window object it would be truthy and block.
+      const sandboxed: LayoutRule = {
+        ...baseRule,
+        id: 's4',
+        name: 'Sandbox',
+        kind: 'script',
+        expression: 'window',
+        when: ['onBeforeSave'],
+        sortOrder: 10,
+      };
+      const engine = new RuleEngine({ layoutRules: [sandboxed] });
+      const result = engine.runBeforeSave(new TestForm({}));
+      expect(result.blocked).toBe(false);
+    });
+
+    it('fails open on a runtime error (unknown function) and records a diagnostic', () => {
+      const broken: LayoutRule = {
+        ...baseRule,
+        id: 's5',
+        name: 'Broken',
+        kind: 'script',
+        expression: 'EVAL("1")',
+        when: ['onBeforeSave'],
+        sortOrder: 10,
+      };
+      const engine = new RuleEngine({ layoutRules: [broken] });
+      const result = engine.runBeforeSave(new TestForm({}));
+      expect(result.blocked).toBe(false);
+      expect(engine.getDiagnostics().some((d) => d.ruleId === 's5')).toBe(true);
+    });
+  });
 });

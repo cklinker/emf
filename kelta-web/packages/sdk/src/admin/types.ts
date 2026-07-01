@@ -932,7 +932,7 @@ export interface LayoutFilter {
   filters: LayoutFilterClause[];
 }
 
-export type LayoutRuleKind = 'compute' | 'validate' | 'default' | 'transform';
+export type LayoutRuleKind = 'compute' | 'validate' | 'default' | 'transform' | 'script';
 export type LayoutRuleEvent = 'onChange' | 'onBlur' | 'onLoad' | 'onBeforeSave';
 export type LayoutRuleEnforce = 'block' | 'warn';
 export type LayoutRuleTransformType = 'upper' | 'lower' | 'trim' | 'titleCase';
@@ -980,17 +980,34 @@ export interface TransformLayoutRule extends BaseLayoutRule {
     | { type: 'formula'; formula: string };
 }
 
+/**
+ * SCRIPT rule — a general client event handler evaluating a sandboxed
+ * `@kelta/formula` expression on its `when` events. The result is treated as a
+ * validation message: a non-empty string surfaces on `target` (or the form
+ * when `target` is omitted); a boolean `true` uses the static `message`; any
+ * falsy result clears it. On `onBeforeSave` a non-empty message blocks the
+ * submit (client-side UX only — the server record-event hook, slice 7, is
+ * authoritative and cannot be bypassed via the API).
+ */
+export interface ScriptLayoutRule extends BaseLayoutRule {
+  kind: 'script';
+  target?: string;
+  expression: string;
+  message?: string;
+}
+
 export type LayoutRule =
   | ComputeLayoutRule
   | ValidateLayoutRule
   | DefaultLayoutRule
-  | TransformLayoutRule;
+  | TransformLayoutRule
+  | ScriptLayoutRule;
 
 export interface CreateLayoutRuleRequest {
   layoutId: string;
   name: string;
   description?: string;
-  kind: 'COMPUTE' | 'VALIDATE' | 'DEFAULT' | 'TRANSFORM';
+  kind: 'COMPUTE' | 'VALIDATE' | 'DEFAULT' | 'TRANSFORM' | 'SCRIPT';
   active?: boolean;
   whenEvents: LayoutRuleEvent[];
   targetField?: string;

@@ -94,6 +94,7 @@ export type {
   ValidateLayoutRule,
   DefaultLayoutRule,
   TransformLayoutRule,
+  ScriptLayoutRule,
   CreateLayoutRuleRequest,
   UpdateLayoutRuleRequest,
   ListView,

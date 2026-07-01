@@ -24,9 +24,10 @@ const RULE_KIND_LABEL: Record<RuleKind, string> = {
   VALIDATE: 'Validate',
   DEFAULT: 'Default',
   TRANSFORM: 'Transform',
+  SCRIPT: 'Script',
 }
 
-type RuleKind = 'COMPUTE' | 'VALIDATE' | 'DEFAULT' | 'TRANSFORM'
+type RuleKind = 'COMPUTE' | 'VALIDATE' | 'DEFAULT' | 'TRANSFORM' | 'SCRIPT'
 type RuleEvent = 'onChange' | 'onBlur' | 'onLoad' | 'onBeforeSave'
 
 interface ApiLayoutRule {
@@ -75,7 +76,7 @@ const emptyDraft = (kind: RuleKind, sortOrder: number): DraftRule => ({
   whenEvents:
     kind === 'TRANSFORM'
       ? ['onBlur']
-      : kind === 'VALIDATE'
+      : kind === 'VALIDATE' || kind === 'SCRIPT'
         ? ['onChange', 'onBeforeSave']
         : ['onChange', 'onLoad'],
   targetField: '',
@@ -111,8 +112,18 @@ function apiRuleToDraft(rule: ApiLayoutRule): DraftRule {
     active: rule.active,
     whenEvents: parseField<RuleEvent[]>(rule.whenEvents, []),
     targetField: rule.targetField ?? '',
-    formula: typeof body.formula === 'string' ? body.formula : '',
-    errorMessage: typeof body.errorMessage === 'string' ? body.errorMessage : '',
+    formula:
+      typeof body.formula === 'string'
+        ? body.formula
+        : typeof body.expression === 'string'
+          ? body.expression
+          : '',
+    errorMessage:
+      typeof body.errorMessage === 'string'
+        ? body.errorMessage
+        : typeof body.message === 'string'
+          ? body.message
+          : '',
     enforce: body.enforce === 'warn' ? 'warn' : 'block',
     transformType:
       transformSpec === 'lower' ||
@@ -143,6 +154,11 @@ function draftToBody(draft: DraftRule): Record<string, unknown> {
           draft.transformType === 'formula'
             ? { type: 'formula', formula: draft.formula }
             : { type: draft.transformType },
+      }
+    case 'SCRIPT':
+      return {
+        expression: draft.formula,
+        ...(draft.errorMessage.trim() ? { message: draft.errorMessage } : {}),
       }
   }
 }
@@ -321,7 +337,7 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
               <h3 className="m-0 text-sm font-semibold text-foreground">Rules ({rules.length})</h3>
             </div>
             <div className="mb-3 grid grid-cols-2 gap-1">
-              {(['COMPUTE', 'VALIDATE', 'DEFAULT', 'TRANSFORM'] as RuleKind[]).map((k) => (
+              {(['COMPUTE', 'VALIDATE', 'DEFAULT', 'TRANSFORM', 'SCRIPT'] as RuleKind[]).map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -483,6 +499,7 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
           <option value="VALIDATE">Validate</option>
           <option value="DEFAULT">Default</option>
           <option value="TRANSFORM">Transform</option>
+          <option value="SCRIPT">Script</option>
         </select>
       </div>
 
@@ -525,7 +542,10 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
             htmlFor="rule-target"
             className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
           >
-            Target field {draft.kind !== 'VALIDATE' && <span className="text-destructive">*</span>}
+            Target field{' '}
+            {draft.kind !== 'VALIDATE' && draft.kind !== 'SCRIPT' && (
+              <span className="text-destructive">*</span>
+            )}
           </label>
           <input
             id="rule-target"
@@ -535,7 +555,9 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
             value={draft.targetField}
             onChange={(e) => update('targetField', e.target.value)}
             placeholder={
-              draft.kind === 'VALIDATE' ? 'optional — leave blank for form-level' : 'field_api_name'
+              draft.kind === 'VALIDATE' || draft.kind === 'SCRIPT'
+                ? 'optional — leave blank for form-level'
+                : 'field_api_name'
             }
             data-testid="rule-target-input"
           />
@@ -576,7 +598,8 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
             htmlFor="rule-formula"
             className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
           >
-            Formula {draft.kind !== 'TRANSFORM' && <span className="text-destructive">*</span>}
+            {draft.kind === 'SCRIPT' ? 'Expression' : 'Formula'}{' '}
+            {draft.kind !== 'TRANSFORM' && <span className="text-destructive">*</span>}
           </label>
           <textarea
             id="rule-formula"
@@ -590,10 +613,18 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
             placeholder={
               draft.kind === 'VALIDATE'
                 ? 'discount > unit_price * 0.5'
-                : '(quantity * unit_price) - discount'
+                : draft.kind === 'SCRIPT'
+                  ? 'IF(discount > 0.5, "Discount over 50% needs approval", "")'
+                  : '(quantity * unit_price) - discount'
             }
             data-testid="rule-formula-input"
           />
+          {draft.kind === 'SCRIPT' && (
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Returns a message string — non-empty blocks submit (on onBeforeSave) or shows live on
+              the target field. Return an empty string when valid.
+            </span>
+          )}
           {formulaError && (
             <span className="mt-1 block text-xs text-destructive" role="alert">
               {formulaError}
@@ -647,6 +678,26 @@ function RuleForm({ draft, onChange, fieldNames, formulaError, cycleError }: Rul
             </select>
           </div>
         </>
+      )}
+
+      {draft.kind === 'SCRIPT' && (
+        <div>
+          <label
+            htmlFor="rule-script-message"
+            className="mb-1 block text-xs font-medium uppercase text-muted-foreground"
+          >
+            Fallback message
+          </label>
+          <input
+            id="rule-script-message"
+            type="text"
+            className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
+            value={draft.errorMessage}
+            onChange={(e) => update('errorMessage', e.target.value)}
+            placeholder="Used when the expression returns true instead of a message string"
+            data-testid="rule-script-message-input"
+          />
+        </div>
       )}
 
       <div>

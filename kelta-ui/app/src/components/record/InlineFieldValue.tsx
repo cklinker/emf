@@ -35,6 +35,12 @@ export interface InlineFieldValueProps {
   required?: boolean
   /** Persist a committed value. Rejects → the error is surfaced and edit mode stays open. */
   onCommit?: (fieldName: string, value: unknown) => Promise<void>
+  /**
+   * What triggers edit mode. `'click'` (default, detail pages) makes the whole value clickable.
+   * `'pencil'` (grid cells) edits only via a hover pencil so a value-click still bubbles to the
+   * row's navigation handler. Edit interactions always stop propagation.
+   */
+  editOn?: 'click' | 'pencil'
   className?: string
 }
 
@@ -54,7 +60,7 @@ function buildContext(props: InlineFieldValueProps): FieldControlContext {
 }
 
 export function InlineFieldValue(props: InlineFieldValueProps): React.ReactElement {
-  const { field, value, editable, readOnly, onCommit, className } = props
+  const { field, value, editable, readOnly, onCommit, className, editOn = 'click' } = props
   const control = getFieldControl(field.type)
   const ctx = buildContext(props)
 
@@ -81,7 +87,31 @@ export function InlineFieldValue(props: InlineFieldValueProps): React.ReactEleme
     return <div className={className}>{readView}</div>
   }
 
+  const startEdit = (e: React.MouseEvent): void => {
+    e.stopPropagation()
+    setError(null)
+    setIsEditing(true)
+  }
+
   if (!isEditing) {
+    // Grid cells: keep the value non-interactive so a cell click bubbles to row navigation;
+    // edit only via the hover pencil (which stops propagation).
+    if (editOn === 'pencil') {
+      return (
+        <div className={cn('group flex w-full items-center gap-1', className)}>
+          <span className="min-w-0 flex-1">{readView}</span>
+          <button
+            type="button"
+            className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/10"
+            onClick={startEdit}
+            aria-label={`Edit ${ctx.displayName}`}
+            data-testid={`inline-field-${field.name}`}
+          >
+            <Pencil className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+          </button>
+        </div>
+      )
+    }
     return (
       <button
         type="button"
@@ -90,10 +120,7 @@ export function InlineFieldValue(props: InlineFieldValueProps): React.ReactEleme
           'hover:bg-primary/[0.04] dark:hover:bg-primary/[0.08]',
           className
         )}
-        onClick={() => {
-          setError(null)
-          setIsEditing(true)
-        }}
+        onClick={startEdit}
         aria-label={`Edit ${ctx.displayName}`}
         data-testid={`inline-field-${field.name}`}
       >
@@ -126,7 +153,12 @@ export function InlineFieldValue(props: InlineFieldValueProps): React.ReactEleme
   }
 
   return (
-    <div className={cn('space-y-1', saving && 'opacity-60', className)}>
+    // Stop clicks inside the active editor from bubbling to a row-navigation handler (grid).
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
+    <div
+      className={cn('space-y-1', saving && 'opacity-60', className)}
+      onClick={(e) => e.stopPropagation()}
+    >
       <InlineEdit
         type={field.type}
         value={value}

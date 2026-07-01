@@ -189,18 +189,17 @@ function DataRow({
             : undefined
 
         if (inlineEditing) {
+          // No cell-level stopPropagation: a value click still bubbles to the row's navigation
+          // handler; editing is triggered only by the hover pencil (editOn="pencil").
           return (
-            <TableCell
-              key={field.name}
-              className="max-w-[300px]"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <TableCell key={field.name} className="max-w-[300px]">
               <InlineFieldValue
                 field={field}
                 value={fieldValue}
                 displayLabel={displayLabel}
                 tenantSlug={tenantSlug}
                 editable
+                editOn="pencil"
                 onCommit={(fieldName, value) => onCellCommit!(record.id, fieldName, value)}
               />
             </TableCell>

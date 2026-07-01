@@ -120,6 +120,16 @@ describe('InlineFieldValue', () => {
     expect(screen.queryByTestId('inline-field-stage')).toBeNull()
   })
 
+  it('editOn=pencil: value is not a button, but the pencil enters edit mode', () => {
+    const onCommit = vi.fn().mockResolvedValue(undefined)
+    renderInline({ field: field(), value: 'Acme', editable: true, editOn: 'pencil', onCommit })
+    // The value text is present but not wrapped in the edit button.
+    expect(screen.getByText('Acme')).toBeDefined()
+    // The pencil (carrying the testid) triggers edit.
+    fireEvent.click(screen.getByTestId('inline-field-name'))
+    expect(screen.getByRole('textbox')).toBeDefined()
+  })
+
   it('is editable for a picklist once options are loaded', () => {
     renderInline({
       field: field({ name: 'stage', type: 'picklist', enumValues: ['New', 'Won'] }),

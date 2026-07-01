@@ -37,9 +37,10 @@ import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { FieldRenderer } from '@/components/FieldRenderer'
-import { LayoutFieldSections } from '@/components/LayoutFieldSections'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { DetailTabBar } from '@/pages/ResourceDetailPage/DetailTabBar'
+import { RecordShell } from '@/components/record/RecordShell'
+import { RecordDetailBody } from '@/components/record/RecordDetailBody'
 import {
   RecordHeader,
   FieldSection,
@@ -465,7 +466,6 @@ export function ObjectDetailPage(): React.ReactElement {
   // Discover reverse relationships (fallback when no layout is configured).
   // Uses the centralized collection store to find collections with master_detail
   // fields pointing to the current collection (e.g., Order Items on Orders).
-  const hasLayoutSections = !!(layout && layout.sections && layout.sections.length > 0)
   const hasLayoutRelatedLists = !!(layout && layout.relatedLists.length > 0)
 
   const relatedCollections = useMemo<RelatedCollection[]>(() => {
@@ -603,143 +603,135 @@ export function ObjectDetailPage(): React.ReactElement {
 
   const railBlocks = layout?.railBlocks ?? null
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  // Permission check: user must have canRead
-  if (!permissions.canRead) {
-    return (
-      <InsufficientPrivileges
-        action="view"
-        resource={`this ${collectionLabel} record`}
-        backPath={`${basePath}/o/${collectionName}`}
-      />
-    )
-  }
-
-  // Error state
-  if (schemaError || recordError) {
-    const errorMsg = schemaError?.message || recordError?.message || 'Failed to load record.'
-    return (
-      <div className="space-y-4 p-6">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{errorMsg}</AlertDescription>
-        </Alert>
-        <Button variant="outline" onClick={() => navigate(`${basePath}/o/${collectionName}`)}>
-          Back to list
-        </Button>
-      </div>
-    )
-  }
-
-  if (!record) {
-    return (
-      <div className="space-y-4 p-6">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Not found</AlertTitle>
-          <AlertDescription>Record not found.</AlertDescription>
-        </Alert>
-        <Button variant="outline" onClick={() => navigate(`${basePath}/o/${collectionName}`)}>
-          Back to list
-        </Button>
-      </div>
-    )
-  }
+  // Status branch (permission gate / error / not-found), rendered by the shell
+  // in place of the record frame. Order matches the legacy early-returns.
+  const statusSlot: React.ReactNode = !permissions.canRead ? (
+    <InsufficientPrivileges
+      action="view"
+      resource={`this ${collectionLabel} record`}
+      backPath={`${basePath}/o/${collectionName}`}
+    />
+  ) : schemaError || recordError ? (
+    <div className="space-y-4 p-6">
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>
+          {schemaError?.message || recordError?.message || 'Failed to load record.'}
+        </AlertDescription>
+      </Alert>
+      <Button variant="outline" onClick={() => navigate(`${basePath}/o/${collectionName}`)}>
+        Back to list
+      </Button>
+    </div>
+  ) : !record ? (
+    <div className="space-y-4 p-6">
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Not found</AlertTitle>
+        <AlertDescription>Record not found.</AlertDescription>
+      </Alert>
+      <Button variant="outline" onClick={() => navigate(`${basePath}/o/${collectionName}`)}>
+        Back to list
+      </Button>
+    </div>
+  ) : null
 
   return (
-    <div className={cn('space-y-6 p-6', inspect.enabled && 'kelta-inspect')}>
-      <Crumb
-        trail={[
-          { label: 'Home', to: `${basePath}/home` },
-          { label: collectionLabel, to: `${basePath}/o/${collectionName}` },
-          { label: recordTitle },
-        ]}
-      />
-      {inspect.enabled && (
-        <div
-          role="status"
-          className="-mt-2 inline-flex items-center gap-2 rounded-md border border-blue-400/30 bg-blue-400/10 px-2 py-1 text-[11px] font-mono text-blue-300"
-        >
-          <span>Inspect mode</span>
-          <button
-            type="button"
-            onClick={() => inspect.set(false)}
-            className="rounded px-1.5 text-blue-200 hover:bg-blue-400/20"
-            aria-label="Disable inspect mode"
-          >
-            ×
-          </button>
-          <span className="text-[10px] text-blue-300/60">Toggle: ⌘⇧L</span>
-        </div>
-      )}
-
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <RecordHeader
-            record={record}
-            recordId={recordId || ''}
-            collectionLabel={collectionLabel}
-            fallbackTitle={recordTitle}
-            config={{
-              titleFields: headerTitleFields,
-              avatarFrom: headerAvatarFrom,
-              metaFields: headerMeta,
-            }}
-            actions={headerActions}
-            moreMenu={
-              <>
-                {permissions.canCreate && (
-                  <DropdownMenuItem onClick={handleClone}>
-                    <Copy className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Clone
-                  </DropdownMenuItem>
-                )}
-                {permissions.canCreate && permissions.canDelete && <DropdownMenuSeparator />}
-                {permissions.canDelete && (
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={handleDelete}
-                    data-testid="delete-button"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Delete
-                  </DropdownMenuItem>
-                )}
-              </>
-            }
-          />
-          {mutations.remove.isPending && (
-            <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-              Deleting…
+    <RecordShell
+      variant="enduser"
+      isLoading={isLoading}
+      statusSlot={statusSlot}
+      className={cn('space-y-6 p-6', inspect.enabled && 'kelta-inspect')}
+      breadcrumb={
+        record ? (
+          <>
+            <Crumb
+              trail={[
+                { label: 'Home', to: `${basePath}/home` },
+                { label: collectionLabel, to: `${basePath}/o/${collectionName}` },
+                { label: recordTitle },
+              ]}
+            />
+            {inspect.enabled && (
+              <div
+                role="status"
+                className="-mt-2 inline-flex items-center gap-2 rounded-md border border-blue-400/30 bg-blue-400/10 px-2 py-1 text-[11px] font-mono text-blue-300"
+              >
+                <span>Inspect mode</span>
+                <button
+                  type="button"
+                  onClick={() => inspect.set(false)}
+                  className="rounded px-1.5 text-blue-200 hover:bg-blue-400/20"
+                  aria-label="Disable inspect mode"
+                >
+                  ×
+                </button>
+                <span className="text-[10px] text-blue-300/60">Toggle: ⌘⇧L</span>
+              </div>
+            )}
+          </>
+        ) : undefined
+      }
+      header={
+        record ? (
+          <div className="flex items-start gap-2">
+            <div className="flex-1 min-w-0">
+              <RecordHeader
+                record={record}
+                recordId={recordId || ''}
+                collectionLabel={collectionLabel}
+                fallbackTitle={recordTitle}
+                config={{
+                  titleFields: headerTitleFields,
+                  avatarFrom: headerAvatarFrom,
+                  metaFields: headerMeta,
+                }}
+                actions={headerActions}
+                moreMenu={
+                  <>
+                    {permissions.canCreate && (
+                      <DropdownMenuItem onClick={handleClone}>
+                        <Copy className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Clone
+                      </DropdownMenuItem>
+                    )}
+                    {permissions.canCreate && permissions.canDelete && <DropdownMenuSeparator />}
+                    {permissions.canDelete && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={handleDelete}
+                        data-testid="delete-button"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Delete
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                }
+              />
+              {mutations.remove.isPending && (
+                <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  Deleting…
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="flex-shrink-0 pt-1">
-          <QuickActionsMenu
-            collectionName={collectionName || ''}
-            context="record"
-            executionContext={quickActionContext}
-          />
-        </div>
-      </div>
-
-      {/* Main + right rail (rail collapses below on narrow screens) */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        {/* Main column: layout sections OR generic highlights + details fallback */}
-        {hasLayoutSections ? (
+            <div className="flex-shrink-0 pt-1">
+              <QuickActionsMenu
+                collectionName={collectionName || ''}
+                context="record"
+                executionContext={quickActionContext}
+              />
+            </div>
+          </div>
+        ) : undefined
+      }
+      body={
+        record ? (
           <div data-testid="field-values" className="space-y-4">
-            <LayoutFieldSections
-              sections={layout!.sections}
+            <RecordDetailBody
+              sections={layout?.sections}
               schemaFields={fields}
               record={record}
               tenantSlug={tenantSlug}
@@ -747,91 +739,90 @@ export function ObjectDetailPage(): React.ReactElement {
               persistKeyPrefix={collectionName}
               editable={permissions.canEdit}
               onFieldCommit={handleFieldCommit}
+              fallback={
+                <>
+                  {highlightFields.length > 0 && (
+                    <Card className="overflow-hidden rounded-xl border border-border bg-card">
+                      <CardContent className="py-5">
+                        <div className="grid grid-cols-2 gap-x-10 gap-y-5 md:grid-cols-4">
+                          {highlightFields.map((field) => {
+                            const value = record[field.name]
+                            const isRef =
+                              field.type === 'master_detail' ||
+                              field.type === 'lookup' ||
+                              field.type === 'reference'
+                            const displayLabel =
+                              isRef && lookupDisplayMap?.[field.name]
+                                ? lookupDisplayMap[field.name][String(value)] || undefined
+                                : undefined
+
+                            return (
+                              <div key={field.name} className="min-w-0 space-y-1">
+                                <dt className="kelta-field-label">
+                                  {field.displayName || field.name}
+                                </dt>
+                                <dd className="text-sm font-medium">
+                                  <FieldRenderer
+                                    type={field.type}
+                                    value={value}
+                                    fieldName={field.name}
+                                    displayName={field.displayName || field.name}
+                                    tenantSlug={tenantSlug}
+                                    targetCollection={field.referenceTarget}
+                                    displayLabel={displayLabel}
+                                    truncate
+                                  />
+                                </dd>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {detailFields.length > 0 && (
+                    <FieldSection<FieldDefinition>
+                      title="Details"
+                      fields={detailFields}
+                      record={record}
+                      lookupDisplayMap={lookupDisplayMap}
+                      persistKey={collectionName ? `${collectionName}.details` : undefined}
+                      renderField={({
+                        field,
+                        value,
+                        displayLabel,
+                      }: FieldSectionRenderContext<FieldDefinition>) => (
+                        <FieldRenderer
+                          type={field.type}
+                          value={value}
+                          fieldName={field.name}
+                          displayName={field.displayName || field.name}
+                          tenantSlug={tenantSlug}
+                          targetCollection={field.referenceTarget}
+                          displayLabel={displayLabel}
+                          truncate={false}
+                        />
+                      )}
+                    />
+                  )}
+                </>
+              }
             />
           </div>
-        ) : (
-          <div data-testid="field-values" className="space-y-4">
-            {/* Highlights Panel (fallback) */}
-            {highlightFields.length > 0 && record && (
-              <Card className="overflow-hidden rounded-xl border border-border bg-card">
-                <CardContent className="py-5">
-                  <div className="grid grid-cols-2 gap-x-10 gap-y-5 md:grid-cols-4">
-                    {highlightFields.map((field) => {
-                      const value = record[field.name]
-                      const isRef =
-                        field.type === 'master_detail' ||
-                        field.type === 'lookup' ||
-                        field.type === 'reference'
-                      const displayLabel =
-                        isRef && lookupDisplayMap?.[field.name]
-                          ? lookupDisplayMap[field.name][String(value)] || undefined
-                          : undefined
-
-                      return (
-                        <div key={field.name} className="min-w-0 space-y-1">
-                          <dt className="kelta-field-label">{field.displayName || field.name}</dt>
-                          <dd className="text-sm font-medium">
-                            <FieldRenderer
-                              type={field.type}
-                              value={value}
-                              fieldName={field.name}
-                              displayName={field.displayName || field.name}
-                              tenantSlug={tenantSlug}
-                              targetCollection={field.referenceTarget}
-                              displayLabel={displayLabel}
-                              truncate
-                            />
-                          </dd>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {detailFields.length > 0 && (
-              <FieldSection<FieldDefinition>
-                title="Details"
-                fields={detailFields}
-                record={record}
-                lookupDisplayMap={lookupDisplayMap}
-                persistKey={collectionName ? `${collectionName}.details` : undefined}
-                renderField={({
-                  field,
-                  value,
-                  displayLabel,
-                }: FieldSectionRenderContext<FieldDefinition>) => (
-                  <FieldRenderer
-                    type={field.type}
-                    value={value}
-                    fieldName={field.name}
-                    displayName={field.displayName || field.name}
-                    tenantSlug={tenantSlug}
-                    targetCollection={field.referenceTarget}
-                    displayLabel={displayLabel}
-                    truncate={false}
-                  />
-                )}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Right rail — layout-configured blocks when present; otherwise a
-            single auto-derived system-info MetadataCard. */}
-        <aside className="space-y-4">
-          {railBlocks && railBlocks.length > 0 ? (
+        ) : null
+      }
+      rail={
+        record ? (
+          railBlocks && railBlocks.length > 0 ? (
             <RailRenderer blocks={railBlocks} />
           ) : (
             <MetadataCard config={{ title: 'System information', rows: systemRows }} />
-          )}
-        </aside>
-      </div>
-
-      {/* Bottom tab bar: related lists + Notes + Attachments + System Information */}
-      {schema && recordId && (
-        <div className="space-y-4">
+          )
+        ) : undefined
+      }
+      tabBar={
+        record && schema && recordId ? (
           <DetailTabBar
             relatedLists={tabBarRelatedLists}
             recordId={recordId}
@@ -847,32 +838,32 @@ export function ObjectDetailPage(): React.ReactElement {
             editable={permissions.canEdit}
             onRelatedChange={refetchRecord}
           />
-        </div>
-      )}
-
-      {/* Delete confirmation */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {recordTitle}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this record. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {mutations.remove.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        ) : undefined
+      }
+      dialogs={
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {recordTitle}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this record. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {mutations.remove.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      }
+    />
   )
 }

@@ -63,6 +63,7 @@ import {
   AiSettingsPage,
   EmailSettingsPage,
   MapSettingsPage,
+  NetworkAccessPage,
   DashboardPage,
   CollectionsPage,
   CollectionDetailPage,
@@ -955,6 +956,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_TENANTS">
               <MapSettingsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Network Access route — tenant admins configure the IP allowlist */}
+      <Route
+        path="network-access"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_TENANTS">
+              <NetworkAccessPage />
             </RequirePermission>
           </AdminPageRoute>
         }

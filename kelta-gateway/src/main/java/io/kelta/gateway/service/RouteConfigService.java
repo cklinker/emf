@@ -118,6 +118,9 @@ public class RouteConfigService {
                     } else {
                         logger.warn("No governor limits found in bootstrap configuration");
                     }
+
+                    // Load per-tenant IP allowlists for network access enforcement
+                    cacheManager.loadTenantIpConfigs(config.getIpAllowlists());
                 })
                 .doOnError(error -> {
                     logger.error("Route refresh failed: {}", error.getMessage(), error);

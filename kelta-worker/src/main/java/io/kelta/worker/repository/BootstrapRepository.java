@@ -31,6 +31,11 @@ public class BootstrapRepository {
             WHERE status NOT IN ('DECOMMISSIONED', 'SUSPENDED')
             """;
 
+    private static final String SELECT_TENANT_IP_ALLOWLISTS = """
+            SELECT id, ip_allowlist_enabled, ip_allowlist_cidrs FROM tenant
+            WHERE status NOT IN ('DECOMMISSIONED', 'SUSPENDED')
+            """;
+
     private static final String SELECT_OIDC_PROVIDER_BY_ISSUER = """
             SELECT id, name, issuer, jwks_uri, audience, active,
                    client_id, client_secret_enc, roles_claim, roles_mapping,
@@ -145,6 +150,15 @@ public class BootstrapRepository {
 
     public List<Map<String, Object>> findTenantLimits() {
         return jdbcTemplate.queryForList(SELECT_TENANT_LIMITS);
+    }
+
+    /**
+     * Returns per-tenant IP allowlist configuration for all routable tenants.
+     * Each row has {@code id}, {@code ip_allowlist_enabled}, and {@code ip_allowlist_cidrs}
+     * (a JSONB array of CIDR strings). Consumed by the gateway to enforce network access.
+     */
+    public List<Map<String, Object>> findTenantIpAllowlists() {
+        return jdbcTemplate.queryForList(SELECT_TENANT_IP_ALLOWLISTS);
     }
 
     public Optional<Map<String, Object>> findOidcProviderByIssuer(String issuer) {

@@ -79,6 +79,15 @@ kelta:
     # fetched from the worker during bootstrap.
     # See GatewayCacheManager for details.
 
+    # Per-tenant IP allowlist (network access restriction).
+    # Non-admin users of a restricted tenant may only reach /api/** from an allowed CIDR;
+    # MANAGE_TENANTS holders bypass. Config is fetched at bootstrap and refreshed via NATS.
+    ip-allowlist:
+      enabled: ${IP_ALLOWLIST_ENABLED:true}   # Global kill-switch for the filter
+      # When true, X-Forwarded-For / X-Real-IP hops are considered (resilient to proxy topology
+      # but client-spoofable). Set false to match only the socket source address.
+      trust-forwarded-for: ${IP_ALLOWLIST_TRUST_XFF:true}
+
     # Cerbos authorization engine
     cerbos:
       host: ${CERBOS_HOST:cerbos.emf.svc.cluster.local}

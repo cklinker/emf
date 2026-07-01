@@ -204,6 +204,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.credential.changed.*` | Credential changed |
 | `kelta.config.api-spec.changed.<tenantId>` | API spec changed |
 | `kelta.config.tenant.email.changed.<tenantId>` | Tenant SMTP config changed |
+| `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist (network access) changed |
 | `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime) |
 
 Envelope: `PlatformEvent<T>` (`eventId`, `eventType`, `tenantId`, `correlationId`, `userId`,

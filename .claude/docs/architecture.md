@@ -55,6 +55,7 @@ Order values below are the live `getOrder()` returns from source (lower runs fir
 | -100 | JwtAuthenticationFilter | Validate JWT |
 | -99 | PatAuthenticationFilter | Validate PAT (`klt_`) as JWT alternative |
 | -50 | RateLimitFilter / UserIdentityResolutionFilter | Per-tenant rate limit; user identity |
+| -40 | TenantIpAllowlistFilter | Per-tenant IP allowlist on `/api/**` (fail-open; `MANAGE_TENANTS` bypass) |
 | 0 | RouteAuthorizationFilter | Cerbos object-level permission check (DynamicRouteLocator then forwards to worker) |
 | 50 | HeaderTransformationFilter | Inject `X-Tenant-*` headers for worker |
 | 100 | SecurityHeadersFilter | Response security headers |

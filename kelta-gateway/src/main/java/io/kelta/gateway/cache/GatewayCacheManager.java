@@ -1,6 +1,7 @@
 package io.kelta.gateway.cache;
 
 import io.kelta.gateway.config.GovernorLimitConfig;
+import io.kelta.gateway.config.TenantIpConfig;
 import io.kelta.gateway.route.RateLimitConfig;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -60,6 +61,7 @@ public class GatewayCacheManager {
 
     private final Cache<String, String> tenantSlugCache;
     private final Cache<String, Integer> governorLimitCache;
+    private final Cache<String, TenantIpConfig> tenantIpConfigCache; // tenantId → IP allowlist config
     private final Cache<String, String> customDomainCache; // domain → tenantSlug
     private final Cache<String, byte[]> systemCollectionResponseCache; // tenantId:path → response body
     private final WebClient webClient;
@@ -77,6 +79,11 @@ public class GatewayCacheManager {
                 .build();
 
         this.governorLimitCache = Caffeine.newBuilder()
+                .maximumSize(10_000)
+                .recordStats()
+                .build();
+
+        this.tenantIpConfigCache = Caffeine.newBuilder()
                 .maximumSize(10_000)
                 .recordStats()
                 .build();
@@ -292,6 +299,76 @@ public class GatewayCacheManager {
             }
         } catch (Exception e) {
             log.warn("Failed to refresh governor limit cache from worker: {}", e.getMessage());
+        }
+    }
+
+    // ── Tenant IP Allowlist Cache ─────────────────────────────────────────
+
+    /**
+     * Loads per-tenant IP allowlist configs from the bootstrap configuration,
+     * replacing any existing entries.
+     *
+     * @param ipAllowlists map of tenantId to {@link TenantIpConfig}
+     */
+    public void loadTenantIpConfigs(Map<String, TenantIpConfig> ipAllowlists) {
+        if (ipAllowlists == null || ipAllowlists.isEmpty()) {
+            log.info("No tenant IP allowlists in bootstrap; no tenants restrict network access");
+            tenantIpConfigCache.invalidateAll();
+            return;
+        }
+        tenantIpConfigCache.invalidateAll();
+        tenantIpConfigCache.putAll(ipAllowlists);
+        log.info("Loaded IP allowlist config for {} tenants from bootstrap", ipAllowlists.size());
+    }
+
+    /**
+     * Returns the IP allowlist config for a tenant, or empty if the tenant is unknown
+     * to the cache (in which case the caller should fail open — allow the request).
+     *
+     * @param tenantId the tenant ID
+     * @return the tenant's IP config, or empty if not cached
+     */
+    public Optional<TenantIpConfig> getTenantIpConfig(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(tenantIpConfigCache.getIfPresent(tenantId));
+    }
+
+    /**
+     * Returns the number of cached tenant IP configs.
+     */
+    public long tenantIpConfigCacheSize() {
+        return tenantIpConfigCache.estimatedSize();
+    }
+
+    /**
+     * Refreshes the tenant IP allowlist cache from the worker service.
+     *
+     * <p>Called by {@link io.kelta.gateway.listener.IpAllowlistCacheInvalidationListener}
+     * when a {@code kelta.config.tenant.ip-allowlist.changed.*} event is received. Fetches
+     * the map from the worker's {@code /internal/ip-allowlists} endpoint and replaces the
+     * cache. On any failure the existing cache is kept so a transient worker blip does not
+     * drop restrictions.
+     */
+    public void refreshIpAllowlistsFromWorker() {
+        try {
+            Map<String, TenantIpConfig> allowlists = webClient.get()
+                    .uri("/internal/ip-allowlists")
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, TenantIpConfig>>() {})
+                    .block(Duration.ofSeconds(2));
+
+            if (allowlists != null) {
+                tenantIpConfigCache.invalidateAll();
+                tenantIpConfigCache.putAll(allowlists);
+                log.info("Refreshed tenant IP allowlist cache from worker: {} entries", allowlists.size());
+            } else {
+                log.warn("IP allowlists map returned null; keeping existing cache ({} entries)",
+                        tenantIpConfigCache.estimatedSize());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to refresh tenant IP allowlist cache from worker: {}", e.getMessage());
         }
     }
 

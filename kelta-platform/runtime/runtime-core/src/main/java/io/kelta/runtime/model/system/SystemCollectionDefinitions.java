@@ -177,6 +177,10 @@ public final class SystemCollectionDefinitions {
                 .withEnumValues(List.of("PROVISIONING", "ACTIVE", "SUSPENDED", "DECOMMISSIONED")))
             .addField(FieldDefinition.json("settings"))
             .addField(FieldDefinition.json("limits"))
+            .addField(FieldDefinition.bool("ipAllowlistEnabled", false)
+                .withColumnName("ip_allowlist_enabled"))
+            .addField(FieldDefinition.json("ipAllowlistCidrs")
+                .withColumnName("ip_allowlist_cidrs"))
             .build();
     }
 

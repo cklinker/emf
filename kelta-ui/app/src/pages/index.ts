@@ -288,6 +288,10 @@ export type { EmailSettingsPageProps } from './EmailSettingsPage'
 export { MapSettingsPage } from './MapSettingsPage'
 export type { MapSettingsPageProps } from './MapSettingsPage'
 
+// NetworkAccessPage - tenant IP allowlist (network access restriction, admin only)
+export { NetworkAccessPage } from './NetworkAccessPage'
+export type { NetworkAccessPageProps } from './NetworkAccessPage'
+
 // PasswordPolicyPage - Password policy configuration page
 export { PasswordPolicyPanel as PasswordPolicyPage } from './SecuritySettingsPage/PasswordPolicyPanel'
 

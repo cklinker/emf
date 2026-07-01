@@ -13,6 +13,7 @@ public class BootstrapConfig {
 
     private List<CollectionConfig> collections;
     private Map<String, GovernorLimitConfig> governorLimits;
+    private Map<String, TenantIpConfig> ipAllowlists;
 
     public BootstrapConfig() {
     }
@@ -35,6 +36,14 @@ public class BootstrapConfig {
 
     public void setGovernorLimits(Map<String, GovernorLimitConfig> governorLimits) {
         this.governorLimits = governorLimits;
+    }
+
+    public Map<String, TenantIpConfig> getIpAllowlists() {
+        return ipAllowlists;
+    }
+
+    public void setIpAllowlists(Map<String, TenantIpConfig> ipAllowlists) {
+        this.ipAllowlists = ipAllowlists;
     }
 
     @Override

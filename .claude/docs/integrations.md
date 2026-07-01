@@ -38,6 +38,7 @@ Files attach to any record via the `attachments` system collection (backed by `f
 | Subject | Purpose |
 |---------|---------|
 | `kelta.config.collection.changed` | Schema change events |
+| `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist changed → gateway refreshes its allowlist cache |
 | `kelta.worker.assignment.changed` | Worker assignment changes |
 | `kelta.record.changed` | Record CRUD events |
 

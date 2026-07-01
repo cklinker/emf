@@ -36,6 +36,7 @@ import {
   LogIn,
   Mail,
   Menu,
+  Network,
   Package,
   PackageOpen,
   Palette,
@@ -199,6 +200,13 @@ const CATEGORIES: SetupCategory[] = [
         description: 'Review security event trail',
         icon: ShieldAlert,
         permission: 'MANAGE_USERS',
+      },
+      {
+        name: 'Network Access',
+        path: '/network-access',
+        description: 'Restrict data access to allowed IP ranges',
+        icon: Network,
+        permission: 'MANAGE_TENANTS',
       },
       {
         name: 'Audit Trail',

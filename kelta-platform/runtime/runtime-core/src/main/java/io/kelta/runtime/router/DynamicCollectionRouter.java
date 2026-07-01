@@ -18,8 +18,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import io.kelta.runtime.storage.StaleWriteException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
@@ -288,9 +292,51 @@ public class DynamicCollectionRouter {
                 systemCollectionCache.putByIdResponse(tenantId, collectionName, id, response);
             }
 
-            return ResponseEntity.ok(response);
+            // Optimistic-locking version token (unified record experience, slice 5).
+            String etag = computeETag(record.get());
+            ResponseEntity.BodyBuilder ok = ResponseEntity.ok();
+            if (etag != null) {
+                ok.header(HttpHeaders.ETAG, etag);
+            }
+            return ok.body(response);
         } finally {
             TenantContext.clear();
+        }
+    }
+
+    /**
+     * Derives an opaque optimistic-locking ETag from a record's {@code updatedAt} version. Returns
+     * {@code null} when the record has no version (nothing to lock against). The token is
+     * base64-encoded so it is header-safe and collision-free for a single record's timeline; the
+     * client treats it as opaque and echoes it back via {@code If-Match}.
+     */
+    private static String computeETag(Map<String, Object> record) {
+        Object updatedAt = record.get("updatedAt");
+        if (updatedAt == null) {
+            return null;
+        }
+        String token = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(String.valueOf(updatedAt).getBytes(StandardCharsets.UTF_8));
+        return "\"" + token + "\"";
+    }
+
+    /**
+     * Enforces optimistic locking on a write. When the request carries an {@code If-Match} header,
+     * the current record's ETag must match or a {@link StaleWriteException} (→ 409) is thrown.
+     * No header ⇒ no check (back-compat). A missing record is left for the normal 404 path.
+     */
+    private void enforceIfMatch(CollectionDefinition definition, String id, HttpServletRequest request) {
+        String ifMatch = request.getHeader(HttpHeaders.IF_MATCH);
+        if (ifMatch == null || ifMatch.isBlank() || "*".equals(ifMatch.trim())) {
+            return;
+        }
+        Optional<Map<String, Object>> existing = queryEngine.getById(definition, id);
+        if (existing.isEmpty()) {
+            return;
+        }
+        String current = computeETag(existing.get());
+        if (current != null && !ifMatch.trim().equals(current)) {
+            throw new StaleWriteException(definition.name(), id);
         }
     }
 
@@ -440,6 +486,9 @@ public class DynamicCollectionRouter {
                 data.put("updatedBy", userId);
             }
 
+            // Optimistic locking: reject a stale If-Match before mutating (slice 5).
+            enforceIfMatch(definition, id, request);
+
             Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
 
             // Evict system collection cache after write
@@ -486,6 +535,9 @@ public class DynamicCollectionRouter {
             if (definition.readOnly()) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
+
+            // Optimistic locking: reject a stale If-Match before deleting (slice 5).
+            enforceIfMatch(definition, id, request);
 
             boolean deleted = queryEngine.delete(definition, id);
 

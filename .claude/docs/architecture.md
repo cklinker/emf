@@ -143,6 +143,10 @@ jobs. RLS then scopes every query automatically.
 
 `kelta-ui/app/src/components/` and `kelta-web/packages/components/src/` have grown overlapping families of components (data tables, filter builders, field renderers, forms). The rule (see `conventions.md` → Component reuse): **reuse the unified `@kelta/components` variant or extend it — never fork a new app-side variant.** This protects the public `@kelta/components` plugin API. Consult `conventions.md` before adding a new shared list/form/filter component on either side.
 
+### Record detail path — one `RecordShell` for both stacks (unified record)
+
+There is now **one record-detail path**. Both the end-user runtime (`/:tenant/app/o/:collection/:id`, `ObjectDetailPage`) and the admin Resource Browser (`/:tenant/resources/:collection/:id`, `ResourceDetailPage`) are **thin `variant` wrappers over `RecordShell`** (`kelta-ui/app/src/components/record/RecordShell.tsx`): `RecordShell` owns the page skeleton (loading/status branches + breadcrumb → header → body(+rail) → tab bar → below-tabs → dialogs), variant chrome is passed as slots, and the field body renders through `RecordDetailBody` (`LayoutFieldSections` when the layout has sections, else a variant fallback). The shared `DetailTabBar` drives related lists (with inline CRUD) + Notes/Attachments/System tabs for both. A fix to view/inline-edit/related-CRUD/rules/optimistic-locking lands once and shows in both stacks. Do **not** reintroduce a per-stack detail body. (The list pages — `ObjectListPage`/`ResourceListPage` — are not yet converged; they share `ObjectDataTable` but keep separate page shells.)
+
 ## Data Flow
 
 **Tenant-slug resolution (cold-cache safe).** `TenantSlugExtractionFilter` resolves the URL slug via

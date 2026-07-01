@@ -316,6 +316,8 @@ export function ObjectDetailPage(): React.ReactElement {
     isLoading: recordLoading,
     error: recordError,
     rawResponse,
+    etag,
+    refetch: refetchRecord,
   } = useRecord({
     collectionName,
     recordId,
@@ -390,14 +392,28 @@ export function ObjectDetailPage(): React.ReactElement {
   })
 
   // In-place inline field edit (unified record experience, slice 2): partial PATCH of one field.
+  // Sends the record's ETag as If-Match (slice 5) so a concurrent edit → 409, surfaced as a
+  // "changed elsewhere" message + a reload rather than silently overwriting the other change.
   const handleFieldCommit = useCallback(
     async (fieldName: string, value: unknown): Promise<void> => {
       if (!recordId) return
-      await mutations.patch.mutateAsync({ id: recordId, data: { [fieldName]: value } })
+      try {
+        await mutations.patch.mutateAsync({
+          id: recordId,
+          data: { [fieldName]: value },
+          ifMatch: etag,
+        })
+      } catch (err) {
+        if ((err as { status?: number })?.status === 409) {
+          announce('This record was changed elsewhere; reloading the latest version')
+          refetchRecord()
+        }
+        throw err
+      }
       invalidateRecordContext()
       announce(`${fieldName} updated`)
     },
-    [recordId, mutations.patch, invalidateRecordContext, announce]
+    [recordId, mutations.patch, etag, refetchRecord, invalidateRecordContext, announce]
   )
 
   // Collection label

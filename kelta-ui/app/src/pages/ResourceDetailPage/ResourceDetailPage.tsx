@@ -300,17 +300,19 @@ async function fetchResource(
   apiClient: ApiClient,
   collectionName: string,
   resourceId: string
-): Promise<Resource> {
-  const response = await apiClient.get(`/api/${collectionName}/${resourceId}`)
-  return unwrapResource<Resource>(response)
+): Promise<{ resource: Resource; etag?: string }> {
+  // Capture the ETag for optimistic locking (slice 5); echoed as If-Match on write.
+  const { data, etag } = await apiClient.getWithMeta(`/api/${collectionName}/${resourceId}`)
+  return { resource: unwrapResource<Resource>(data), etag }
 }
 
 async function deleteResource(
   apiClient: ApiClient,
   collectionName: string,
-  resourceId: string
+  resourceId: string,
+  ifMatch?: string
 ): Promise<void> {
-  return apiClient.delete(`/api/${collectionName}/${resourceId}`)
+  return apiClient.delete(`/api/${collectionName}/${resourceId}`, ifMatch)
 }
 
 /**
@@ -365,7 +367,7 @@ export function ResourceDetailPage({
 
   // Fetch resource data
   const {
-    data: resource,
+    data: resourceEnvelope,
     isLoading: resourceLoading,
     error: resourceError,
     refetch: refetchResource,
@@ -374,6 +376,8 @@ export function ResourceDetailPage({
     queryFn: () => fetchResource(apiClient, collectionName, resourceId),
     enabled: !!collectionName && !!resourceId,
   })
+  const resource = resourceEnvelope?.resource
+  const etag = resourceEnvelope?.etag
 
   // Fetch notes and attachments in a single API call
   const {
@@ -396,19 +400,32 @@ export function ResourceDetailPage({
   })
 
   // In-place inline field edit (unified record experience, slice 2): partial PATCH of one field.
+  // Echoes the record's ETag as If-Match (slice 5): a concurrent edit → 409, so we reload the
+  // latest instead of clobbering it.
   const handleFieldCommit = useCallback(
     async (fieldName: string, value: unknown): Promise<void> => {
-      await apiClient.patch(`/api/${collectionName}/${resourceId}`, {
-        data: {
-          type: collectionName,
-          id: resourceId,
-          attributes: { [fieldName]: value },
-        },
-      })
+      try {
+        await apiClient.patch(
+          `/api/${collectionName}/${resourceId}`,
+          {
+            data: {
+              type: collectionName,
+              id: resourceId,
+              attributes: { [fieldName]: value },
+            },
+          },
+          etag
+        )
+      } catch (err) {
+        if ((err as { status?: number })?.status === 409) {
+          await refetchResource()
+        }
+        throw err
+      }
       await refetchResource()
       invalidateRecordContext()
     },
-    [apiClient, collectionName, resourceId, refetchResource, invalidateRecordContext]
+    [apiClient, collectionName, resourceId, etag, refetchResource, invalidateRecordContext]
   )
 
   // Sharing: fetch shares for this record

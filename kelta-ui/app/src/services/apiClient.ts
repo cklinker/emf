@@ -424,9 +424,13 @@ export class ApiClient {
   /**
    * PUT request. Returns raw response.data.
    */
-  async put<T = unknown>(url: string, data?: unknown): Promise<T> {
+  async put<T = unknown>(url: string, data?: unknown, ifMatch?: string): Promise<T> {
     try {
-      const response = await this.axios.put(url, data)
+      const response = await this.axios.put(
+        url,
+        data,
+        ifMatch ? { headers: { 'If-Match': ifMatch } } : undefined
+      )
       return response.data
     } catch (error) {
       throw parseAxiosError(error)
@@ -434,11 +438,15 @@ export class ApiClient {
   }
 
   /**
-   * PATCH request. Returns raw response.data.
+   * PATCH request. Returns raw response.data. Pass `ifMatch` for optimistic locking.
    */
-  async patch<T = unknown>(url: string, data?: unknown): Promise<T> {
+  async patch<T = unknown>(url: string, data?: unknown, ifMatch?: string): Promise<T> {
     try {
-      const response = await this.axios.patch(url, data)
+      const response = await this.axios.patch(
+        url,
+        data,
+        ifMatch ? { headers: { 'If-Match': ifMatch } } : undefined
+      )
       return response.data
     } catch (error) {
       throw parseAxiosError(error)
@@ -446,11 +454,14 @@ export class ApiClient {
   }
 
   /**
-   * DELETE request. Returns raw response.data.
+   * DELETE request. Returns raw response.data. Pass `ifMatch` for optimistic locking.
    */
-  async delete<T = unknown>(url: string): Promise<T> {
+  async delete<T = unknown>(url: string, ifMatch?: string): Promise<T> {
     try {
-      const response = await this.axios.delete<T>(url)
+      const response = await this.axios.delete<T>(
+        url,
+        ifMatch ? { headers: { 'If-Match': ifMatch } } : undefined
+      )
       return response.data
     } catch (error) {
       throw parseAxiosError(error)
@@ -488,6 +499,21 @@ export class ApiClient {
   }
 
   /**
+   * GET returning the raw response body plus the `ETag` header, for optimistic
+   * locking (unified record slice 5). The caller echoes `etag` back as `If-Match`
+   * on the next write; the token is opaque.
+   */
+  async getWithMeta<T = unknown>(url: string): Promise<{ data: T; etag?: string }> {
+    try {
+      const response = await this.axios.get(url)
+      const etag = (response.headers?.etag ?? response.headers?.ETag) as string | undefined
+      return { data: response.data as T, etag }
+    } catch (error) {
+      throw parseAxiosError(error)
+    }
+  }
+
+  /**
    * GET a paginated list of resources from a JSON:API endpoint.
    * Unwraps JSON:API list format and maps metadata to PageResponse<T>.
    */
@@ -514,9 +540,9 @@ export class ApiClient {
    * DELETE a resource from a JSON:API endpoint.
    * Returns void (most deletes return 204 No Content).
    */
-  async deleteResource(url: string): Promise<void> {
+  async deleteResource(url: string, ifMatch?: string): Promise<void> {
     try {
-      await this.axios.delete(url)
+      await this.axios.delete(url, ifMatch ? { headers: { 'If-Match': ifMatch } } : undefined)
     } catch (error) {
       throw parseAxiosError(error)
     }
@@ -546,7 +572,7 @@ export class ApiClient {
    * Auto-wraps plain objects in JSON:API format and unwraps response.
    * Skips wrapping if body is already in JSON:API format.
    */
-  async putResource<T = unknown>(url: string, data?: unknown): Promise<T> {
+  async putResource<T = unknown>(url: string, data?: unknown, ifMatch?: string): Promise<T> {
     try {
       let body = data
       if (data && typeof data === 'object' && !Array.isArray(data) && !isAlreadyWrapped(data)) {
@@ -554,7 +580,11 @@ export class ApiClient {
         const id = extractIdFromUrl(url)
         body = wrapJsonApiBody(type, data as Record<string, unknown>, id)
       }
-      const response = await this.axios.put(url, body)
+      const response = await this.axios.put(
+        url,
+        body,
+        ifMatch ? { headers: { 'If-Match': ifMatch } } : undefined
+      )
       return unwrapJsonApiSingle<T>(response.data)
     } catch (error) {
       throw parseAxiosError(error)
@@ -566,7 +596,7 @@ export class ApiClient {
    * Auto-wraps plain objects in JSON:API format and unwraps response.
    * Skips wrapping if body is already in JSON:API format.
    */
-  async patchResource<T = unknown>(url: string, data?: unknown): Promise<T> {
+  async patchResource<T = unknown>(url: string, data?: unknown, ifMatch?: string): Promise<T> {
     try {
       let body = data
       if (data && typeof data === 'object' && !Array.isArray(data) && !isAlreadyWrapped(data)) {
@@ -574,7 +604,11 @@ export class ApiClient {
         const id = extractIdFromUrl(url)
         body = wrapJsonApiBody(type, data as Record<string, unknown>, id)
       }
-      const response = await this.axios.patch(url, body)
+      const response = await this.axios.patch(
+        url,
+        body,
+        ifMatch ? { headers: { 'If-Match': ifMatch } } : undefined
+      )
       return unwrapJsonApiSingle<T>(response.data)
     } catch (error) {
       throw parseAxiosError(error)

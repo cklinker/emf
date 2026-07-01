@@ -29,6 +29,8 @@ export interface UseRecordReturn {
   refetch: () => void
   /** Raw JSON:API response for building display maps from included resources */
   rawResponse: unknown
+  /** Optimistic-locking version token from the GET `ETag` (slice 5); echo as `If-Match` on write. */
+  etag: string | undefined
 }
 
 /**
@@ -47,9 +49,9 @@ export function useRecord(options: UseRecordOptions): UseRecordReturn {
       const url = include
         ? `/api/${collectionName}/${recordId}?include=${encodeURIComponent(include)}`
         : `/api/${collectionName}/${recordId}`
-      const response = await apiClient.get(url)
+      const { data: response, etag } = await apiClient.getWithMeta(url)
       const record = unwrapResource<CollectionRecord>(response)
-      return { record, rawResponse: response }
+      return { record, rawResponse: response, etag }
     },
     enabled: !!collectionName && !!recordId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -61,5 +63,6 @@ export function useRecord(options: UseRecordOptions): UseRecordReturn {
     error: error as Error | null,
     refetch,
     rawResponse: data?.rawResponse,
+    etag: data?.etag,
   }
 }

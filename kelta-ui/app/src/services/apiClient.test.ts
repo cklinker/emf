@@ -211,6 +211,40 @@ describe('ApiClient error handling', () => {
     })
   })
 
+  describe('optimistic locking (slice 5)', () => {
+    it('getWithMeta returns the raw body and the ETag header', async () => {
+      mockAxios.get.mockResolvedValueOnce({
+        data: { data: { id: '1' } },
+        headers: { etag: 'W/"v1"' },
+      })
+      const result = await client.getWithMeta('/api/things/1')
+      expect(result.data).toEqual({ data: { id: '1' } })
+      expect(result.etag).toBe('W/"v1"')
+    })
+
+    it('patchResource sends If-Match when ifMatch is provided', async () => {
+      mockAxios.patch.mockResolvedValueOnce({ data: { data: { id: '1', attributes: {} } } })
+      await client.patchResource('/api/things/1', { name: 'x' }, 'W/"v1"')
+      expect(mockAxios.patch).toHaveBeenCalledWith('/api/things/1', expect.anything(), {
+        headers: { 'If-Match': 'W/"v1"' },
+      })
+    })
+
+    it('base patch omits the config when no ifMatch is given', async () => {
+      mockAxios.patch.mockResolvedValueOnce({ data: {} })
+      await client.patch('/api/things/1', { data: {} })
+      expect(mockAxios.patch).toHaveBeenCalledWith('/api/things/1', { data: {} }, undefined)
+    })
+
+    it('deleteResource sends If-Match when provided', async () => {
+      mockAxios.delete.mockResolvedValueOnce({ data: undefined })
+      await client.deleteResource('/api/things/1', 'W/"v1"')
+      expect(mockAxios.delete).toHaveBeenCalledWith('/api/things/1', {
+        headers: { 'If-Match': 'W/"v1"' },
+      })
+    })
+  })
+
   describe('JSON:API error format', () => {
     it('should parse JSON:API validation errors with source.pointer', async () => {
       mockAxios.get.mockRejectedValueOnce(

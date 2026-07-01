@@ -282,6 +282,21 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Runs tenant-defined record-event scripts (record-scripts system collection) through the
+     * sandboxed GraalVM ScriptExecutor on record writes (unified record experience, slice 7).
+     */
+    @Bean
+    public io.kelta.worker.listener.RecordScriptHook recordScriptHook(
+            BeforeSaveHookRegistry hookRegistry,
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
+            ScriptExecutor scriptExecutor) {
+        io.kelta.worker.listener.RecordScriptHook hook =
+                new io.kelta.worker.listener.RecordScriptHook(jdbcTemplate, scriptExecutor);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public io.kelta.worker.listener.FieldQuotaEnforcementHook fieldQuotaEnforcementHook(
             BeforeSaveHookRegistry hookRegistry,

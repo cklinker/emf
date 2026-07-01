@@ -89,6 +89,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(recordTypes());
         definitions.add(recordTypePicklists());
         definitions.add(validationRules());
+        definitions.add(recordScripts());
 
         // Workflows & Automation
         definitions.add(scripts());
@@ -441,6 +442,32 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredString("severity", 10)
                 .withDefault("ERROR")
                 .withEnumValues(List.of("ERROR", "WARNING")))
+            .build();
+    }
+
+    /**
+     * Record-event scripts (unified record experience, slice 7): tenant-defined JavaScript bound to
+     * a collection's record lifecycle events, executed server-side by the sandboxed GraalVM
+     * {@code ScriptExecutor} from a {@code BeforeSaveHook}. A {@code BEFORE_*} script may block a
+     * write (validation) or return field updates to merge; {@code AFTER_*} scripts run side effects.
+     */
+    public static CollectionDefinition recordScripts() {
+        return systemBuilder("record-scripts", "Record Scripts", "record_script")
+            .displayFieldName("name")
+            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
+                .withColumnName("collection_id"))
+            .addField(FieldDefinition.requiredString("name", 200))
+            .addField(FieldDefinition.string("description", 500))
+            .addField(FieldDefinition.requiredString("triggerType", 20)
+                .withColumnName("trigger_type")
+                .withEnumValues(List.of(
+                    "BEFORE_CREATE", "BEFORE_UPDATE", "AFTER_CREATE", "AFTER_UPDATE", "AFTER_DELETE")))
+            .addField(FieldDefinition.text("scriptSource").withColumnName("script_source"))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .addField(FieldDefinition.integer("orderSequence")
+                .withColumnName("order_sequence").withDefault(0))
+            .addField(FieldDefinition.integer("timeoutSeconds")
+                .withColumnName("timeout_seconds").withDefault(5))
             .build();
     }
 

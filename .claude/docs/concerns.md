@@ -36,6 +36,29 @@ bulk, `CUSTOMIZE_APPLICATION`/`VIEW_SETUP` for packages). Follow-up, not yet don
 
 ## Tech Debt
 
+**Feature-flag audit outcomes (2026-07-02).** The audit reviewed every `@ConditionalOnProperty`
+for removal ("inline the current value"). Findings:
+- **Removed**: frontend `RENDER_TREE_V2` (was hardcoded `true`; legacy per-type renderer deleted — #1137).
+- **RETAINED — not dead, do not inline**: `kelta.scheduler.enabled` + `kelta.bulk.processor.enabled`
+  are set to `false` by `application-migrate.yml` so the K8s PreSync **migration pod** starts no
+  background workers and exits after runners complete. Inlining them would hang the migrate job.
+  `kelta.email.enabled=false` provides a no-op `EmailService` for envs without SMTP (dev/test).
+  `kelta.flow.enabled` / `kelta.modules.runtime.enabled` likewise gate real subsystems.
+- **RETAINED — presence-gated secrets/integrations** (removing the gate constructs a bean with a
+  null secret → startup failure): `kelta.encryption.key`, `kelta.svix.auth-token`,
+  `kelta.superset.url`, `kelta.sms.provider`, `kelta.push.provider`.
+- **Security flags** `kelta.{worker,gateway,auth}.internal-auth.enabled` (default off): flipping ON
+  + removing is a prod behavior + security change requiring the gateway client-credentials path
+  verified first — a scoped follow-up, not a mechanical inline.
+
+**Deliberately-retained code (audit judged deletion riskier than the cleanliness gain):**
+- `WorkflowMigrationController` (`/api/admin/migrate-workflow-rules`) — one-time workflows→flows
+  migration tool; no UI caller, but removing it deletes a migration path with unclear per-tenant
+  need. Harmless as-is.
+- Email-template dual lookup (`findTemplateByKey` vs `findTemplateByName`, see below) — both axes
+  are live on the transactional-email path (password reset/invite); consolidating risks that path
+  for a cosmetic gain.
+
 **Large files needing decomposition:**
 
 | File | Lines | Proposed fix |

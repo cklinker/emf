@@ -139,8 +139,11 @@ CREATE POLICY admin_bypass ON email_suppression
 -- new permission inherits the same "who can touch email" posture. New tenants seed it via
 -- TenantProvisioningHook.
 -- ---------------------------------------------------------------------------
-INSERT INTO profile_system_permission (id, profile_id, permission_name, granted)
-SELECT gen_random_uuid()::text, p.profile_id, 'MANAGE_CAMPAIGNS', p.granted
+-- profile_system_permission.tenant_id is NOT NULL (V85) with RLS (V86); clone it from the
+-- source row so the insert satisfies the constraint. Flyway runs under the admin (empty-tenant)
+-- context, so RLS admin_bypass permits writing rows for every tenant.
+INSERT INTO profile_system_permission (id, tenant_id, profile_id, permission_name, granted)
+SELECT gen_random_uuid()::text, p.tenant_id, p.profile_id, 'MANAGE_CAMPAIGNS', p.granted
 FROM profile_system_permission p
 WHERE p.permission_name = 'MANAGE_EMAIL_TEMPLATES'
   AND NOT EXISTS (

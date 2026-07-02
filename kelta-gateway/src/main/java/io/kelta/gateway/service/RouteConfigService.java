@@ -81,14 +81,16 @@ public class RouteConfigService {
     public void refreshRoutes() {
         logger.info("Starting route refresh");
 
+        // Register static routes UNCONDITIONALLY, before the bootstrap fetch. These are the
+        // default admin/config/API routes (collections, users, flows, …). They must NOT depend
+        // on the bootstrap response deserializing — otherwise any single bad DTO in the payload
+        // (e.g. a native-image reflection gap) drops every static route and takes the whole API
+        // offline. Bootstrap collection routes are registered afterwards and overwrite any
+        // static route sharing the same path (bootstrap routes are more specific).
+        registerStaticRoutes();
+
         fetchBootstrapConfig()
                 .doOnNext(config -> {
-                    // Register static routes FIRST — these are default routes for
-                    // admin/config endpoints.  Bootstrap collection routes are
-                    // registered afterwards and will overwrite any static route
-                    // that shares the same path (bootstrap routes are more specific).
-                    registerStaticRoutes();
-
                     if (config.getCollections() != null) {
                         int validRoutes = 0;
                         int invalidRoutes = 0;

@@ -30,6 +30,12 @@
     "allDeclaredFields": true
   },
   {
+    "name": "io.kelta.gateway.config.TenantIpConfig",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "io.kelta.runtime.event.PlatformEvent",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,

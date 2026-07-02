@@ -93,6 +93,10 @@ class SchemaMigrationScenarioTest extends ScenarioBase {
         assertThat(execute.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(execute.getBody()).containsEntry("status", "completed");
         assertThat(execute.getBody().get("toVersion")).isEqualTo(1);
+        // The run must have actually removed "extra" — guards against a false no-op (empty diff).
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) execute.getBody().get("steps");
+        assertThat(steps).as("execute applied a REMOVE_FIELD step")
+                .anySatisfy(s -> assertThat(s.get("operation")).isEqualTo("REMOVE_FIELD"));
 
         // 6. The "extra" field metadata row is gone.
         waitForField(client, slug, collectionId, "extra", false);

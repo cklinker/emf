@@ -61,6 +61,7 @@ public class MigrationExecutionService {
     private final CollectionRegistry collectionRegistry;
     private final MigrationRunRepository runRepository;
     private final MigrationFieldRepository fieldRepository;
+    private final CollectionLifecycleManager lifecycleManager;
     private final PlatformEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
@@ -69,6 +70,7 @@ public class MigrationExecutionService {
                                      CollectionRegistry collectionRegistry,
                                      MigrationRunRepository runRepository,
                                      MigrationFieldRepository fieldRepository,
+                                     CollectionLifecycleManager lifecycleManager,
                                      PlatformEventPublisher eventPublisher,
                                      ObjectMapper objectMapper) {
         this.versionService = versionService;
@@ -76,6 +78,7 @@ public class MigrationExecutionService {
         this.collectionRegistry = collectionRegistry;
         this.runRepository = runRepository;
         this.fieldRepository = fieldRepository;
+        this.lifecycleManager = lifecycleManager;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
     }
@@ -93,6 +96,11 @@ public class MigrationExecutionService {
      *         if a type change is incompatible and {@code force} is false
      */
     public Map<String, Object> execute(String collectionId, int targetVersion, boolean dryRun, boolean force) {
+        // Make the in-memory registry consistent with the committed `field` rows before diffing.
+        // A just-added field propagates to the registry asynchronously (NATS), so reading the live
+        // def straight from the registry can miss it — yielding an empty diff and a false no-op.
+        lifecycleManager.refreshOrInitializeLocally(collectionId);
+
         CollectionDefinition live = versionService.liveDefinition(collectionId);
         CollectionDefinition target = versionService.targetDefinition(collectionId, targetVersion)
                 .orElseThrow(() -> new IllegalArgumentException(

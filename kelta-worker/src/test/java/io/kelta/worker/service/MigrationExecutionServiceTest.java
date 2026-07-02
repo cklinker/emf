@@ -38,6 +38,7 @@ class MigrationExecutionServiceTest {
     private CollectionRegistry registry;
     private MigrationRunRepository runRepository;
     private MigrationFieldRepository fieldRepository;
+    private CollectionLifecycleManager lifecycleManager;
     private PlatformEventPublisher eventPublisher;
     private MigrationExecutionService service;
 
@@ -48,9 +49,10 @@ class MigrationExecutionServiceTest {
         registry = mock(CollectionRegistry.class);
         runRepository = mock(MigrationRunRepository.class);
         fieldRepository = mock(MigrationFieldRepository.class);
+        lifecycleManager = mock(CollectionLifecycleManager.class);
         eventPublisher = mock(PlatformEventPublisher.class);
         service = new MigrationExecutionService(versionService, engine, registry, runRepository,
-                fieldRepository, eventPublisher, new ObjectMapper());
+                fieldRepository, lifecycleManager, eventPublisher, new ObjectMapper());
     }
 
     private CollectionDefinition def(String name, List<FieldDefinition> fields) {
@@ -125,6 +127,8 @@ class MigrationExecutionServiceTest {
 
         assertThat(result).containsEntry("runId", "run-1").containsEntry("status", "completed");
 
+        // Registry is made DB-consistent before the diff (avoids a stale-registry false no-op).
+        verify(lifecycleManager).refreshOrInitializeLocally("c1");
         // Restore point captured before the destructive change.
         verify(versionService).snapshot("c1");
         // field metadata synced (row removed).

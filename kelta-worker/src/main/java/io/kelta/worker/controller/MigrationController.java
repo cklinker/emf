@@ -1,8 +1,11 @@
 package io.kelta.worker.controller;
 
+import io.kelta.runtime.storage.IncompatibleSchemaChangeException;
 import io.kelta.worker.repository.BootstrapRepository;
+import io.kelta.worker.repository.MigrationRunRepository;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.CollectionVersionService;
+import io.kelta.worker.service.MigrationExecutionService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +18,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Schema-migration planner — the <em>non-destructive</em> half. Snapshots a collection's schema
- * into a version and builds a read-only plan diffing the current live schema against a stored
- * target version. Applying a plan (destructive DDL) is a separate, guarded endpoint (follow-up).
+ * Schema-migration planner. Snapshots a collection's schema into a version, builds a read-only plan
+ * diffing the current live schema against a stored target version ({@code /snapshot}, {@code /plan},
+ * {@code /versions}), and <strong>applies</strong> a plan — transforming the live schema into a
+ * stored target version with real {@code ALTER TABLE}/{@code DROP COLUMN} on live tenant data
+ * ({@code /execute}, {@code /{runId}/rollback}).
  *
  * <p>Lives on the {@code /api/migrations/**} static route and is gated in-controller on
  * {@code CUSTOMIZE_APPLICATION} (schema authoring), since {@code /api/*} routes only get the
@@ -32,13 +37,19 @@ public class MigrationController {
     private static final String SCHEMA_PERMISSION = "CUSTOMIZE_APPLICATION";
 
     private final CollectionVersionService versionService;
+    private final MigrationExecutionService executionService;
+    private final MigrationRunRepository runRepository;
     private final CerbosPermissionResolver permissionResolver;
     private final BootstrapRepository bootstrapRepository;
 
     public MigrationController(CollectionVersionService versionService,
+                              MigrationExecutionService executionService,
+                              MigrationRunRepository runRepository,
                               CerbosPermissionResolver permissionResolver,
                               BootstrapRepository bootstrapRepository) {
         this.versionService = versionService;
+        this.executionService = executionService;
+        this.runRepository = runRepository;
         this.permissionResolver = permissionResolver;
         this.bootstrapRepository = bootstrapRepository;
     }
@@ -90,6 +101,81 @@ public class MigrationController {
             return plan.map(ResponseEntity::ok)
                     .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                             .body(error("No stored version " + targetVersion + " for collection " + collectionId)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        }
+    }
+
+    /**
+     * Applies a plan — transforms the live schema into a stored target version (destructive DDL).
+     * Accepts either a {@code planId} ({@code "<collectionId>:<targetVersion>"}, as returned by
+     * {@code /plan}) or explicit {@code collectionId} + {@code targetVersion}. Optional
+     * {@code dryRun} previews without applying; optional {@code force} allows incompatible type
+     * changes. Gated on {@code CUSTOMIZE_APPLICATION}.
+     */
+    @PostMapping("/execute")
+    public ResponseEntity<Map<String, Object>> execute(@RequestBody Map<String, Object> body,
+                                                       HttpServletRequest request) {
+        requireSchemaPermission(request);
+
+        String collectionId = asString(body.get("collectionId"));
+        Integer targetVersion = body.get("targetVersion") instanceof Number n ? n.intValue() : null;
+
+        // Fall back to parsing the composite planId "<collectionId>:<targetVersion>".
+        String planId = asString(body.get("planId"));
+        if ((collectionId == null || targetVersion == null) && planId != null) {
+            int sep = planId.lastIndexOf(':');
+            if (sep > 0 && sep < planId.length() - 1) {
+                collectionId = planId.substring(0, sep);
+                try {
+                    targetVersion = Integer.parseInt(planId.substring(sep + 1));
+                } catch (NumberFormatException ignored) {
+                    // handled by the validation below
+                }
+            }
+        }
+
+        if (collectionId == null || targetVersion == null) {
+            return ResponseEntity.badRequest()
+                    .body(error("planId, or collectionId + targetVersion, is required"));
+        }
+
+        boolean dryRun = Boolean.TRUE.equals(body.get("dryRun"));
+        boolean force = Boolean.TRUE.equals(body.get("force"));
+
+        try {
+            Map<String, Object> result = executionService.execute(collectionId, targetVersion, dryRun, force);
+            return ResponseEntity.ok(result);
+        } catch (IncompatibleSchemaChangeException e) {
+            return ResponseEntity.badRequest().body(error(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        }
+    }
+
+    /**
+     * Rolls a completed/failed run back to the schema it started from: applies a fresh migration to
+     * the run's {@code from_version} (the restore point captured before the original run), forcing
+     * any type changes. Gated on {@code CUSTOMIZE_APPLICATION}.
+     */
+    @PostMapping("/{runId}/rollback")
+    public ResponseEntity<Map<String, Object>> rollback(@PathVariable String runId,
+                                                       HttpServletRequest request) {
+        requireSchemaPermission(request);
+
+        Map<String, Object> run = runRepository.findRun(runId);
+        if (run == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Migration run not found: " + runId));
+        }
+        String collectionId = String.valueOf(run.get("collection_id"));
+        Integer fromVersion = run.get("from_version") instanceof Number n ? n.intValue() : null;
+        if (fromVersion == null) {
+            return ResponseEntity.badRequest().body(error("Run " + runId + " has no from_version to restore"));
+        }
+
+        try {
+            Map<String, Object> result = executionService.execute(collectionId, fromVersion, false, true);
+            return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         }

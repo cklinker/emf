@@ -115,12 +115,28 @@ export interface MigrationsPageProps {
 }
 
 // API functions using apiClient / keltaClient
+/**
+ * Normalizes a migration run coming off the generic JSON:API route (`/api/migration-runs`).
+ * The stored `status` is upper-case (`COMPLETED`) while the UI works in lower-case, and the run
+ * resource carries no nested `steps` (migration-steps is a separate collection). Coercing both here
+ * keeps the badge, the polling terminate-check, and the step list from breaking on the raw shape.
+ */
+function normalizeRun(run: MigrationRun): MigrationRun {
+  return {
+    ...run,
+    status: (String(run?.status ?? '').toLowerCase() as MigrationStatus) || 'pending',
+    steps: Array.isArray(run?.steps) ? run.steps : [],
+  }
+}
+
 async function fetchMigrationHistory(keltaClient: KeltaClient): Promise<MigrationRun[]> {
-  return keltaClient.admin.migrations.listRuns() as unknown as Promise<MigrationRun[]>
+  const runs = (await keltaClient.admin.migrations.listRuns()) as unknown as MigrationRun[]
+  return runs.map(normalizeRun)
 }
 
 async function fetchMigrationDetails(keltaClient: KeltaClient, id: string): Promise<MigrationRun> {
-  return keltaClient.admin.migrations.getRun(id) as unknown as Promise<MigrationRun>
+  const run = (await keltaClient.admin.migrations.getRun(id)) as unknown as MigrationRun
+  return normalizeRun(run)
 }
 
 async function fetchCollectionVersions(
@@ -184,7 +200,11 @@ async function executeMigration(
  * Requirement 10.7: Migration execution offers rollback option on failure
  */
 async function rollbackMigration(apiClient: ApiClient, runId: string): Promise<MigrationRun> {
-  return apiClient.postResource(`/api/migrations/${runId}/rollback`, {})
+  const run = (await apiClient.postResource(
+    `/api/migrations/${runId}/rollback`,
+    {}
+  )) as unknown as MigrationRun
+  return normalizeRun(run)
 }
 
 /**
@@ -194,7 +214,8 @@ async function getMigrationRunStatus(
   keltaClient: KeltaClient,
   runId: string
 ): Promise<MigrationRun> {
-  return keltaClient.admin.migrations.getRun(runId) as unknown as Promise<MigrationRun>
+  const run = (await keltaClient.admin.migrations.getRun(runId)) as unknown as MigrationRun
+  return normalizeRun(run)
 }
 
 /**

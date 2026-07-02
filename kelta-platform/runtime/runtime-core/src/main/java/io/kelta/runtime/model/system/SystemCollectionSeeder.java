@@ -313,7 +313,7 @@ public class SystemCollectionSeeder {
      * Maps runtime FieldType to the string type stored in the database.
      * Matches the control-plane's SystemCollectionSeeder.mapFieldType() exactly.
      */
-    static String mapFieldType(FieldType fieldType) {
+    public static String mapFieldType(FieldType fieldType) {
         return switch (fieldType) {
             case STRING -> "string";
             case INTEGER -> "number";

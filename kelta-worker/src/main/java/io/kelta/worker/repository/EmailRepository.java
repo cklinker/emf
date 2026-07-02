@@ -105,6 +105,22 @@ public class EmailRepository {
     }
 
     /**
+     * Counts {@code email_log} rows created for a tenant since {@code since}. Backs the
+     * per-tenant send rate limit on the transactional-send endpoint — every queued email
+     * (regardless of eventual delivery status) writes a log row, so this reflects real send
+     * volume within the window.
+     *
+     * @return the number of emails logged for the tenant since {@code since}
+     */
+    public int countRecentByTenant(String tenantId, Instant since) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM email_log WHERE tenant_id = ? AND created_at > ?",
+                Integer.class, tenantId, Timestamp.from(since)
+        );
+        return count == null ? 0 : count;
+    }
+
+    /**
      * Updates the email log status to SENDING.
      */
     public void markSending(String logId) {

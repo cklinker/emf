@@ -209,6 +209,13 @@ the SMTP target in K8s via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
 `SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS`. Per-tenant SMTP overrides live in
 `TenantEmailSettings` and take precedence over the platform-wide config.
 
+**Send paths.** Internal service-to-service delivery uses `InternalEmailController`
+(`/api/internal/email/**`, shared-token, not gateway-routed). The FE-reachable
+transactional send is `EmailSendController` `POST /api/email/send` (gateway static
+route `/api/email/**`) — stored-template-only, `MANAGE_EMAIL_TEMPLATES`-gated,
+per-tenant rate-limited; backs the `send_email` UI Quick Action. See
+`architecture.md` → *Transactional send endpoint*.
+
 ## Mass-email campaigns (V152)
 
 Bulk send on top of the same SMTP path. Three tenant-scoped tables (RLS): `email_campaign`

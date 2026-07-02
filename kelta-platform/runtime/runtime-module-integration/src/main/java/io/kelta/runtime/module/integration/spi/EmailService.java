@@ -74,6 +74,26 @@ public interface EmailService {
                                 Map<String, Object> vars, String source, String sourceId);
 
     /**
+     * Looks up a template by its {@code id} scoped to the owning tenant (admin-authored
+     * templates only — no {@code system} fallback), substitutes {@code ${var}} placeholders
+     * from {@code vars}, and queues the result.
+     *
+     * <p>Used by the transactional-send endpoint ({@code POST /api/email/send}) where the
+     * caller selects a concrete tenant template by id. Restricting resolution to the tenant's
+     * own templates keeps the endpoint from being used to send arbitrary system templates.
+     *
+     * @param tenantId   owning tenant
+     * @param to         recipient email address
+     * @param templateId the template id (must belong to {@code tenantId} and be active)
+     * @param vars       variables for {@code ${name}} substitution in subject + body
+     * @param source     source tag for {@code email_log}
+     * @param sourceId   optional source row id
+     * @return the generated email log id; empty if the template is missing
+     */
+    Optional<String> sendById(String tenantId, String to, String templateId,
+                              Map<String, Object> vars, String source, String sourceId);
+
+    /**
      * Email template data.
      *
      * @param subject the template subject

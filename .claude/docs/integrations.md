@@ -215,3 +215,35 @@ transactional send is `EmailSendController` `POST /api/email/send` (gateway stat
 route `/api/email/**`) — stored-template-only, `MANAGE_EMAIL_TEMPLATES`-gated,
 per-tenant rate-limited; backs the `send_email` UI Quick Action. See
 `architecture.md` → *Transactional send endpoint*.
+
+## Mass-email campaigns (V152)
+
+Bulk send on top of the same SMTP path. Three tenant-scoped tables (RLS): `email_campaign`
+(the read-only **campaigns** system collection — config + aggregate stats), `email_campaign_recipient`
+(per-recipient send + open/click/unsubscribe events), and `email_suppression` (per-tenant
+unsubscribe/suppression list).
+
+- **Admin API** — `/api/admin/campaigns` (`CampaignAdminController`), gated on the new
+  **`MANAGE_CAMPAIGNS`** system permission (seeded to System Administrator + Marketing User).
+  CRUD + actions `/{id}/send` (enqueue now), `/{id}/schedule`, `/{id}/cancel`, `/{id}/stats`,
+  `/{id}/recipients`, `/{id}/test`, and `/suppressions` (list/add/remove). The generic collection
+  route is read-only, so every mutation goes through this controller.
+- **Runner** — `CampaignRunnerService`, polled by `CampaignPollerConfig` (default 15s). Claims
+  runnable campaigns (QUEUED, or SCHEDULED whose time has arrived) with a conditional-claim
+  `UPDATE ... WHERE status IN (...)` after a `SELECT ... FOR UPDATE SKIP LOCKED` (leader election,
+  mirrors `BulkJobProcessorService`). Runs the claim with **no tenant context** (admin_bypass) so it
+  sees campaigns across tenants; each campaign's work then runs under `TenantContext.withTenant`.
+  Resolves recipients from `target_collection` via the `QueryEngine` (paged), renders subject/body
+  with `${field}` merge fields (same grammar as `DefaultEmailService`), and sends via
+  `EmailService.queueEmail(..., "CAMPAIGN_SEND", campaignId)`.
+- **Tracking** — public, unauthenticated endpoints `/api/track/{open,click,unsubscribe}`
+  (`CampaignTrackingController`), added to the gateway `unauthenticated-paths` allowlist. Each link
+  carries an **HMAC-signed opaque token** (`TrackingTokenService`, `CAMPAIGN_TRACKING_SECRET`) that
+  encodes the recipient id and self-authenticates — a forged/tampered token is rejected, so stats
+  can't be poisoned and unsubscribes can't be forged. Bodies get the open pixel appended, `href`s
+  rewritten through the click redirect, and an unsubscribe footer (`${unsubscribeUrl}` merge var).
+  The click redirect only forwards to `http(s)` URLs (open-redirect guard).
+- **Spam controls** — the suppression list is checked before every send; the daily
+  `campaignEmailsPerDay` governor limit (`TenantTierQuotas`) caps volume; a configurable
+  `send-rate-per-second` throttle paces delivery. Config lives under `kelta.campaigns.*`
+  (`CampaignProperties`).

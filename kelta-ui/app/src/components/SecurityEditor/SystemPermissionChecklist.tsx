@@ -7,7 +7,7 @@
  * Categories:
  * - Application Setup: VIEW_SETUP, CUSTOMIZE_APPLICATION
  * - User & Group Management: MANAGE_USERS, MANAGE_GROUPS, MANAGE_SHARING
- * - Automation & Workflows: MANAGE_WORKFLOWS, MANAGE_APPROVALS, MANAGE_EMAIL_TEMPLATES
+ * - Automation & Workflows: MANAGE_WORKFLOWS, MANAGE_APPROVALS, MANAGE_EMAIL_TEMPLATES, MANAGE_CAMPAIGNS
  * - Data & Reporting: MANAGE_REPORTS, MANAGE_LISTVIEWS, MANAGE_DATA, VIEW_ALL_DATA, MODIFY_ALL_DATA
  * - Integration & API: MANAGE_CONNECTED_APPS, API_ACCESS
  */
@@ -82,6 +82,11 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
         name: 'MANAGE_EMAIL_TEMPLATES',
         label: 'Manage Email Templates',
         description: 'Create and edit email notification templates',
+      },
+      {
+        name: 'MANAGE_CAMPAIGNS',
+        label: 'Manage Campaigns',
+        description: 'Compose, schedule, and send email campaigns',
       },
     ],
   },

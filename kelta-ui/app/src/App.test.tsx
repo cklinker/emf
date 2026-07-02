@@ -283,6 +283,7 @@ vi.mock('./pages', () => ({
   FlowDesignerPage: () => <div data-testid="flow-designer-page">Flow Designer Page</div>,
   ScheduledJobsPage: () => <div data-testid="scheduled-jobs-page">Scheduled Jobs Page</div>,
   EmailTemplatesPage: () => <div data-testid="email-templates-page">Email Templates Page</div>,
+  CampaignsPage: () => <div data-testid="campaigns-page">Campaigns Page</div>,
   ScriptsPage: () => <div data-testid="scripts-page">Scripts Page</div>,
   WebhooksPage: () => <div data-testid="webhooks-page">Webhooks Page</div>,
   ConnectedAppsPage: () => <div data-testid="connected-apps-page">Connected Apps Page</div>,

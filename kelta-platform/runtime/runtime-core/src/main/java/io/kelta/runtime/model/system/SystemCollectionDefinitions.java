@@ -105,6 +105,9 @@ public final class SystemCollectionDefinitions {
 
         // Communication
         definitions.add(emailTemplates());
+        definitions.add(campaigns());
+        definitions.add(campaignRecipients());
+        definitions.add(emailSuppressions());
 
         // Integration
         definitions.add(connectedApps());
@@ -627,6 +630,75 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.json("variablesSchema").withColumnName("variables_schema"))
             .addField(FieldDefinition.lookup("smtpCredentialId", "credentials", "SMTP Credential")
                 .withColumnName("smtp_credential_id"))
+            .build();
+    }
+
+    /**
+     * Mass-email campaigns. Read-only over the generic API — all mutations and the
+     * schedule/send/cancel actions go through {@code CampaignAdminController}, which enforces
+     * {@code MANAGE_CAMPAIGNS} and the daily send governor limit. Aggregate stat columns
+     * (sent/open/click/unsubscribe/failed) are maintained by the campaign runner.
+     */
+    public static CollectionDefinition campaigns() {
+        return readOnlySystemBuilder("campaigns", "Email Campaigns", "email_campaign")
+            .displayFieldName("name")
+            .addField(FieldDefinition.requiredString("name", 200))
+            .addField(FieldDefinition.string("description", 500))
+            .addField(FieldDefinition.requiredString("subject", 500))
+            .addField(FieldDefinition.text("bodyHtml").withColumnName("body_html"))
+            .addField(FieldDefinition.lookup("templateId", "email-templates", "Email Template")
+                .withColumnName("template_id"))
+            .addField(FieldDefinition.requiredString("targetCollection", 100)
+                .withColumnName("target_collection"))
+            .addField(FieldDefinition.requiredString("recipientEmailField", 100)
+                .withColumnName("recipient_email_field"))
+            .addField(FieldDefinition.json("filterJson").withColumnName("filter_json"))
+            .addField(FieldDefinition.string("listViewId", 36).withColumnName("list_view_id"))
+            .addField(FieldDefinition.string("fromName", 200).withColumnName("from_name"))
+            .addField(FieldDefinition.string("fromAddress", 320).withColumnName("from_address"))
+            .addField(FieldDefinition.requiredString("status", 20).withDefault("DRAFT"))
+            .addField(FieldDefinition.datetime("scheduledAt").withColumnName("scheduled_at"))
+            .addField(FieldDefinition.integer("totalRecipients").withColumnName("total_recipients"))
+            .addField(FieldDefinition.integer("sentCount").withColumnName("sent_count"))
+            .addField(FieldDefinition.integer("failedCount").withColumnName("failed_count"))
+            .addField(FieldDefinition.integer("openCount").withColumnName("open_count"))
+            .addField(FieldDefinition.integer("clickCount").withColumnName("click_count"))
+            .addField(FieldDefinition.integer("unsubscribeCount").withColumnName("unsubscribe_count"))
+            .addField(FieldDefinition.datetime("startedAt").withColumnName("started_at"))
+            .addField(FieldDefinition.datetime("completedAt").withColumnName("completed_at"))
+            .addField(FieldDefinition.text("errorMessage").withColumnName("error_message"))
+            .build();
+    }
+
+    /** Per-recipient send + tracking rows for a campaign (read-only; written by the runner). */
+    public static CollectionDefinition campaignRecipients() {
+        return readOnlySystemBuilder("campaign-recipients", "Campaign Recipients",
+                "email_campaign_recipient")
+            .displayFieldName("email")
+            .addField(FieldDefinition.lookup("campaignId", "campaigns", "Campaign")
+                .withColumnName("campaign_id"))
+            .addField(FieldDefinition.string("recordId", 36).withColumnName("record_id"))
+            .addField(FieldDefinition.requiredString("email", 320))
+            .addField(FieldDefinition.requiredString("status", 20))
+            .addField(FieldDefinition.text("errorMessage").withColumnName("error_message"))
+            .addField(FieldDefinition.string("emailLogId", 36).withColumnName("email_log_id"))
+            .addField(FieldDefinition.integer("openCount").withColumnName("open_count"))
+            .addField(FieldDefinition.integer("clickCount").withColumnName("click_count"))
+            .addField(FieldDefinition.datetime("sentAt").withColumnName("sent_at"))
+            .addField(FieldDefinition.datetime("openedAt").withColumnName("opened_at"))
+            .addField(FieldDefinition.datetime("clickedAt").withColumnName("clicked_at"))
+            .addField(FieldDefinition.datetime("unsubscribedAt").withColumnName("unsubscribed_at"))
+            .build();
+    }
+
+    /** Per-tenant unsubscribe / suppression list — a match here blocks all future campaign sends. */
+    public static CollectionDefinition emailSuppressions() {
+        return readOnlySystemBuilder("email-suppressions", "Email Suppressions", "email_suppression")
+            .displayFieldName("email")
+            .addField(FieldDefinition.requiredString("email", 320))
+            .addField(FieldDefinition.requiredString("reason", 30).withDefault("UNSUBSCRIBE"))
+            .addField(FieldDefinition.lookup("campaignId", "campaigns", "Campaign")
+                .withColumnName("campaign_id"))
             .build();
     }
 

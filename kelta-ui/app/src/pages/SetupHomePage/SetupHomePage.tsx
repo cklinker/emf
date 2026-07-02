@@ -36,6 +36,7 @@ import {
   Lock,
   LogIn,
   Mail,
+  Megaphone,
   Menu,
   Network,
   Package,
@@ -294,6 +295,13 @@ const CATEGORIES: SetupCategory[] = [
         description: 'Design email templates',
         icon: Mail,
         permission: 'MANAGE_EMAIL_TEMPLATES',
+      },
+      {
+        name: 'Campaigns',
+        path: '/campaigns',
+        description: 'Compose and send email campaigns',
+        icon: Megaphone,
+        permission: 'MANAGE_CAMPAIGNS',
       },
       {
         name: 'Scripts',

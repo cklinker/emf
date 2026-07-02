@@ -201,6 +201,7 @@ public class RouteConfigService {
                 {"connected-apps", "/api/connected-apps/**", "connected-apps"},
                 {"email-templates", "/api/email-templates/**", "email-templates"},
                 {"email", "/api/email/**", "email"},
+                {"track", "/api/track/**", "track"},
                 {"scripts", "/api/scripts/**", "scripts"},
                 {"scheduled-jobs", "/api/scheduled-jobs/**", "scheduled-jobs"},
                 // Reporting & monitoring

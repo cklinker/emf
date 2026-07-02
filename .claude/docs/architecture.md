@@ -86,6 +86,14 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   route in `kelta-gateway/.../service/RouteConfigService.registerStaticRoutes()` (and
   `config/RouteInitializer.registerStaticRoutes()`) or the gateway returns **404**. Sub-paths
   under an existing segment need no new route.
+- **Public (unauthenticated) endpoint**: to expose a path with no JWT, add its prefix to
+  `kelta.gateway.security.unauthenticated-paths` (all methods) or `public-paths` (GET/HEAD only)
+  in the gateway `application.yml`, *and* register its worker static route. Example: mass-email
+  campaign tracking — `CampaignTrackingController` at `/api/track/**` (static route `track` +
+  `unauthenticated-paths`), authenticated solely by the HMAC token in the link, not the session.
+  The endpoint resolves its own tenant from the verified token and records events under
+  `TenantContext.withTenant`. Campaign management itself is a normal `/api/admin/campaigns`
+  endpoint gated in-controller on `MANAGE_CAMPAIGNS` (the DB-lookup pattern above).
 
 **Worker-side system-permission check — how (use the existing pattern, don't reinvent):**
 - Enforce a specific system permission **in the controller/service** with a DB lookup against

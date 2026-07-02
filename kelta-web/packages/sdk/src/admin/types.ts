@@ -1329,6 +1329,98 @@ export interface CreateEmailTemplateRequest {
   active?: boolean;
 }
 
+// --- Email Campaigns ---
+
+export type CampaignStatus =
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'QUEUED'
+  | 'SENDING'
+  | 'SENT'
+  | 'FAILED'
+  | 'CANCELLED';
+
+/** A single filter condition applied to the target collection. */
+export interface CampaignFilterCondition {
+  field: string;
+  op: string;
+  value: unknown;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  description?: string;
+  subject: string;
+  bodyHtml?: string;
+  templateId?: string;
+  targetCollection: string;
+  recipientEmailField: string;
+  filterJson?: CampaignFilterCondition[];
+  listViewId?: string;
+  fromName?: string;
+  fromAddress?: string;
+  status: CampaignStatus;
+  scheduledAt?: string;
+  totalRecipients?: number;
+  sentCount?: number;
+  failedCount?: number;
+  openCount?: number;
+  clickCount?: number;
+  unsubscribeCount?: number;
+  startedAt?: string;
+  completedAt?: string;
+  errorMessage?: string;
+  createdAt: string;
+}
+
+export interface CreateCampaignRequest {
+  name: string;
+  description?: string;
+  subject: string;
+  bodyHtml?: string;
+  templateId?: string;
+  targetCollection: string;
+  recipientEmailField: string;
+  filterJson?: CampaignFilterCondition[];
+  listViewId?: string;
+  fromName?: string;
+  fromAddress?: string;
+  status?: CampaignStatus;
+  scheduledAt?: string;
+}
+
+export interface CampaignStats {
+  status: CampaignStatus;
+  totalRecipients: number;
+  sent: number;
+  failed: number;
+  opens: number;
+  clicks: number;
+  unsubscribes: number;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface CampaignRecipient {
+  id: string;
+  campaignId?: string;
+  recordId?: string;
+  email: string;
+  status: string;
+  errorMessage?: string;
+  sentAt?: string;
+  openedAt?: string;
+  clickedAt?: string;
+}
+
+export interface EmailSuppression {
+  id: string;
+  email: string;
+  reason?: string;
+  createdAt?: string;
+}
+
 // --- Workflow Rules (Phase 4 Stream B) ---
 
 export interface WorkflowRule {

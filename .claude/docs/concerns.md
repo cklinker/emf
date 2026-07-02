@@ -5,6 +5,21 @@ at the bottom so reviewers can see what's already been addressed.
 
 ## Security Risks
 
+**Mass-email campaigns are a spam-capable, partly-public surface (V152).** Guardrails that
+MUST stay intact:
+- `CAMPAIGN_TRACKING_SECRET` **must be set to a strong per-deployment value.** It signs the HMAC
+  tracking tokens for the public `/api/track/{open,click,unsubscribe}` endpoints. The dev default in
+  `CampaignProperties` is a placeholder — if it ships to prod, an attacker can forge unsubscribes and
+  poison open/click stats. Inject it via env/secret like `KELTA_ENCRYPTION_KEY`.
+- `/api/track/**` is on the gateway `unauthenticated-paths` allowlist (all methods, no JWT). The
+  token is the only authenticator — never widen this path or accept an unsigned recipient id.
+- The click redirect (`CampaignTrackingController.isSafeUrl`) only forwards to `http(s)` URLs; keep
+  that guard (open-redirect / `javascript:` protection).
+- Sends are gated on `MANAGE_CAMPAIGNS`, the suppression list (checked per recipient), the
+  `campaignEmailsPerDay` governor, and a `send-rate-per-second` throttle. Don't add a bulk-send path
+  that bypasses the suppression check or the governor. Campaign writes deliberately do **not** go
+  through the generic collection route (the collections are read-only) — keep it that way.
+
 **Power controllers gated only by blanket `API_ACCESS` + RLS (2026-07-02 audit).**
 `ReportExecutionController`, `DashboardDataController`, `BulkOperationsController`, and
 `PackageController` do **not** enforce a specific system permission in-controller — they

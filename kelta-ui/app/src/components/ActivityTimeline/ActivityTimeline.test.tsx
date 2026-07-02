@@ -62,6 +62,22 @@ describe('ActivityTimeline', () => {
     await waitFor(() => expect(screen.getByText(/x{140}…/)).toBeInTheDocument())
   })
 
+  it('merges an attachment from /api/attachments into the feed', async () => {
+    const getList = vi.fn((url: string) => {
+      if (url.startsWith('/api/attachments')) {
+        return Promise.resolve([{ id: 'a1', fileName: 'contract.pdf', uploadedAt: '2026-02-02T00:00:00Z' }])
+      }
+      return Promise.resolve([])
+    })
+
+    renderTimeline({ getList: getList as unknown as ApiClient['getList'] })
+
+    await waitFor(() => expect(screen.getByText(/contract\.pdf/)).toBeInTheDocument())
+    expect(getList).toHaveBeenCalledWith(
+      expect.stringContaining('/api/attachments?filter[collectionId][eq]=col-1&filter[recordId][eq]=rec-1')
+    )
+  })
+
   it('still renders lifecycle events when there are no notes', async () => {
     const getList = vi.fn(() => Promise.resolve([]))
     renderTimeline({ getList: getList as unknown as ApiClient['getList'] })

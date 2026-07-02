@@ -3,12 +3,15 @@ package io.kelta.worker.controller;
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.worker.repository.BulkJobRepository;
+import io.kelta.worker.service.CsvImportService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 
@@ -38,13 +41,16 @@ public class BulkOperationsController {
     private final BulkJobRepository bulkJobRepository;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final CsvImportService csvImportService;
 
     public BulkOperationsController(BulkJobRepository bulkJobRepository,
                                      ObjectMapper objectMapper,
-                                     JdbcTemplate jdbcTemplate) {
+                                     JdbcTemplate jdbcTemplate,
+                                     CsvImportService csvImportService) {
         this.bulkJobRepository = bulkJobRepository;
         this.objectMapper = objectMapper;
         this.jdbcTemplate = jdbcTemplate;
+        this.csvImportService = csvImportService;
     }
 
     /**
@@ -104,12 +110,91 @@ public class BulkOperationsController {
                             "Collection " + collectionId + " not found or inactive"));
         }
 
-        // Validate batch size
+        return queueJob(tenantId, userEmail, collectionId, operation, externalIdField, batchSize, records);
+    }
+
+    /**
+     * Creates a bulk job from an uploaded CSV or JSON file (for payloads larger than a
+     * practical inline request). The file is parsed to records here; each record is then
+     * processed asynchronously through the normal write path (which coerces + validates
+     * per field). CSV values are strings — use a JSON file for pre-typed values.
+     */
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @SuppressWarnings("unchecked")
+    public ResponseEntity<Map<String, Object>> uploadJob(
+            @RequestHeader("X-Tenant-ID") String tenantId,
+            @RequestHeader("X-User-Email") String userEmail,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("collectionId") String collectionId,
+            @RequestParam("operation") String operation,
+            @RequestParam(value = "externalIdField", required = false) String externalIdField,
+            @RequestParam(value = "batchSize", required = false) Integer batchSize) {
+
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Missing file", "file is required and must be non-empty"));
+        }
+        if (collectionId == null || collectionId.isBlank()) {
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Missing field", "collectionId is required"));
+        }
+        if (operation == null || !VALID_OPERATIONS.contains(operation.toUpperCase())) {
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Invalid operation",
+                            "operation must be one of: INSERT, UPDATE, UPSERT, DELETE"));
+        }
+        operation = operation.toUpperCase();
+
+        List<Map<String, Object>> records;
+        try {
+            String name = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+            String contentType = file.getContentType() != null ? file.getContentType().toLowerCase() : "";
+            boolean json = name.endsWith(".json") || contentType.contains("json");
+            if (json) {
+                records = objectMapper.readValue(file.getInputStream(),
+                        new tools.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+            } else {
+                records = csvImportService.parseCsvToRecords(file.getInputStream());
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Parse error",
+                            "Failed to parse uploaded file: " + e.getMessage()));
+        }
+
+        if (records == null || records.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Empty file", "The uploaded file contained no records"));
+        }
+        if (records.size() > MAX_INLINE_RECORDS) {
+            return ResponseEntity.unprocessableEntity().body(
+                    JsonApiResponseBuilder.error("422", "Too many records",
+                            "Maximum " + MAX_INLINE_RECORDS + " records per upload"));
+        }
+        if ("UPSERT".equals(operation) && (externalIdField == null || externalIdField.isBlank())) {
+            externalIdField = null;
+        }
+        if (!collectionExists(collectionId, tenantId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    JsonApiResponseBuilder.error("404", "Collection not found",
+                            "Collection " + collectionId + " not found or inactive"));
+        }
+
+        return queueJob(tenantId, userEmail, collectionId, operation, externalIdField, batchSize, records);
+    }
+
+    /**
+     * Serializes the records, creates a QUEUED bulk job, and returns the JSON:API resource.
+     * Shared by the inline-JSON ({@code POST}) and file-upload ({@code POST /upload}) paths.
+     */
+    private ResponseEntity<Map<String, Object>> queueJob(
+            String tenantId, String userEmail, String collectionId, String operation,
+            String externalIdField, Integer batchSize, List<Map<String, Object>> records) {
+
         int effectiveBatchSize = batchSize != null
                 ? Math.min(Math.max(batchSize, 1), MAX_BATCH_SIZE)
                 : DEFAULT_BATCH_SIZE;
 
-        // Serialize records to JSON
         String dataPayload;
         try {
             dataPayload = objectMapper.writeValueAsString(records);
@@ -119,7 +204,6 @@ public class BulkOperationsController {
                             "Failed to serialize records: " + e.getMessage()));
         }
 
-        // Create the job
         String jobId = bulkJobRepository.create(
                 tenantId, collectionId, operation,
                 "application/json", effectiveBatchSize, externalIdField,
@@ -131,7 +215,6 @@ public class BulkOperationsController {
         log.info("Bulk job created: jobId={}, operation={}, collection={}, records={}, batchSize={}",
                 jobId, operation, collectionId, records.size(), effectiveBatchSize);
 
-        // Return the created job
         Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("status", "QUEUED");
         attributes.put("operation", operation);

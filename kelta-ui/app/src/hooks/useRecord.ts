@@ -8,6 +8,8 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
+import { useOffline } from '../offline'
+import type { ReplicaRecord } from '../offline'
 import { unwrapResource } from '../utils/jsonapi'
 import type { CollectionRecord } from './useCollectionRecords'
 
@@ -41,16 +43,35 @@ export interface UseRecordReturn {
  */
 export function useRecord(options: UseRecordOptions): UseRecordReturn {
   const { apiClient } = useApi()
+  const offline = useOffline()
   const { collectionName, recordId, enabled = true, include } = options
 
+  // undefined offline context (admin pages) ⇒ always treat as online.
+  const isOnline = offline?.online !== false
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['record', collectionName, recordId, include],
+    // `isOnline` is part of the key so a reconnect naturally re-runs the online path.
+    queryKey: ['record', collectionName, recordId, include, isOnline],
     queryFn: async () => {
+      // Offline: serve the record from the local replica (no ETag when cached).
+      if (offline && !isOnline) {
+        const cached = await offline.store.get(collectionName!, recordId!)
+        return {
+          record: cached as CollectionRecord | undefined,
+          rawResponse: undefined,
+          etag: undefined,
+        }
+      }
       const url = include
         ? `/api/${collectionName}/${recordId}?include=${encodeURIComponent(include)}`
         : `/api/${collectionName}/${recordId}`
       const { data: response, etag } = await apiClient.getWithMeta(url)
       const record = unwrapResource<CollectionRecord>(response)
+      // Write-through into the replica for later offline reads.
+      if (offline) {
+        offline.registerCollection(collectionName!)
+        await offline.store.putRecords(collectionName!, [record as ReplicaRecord])
+      }
       return { record, rawResponse: response, etag }
     },
     enabled: !!collectionName && !!recordId && enabled,

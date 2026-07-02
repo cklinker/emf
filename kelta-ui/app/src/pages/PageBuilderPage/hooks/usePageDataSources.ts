@@ -12,6 +12,8 @@
 import { useMemo } from 'react'
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '@/context/ApiContext'
+import { useOffline } from '@/offline'
+import type { OfflineContextValue, ReplicaRecord } from '@/offline'
 import type { ApiClient } from '@/services/apiClient'
 import type { PageDataSource } from '../pageConfig'
 import { MAX_PAGE_DATA_SOURCES } from '../model/limits'
@@ -70,21 +72,44 @@ function resolvedConfigKey(src: PageDataSource, scope: BindingScope): string {
 async function fetchSource(
   apiClient: ApiClient,
   src: PageDataSource,
-  scope: BindingScope
+  scope: BindingScope,
+  offline?: OfflineContextValue
 ): Promise<unknown> {
+  const isOnline = offline?.online !== false
+
   if (src.mode === 'single') {
     const id = resolveValue(src.recordId as PropValue, scope)
     if (id == null || id === '') return null
+    const key = String(id)
+    // Offline: serve the record from the local replica.
+    if (offline && !isOnline) {
+      return (await offline.store.get(src.collection, key)) ?? null
+    }
     try {
-      return await apiClient.getOne<Record<string, unknown>>(
-        `/api/${src.collection}/${encodeURIComponent(String(id))}`
+      const record = await apiClient.getOne<Record<string, unknown>>(
+        `/api/${src.collection}/${encodeURIComponent(key)}`
       )
+      if (offline && record && typeof record === 'object' && 'id' in record) {
+        offline.registerCollection(src.collection)
+        await offline.store.putRecords(src.collection, [record as ReplicaRecord])
+      }
+      return record
     } catch {
       // 404 / denied → null (Cerbos/FLS apply server-side; a missing record reads as absent).
       return null
     }
   }
-  return apiClient.getList<Record<string, unknown>>(buildListUrl(src, scope))
+
+  // Offline: serve cached rows for the collection.
+  if (offline && !isOnline) {
+    return offline.store.getAll(src.collection)
+  }
+  const rows = await apiClient.getList<Record<string, unknown>>(buildListUrl(src, scope))
+  if (offline) {
+    offline.registerCollection(src.collection)
+    await offline.store.putRecords(src.collection, rows as ReplicaRecord[])
+  }
+  return rows
 }
 
 export function usePageDataSources(
@@ -93,7 +118,9 @@ export function usePageDataSources(
   pageSlug?: string
 ): UsePageDataSourcesReturn {
   const { apiClient } = useApi()
+  const offline = useOffline()
   const queryClient = useQueryClient()
+  const isOnline = offline?.online !== false
 
   // Defensive cap: only the first MAX_PAGE_DATA_SOURCES sources fire (a hand-edited config can't fan out).
   const sources = useMemo(() => {
@@ -111,12 +138,14 @@ export function usePageDataSources(
     pageSlug ?? '',
     src.name,
     resolvedConfigKey(src, scope),
+    // `isOnline` in the key so a reconnect re-runs the online fetch path.
+    isOnline,
   ]
 
   const results = useQueries({
     queries: sources.map((src) => ({
       queryKey: queryKeyFor(src),
-      queryFn: () => fetchSource(apiClient, src, scope),
+      queryFn: () => fetchSource(apiClient, src, scope, offline),
       enabled: !!src.collection,
       staleTime: 60 * 1000,
       retry: false,

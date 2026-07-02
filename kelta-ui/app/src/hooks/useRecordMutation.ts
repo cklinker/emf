@@ -8,6 +8,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
+import { useOffline } from '../offline'
 import { parseAxiosError } from '../services/apiClient'
 import { wrapResource, unwrapResource } from '../utils/jsonapi'
 import type { CollectionRecord } from './useCollectionRecords'
@@ -71,7 +72,11 @@ export interface UseRecordMutationReturn {
 export function useRecordMutation(options: UseRecordMutationOptions): UseRecordMutationReturn {
   const { collectionName, onSuccess, onError } = options
   const { apiClient } = useApi()
+  const offline = useOffline()
   const queryClient = useQueryClient()
+
+  /** True when an offline replica is mounted and connectivity is down. */
+  const isOffline = (): boolean => !!offline && offline.online === false
 
   const invalidateRecords = () => {
     queryClient.invalidateQueries({ queryKey: ['collection-records', collectionName] })
@@ -86,6 +91,11 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
 
   const createMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
+      // Offline: queue to the outbox; the temp record surfaces optimistically.
+      if (offline && isOffline()) {
+        const op = await offline.engine.queue(collectionName, 'create', { payload: data })
+        return { id: op.recordId!, ...data } as CollectionRecord
+      }
       const body = wrapResource(collectionName, data)
       const response = await apiClient.post(`/api/${collectionName}`, body)
       return unwrapResource<CollectionRecord>(response)
@@ -107,6 +117,10 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
       data: Record<string, unknown>
       ifMatch?: string
     }) => {
+      if (offline && isOffline()) {
+        await offline.engine.queue(collectionName, 'update', { recordId: id, payload: data })
+        return { id, ...data } as CollectionRecord
+      }
       const body = wrapResource(collectionName, data, id)
       const response = await apiClient.put(`/api/${collectionName}/${id}`, body, ifMatch)
       return unwrapResource<CollectionRecord>(response)
@@ -128,6 +142,12 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
       data: Record<string, unknown>
       ifMatch?: string
     }) => {
+      // Offline: a partial edit is queued as an 'update' op; push replays it as a
+      // full PUT (queued PATCH promoted to PUT on flush — acceptable for v1).
+      if (offline && isOffline()) {
+        await offline.engine.queue(collectionName, 'update', { recordId: id, payload: data })
+        return { id, ...data } as CollectionRecord
+      }
       const body = wrapResource(collectionName, data, id)
       const response = await apiClient.patch(`/api/${collectionName}/${id}`, body, ifMatch)
       return unwrapResource<CollectionRecord>(response)
@@ -143,6 +163,10 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
     mutationFn: async (idOrParams: string | { id: string; ifMatch?: string }) => {
       const { id, ifMatch } =
         typeof idOrParams === 'string' ? { id: idOrParams, ifMatch: undefined } : idOrParams
+      if (offline && isOffline()) {
+        await offline.engine.queue(collectionName, 'delete', { recordId: id })
+        return
+      }
       await apiClient.delete(`/api/${collectionName}/${id}`, ifMatch)
     },
     onSuccess: () => {

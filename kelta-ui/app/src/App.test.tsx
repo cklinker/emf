@@ -252,6 +252,221 @@ vi.mock('./components/ProtectedRoute', () => ({
 }))
 
 // Mock page components
+// These pages are lazy-loaded from their own submodules (code-splitting — they pull the
+// heavy react-flow / recharts / dnd-kit chunks). The barrel mock below doesn't intercept a
+// `import('./pages/<Name>')`, so mock the submodule paths too or the test loads the real
+// (heavy) pages.
+vi.mock('./pages/PageBuilderPage', () => ({
+  PageBuilderPage: () => <div data-testid="page-builder-page">Page Builder Page</div>,
+}))
+vi.mock('./pages/FlowDesignerPage', () => ({
+  FlowDesignerPage: () => <div data-testid="flow-designer-page">Flow Designer Page</div>,
+}))
+vi.mock('./pages/MonitoringPage', () => ({
+  MonitoringLayout: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="monitoring-layout">{children}</div>
+  ),
+  MonitoringOverviewPage: () => (
+    <div data-testid="monitoring-overview-page">Monitoring Overview Page</div>
+  ),
+}))
+
+// Per-submodule page mocks — App imports pages from their own modules (code-splitting),
+// so a `vi.mock('./pages')` barrel mock alone would NOT intercept them.
+vi.mock('./pages/AiSettingsPage', () => ({
+  AiSettingsPage: () => <div data-testid="ai-settings-page">AiSettingsPage</div>,
+}))
+vi.mock('./pages/EmailSettingsPage', () => ({
+  EmailSettingsPage: () => <div data-testid="email-settings-page">EmailSettingsPage</div>,
+}))
+vi.mock('./pages/MapSettingsPage', () => ({
+  MapSettingsPage: () => <div data-testid="map-settings-page">MapSettingsPage</div>,
+}))
+vi.mock('./pages/NetworkAccessPage', () => ({
+  NetworkAccessPage: () => <div data-testid="network-access-page">NetworkAccessPage</div>,
+}))
+vi.mock('./pages/DashboardPage', () => ({
+  DashboardPage: () => <div data-testid="dashboard-page">DashboardPage</div>,
+}))
+vi.mock('./pages/CollectionsPage', () => ({
+  CollectionsPage: () => <div data-testid="collections-page">CollectionsPage</div>,
+}))
+vi.mock('./pages/CollectionDetailPage', () => ({
+  CollectionDetailPage: () => <div data-testid="collection-detail-page">CollectionDetailPage</div>,
+}))
+vi.mock('./pages/CollectionFormPage', () => ({
+  CollectionFormPage: () => <div data-testid="collection-form-page">CollectionFormPage</div>,
+}))
+vi.mock('./pages/CollectionWizardPage', () => ({
+  CollectionWizardPage: () => <div data-testid="collection-wizard-page">CollectionWizardPage</div>,
+}))
+vi.mock('./pages/OIDCProvidersPage', () => ({
+  OIDCProvidersPage: () => <div data-testid="oidc-providers-page">OIDCProvidersPage</div>,
+}))
+vi.mock('./pages/MenuBuilderPage', () => ({
+  MenuBuilderPage: () => <div data-testid="menu-builder-page">MenuBuilderPage</div>,
+}))
+vi.mock('./pages/PackagesPage', () => ({
+  PackagesPage: () => <div data-testid="packages-page">PackagesPage</div>,
+}))
+vi.mock('./pages/MigrationsPage', () => ({
+  MigrationsPage: () => <div data-testid="migrations-page">MigrationsPage</div>,
+}))
+vi.mock('./pages/ResourceBrowserPage', () => ({
+  ResourceBrowserPage: () => <div data-testid="resource-browser-page">ResourceBrowserPage</div>,
+}))
+vi.mock('./pages/ResourceListPage', () => ({
+  ResourceListPage: () => <div data-testid="resource-list-page">ResourceListPage</div>,
+}))
+vi.mock('./pages/ResourceDetailPage', () => ({
+  ResourceDetailPage: () => <div data-testid="resource-detail-page">ResourceDetailPage</div>,
+}))
+vi.mock('./pages/ResourceFormPage', () => ({
+  ResourceFormPage: () => <div data-testid="resource-form-page">ResourceFormPage</div>,
+}))
+vi.mock('./pages/PluginsPage', () => ({
+  PluginsPage: () => <div data-testid="plugins-page">PluginsPage</div>,
+}))
+vi.mock('./pages/UsersPage', () => ({
+  UsersPage: () => <div data-testid="users-page">UsersPage</div>,
+}))
+vi.mock('./pages/UserDetailPage', () => ({
+  UserDetailPage: () => <div data-testid="user-detail-page">UserDetailPage</div>,
+}))
+vi.mock('./pages/SetupAuditTrailPage', () => ({
+  SetupAuditTrailPage: () => <div data-testid="audit-trail-page">SetupAuditTrailPage</div>,
+}))
+vi.mock('./pages/GovernorLimitsPage', () => ({
+  GovernorLimitsPage: () => <div data-testid="governor-limits-page">GovernorLimitsPage</div>,
+}))
+vi.mock('./pages/TenantsPage', () => ({
+  TenantsPage: () => <div data-testid="tenants-page">TenantsPage</div>,
+}))
+vi.mock('./pages/TenantDashboardPage', () => ({
+  TenantDashboardPage: () => <div data-testid="tenant-dashboard-page">TenantDashboardPage</div>,
+}))
+vi.mock('./pages/PicklistsPage', () => ({
+  PicklistsPage: () => <div data-testid="picklists-page">PicklistsPage</div>,
+}))
+vi.mock('./pages/AiAgentsPage', () => ({
+  AiAgentsPage: () => <div data-testid="ai-agents-page">AiAgentsPage</div>,
+}))
+vi.mock('./pages/PageLayoutsPage', () => ({
+  PageLayoutsPage: () => <div data-testid="page-layouts-page">PageLayoutsPage</div>,
+}))
+vi.mock('./pages/ListViewsPage', () => ({
+  ListViewsPage: () => <div data-testid="list-views-page">ListViewsPage</div>,
+}))
+vi.mock('./pages/AnalyticsPage', () => ({
+  AnalyticsPage: () => <div data-testid="analytics-page">AnalyticsPage</div>,
+}))
+vi.mock('./pages/ApprovalProcessesPage', () => ({
+  ApprovalProcessesPage: () => (
+    <div data-testid="approval-processes-page">ApprovalProcessesPage</div>
+  ),
+}))
+vi.mock('./pages/FlowsPage', () => ({
+  FlowsPage: () => <div data-testid="flows-page">FlowsPage</div>,
+}))
+vi.mock('./pages/ScheduledJobsPage', () => ({
+  ScheduledJobsPage: () => <div data-testid="scheduled-jobs-page">ScheduledJobsPage</div>,
+}))
+vi.mock('./pages/EmailTemplatesPage', () => ({
+  EmailTemplatesPage: () => <div data-testid="email-templates-page">EmailTemplatesPage</div>,
+}))
+vi.mock('./pages/CampaignsPage', () => ({
+  CampaignsPage: () => <div data-testid="campaigns-page">CampaignsPage</div>,
+}))
+vi.mock('./pages/ScriptsPage', () => ({
+  ScriptsPage: () => <div data-testid="scripts-page">ScriptsPage</div>,
+}))
+vi.mock('./pages/WebhooksPage', () => ({
+  WebhooksPage: () => <div data-testid="webhooks-page">WebhooksPage</div>,
+}))
+vi.mock('./pages/ApiSpecsPage', () => ({
+  ApiSpecsPage: () => <div data-testid="api-specs-page">ApiSpecsPage</div>,
+  ApiSpecDetailPage: () => <div data-testid="api-spec-detail-page">ApiSpecDetailPage</div>,
+}))
+vi.mock('./pages/ConnectedAppsPage', () => ({
+  ConnectedAppsPage: () => <div data-testid="connected-apps-page">ConnectedAppsPage</div>,
+}))
+vi.mock('./pages/CredentialsPage', () => ({
+  CredentialsPage: () => <div data-testid="credentials-page">CredentialsPage</div>,
+}))
+vi.mock('./pages/ApiTokensPage', () => ({
+  ApiTokensPage: () => <div data-testid="api-tokens-page">ApiTokensPage</div>,
+}))
+vi.mock('./pages/ModulesPage', () => ({
+  ModulesPage: () => <div data-testid="modules-page">ModulesPage</div>,
+}))
+vi.mock('./pages/BulkJobsPage', () => ({
+  BulkJobsPage: () => <div data-testid="bulk-jobs-page">BulkJobsPage</div>,
+}))
+vi.mock('./pages/DeduplicationPage', () => ({
+  DeduplicationPage: () => <div data-testid="deduplication-page">DeduplicationPage</div>,
+}))
+vi.mock('./pages/SetupHomePage', () => ({
+  SetupHomePage: () => <div data-testid="setup-home-page">SetupHomePage</div>,
+}))
+vi.mock('./pages/LoginPage', () => ({
+  LoginPage: () => <div data-testid="login-page">LoginPage</div>,
+}))
+vi.mock('./pages/UnauthorizedPage', () => ({
+  UnauthorizedPage: () => <div data-testid="unauthorized-page">UnauthorizedPage</div>,
+}))
+vi.mock('./pages/NotFoundPage', () => ({
+  NotFoundPage: () => <div data-testid="not-found-page">NotFoundPage</div>,
+}))
+vi.mock('./pages/ProfilesPage', () => ({
+  ProfilesPage: () => <div data-testid="profiles-page">ProfilesPage</div>,
+}))
+vi.mock('./pages/ProfileDetailPage', () => ({
+  ProfileDetailPage: () => <div data-testid="profile-detail-page">ProfileDetailPage</div>,
+}))
+vi.mock('./pages/LoginHistoryPage', () => ({
+  LoginHistoryPage: () => <div data-testid="login-history-page">LoginHistoryPage</div>,
+}))
+vi.mock('./pages/SecurityAuditPage', () => ({
+  SecurityAuditPage: () => <div data-testid="security-audit-page">SecurityAuditPage</div>,
+}))
+vi.mock('./pages/RequestLogPage', () => ({
+  RequestLogPage: () => <div data-testid="request-log-page">RequestLogPage</div>,
+}))
+vi.mock('./pages/RequestLogDetailPage', () => ({
+  RequestLogDetailPage: () => <div data-testid="request-log-detail-page">RequestLogDetailPage</div>,
+}))
+vi.mock('./pages/LogViewerPage', () => ({
+  LogViewerPage: () => <div data-testid="log-viewer-page">LogViewerPage</div>,
+}))
+vi.mock('./pages/ErrorDashboardPage', () => ({
+  ErrorDashboardPage: () => <div data-testid="error-dashboard-page">ErrorDashboardPage</div>,
+}))
+vi.mock('./pages/UserActivityPage', () => ({
+  UserActivityPage: () => <div data-testid="user-activity-page">UserActivityPage</div>,
+}))
+vi.mock('./pages/EndpointPerformancePage', () => ({
+  EndpointPerformancePage: () => (
+    <div data-testid="endpoint-performance-page">EndpointPerformancePage</div>
+  ),
+}))
+vi.mock('./pages/ObservabilitySettingsPage', () => ({
+  ObservabilitySettingsPage: () => (
+    <div data-testid="observability-settings-page">ObservabilitySettingsPage</div>
+  ),
+}))
+vi.mock('./pages/SearchSettingsPage', () => ({
+  SearchSettingsPage: () => <div data-testid="search-settings-page">SearchSettingsPage</div>,
+}))
+vi.mock('./pages/ConfigHealthPage', () => ({
+  ConfigHealthPage: () => <div data-testid="config-health-page">ConfigHealthPage</div>,
+}))
+vi.mock('./pages/SecuritySettingsPage/PasswordPolicyPanel', () => ({
+  PasswordPolicyPanel: () => <div data-testid="password-policy-page">PasswordPolicyPage</div>,
+}))
+vi.mock('./pages/SecuritySettingsPage/MfaPolicyPanel', () => ({
+  MfaPolicyPanel: () => <div data-testid="mfa-policy-page">MfaPolicyPage</div>,
+}))
+
 vi.mock('./pages', () => ({
   HomePage: () => <div data-testid="home-page">Home Page</div>,
   DashboardPage: () => <div data-testid="dashboard-page">Dashboard Page</div>,

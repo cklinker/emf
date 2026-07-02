@@ -21,7 +21,7 @@ function offlineWrapper(store: InMemoryOfflineStore) {
     return React.createElement(
       QueryClientProvider,
       { client: qc },
-      React.createElement(OfflineProvider, { store }, children)
+      React.createElement(OfflineProvider, { store, children })
     )
   }
 }

@@ -36,9 +36,12 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
-        // The app's main bundle is a few MB; raise the precache size limit so it's cached
-        // for offline use (default is 2 MiB). Code-splitting to shrink it is a separate task.
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        // Heavy admin pages (react-flow / recharts / dnd-kit) are route-split into their own
+        // lazy chunks, so the main bundle no longer carries them and the end-user PWA loads
+        // them only if those admin routes are visited. The remaining main chunk is still a
+        // few MB, so keep the precache limit above the default 2 MiB. Further lazy-loading of
+        // the remaining admin pages + excluding admin chunks from precache is a follow-up.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // SPA fallback to index.html for client routes, but never for backend paths.
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [

@@ -13,6 +13,7 @@ import { Outlet } from 'react-router-dom'
 import { TopNavBar } from './TopNavBar'
 import { GlobalSearch } from './GlobalSearch'
 import { OfflineIndicator } from './OfflineIndicator'
+import { OfflineProvider } from '@/offline'
 import { buildNavTabs } from './navTabs'
 import { useAuth } from '@/context/AuthContext'
 import { useConfig } from '@/context/ConfigContext'
@@ -68,7 +69,9 @@ export function EndUserShell(): React.ReactElement {
       />
       <OfflineIndicator />
       <main id="main-content" className="flex-1 overflow-auto" role="main" tabIndex={-1}>
-        <Outlet />
+        <OfflineProvider>
+          <Outlet />
+        </OfflineProvider>
       </main>
       <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </div>

@@ -7,6 +7,8 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
+import { useOffline } from '../offline'
+import type { ReplicaRecord } from '../offline'
 import { unwrapCollection } from '../utils/jsonapi'
 import type { ApiClient } from '../services/apiClient'
 
@@ -86,6 +88,69 @@ interface FetchRecordsParams {
 }
 
 /**
+ * Evaluate a single UI filter condition against a record value (best-effort,
+ * used only for the offline replica path — the server is authoritative online).
+ */
+function matchesFilter(value: unknown, filter: FilterCondition): boolean {
+  const target = filter.value
+  const asStr = value == null ? '' : String(value)
+  const numA = Number(value)
+  const numB = Number(target)
+  const bothNumeric = !Number.isNaN(numA) && !Number.isNaN(numB) && asStr.trim() !== ''
+  switch (filter.operator) {
+    case 'equals':
+      return asStr === target
+    case 'not_equals':
+      return asStr !== target
+    case 'contains':
+      return asStr.toLowerCase().includes(target.toLowerCase())
+    case 'starts_with':
+      return asStr.toLowerCase().startsWith(target.toLowerCase())
+    case 'ends_with':
+      return asStr.toLowerCase().endsWith(target.toLowerCase())
+    case 'greater_than':
+      return bothNumeric ? numA > numB : asStr > target
+    case 'less_than':
+      return bothNumeric ? numA < numB : asStr < target
+    case 'greater_than_or_equal':
+      return bothNumeric ? numA >= numB : asStr >= target
+    case 'less_than_or_equal':
+      return bothNumeric ? numA <= numB : asStr <= target
+    default:
+      return true
+  }
+}
+
+/**
+ * Apply sort/filter/paginate over the offline replica's cached rows.
+ * Best-effort parity with the server query; `total` reflects the cached subset.
+ */
+function queryReplica(rows: ReplicaRecord[], params: FetchRecordsParams): PaginatedResponse {
+  const { page, pageSize, sort, filters } = params
+
+  let result = rows
+  if (filters && filters.length > 0) {
+    result = result.filter((row) => filters.every((f) => matchesFilter(row[f.field], f)))
+  }
+  if (sort) {
+    const dir = sort.direction === 'desc' ? -1 : 1
+    result = [...result].sort((a, b) => {
+      const av = a[sort.field]
+      const bv = b[sort.field]
+      if (av == null && bv == null) return 0
+      if (av == null) return -dir
+      if (bv == null) return dir
+      return av < bv ? -dir : av > bv ? dir : 0
+    })
+  }
+
+  const total = result.length
+  const start = (page - 1) * pageSize
+  const pageRows = result.slice(start, start + pageSize)
+  return { data: pageRows as CollectionRecord[], total, page, pageSize }
+}
+
+/**
  * Build JSON:API query parameters and fetch records.
  */
 async function fetchRecords(
@@ -161,6 +226,7 @@ export function useCollectionRecords(
   options: UseCollectionRecordsOptions
 ): UseCollectionRecordsReturn {
   const { apiClient } = useApi()
+  const offline = useOffline()
   const {
     collectionName,
     page = 1,
@@ -171,22 +237,48 @@ export function useCollectionRecords(
     include,
   } = options
 
+  // undefined offline context (admin pages) ⇒ always treat as online.
+  const isOnline = offline?.online !== false
+
   const {
     data: response,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['collection-records', collectionName, page, pageSize, sort, filters, include],
-    queryFn: () =>
-      fetchRecords(apiClient, {
+    // `isOnline` is part of the key so a reconnect naturally re-runs the online path.
+    queryKey: [
+      'collection-records',
+      collectionName,
+      page,
+      pageSize,
+      sort,
+      filters,
+      include,
+      isOnline,
+    ],
+    queryFn: async () => {
+      const params: FetchRecordsParams = {
         collectionName: collectionName!,
         page,
         pageSize,
         sort,
         filters,
         include,
-      }),
+      }
+      // Offline: serve the local replica.
+      if (offline && !isOnline) {
+        const rows = await offline.store.getAll(collectionName!)
+        return queryReplica(rows, params)
+      }
+      // Online: fetch, then write-through into the replica for later offline reads.
+      const result = await fetchRecords(apiClient, params)
+      if (offline) {
+        offline.registerCollection(collectionName!)
+        await offline.store.putRecords(collectionName!, result.data as ReplicaRecord[])
+      }
+      return result
+    },
     enabled: !!collectionName && enabled,
     staleTime: 30 * 1000, // 30 seconds — record data changes more frequently
   })

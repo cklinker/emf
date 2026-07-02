@@ -90,6 +90,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(recordTypePicklists());
         definitions.add(validationRules());
         definitions.add(recordScripts());
+        definitions.add(recordShares());
 
         // Workflows & Automation
         definitions.add(scripts());
@@ -468,6 +469,32 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("order_sequence").withDefault(0))
             .addField(FieldDefinition.integer("timeoutSeconds")
                 .withColumnName("timeout_seconds").withDefault(5))
+            .build();
+    }
+
+    /**
+     * Manual per-record shares (Salesforce-style). A row grants a user or group an access
+     * level on a specific record. CRUD is served by the generic dynamic path
+     * ({@code /api/record-shares}); the record-detail Sharing panel manages these rows.
+     *
+     * <p>NOTE: this ships the share <em>store</em> + CRUD. Runtime <em>enforcement</em>
+     * (Cerbos/record-authz consulting shares to widen access) is a documented follow-up.
+     */
+    public static CollectionDefinition recordShares() {
+        return systemBuilder("record-shares", "Record Shares", "record_share")
+            .displayFieldName("recordId")
+            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
+                .withColumnName("collection_id"))
+            .addField(FieldDefinition.requiredString("recordId", 36).withColumnName("record_id"))
+            .addField(FieldDefinition.requiredString("sharedWithId", 36).withColumnName("shared_with_id"))
+            .addField(FieldDefinition.requiredString("sharedWithType", 20)
+                .withColumnName("shared_with_type")
+                .withEnumValues(List.of("USER", "GROUP")))
+            .addField(FieldDefinition.requiredString("accessLevel", 20)
+                .withColumnName("access_level")
+                .withDefault("READ")
+                .withEnumValues(List.of("READ", "EDIT")))
+            .addField(FieldDefinition.string("reason", 500))
             .build();
     }
 

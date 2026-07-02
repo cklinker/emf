@@ -58,76 +58,70 @@ import {
   BreadcrumbLink,
 } from './components/ui/breadcrumb'
 
-// Pages
-import {
-  AiSettingsPage,
-  EmailSettingsPage,
-  MapSettingsPage,
-  NetworkAccessPage,
-  DashboardPage,
-  CollectionsPage,
-  CollectionDetailPage,
-  CollectionFormPage,
-  CollectionWizardPage,
-  OIDCProvidersPage,
-  PageBuilderPage,
-  MenuBuilderPage,
-  PackagesPage,
-  MigrationsPage,
-  ResourceBrowserPage,
-  ResourceListPage,
-  ResourceDetailPage,
-  ResourceFormPage,
-  PluginsPage,
-  UsersPage,
-  UserDetailPage,
-  SetupAuditTrailPage,
-  GovernorLimitsPage,
-  TenantsPage,
-  TenantDashboardPage,
-  PicklistsPage,
-  AiAgentsPage,
-  PageLayoutsPage,
-  ListViewsPage,
-  AnalyticsPage,
-  ApprovalProcessesPage,
-  FlowsPage,
-  FlowDesignerPage,
-  ScheduledJobsPage,
-  EmailTemplatesPage,
-  CampaignsPage,
-  ScriptsPage,
-  WebhooksPage,
-  ApiSpecsPage,
-  ApiSpecDetailPage,
-  ConnectedAppsPage,
-  CredentialsPage,
-  ApiTokensPage,
-  ModulesPage,
-  BulkJobsPage,
-  DeduplicationPage,
-  SetupHomePage,
-  LoginPage,
-  UnauthorizedPage,
-  NotFoundPage,
-  ProfilesPage,
-  ProfileDetailPage,
-  LoginHistoryPage,
-  SecurityAuditPage,
-  RequestLogPage,
-  RequestLogDetailPage,
-  LogViewerPage,
-  ErrorDashboardPage,
-  UserActivityPage,
-  EndpointPerformancePage,
-  ObservabilitySettingsPage,
-  SearchSettingsPage,
-  MonitoringLayout,
-  MonitoringOverviewPage,
-  ConfigHealthPage,
-  PasswordPolicyPage,
-  MfaPolicyPage,
-} from './pages'
+// Admin/Setup pages (imported per-module, not via the barrel, so the eager barrel
+// graph doesn't drag the heavy lazy pages into the main chunk).
+import { AiSettingsPage } from './pages/AiSettingsPage'
+import { EmailSettingsPage } from './pages/EmailSettingsPage'
+import { MapSettingsPage } from './pages/MapSettingsPage'
+import { NetworkAccessPage } from './pages/NetworkAccessPage'
+import { DashboardPage } from './pages/DashboardPage'
+import { CollectionsPage } from './pages/CollectionsPage'
+import { CollectionDetailPage } from './pages/CollectionDetailPage'
+import { CollectionFormPage } from './pages/CollectionFormPage'
+import { CollectionWizardPage } from './pages/CollectionWizardPage'
+import { OIDCProvidersPage } from './pages/OIDCProvidersPage'
+import { MenuBuilderPage } from './pages/MenuBuilderPage'
+import { PackagesPage } from './pages/PackagesPage'
+import { MigrationsPage } from './pages/MigrationsPage'
+import { ResourceBrowserPage } from './pages/ResourceBrowserPage'
+import { ResourceListPage } from './pages/ResourceListPage'
+import { ResourceDetailPage } from './pages/ResourceDetailPage'
+import { ResourceFormPage } from './pages/ResourceFormPage'
+import { PluginsPage } from './pages/PluginsPage'
+import { UsersPage } from './pages/UsersPage'
+import { UserDetailPage } from './pages/UserDetailPage'
+import { SetupAuditTrailPage } from './pages/SetupAuditTrailPage'
+import { GovernorLimitsPage } from './pages/GovernorLimitsPage'
+import { TenantsPage } from './pages/TenantsPage'
+import { TenantDashboardPage } from './pages/TenantDashboardPage'
+import { PicklistsPage } from './pages/PicklistsPage'
+import { AiAgentsPage } from './pages/AiAgentsPage'
+import { PageLayoutsPage } from './pages/PageLayoutsPage'
+import { ListViewsPage } from './pages/ListViewsPage'
+import { AnalyticsPage } from './pages/AnalyticsPage'
+import { ApprovalProcessesPage } from './pages/ApprovalProcessesPage'
+import { FlowsPage } from './pages/FlowsPage'
+import { ScheduledJobsPage } from './pages/ScheduledJobsPage'
+import { EmailTemplatesPage } from './pages/EmailTemplatesPage'
+import { CampaignsPage } from './pages/CampaignsPage'
+import { ScriptsPage } from './pages/ScriptsPage'
+import { WebhooksPage } from './pages/WebhooksPage'
+import { ApiSpecsPage, ApiSpecDetailPage } from './pages/ApiSpecsPage'
+import { ConnectedAppsPage } from './pages/ConnectedAppsPage'
+import { CredentialsPage } from './pages/CredentialsPage'
+import { ApiTokensPage } from './pages/ApiTokensPage'
+import { ModulesPage } from './pages/ModulesPage'
+import { BulkJobsPage } from './pages/BulkJobsPage'
+import { DeduplicationPage } from './pages/DeduplicationPage'
+import { SetupHomePage } from './pages/SetupHomePage'
+import { LoginPage } from './pages/LoginPage'
+import { UnauthorizedPage } from './pages/UnauthorizedPage'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { ProfilesPage } from './pages/ProfilesPage'
+import { ProfileDetailPage } from './pages/ProfileDetailPage'
+import { LoginHistoryPage } from './pages/LoginHistoryPage'
+import { SecurityAuditPage } from './pages/SecurityAuditPage'
+import { RequestLogPage } from './pages/RequestLogPage'
+import { RequestLogDetailPage } from './pages/RequestLogDetailPage'
+import { LogViewerPage } from './pages/LogViewerPage'
+import { ErrorDashboardPage } from './pages/ErrorDashboardPage'
+import { UserActivityPage } from './pages/UserActivityPage'
+import { EndpointPerformancePage } from './pages/EndpointPerformancePage'
+import { ObservabilitySettingsPage } from './pages/ObservabilitySettingsPage'
+import { SearchSettingsPage } from './pages/SearchSettingsPage'
+import { ConfigHealthPage } from './pages/ConfigHealthPage'
+import { PasswordPolicyPanel as PasswordPolicyPage } from './pages/SecuritySettingsPage/PasswordPolicyPanel'
+import { MfaPolicyPanel as MfaPolicyPage } from './pages/SecuritySettingsPage/MfaPolicyPanel'
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
 
 // End-User Shell & Pages (lazy-loaded for code splitting)
@@ -154,6 +148,22 @@ const GlobalSearchPage = React.lazy(() =>
 )
 const EndUserCustomPage = React.lazy(() =>
   import('./pages/app/CustomPage/CustomPage').then((m) => ({ default: m.CustomPage }))
+)
+
+// Heavy admin pages — lazy-loaded so their large libraries (react-flow, recharts, dnd-kit)
+// split into their own chunks instead of bloating the main bundle the installable PWA
+// precaches. Rendered under the Suspense boundary in TenantRoutes.
+const PageBuilderPage = React.lazy(() =>
+  import('./pages/PageBuilderPage').then((m) => ({ default: m.PageBuilderPage }))
+)
+const FlowDesignerPage = React.lazy(() =>
+  import('./pages/FlowDesignerPage').then((m) => ({ default: m.FlowDesignerPage }))
+)
+const MonitoringLayout = React.lazy(() =>
+  import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringLayout }))
+)
+const MonitoringOverviewPage = React.lazy(() =>
+  import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringOverviewPage }))
 )
 
 // Types
@@ -477,783 +487,785 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
 function TenantRoutes(): React.ReactElement {
   const { tenantBasePath } = useTenant()
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="login" element={<LoginPage />} />
-      <Route path="unauthorized" element={<UnauthorizedPage />} />
+    <React.Suspense fallback={<PageLoader fullPage message="Loading..." />}>
+      <Routes>
+        {/* Public routes */}
+        <Route path="login" element={<LoginPage />} />
+        <Route path="unauthorized" element={<UnauthorizedPage />} />
 
-      {/* OAuth callback route */}
-      <Route path="auth/callback" element={<AuthCallbackPage />} />
+        {/* OAuth callback route */}
+        <Route path="auth/callback" element={<AuthCallbackPage />} />
 
-      {/* Root redirects to end-user app */}
-      <Route
-        path=""
-        element={
-          <ProtectedRoute
-            loginPath={`${tenantBasePath}/login`}
-            unauthorizedPath={`${tenantBasePath}/unauthorized`}
-          >
-            <Navigate to="app" replace />
-          </ProtectedRoute>
-        }
-      />
+        {/* Root redirects to end-user app */}
+        <Route
+          path=""
+          element={
+            <ProtectedRoute
+              loginPath={`${tenantBasePath}/login`}
+              unauthorizedPath={`${tenantBasePath}/unauthorized`}
+            >
+              <Navigate to="app" replace />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* System Health Dashboard */}
-      <Route
-        path="system-health"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <DashboardPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* System Health Dashboard */}
+        <Route
+          path="system-health"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_SETUP">
+                <DashboardPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Collections routes */}
-      <Route
-        path="collections"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <CollectionsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="collections/new"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <CollectionWizardPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="collections/:id"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <CollectionDetailPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="collections/:id/edit"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <CollectionFormPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* Collections routes */}
+        <Route
+          path="collections"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <CollectionsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="collections/new"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <CollectionWizardPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="collections/:id"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <CollectionDetailPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="collections/:id/edit"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <CollectionFormPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* OIDC Providers route */}
-      <Route
-        path="oidc-providers"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_CONNECTED_APPS">
-              <OIDCProvidersPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* OIDC Providers route */}
+        <Route
+          path="oidc-providers"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_CONNECTED_APPS">
+                <OIDCProvidersPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Workers route */}
-      {/* UI Builder routes */}
-      <Route
-        path="pages"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <PageBuilderPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="menus"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <MenuBuilderPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* Workers route */}
+        {/* UI Builder routes */}
+        <Route
+          path="pages"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <PageBuilderPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="menus"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <MenuBuilderPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Package Management route */}
-      <Route
-        path="packages"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <PackagesPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* Package Management route */}
+        <Route
+          path="packages"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <PackagesPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Migrations route */}
-      <Route
-        path="migrations"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <MigrationsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* Migrations route */}
+        <Route
+          path="migrations"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <MigrationsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Resource Browser routes */}
-      <Route
-        path="resources"
-        element={
-          <AdminPageRoute>
-            <ResourceBrowserPage />
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="resources/:collection"
-        element={
-          <AdminPageRoute>
-            <ResourceListPage />
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="resources/:collection/new"
-        element={
-          <AdminPageRoute>
-            <ResourceFormPage />
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="resources/:collection/:id"
-        element={
-          <AdminPageRoute>
-            <ResourceDetailPage />
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="resources/:collection/:id/edit"
-        element={
-          <AdminPageRoute>
-            <ResourceFormPage />
-          </AdminPageRoute>
-        }
-      />
+        {/* Resource Browser routes */}
+        <Route
+          path="resources"
+          element={
+            <AdminPageRoute>
+              <ResourceBrowserPage />
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="resources/:collection"
+          element={
+            <AdminPageRoute>
+              <ResourceListPage />
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="resources/:collection/new"
+          element={
+            <AdminPageRoute>
+              <ResourceFormPage />
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="resources/:collection/:id"
+          element={
+            <AdminPageRoute>
+              <ResourceDetailPage />
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="resources/:collection/:id/edit"
+          element={
+            <AdminPageRoute>
+              <ResourceFormPage />
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Picklists route */}
-      <Route
-        path="picklists"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <PicklistsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* Picklists route */}
+        <Route
+          path="picklists"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <PicklistsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* AI Agents route */}
-      <Route
-        path="ai-agents"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <AiAgentsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* AI Agents route */}
+        <Route
+          path="ai-agents"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <AiAgentsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Page Layouts route */}
-      <Route
-        path="layouts"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <PageLayoutsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* Page Layouts route */}
+        <Route
+          path="layouts"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <PageLayoutsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* List Views route */}
-      <Route
-        path="listviews"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_LISTVIEWS">
-              <ListViewsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* List Views route */}
+        <Route
+          path="listviews"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_LISTVIEWS">
+                <ListViewsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Analytics route (replaces Reports + Dashboards with Superset) */}
-      <Route
-        path="analytics"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_REPORTS">
-              <AnalyticsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* Analytics route (replaces Reports + Dashboards with Superset) */}
+        <Route
+          path="analytics"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_REPORTS">
+                <AnalyticsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Permanent backward-compat aliases for /reports and /dashboards.
+        {/* Permanent backward-compat aliases for /reports and /dashboards.
           The original ReportsPage and DashboardsPage components have been removed;
           both paths now render AnalyticsPage so external bookmarks keep working. */}
-      <Route
-        path="reports"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_REPORTS">
-              <AnalyticsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="dashboards"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_REPORTS">
-              <AnalyticsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        <Route
+          path="reports"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_REPORTS">
+                <AnalyticsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="dashboards"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_REPORTS">
+                <AnalyticsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Approval Processes route */}
-      <Route
-        path="approvals"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_APPROVALS">
-              <ApprovalProcessesPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
+        {/* Approval Processes route */}
+        <Route
+          path="approvals"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_APPROVALS">
+                <ApprovalProcessesPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
 
-      {/* Flows route */}
-      <Route
-        path="flows"
-        element={
-          <AdminPageRoute>
+        {/* Flows route */}
+        <Route
+          path="flows"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_WORKFLOWS">
+                <FlowsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Flow Designer route */}
+        <Route
+          path="flows/:flowId/design"
+          element={
             <RequirePermission permission="MANAGE_WORKFLOWS">
-              <FlowsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Flow Designer route */}
-      <Route
-        path="flows/:flowId/design"
-        element={
-          <RequirePermission permission="MANAGE_WORKFLOWS">
-            <FlowDesignerPage />
-          </RequirePermission>
-        }
-      />
-
-      {/* Modules route */}
-      <Route
-        path="modules"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_CONNECTED_APPS">
-              <ModulesPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Scheduled Jobs route */}
-      <Route
-        path="scheduled-jobs"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_WORKFLOWS">
-              <ScheduledJobsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Email Templates route */}
-      <Route
-        path="email-templates"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_EMAIL_TEMPLATES">
-              <EmailTemplatesPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Campaigns route */}
-      <Route
-        path="campaigns"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_CAMPAIGNS">
-              <CampaignsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Plugins route */}
-      <Route
-        path="plugins"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <PluginsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* User Management routes */}
-      <Route
-        path="users"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_USERS">
-              <UsersPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="users/:id"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_USERS">
-              <UserDetailPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Audit Trail route */}
-      <Route
-        path="audit-trail"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <SetupAuditTrailPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Security Management routes */}
-      <Route
-        path="profiles"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_USERS">
-              <ProfilesPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="profiles/:id"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_USERS">
-              <ProfileDetailPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="password-policy"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_USERS">
-              <PasswordPolicyPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="mfa-policy"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_USERS">
-              <MfaPolicyPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="login-history"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_USERS">
-              <LoginHistoryPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="security-audit"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_USERS">
-              <SecurityAuditPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Governor Limits route */}
-      <Route
-        path="governor-limits"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <GovernorLimitsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* AI Settings route (platform admin only) */}
-      <Route
-        path="ai-settings"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_TENANTS">
-              <AiSettingsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Email Settings route — tenant admins configure SMTP + From + templates */}
-      <Route
-        path="email-settings"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_TENANTS">
-              <EmailSettingsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Map Settings route — tenant admins configure Mapbox token + style */}
-      <Route
-        path="map-settings"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_TENANTS">
-              <MapSettingsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Network Access route — tenant admins configure the IP allowlist */}
-      <Route
-        path="network-access"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_TENANTS">
-              <NetworkAccessPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Monitoring hub — consolidated observability section */}
-      <Route
-        path="monitoring"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <MonitoringLayout />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      >
-        <Route index element={<Navigate to="overview" replace />} />
-        <Route path="overview" element={<MonitoringOverviewPage />} />
-        <Route path="requests" element={<RequestLogPage />} />
-        <Route path="requests/:traceId" element={<RequestLogDetailPage />} />
-        <Route path="logs" element={<LogViewerPage />} />
-        <Route path="errors" element={<ErrorDashboardPage />} />
-        <Route path="performance" element={<EndpointPerformancePage />} />
-        <Route path="activity" element={<UserActivityPage />} />
-        <Route path="health" element={<ConfigHealthPage />} />
-        <Route
-          path="settings"
-          element={
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <ObservabilitySettingsPage />
+              <FlowDesignerPage />
             </RequirePermission>
           }
         />
-      </Route>
 
-      {/* Legacy observability route redirects */}
-      <Route path="metrics" element={<Navigate to="monitoring/overview" replace />} />
-      <Route path="request-log" element={<Navigate to="monitoring/requests" replace />} />
-      <Route path="request-log/:traceId" element={<NavigateWithTraceId />} />
-      <Route path="logs" element={<Navigate to="monitoring/logs" replace />} />
-      <Route path="errors" element={<Navigate to="monitoring/errors" replace />} />
-      <Route
-        path="endpoint-performance"
-        element={<Navigate to="monitoring/performance" replace />}
-      />
-      <Route path="user-activity" element={<Navigate to="monitoring/activity" replace />} />
-      <Route
-        path="observability-settings"
-        element={<Navigate to="monitoring/settings" replace />}
-      />
-
-      {/* Tenant Management routes (platform admin) */}
-      <Route
-        path="tenants"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_TENANTS">
-              <TenantsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="tenant-dashboard"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <TenantDashboardPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Scripts route */}
-      <Route
-        path="scripts"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_CONNECTED_APPS">
-              <ScriptsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Webhooks route */}
-      <Route
-        path="webhooks"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_CONNECTED_APPS">
-              <WebhooksPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Connected Apps route */}
-      <Route
-        path="connected-apps"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_CONNECTED_APPS">
-              <ConnectedAppsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Credentials route — tenant-managed secrets used by flows */}
-      <Route
-        path="credentials"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_CREDENTIALS">
-              <CredentialsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* OpenAPI Spec Library — list + import */}
-      <Route
-        path="api-specs"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_API_SPECS">
-              <ApiSpecsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Spec detail — overview, operations browser, raw */}
-      <Route
-        path="api-specs/:specId"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_API_SPECS">
-              <ApiSpecDetailPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Bulk Jobs route */}
-      <Route
-        path="bulk-jobs"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_DATA">
-              <BulkJobsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Deduplication route */}
-      <Route
-        path="dedup"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_DATA">
-              <DeduplicationPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Search Settings route */}
-      <Route
-        path="search-settings"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="CUSTOMIZE_APPLICATION">
-              <SearchSettingsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Setup Home Page */}
-      <Route
-        path="setup"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <SetupHomePage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* ============================================
-       * END-USER RUNTIME (shadcn/Tailwind)
-       * All routes under /app use the EndUserShell
-       * with horizontal top nav bar.
-       * ============================================ */}
-      <Route
-        path="app"
-        element={
-          <ProtectedRoute
-            loginPath={`${tenantBasePath}/login`}
-            unauthorizedPath={`${tenantBasePath}/unauthorized`}
-          >
-            <EndUserShell />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="home" replace />} />
+        {/* Modules route */}
         <Route
-          path="home"
+          path="modules"
           element={
-            <React.Suspense fallback={<PageLoader message="Loading..." />}>
-              <AppHomePage />
-            </React.Suspense>
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_CONNECTED_APPS">
+                <ModulesPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Scheduled Jobs route */}
+        <Route
+          path="scheduled-jobs"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_WORKFLOWS">
+                <ScheduledJobsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Email Templates route */}
+        <Route
+          path="email-templates"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_EMAIL_TEMPLATES">
+                <EmailTemplatesPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Campaigns route */}
+        <Route
+          path="campaigns"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_CAMPAIGNS">
+                <CampaignsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Plugins route */}
+        <Route
+          path="plugins"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <PluginsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* User Management routes */}
+        <Route
+          path="users"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_USERS">
+                <UsersPage />
+              </RequirePermission>
+            </AdminPageRoute>
           }
         />
         <Route
-          path="o/:collection"
+          path="users/:id"
           element={
-            <React.Suspense fallback={<PageLoader message="Loading..." />}>
-              <EndUserObjectListPage />
-            </React.Suspense>
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_USERS">
+                <UserDetailPage />
+              </RequirePermission>
+            </AdminPageRoute>
           }
         />
-        <Route
-          path="o/:collection/new"
-          element={
-            <React.Suspense fallback={<PageLoader message="Loading..." />}>
-              <EndUserObjectFormPage />
-            </React.Suspense>
-          }
-        />
-        <Route
-          path="o/:collection/:id"
-          element={
-            <React.Suspense fallback={<PageLoader message="Loading..." />}>
-              <EndUserObjectDetailPage />
-            </React.Suspense>
-          }
-        />
-        <Route
-          path="o/:collection/:id/edit"
-          element={
-            <React.Suspense fallback={<PageLoader message="Loading..." />}>
-              <EndUserObjectFormPage />
-            </React.Suspense>
-          }
-        />
-        <Route
-          path="search"
-          element={
-            <React.Suspense fallback={<PageLoader message="Loading..." />}>
-              <GlobalSearchPage />
-            </React.Suspense>
-          }
-        />
-        <Route
-          path="p/:pageSlug"
-          element={
-            <React.Suspense fallback={<PageLoader message="Loading..." />}>
-              <EndUserCustomPage />
-            </React.Suspense>
-          }
-        />
-        <Route path="api-tokens" element={<ApiTokensPage />} />
-      </Route>
 
-      {/* 404 Not Found - catch all within tenant scope */}
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        {/* Audit Trail route */}
+        <Route
+          path="audit-trail"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_SETUP">
+                <SetupAuditTrailPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Security Management routes */}
+        <Route
+          path="profiles"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_USERS">
+                <ProfilesPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="profiles/:id"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_USERS">
+                <ProfileDetailPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="password-policy"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_USERS">
+                <PasswordPolicyPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="mfa-policy"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_USERS">
+                <MfaPolicyPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="login-history"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_USERS">
+                <LoginHistoryPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="security-audit"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_USERS">
+                <SecurityAuditPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Governor Limits route */}
+        <Route
+          path="governor-limits"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_SETUP">
+                <GovernorLimitsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* AI Settings route (platform admin only) */}
+        <Route
+          path="ai-settings"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_TENANTS">
+                <AiSettingsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Email Settings route — tenant admins configure SMTP + From + templates */}
+        <Route
+          path="email-settings"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_TENANTS">
+                <EmailSettingsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Map Settings route — tenant admins configure Mapbox token + style */}
+        <Route
+          path="map-settings"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_TENANTS">
+                <MapSettingsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Network Access route — tenant admins configure the IP allowlist */}
+        <Route
+          path="network-access"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_TENANTS">
+                <NetworkAccessPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Monitoring hub — consolidated observability section */}
+        <Route
+          path="monitoring"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_SETUP">
+                <MonitoringLayout />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        >
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<MonitoringOverviewPage />} />
+          <Route path="requests" element={<RequestLogPage />} />
+          <Route path="requests/:traceId" element={<RequestLogDetailPage />} />
+          <Route path="logs" element={<LogViewerPage />} />
+          <Route path="errors" element={<ErrorDashboardPage />} />
+          <Route path="performance" element={<EndpointPerformancePage />} />
+          <Route path="activity" element={<UserActivityPage />} />
+          <Route path="health" element={<ConfigHealthPage />} />
+          <Route
+            path="settings"
+            element={
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <ObservabilitySettingsPage />
+              </RequirePermission>
+            }
+          />
+        </Route>
+
+        {/* Legacy observability route redirects */}
+        <Route path="metrics" element={<Navigate to="monitoring/overview" replace />} />
+        <Route path="request-log" element={<Navigate to="monitoring/requests" replace />} />
+        <Route path="request-log/:traceId" element={<NavigateWithTraceId />} />
+        <Route path="logs" element={<Navigate to="monitoring/logs" replace />} />
+        <Route path="errors" element={<Navigate to="monitoring/errors" replace />} />
+        <Route
+          path="endpoint-performance"
+          element={<Navigate to="monitoring/performance" replace />}
+        />
+        <Route path="user-activity" element={<Navigate to="monitoring/activity" replace />} />
+        <Route
+          path="observability-settings"
+          element={<Navigate to="monitoring/settings" replace />}
+        />
+
+        {/* Tenant Management routes (platform admin) */}
+        <Route
+          path="tenants"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_TENANTS">
+                <TenantsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="tenant-dashboard"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_SETUP">
+                <TenantDashboardPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Scripts route */}
+        <Route
+          path="scripts"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_CONNECTED_APPS">
+                <ScriptsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Webhooks route */}
+        <Route
+          path="webhooks"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_CONNECTED_APPS">
+                <WebhooksPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Connected Apps route */}
+        <Route
+          path="connected-apps"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_CONNECTED_APPS">
+                <ConnectedAppsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Credentials route — tenant-managed secrets used by flows */}
+        <Route
+          path="credentials"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_CREDENTIALS">
+                <CredentialsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* OpenAPI Spec Library — list + import */}
+        <Route
+          path="api-specs"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_API_SPECS">
+                <ApiSpecsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Spec detail — overview, operations browser, raw */}
+        <Route
+          path="api-specs/:specId"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_API_SPECS">
+                <ApiSpecDetailPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Bulk Jobs route */}
+        <Route
+          path="bulk-jobs"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_DATA">
+                <BulkJobsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Deduplication route */}
+        <Route
+          path="dedup"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_DATA">
+                <DeduplicationPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Search Settings route */}
+        <Route
+          path="search-settings"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <SearchSettingsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Setup Home Page */}
+        <Route
+          path="setup"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_SETUP">
+                <SetupHomePage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* ============================================
+         * END-USER RUNTIME (shadcn/Tailwind)
+         * All routes under /app use the EndUserShell
+         * with horizontal top nav bar.
+         * ============================================ */}
+        <Route
+          path="app"
+          element={
+            <ProtectedRoute
+              loginPath={`${tenantBasePath}/login`}
+              unauthorizedPath={`${tenantBasePath}/unauthorized`}
+            >
+              <EndUserShell />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="home" replace />} />
+          <Route
+            path="home"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <AppHomePage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="o/:collection"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserObjectListPage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="o/:collection/new"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserObjectFormPage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="o/:collection/:id"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserObjectDetailPage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="o/:collection/:id/edit"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserObjectFormPage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="search"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <GlobalSearchPage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="p/:pageSlug"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserCustomPage />
+              </React.Suspense>
+            }
+          />
+          <Route path="api-tokens" element={<ApiTokensPage />} />
+        </Route>
+
+        {/* 404 Not Found - catch all within tenant scope */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </React.Suspense>
   )
 }
 

@@ -138,6 +138,42 @@ public class CsvImportService {
         return new ImportResult(dataRowCount, imported, errors);
     }
 
+    /**
+     * Parses CSV into raw, header-keyed string records — no field coercion or validation.
+     *
+     * <p>Used by the bulk-job file-upload path: the resulting records are queued and each is
+     * written through the normal create/update path (which coerces + validates per field and
+     * records per-row errors), so this method stays collection-agnostic. Blank rows and blank
+     * header columns are skipped. Values are strings; use a JSON upload for pre-typed values.
+     *
+     * @param csvStream the CSV input
+     * @return one map per data row, keyed by trimmed header name
+     */
+    public List<Map<String, Object>> parseCsvToRecords(InputStream csvStream) throws IOException {
+        List<String[]> rows = parseCsv(csvStream);
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        String[] headers = rows.get(0);
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (int i = 1; i < rows.size(); i++) {
+            String[] cells = rows.get(i);
+            if (isBlankRow(cells)) {
+                continue;
+            }
+            Map<String, Object> record = new LinkedHashMap<>();
+            for (int c = 0; c < headers.length; c++) {
+                String key = headers[c].trim();
+                if (key.isBlank()) {
+                    continue;
+                }
+                record.put(key, c < cells.length ? cells[c].trim() : "");
+            }
+            records.add(record);
+        }
+        return records;
+    }
+
     // =========================================================================
     // CSV parsing (RFC 4180)
     // =========================================================================

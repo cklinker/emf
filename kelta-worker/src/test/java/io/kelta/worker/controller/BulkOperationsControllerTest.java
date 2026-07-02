@@ -2,6 +2,7 @@ package io.kelta.worker.controller;
 
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.worker.repository.BulkJobRepository;
+import io.kelta.worker.service.CsvImportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -12,7 +13,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +32,8 @@ class BulkOperationsControllerTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
+    private CsvImportService csvImportService;
+
     private BulkOperationsController controller;
 
     private static final String TENANT_ID = "tenant-1";
@@ -37,7 +43,9 @@ class BulkOperationsControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new BulkOperationsController(bulkJobRepository, new ObjectMapper(), jdbcTemplate);
+        csvImportService = mock(CsvImportService.class);
+        controller = new BulkOperationsController(bulkJobRepository, new ObjectMapper(), jdbcTemplate,
+                csvImportService);
     }
 
     @SuppressWarnings("unchecked")
@@ -430,6 +438,73 @@ class BulkOperationsControllerTest {
             ResponseEntity<Map<String, Object>> response = controller.abortJob(JOB_ID, TENANT_ID, USER_EMAIL);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+    }
+
+    @Nested
+    @DisplayName("uploadJob (file)")
+    class UploadJob {
+
+        private void stubCollectionExistsAndCreate() {
+            when(jdbcTemplate.queryForList(anyString(), eq(COLLECTION_ID), eq(TENANT_ID)))
+                    .thenReturn(List.of(Map.of("id", COLLECTION_ID)));
+            when(bulkJobRepository.create(anyString(), anyString(), anyString(),
+                    anyString(), anyInt(), any(), anyString(), anyString(), any(), anyInt()))
+                    .thenReturn(JOB_ID);
+        }
+
+        @Test
+        @DisplayName("queues a job from a JSON file")
+        void jsonUpload() {
+            stubCollectionExistsAndCreate();
+            MultipartFile file = new MockMultipartFile("file", "data.json", "application/json",
+                    "[{\"name\":\"A\"},{\"name\":\"B\"}]".getBytes(StandardCharsets.UTF_8));
+
+            ResponseEntity<Map<String, Object>> response = controller.uploadJob(
+                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(getAttributes(response.getBody())).containsEntry("totalRecords", 2);
+        }
+
+        @Test
+        @DisplayName("queues a job from a CSV file (parsed via CsvImportService)")
+        void csvUpload() throws Exception {
+            stubCollectionExistsAndCreate();
+            when(csvImportService.parseCsvToRecords(any())).thenReturn(List.of(
+                    Map.of("name", "A"), Map.of("name", "B"), Map.of("name", "C")));
+            MultipartFile file = new MockMultipartFile("file", "data.csv", "text/csv",
+                    "name\nA\nB\nC".getBytes(StandardCharsets.UTF_8));
+
+            ResponseEntity<Map<String, Object>> response = controller.uploadJob(
+                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(getAttributes(response.getBody())).containsEntry("totalRecords", 3);
+        }
+
+        @Test
+        @DisplayName("rejects an empty file with 400")
+        void emptyFile() {
+            MultipartFile file = new MockMultipartFile("file", "data.csv", "text/csv", new byte[0]);
+
+            ResponseEntity<Map<String, Object>> response = controller.uploadJob(
+                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            verifyNoInteractions(bulkJobRepository);
+        }
+
+        @Test
+        @DisplayName("rejects an invalid operation with 400")
+        void invalidOperation() {
+            MultipartFile file = new MockMultipartFile("file", "data.json", "application/json",
+                    "[{\"name\":\"A\"}]".getBytes(StandardCharsets.UTF_8));
+
+            ResponseEntity<Map<String, Object>> response = controller.uploadJob(
+                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "FROB", null, null);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 }

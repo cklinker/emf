@@ -5,7 +5,15 @@ at the bottom so reviewers can see what's already been addressed.
 
 ## Security Risks
 
-(No open application-layer issues. See Resolved → Security for the prior list.)
+**Power controllers gated only by blanket `API_ACCESS` + RLS (2026-07-02 audit).**
+`ReportExecutionController`, `DashboardDataController`, `BulkOperationsController`, and
+`PackageController` do **not** enforce a specific system permission in-controller — they
+rely on tenant-scoping (RLS) plus the gateway's blanket `API_ACCESS` check and the fact
+that their UIs sit behind `VIEW_SETUP` nav. A PAT holder with only `API_ACCESS` can call
+them directly. `DataExportController` was the most exfiltration-sensitive (one call →
+whole-tenant dump) and is now gated on `VIEW_ALL_DATA` (2026-07-02); the others should get
+matching in-controller gates (`MANAGE_REPORTS` for reports/dashboards, `MANAGE_DATA` for
+bulk, `CUSTOMIZE_APPLICATION`/`VIEW_SETUP` for packages). Follow-up, not yet done.
 
 **Network-level defense-in-depth** (out of tree):
 - Worker, auth, ai pods reachable only via gateway in production. Pod-to-pod

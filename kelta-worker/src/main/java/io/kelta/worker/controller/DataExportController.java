@@ -1,8 +1,11 @@
 package io.kelta.worker.controller;
 
 import io.kelta.jsonapi.JsonApiResponseBuilder;
+import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.repository.DataExportRepository;
+import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.DataExportService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -10,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
@@ -31,13 +35,41 @@ public class DataExportController {
     private static final Set<String> VALID_FORMATS = Set.of("CSV", "JSON");
     private static final Set<String> VALID_SCOPES = Set.of("FULL", "SELECTIVE");
 
+    /**
+     * Bulk data export is a whole-tenant read (one call can serialize every record in every
+     * collection to a downloadable file), so it is gated on {@code VIEW_ALL_DATA} — the same
+     * "read everything" authority required to see the data by other means. The gateway only
+     * applies the blanket {@code API_ACCESS} check to {@code /api/*} routes, so the specific
+     * permission must be enforced here (see kelta-worker/CLAUDE.md → Authorization).
+     */
+    private static final String EXPORT_PERMISSION = "VIEW_ALL_DATA";
+
     private final DataExportService dataExportService;
     private final DataExportRepository dataExportRepository;
+    private final CerbosPermissionResolver permissionResolver;
+    private final BootstrapRepository bootstrapRepository;
 
     public DataExportController(DataExportService dataExportService,
-                                DataExportRepository dataExportRepository) {
+                                DataExportRepository dataExportRepository,
+                                CerbosPermissionResolver permissionResolver,
+                                BootstrapRepository bootstrapRepository) {
         this.dataExportService = dataExportService;
         this.dataExportRepository = dataExportRepository;
+        this.permissionResolver = permissionResolver;
+        this.bootstrapRepository = bootstrapRepository;
+    }
+
+    private void requireExportPermission(HttpServletRequest request) {
+        String profileId = permissionResolver.getProfileId(request);
+        if (profileId == null || profileId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No identity");
+        }
+        boolean granted = bootstrapRepository.findProfileSystemPermissions(profileId).stream()
+                .anyMatch(p -> EXPORT_PERMISSION.equals(p.get("permission_name"))
+                        && Boolean.TRUE.equals(p.get("granted")));
+        if (!granted) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, EXPORT_PERMISSION + " permission required");
+        }
     }
 
     /**
@@ -48,7 +80,10 @@ public class DataExportController {
     public ResponseEntity<Map<String, Object>> createExport(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestHeader("X-User-Email") String userEmail,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body,
+            HttpServletRequest request) {
+
+        requireExportPermission(request);
 
         String name = (String) body.get("name");
         String description = (String) body.get("description");
@@ -120,7 +155,10 @@ public class DataExportController {
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getExport(
             @PathVariable String id,
-            @RequestHeader("X-Tenant-ID") String tenantId) {
+            @RequestHeader("X-Tenant-ID") String tenantId,
+            HttpServletRequest request) {
+
+        requireExportPermission(request);
 
         Optional<Map<String, Object>> exportOpt = dataExportRepository.findByIdAndTenant(id, tenantId);
         if (exportOpt.isEmpty()) {
@@ -138,7 +176,10 @@ public class DataExportController {
     public ResponseEntity<Map<String, Object>> listExports(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestParam(defaultValue = "20") int limit,
-            @RequestParam(defaultValue = "0") int offset) {
+            @RequestParam(defaultValue = "0") int offset,
+            HttpServletRequest request) {
+
+        requireExportPermission(request);
 
         int effectiveLimit = Math.min(Math.max(limit, 1), 100);
         int effectiveOffset = Math.max(offset, 0);
@@ -169,7 +210,10 @@ public class DataExportController {
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> downloadExport(
             @PathVariable String id,
-            @RequestHeader("X-Tenant-ID") String tenantId) {
+            @RequestHeader("X-Tenant-ID") String tenantId,
+            HttpServletRequest request) {
+
+        requireExportPermission(request);
 
         Optional<Map<String, Object>> exportOpt = dataExportRepository.findByIdAndTenant(id, tenantId);
         if (exportOpt.isEmpty()) {
@@ -216,7 +260,10 @@ public class DataExportController {
     public ResponseEntity<Map<String, Object>> cancelExport(
             @PathVariable String id,
             @RequestHeader("X-Tenant-ID") String tenantId,
-            @RequestHeader("X-User-Email") String userEmail) {
+            @RequestHeader("X-User-Email") String userEmail,
+            HttpServletRequest request) {
+
+        requireExportPermission(request);
 
         int updated = dataExportRepository.cancel(id, tenantId);
         if (updated == 0) {

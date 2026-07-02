@@ -205,6 +205,7 @@ public class RouteConfigService {
                 {"dashboards", "/api/dashboards/**", "dashboards"},
                 {"superset", "/api/superset/**", "superset"},
                 {"bulk-jobs", "/api/bulk-jobs/**", "bulk-jobs"},
+                {"data-exports", "/api/data-exports/**", "data-exports"},
                 {"migration-runs", "/api/migration-runs/**", "migration-runs"},
                 // ALM & governance
                 {"metadata", "/api/metadata/**", "metadata"},

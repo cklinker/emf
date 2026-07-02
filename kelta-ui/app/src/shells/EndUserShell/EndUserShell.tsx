@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { TopNavBar } from './TopNavBar'
 import { GlobalSearch } from './GlobalSearch'
+import { OfflineIndicator } from './OfflineIndicator'
 import { buildNavTabs } from './navTabs'
 import { useAuth } from '@/context/AuthContext'
 import { useConfig } from '@/context/ConfigContext'
@@ -65,6 +66,7 @@ export function EndUserShell(): React.ReactElement {
         onSearchOpen={() => setSearchOpen(true)}
         notificationCount={0}
       />
+      <OfflineIndicator />
       <main id="main-content" className="flex-1 overflow-auto" role="main" tabIndex={-1}>
         <Outlet />
       </main>

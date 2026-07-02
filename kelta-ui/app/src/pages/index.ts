@@ -185,6 +185,10 @@ export type { ScheduledJobsPageProps } from './ScheduledJobsPage'
 export { EmailTemplatesPage } from './EmailTemplatesPage'
 export type { EmailTemplatesPageProps } from './EmailTemplatesPage'
 
+// CampaignsPage - Email campaigns management page
+export { CampaignsPage } from './CampaignsPage'
+export type { CampaignsPageProps } from './CampaignsPage'
+
 // ScriptsPage - Server-side scripts management page
 export { ScriptsPage } from './ScriptsPage'
 export type { ScriptsPageProps } from './ScriptsPage'

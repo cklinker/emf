@@ -95,6 +95,7 @@ import {
   FlowDesignerPage,
   ScheduledJobsPage,
   EmailTemplatesPage,
+  CampaignsPage,
   ScriptsPage,
   WebhooksPage,
   ApiSpecsPage,
@@ -800,6 +801,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_EMAIL_TEMPLATES">
               <EmailTemplatesPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Campaigns route */}
+      <Route
+        path="campaigns"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_CAMPAIGNS">
+              <CampaignsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

@@ -41,6 +41,8 @@ public final class TenantTierQuotas {
     public static final String KEY_MAX_REPORTS = "maxReports";
     public static final String KEY_AI_TOKENS_PER_MONTH = "aiTokensPerMonth";
     public static final String KEY_AI_ENABLED = "aiEnabled";
+    /** Max campaign emails a tenant may send per calendar day (spam-rate governor). */
+    public static final String KEY_CAMPAIGN_EMAILS_PER_DAY = "campaignEmailsPerDay";
 
     private TenantTierQuotas() {}
 
@@ -58,6 +60,7 @@ public final class TenantTierQuotas {
                 q.put(KEY_MAX_REPORTS, 10);
                 q.put(KEY_AI_TOKENS_PER_MONTH, 100_000L);
                 q.put(KEY_AI_ENABLED, false);
+                q.put(KEY_CAMPAIGN_EMAILS_PER_DAY, 500);
             }
             case PROFESSIONAL -> {
                 q.put(KEY_API_CALLS_PER_DAY, 100_000);
@@ -69,6 +72,7 @@ public final class TenantTierQuotas {
                 q.put(KEY_MAX_REPORTS, 200);
                 q.put(KEY_AI_TOKENS_PER_MONTH, 1_000_000L);
                 q.put(KEY_AI_ENABLED, true);
+                q.put(KEY_CAMPAIGN_EMAILS_PER_DAY, 50_000);
             }
             case ENTERPRISE -> {
                 q.put(KEY_API_CALLS_PER_DAY, 1_000_000);
@@ -80,6 +84,7 @@ public final class TenantTierQuotas {
                 q.put(KEY_MAX_REPORTS, 2_000);
                 q.put(KEY_AI_TOKENS_PER_MONTH, 10_000_000L);
                 q.put(KEY_AI_ENABLED, true);
+                q.put(KEY_CAMPAIGN_EMAILS_PER_DAY, 500_000);
             }
             case UNLIMITED -> {
                 q.put(KEY_API_CALLS_PER_DAY, Integer.MAX_VALUE);
@@ -91,6 +96,7 @@ public final class TenantTierQuotas {
                 q.put(KEY_MAX_REPORTS, Integer.MAX_VALUE);
                 q.put(KEY_AI_TOKENS_PER_MONTH, Long.MAX_VALUE);
                 q.put(KEY_AI_ENABLED, true);
+                q.put(KEY_CAMPAIGN_EMAILS_PER_DAY, Integer.MAX_VALUE);
             }
         }
         return q;

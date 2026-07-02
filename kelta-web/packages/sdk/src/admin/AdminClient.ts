@@ -82,6 +82,11 @@ import type {
   EmailTemplate,
   EmailLog,
   CreateEmailTemplateRequest,
+  Campaign,
+  CampaignStats,
+  CampaignRecipient,
+  EmailSuppression,
+  CreateCampaignRequest,
   WorkflowRule,
   WorkflowExecutionLog,
   CreateWorkflowRuleRequest,
@@ -1536,6 +1541,101 @@ export class AdminClient {
     listLogs: async (_tenantId?: string, _status?: string): Promise<EmailLog[]> => {
       const response = await this.axios.get('/api/email-logs');
       return unwrapJsonApiList<EmailLog>(response.data);
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Email campaigns (admin API)
+  // ---------------------------------------------------------------------------
+
+  readonly campaigns = {
+    list: async (limit?: number, offset?: number): Promise<Campaign[]> => {
+      const params: Record<string, number> = {};
+      if (limit !== undefined) params.limit = limit;
+      if (offset !== undefined) params.offset = offset;
+      const response = await this.axios.get('/api/admin/campaigns', { params });
+      return unwrapJsonApiList<Campaign>(response.data);
+    },
+
+    get: async (id: string): Promise<Campaign> => {
+      const response = await this.axios.get(`/api/admin/campaigns/${id}`);
+      return unwrapJsonApiResource<Campaign>(response.data);
+    },
+
+    create: async (request: CreateCampaignRequest): Promise<Campaign> => {
+      const body = toJsonApiBody('campaigns', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/admin/campaigns', body);
+      return unwrapJsonApiResource<Campaign>(response.data);
+    },
+
+    update: async (id: string, request: Partial<CreateCampaignRequest>): Promise<Campaign> => {
+      const body = toJsonApiBody('campaigns', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/admin/campaigns/${id}`, body);
+      return unwrapJsonApiResource<Campaign>(response.data);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/api/admin/campaigns/${id}`);
+    },
+
+    send: async (id: string): Promise<{ status: string }> => {
+      const response = await this.axios.post(`/api/admin/campaigns/${id}/send`);
+      return response.data as { status: string };
+    },
+
+    schedule: async (id: string, scheduledAt: string): Promise<{ status: string }> => {
+      const response = await this.axios.post(`/api/admin/campaigns/${id}/schedule`, {
+        scheduledAt,
+      });
+      return response.data as { status: string };
+    },
+
+    cancel: async (id: string): Promise<{ status: string }> => {
+      const response = await this.axios.post(`/api/admin/campaigns/${id}/cancel`);
+      return response.data as { status: string };
+    },
+
+    stats: async (id: string): Promise<CampaignStats> => {
+      const response = await this.axios.get(`/api/admin/campaigns/${id}/stats`);
+      return (response.data as { data: CampaignStats }).data;
+    },
+
+    recipients: async (
+      id: string,
+      limit?: number,
+      offset?: number
+    ): Promise<CampaignRecipient[]> => {
+      const params: Record<string, number> = {};
+      if (limit !== undefined) params.limit = limit;
+      if (offset !== undefined) params.offset = offset;
+      const response = await this.axios.get(`/api/admin/campaigns/${id}/recipients`, { params });
+      return unwrapJsonApiList<CampaignRecipient>(response.data);
+    },
+
+    test: async (id: string, email: string): Promise<void> => {
+      await this.axios.post(`/api/admin/campaigns/${id}/test`, { email });
+    },
+
+    listSuppressions: async (limit?: number, offset?: number): Promise<EmailSuppression[]> => {
+      const params: Record<string, number> = {};
+      if (limit !== undefined) params.limit = limit;
+      if (offset !== undefined) params.offset = offset;
+      const response = await this.axios.get('/api/admin/campaigns/suppressions', { params });
+      return unwrapJsonApiList<EmailSuppression>(response.data);
+    },
+
+    addSuppression: async (email: string, reason?: string): Promise<EmailSuppression> => {
+      const response = await this.axios.post('/api/admin/campaigns/suppressions', {
+        email,
+        ...(reason !== undefined ? { reason } : {}),
+      });
+      return unwrapJsonApiResource<EmailSuppression>(response.data);
+    },
+
+    removeSuppression: async (email: string): Promise<void> => {
+      await this.axios.delete('/api/admin/campaigns/suppressions', {
+        params: { email },
+      });
     },
   };
 

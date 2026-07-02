@@ -76,6 +76,18 @@ kelta:
     from-address: ${EMAIL_FROM_ADDRESS:noreply@kelta.io}
     from-name: ${EMAIL_FROM_NAME:Kelta Platform}
     enabled: ${EMAIL_ENABLED:true}
+  campaigns:
+    runner-enabled: ${CAMPAIGN_RUNNER_ENABLED:true}
+    poll-interval-ms: ${CAMPAIGN_POLL_INTERVAL_MS:15000}
+    batch-size: ${CAMPAIGN_BATCH_SIZE:5}
+    # Per-campaign delivery throttle (recipients/second) — spam-rate control.
+    send-rate-per-second: ${CAMPAIGN_SEND_RATE_PER_SECOND:20}
+    # Fallback daily cap when no per-tenant campaignEmailsPerDay governor limit is set.
+    daily-send-limit: ${CAMPAIGN_DAILY_SEND_LIMIT:50000}
+    # Public base URL for open-pixel / click-redirect / unsubscribe links (must be reachable).
+    tracking-base-url: ${CAMPAIGN_TRACKING_BASE_URL:${EXTERNAL_BASE_URL:http://localhost:8080}}
+    # HMAC signing secret for tracking tokens — MUST be overridden in every deployment.
+    tracking-secret: ${CAMPAIGN_TRACKING_SECRET:}
   internal:
     token: ${KELTA_INTERNAL_TOKEN:}
   scheduler:

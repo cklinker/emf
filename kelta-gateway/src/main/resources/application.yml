@@ -102,8 +102,9 @@ kelta:
       # Matched as prefixes against the slug-stripped path.
       public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
       # Paths accessible without authentication for ALL HTTP methods.
-      # Used for endpoints receiving data from unauthenticated sources (e.g., browser OTEL SDK).
-      unauthenticated-paths: /otel,/api/webhooks,/scim
+      # Used for endpoints receiving data from unauthenticated sources (e.g., browser OTEL SDK,
+      # campaign open-pixel / click-redirect / unsubscribe links authenticated by HMAC token).
+      unauthenticated-paths: /otel,/api/webhooks,/scim,/api/track
 
 # Actuator configuration for health and metrics
 management:

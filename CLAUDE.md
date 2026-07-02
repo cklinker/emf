@@ -142,7 +142,7 @@ visual system.
 | Frontend | React | 19.2 | `kelta-ui/app/package.json` |
 | Frontend build | Vite / Vitest | web 5.1/1.3, ui 7.2/4.0 | package.json (npm, Node 18 in CI) |
 | E2E | Playwright | 1.50 | `e2e-tests/package.json` |
-| Migrations | Flyway | head **V148**, next **V149** | `kelta-worker/.../db/migration/` |
+| Migrations | Flyway | head **V152**, next **V153** | `kelta-worker/.../db/migration/` |
 
 Check the relevant `pom.xml` / `package.json` for exact current versions before pinning.
 
@@ -243,7 +243,7 @@ Java tests: surefire runs `*Test`/`*Tests`/`*Properties` in parallel; failsafe r
 ## Database Migrations
 
 - Location: `kelta-worker/src/main/resources/db/migration/`
-- Naming: `V<n>__<snake_description>.sql`. **Head is V148; next new migration is V149.**
+- Naming: `V<n>__<snake_description>.sql`. **Head is V152; next new migration is V153.**
   Check the directory for the true highest number before creating one — never reuse/skip.
 - Flyway runs at worker startup. Migrations execute under the platform sentinel tenant.
 

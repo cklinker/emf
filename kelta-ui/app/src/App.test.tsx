@@ -255,6 +255,7 @@ vi.mock('./components/ProtectedRoute', () => ({
 vi.mock('./pages', () => ({
   HomePage: () => <div data-testid="home-page">Home Page</div>,
   DashboardPage: () => <div data-testid="dashboard-page">Dashboard Page</div>,
+  DeduplicationPage: () => <div data-testid="deduplication-page">Deduplication Page</div>,
   CollectionsPage: () => <div data-testid="collections-page">Collections Page</div>,
   CollectionDetailPage: () => (
     <div data-testid="collection-detail-page">Collection Detail Page</div>

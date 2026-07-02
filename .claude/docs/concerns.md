@@ -30,6 +30,17 @@ whole-tenant dump) and is now gated on `VIEW_ALL_DATA` (2026-07-02); the others 
 matching in-controller gates (`MANAGE_REPORTS` for reports/dashboards, `MANAGE_DATA` for
 bulk, `CUSTOMIZE_APPLICATION`/`VIEW_SETUP` for packages). Follow-up, not yet done.
 
+**Record merge write path — field-level write-FLS not applied (accepted trade-off).**
+`RecordMergeController` (`POST /api/collections/{name}/merge`) applies the master's
+`fieldOverrides` and re-parents children by calling the `QueryEngine` **from the service
+layer**, so the controller-advice `CerbosFieldWriteSecurityAdvice` (per-field write-FLS) does
+**not** run — the same shape as `DuplicateDetectionService`'s read path. The security boundary
+is the in-controller `MANAGE_DATA` gate (a bulk data-management authority) plus RLS + record
+validation/before-save hooks (which *do* fire through the `QueryEngine`). A `MANAGE_DATA` holder
+can therefore set an override on a field they'd be denied at the field level via the normal PATCH
+route. Acceptable because merge is an all-or-nothing data-admin operation, but revisit if merge is
+ever exposed to a lower-privilege role. It is deliberately **not** auto-invoked by any flow.
+
 **Network-level defense-in-depth** (out of tree):
 - Worker, auth, ai pods reachable only via gateway in production. Pod-to-pod
   bypass mitigated by K8s NetworkPolicy + service-mesh mTLS, not by app code.
@@ -95,6 +106,7 @@ for removal ("inline the current value"). Findings:
 
 ## Fragile Areas
 
+- **Destructive schema-migration execute** (`MigrationExecutionService` + `SchemaMigrationEngine.migrateSchemaDestructive`): the only path that physically `DROP COLUMN`s live tenant data. It applies DDL, then re-registers the local `CollectionRegistry` with the target def and broadcasts `kelta.config.collection.changed`. On the originating pod this is exact (direct `register(target)`, no re-migrate). **Other pods** react to the broadcast via `refreshCollection`, which reloads the target from the `field` table (correct) but *also* calls `updateCollectionSchema` → the non-destructive `migrateSchema`, which tries to **deprecate** the just-removed column via `COMMENT ON COLUMN`. Because the column is already dropped in the shared DB, that COMMENT fails — but `refreshCollection` swallows the error after it has already re-registered the target def, so all pods still converge. Net effect: correct state everywhere, with a harmless one-off `StorageException` logged on non-originating pods per removed field. Tightening this (make deprecate tolerant of a missing column, or route the drop through the refresh path) is a follow-up. Gated on `CUSTOMIZE_APPLICATION`; **security-sensitive → not auto-merged**.
 - **FK constraint generation** (`PhysicalTableStorageAdapter.java` 177-185): String concatenation for FK names; collision risk with very long tenant slugs + collection names.
 - **Tenant schema isolation** (`PhysicalTableStorageAdapter.java` 105-107): Assumes schema exists; silent failure on permission error. Surfaces as confused-state on tenant provisioning failure.
 
@@ -159,7 +171,7 @@ Regression guard: `TenantAwareDataSourceTest` asserts tenant connections use tra
 
 ## Test Coverage Gaps
 
-- Schema migration edge cases (`SchemaMigrationEngine` — 771 lines) — minimal tests.
+- Schema migration edge cases (`SchemaMigrationEngine` — ~880 lines) — the destructive `migrateSchemaDestructive` (ADD/DROP/ALTER) path now has engine unit tests + a real-DB `SchemaMigrationScenarioTest`; the older non-destructive `migrateSchema` (deprecate) branch is still lightly covered.
 - SQL filter operator mappings in `PhysicalTableStorageAdapter` — no tests.
 - Federated user provisioning (`FederatedUserMapper`) — happy path only; group→profile mapping permutations not covered.
 - Password reset workflow — change/request/reset all unit-tested; full end-to-end (DB → email → reset link → new password) not.

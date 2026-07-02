@@ -2,6 +2,9 @@ package io.kelta.worker.service;
 
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
+import io.kelta.runtime.model.FieldType;
+import io.kelta.runtime.model.ReferenceConfig;
+import io.kelta.runtime.model.ValidationRules;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.worker.repository.CollectionVersionRepository;
 import org.slf4j.Logger;
@@ -9,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
@@ -38,6 +42,12 @@ public class CollectionVersionService {
     private final CollectionRegistry collectionRegistry;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    /**
+     * Lenient reader for stored snapshots: tolerates legacy rows written in the original
+     * {@code {name,type,nullable}} format (missing the newer primitive fields) and any
+     * forward-added keys, so upgrading the snapshot schema never bricks an existing version.
+     */
+    private final ObjectMapper snapshotReader;
 
     public CollectionVersionService(CollectionVersionRepository versionRepository,
                                     CollectionRegistry collectionRegistry,
@@ -47,10 +57,93 @@ public class CollectionVersionService {
         this.collectionRegistry = collectionRegistry;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.snapshotReader = objectMapper.rebuild()
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
     }
 
-    /** A minimal serialized field, sufficient to diff schemas (name + type + nullability). */
-    public record FieldSnapshot(String name, String type, boolean nullable) {
+    /**
+     * A <strong>full-fidelity</strong> serialized field. Captures the whole {@link FieldDefinition}
+     * — not just name/type/nullable — so a target {@link CollectionDefinition} can be faithfully
+     * reconstructed for a destructive migration (correct SQL types, companion columns, relationship
+     * cascade behaviour, enum/validation constraints). Deliberately a flat record with a single
+     * canonical constructor so Jackson round-trips it without the multi-constructor ambiguity of
+     * {@link FieldDefinition}/{@link ReferenceConfig}.
+     */
+    public record FieldSnapshot(
+            String name,
+            String type,
+            boolean nullable,
+            boolean immutable,
+            boolean unique,
+            Object defaultValue,
+            List<String> enumValues,
+            String columnName,
+            ValidationSnapshot validation,
+            ReferenceSnapshot reference,
+            Map<String, Object> fieldTypeConfig) {
+
+        /** Serialized {@link ValidationRules}. */
+        public record ValidationSnapshot(Double minValue, Double maxValue,
+                                         Integer minLength, Integer maxLength, String pattern) {
+            static ValidationSnapshot from(ValidationRules r) {
+                return r == null ? null : new ValidationSnapshot(
+                        r.minValue(), r.maxValue(), r.minLength(), r.maxLength(), r.pattern());
+            }
+
+            ValidationRules toRules() {
+                return new ValidationRules(minValue, maxValue, minLength, maxLength, pattern);
+            }
+        }
+
+        /** Serialized {@link ReferenceConfig}. */
+        public record ReferenceSnapshot(String targetCollection, String targetField,
+                                        boolean cascadeDelete, String relationshipType,
+                                        String relationshipName) {
+            static ReferenceSnapshot from(ReferenceConfig c) {
+                return c == null ? null : new ReferenceSnapshot(
+                        c.targetCollection(), c.targetField(), c.cascadeDelete(),
+                        c.relationshipType(), c.relationshipName());
+            }
+
+            ReferenceConfig toConfig() {
+                return new ReferenceConfig(targetCollection, targetField, cascadeDelete,
+                        relationshipType, relationshipName);
+            }
+        }
+
+        /** Serializes a live {@link FieldDefinition} into a snapshot. */
+        static FieldSnapshot from(FieldDefinition f) {
+            return new FieldSnapshot(
+                    f.name(),
+                    f.type().name(),
+                    f.nullable(),
+                    f.immutable(),
+                    f.unique(),
+                    f.defaultValue(),
+                    f.enumValues(),
+                    f.columnName(),
+                    ValidationSnapshot.from(f.validationRules()),
+                    ReferenceSnapshot.from(f.referenceConfig()),
+                    f.fieldTypeConfig());
+        }
+
+        /** Reconstructs a {@link FieldDefinition} from this snapshot. */
+        FieldDefinition toFieldDefinition() {
+            return new FieldDefinition(
+                    name,
+                    FieldType.valueOf(type),
+                    nullable,
+                    immutable,
+                    unique,
+                    defaultValue,
+                    validation == null ? null : validation.toRules(),
+                    enumValues,
+                    reference == null ? null : reference.toConfig(),
+                    fieldTypeConfig,
+                    columnName);
+        }
     }
 
     /**
@@ -143,7 +236,39 @@ public class CollectionVersionService {
 
     // --- helpers ------------------------------------------------------------
 
-    private CollectionDefinition requireDefinition(String collectionId) {
+    /**
+     * Reconstructs the target {@link CollectionDefinition} a stored version represents: the live
+     * collection's storage/config metadata with its field list swapped for the snapshot's fields.
+     * Empty when the target version does not exist.
+     *
+     * @param collectionId  the collection id
+     * @param targetVersion the stored version to reconstruct
+     * @return the reconstructed definition, or empty if that version is absent
+     */
+    public Optional<CollectionDefinition> targetDefinition(String collectionId, int targetVersion) {
+        CollectionDefinition live = requireDefinition(collectionId);
+        Optional<String> targetJson = versionRepository.findSchema(collectionId, targetVersion);
+        if (targetJson.isEmpty()) {
+            return Optional.empty();
+        }
+        List<FieldDefinition> fields = new ArrayList<>();
+        for (FieldSnapshot snap : parseSnapshot(targetJson.get())) {
+            fields.add(snap.toFieldDefinition());
+        }
+        return Optional.of(live.withFields(fields));
+    }
+
+    /** The live collection definition currently registered for a collection id. */
+    public CollectionDefinition liveDefinition(String collectionId) {
+        return requireDefinition(collectionId);
+    }
+
+    /** The highest stored version number for a collection, or 0 if none exist. */
+    public int latestVersion(String collectionId) {
+        return Math.max(versionRepository.nextVersion(collectionId) - 1, 0);
+    }
+
+    CollectionDefinition requireDefinition(String collectionId) {
         String name = jdbcTemplate.query(
                 "SELECT name FROM collection WHERE id = ?",
                 rs -> rs.next() ? rs.getString("name") : null,
@@ -162,14 +287,14 @@ public class CollectionVersionService {
         List<FieldSnapshot> out = new ArrayList<>();
         if (def.fields() != null) {
             for (FieldDefinition f : def.fields()) {
-                out.add(new FieldSnapshot(f.name(), f.type().name(), f.nullable()));
+                out.add(FieldSnapshot.from(f));
             }
         }
         return out;
     }
 
     private List<FieldSnapshot> parseSnapshot(String json) {
-        return objectMapper.readValue(json, new TypeReference<List<FieldSnapshot>>() {});
+        return snapshotReader.readValue(json, new TypeReference<List<FieldSnapshot>>() {});
     }
 
     private long countRecords(CollectionDefinition def) {

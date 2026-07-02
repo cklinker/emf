@@ -200,6 +200,7 @@ public class RouteConfigService {
                 {"webhooks", "/api/webhooks/**", "webhooks"},
                 {"connected-apps", "/api/connected-apps/**", "connected-apps"},
                 {"email-templates", "/api/email-templates/**", "email-templates"},
+                {"email", "/api/email/**", "email"},
                 {"scripts", "/api/scripts/**", "scripts"},
                 {"scheduled-jobs", "/api/scheduled-jobs/**", "scheduled-jobs"},
                 // Reporting & monitoring

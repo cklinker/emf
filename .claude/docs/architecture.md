@@ -413,6 +413,25 @@ tenant override (a row the tenant inserted with the same key/name) wins; the
 system default is only returned when no tenant override exists. Callers don't
 branch on the source — the same row shape is returned in either case.
 
+`EmailService.sendById(tenantId, to, templateId, vars, source, sourceId)` is the
+exception: it resolves via `findTemplateByTenantAndId` (**tenant-scoped, no system
+fallback**) so a caller selecting a template by id can only send that tenant's own
+templates — the send endpoint below relies on this.
+
+### Transactional send endpoint — `POST /api/email/send`
+
+`EmailSendController` (gateway static route `static-email` → `/api/email/**`) is the
+FE-reachable transactional-send path used by the `send_email` UI Quick Action. It is a
+deliberate spam-surface lockdown: **no client-supplied body** (subject/body always come
+from a stored `email_template` selected by `templateId` or `templateKey`), **gated on the
+`MANAGE_EMAIL_TEMPLATES` system permission** (in-controller `profile_system_permission`
+check via `BootstrapRepository.findProfileSystemPermissions` — `/api/*` gets only the
+gateway's blanket `API_ACCESS`), and **rate-limited per tenant** (`≤ MAX_SENDS_PER_WINDOW`
+`email_log` rows in a rolling `RATE_LIMIT_WINDOW_MINUTES` window → `429`). The recipient
+`to` is already resolved by the caller (the FE reads `SendEmailConfig.recipientField` off
+the record it is showing); `mergeContext` feeds `${var}` substitution. Sends are tagged
+`source = "QUICK_ACTION"` in `email_log` and audit-logged to `security.audit`.
+
 ### User invitation flow
 
 `POST /api/internal/email/invite` (worker `InternalEmailController`) accepts

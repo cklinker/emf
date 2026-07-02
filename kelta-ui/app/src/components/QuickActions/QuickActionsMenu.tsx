@@ -8,7 +8,7 @@
  * When no quick actions are configured, the component renders nothing.
  */
 
-import React, { useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Zap,
@@ -33,6 +33,7 @@ import {
 import { useApi } from '@/context/ApiContext'
 import { useQuickActions } from '@/hooks/useQuickActions'
 import { useScriptExecution } from '@/hooks/useScriptExecution'
+import { componentRegistry, type QuickActionComponentProps } from '@/services/componentRegistry'
 import type {
   QuickActionDefinition,
   QuickActionContext,
@@ -41,6 +42,8 @@ import type {
   CreateRelatedConfig,
   UpdateFieldConfig,
   LogActivityConfig,
+  SendEmailConfig,
+  CustomActionConfig,
 } from '@/types/quickActions'
 
 /**
@@ -88,6 +91,10 @@ export function QuickActionsMenu({
     context,
   })
   const { execute, isPending } = useScriptExecution()
+  const [customAction, setCustomAction] = useState<{
+    Component: React.ComponentType<QuickActionComponentProps>
+    props?: Record<string, unknown>
+  } | null>(null)
 
   const handleAction = useCallback(
     async (action: QuickActionDefinition) => {
@@ -157,15 +164,40 @@ export function QuickActionsMenu({
             break
           }
 
-          case 'send_email':
-            // No FE-reachable transactional-send endpoint yet; wire via a flow (run_script) or a
-            // future /api email-send endpoint. Kept explicit rather than silently succeeding.
-            toast.info('Configure email sending via a flow action for now.')
+          case 'send_email': {
+            const config = action.config as SendEmailConfig
+            if (!config.templateId) {
+              toast.error('No email template configured for this action')
+              break
+            }
+            const to = config.recipientField
+              ? (executionContext.record?.[config.recipientField] as string | undefined)
+              : undefined
+            if (!to) {
+              toast.error('No recipient email found on this record')
+              break
+            }
+            await apiClient.post('/api/email/send', {
+              templateId: config.templateId,
+              to,
+              // The template is admin-authored; the record supplies ${field} merge values only.
+              mergeContext: executionContext.record ?? {},
+            })
+            toast.success('Email sent')
+            onActionComplete?.()
             break
+          }
 
-          case 'custom':
-            toast.info('Custom action requires a registered plugin component.')
+          case 'custom': {
+            const config = action.config as CustomActionConfig
+            const Component = componentRegistry.getQuickAction(config.componentName)
+            if (!Component) {
+              toast.info('Custom action requires a registered plugin component.')
+              break
+            }
+            setCustomAction({ Component, props: config.props })
             break
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Action failed'
@@ -181,39 +213,56 @@ export function QuickActionsMenu({
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} disabled={isLoading || isPending}>
-          {isPending ? (
-            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant={variant} size={size} disabled={isLoading || isPending}>
+            {isPending ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Zap className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            {label}
+            <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {isLoading ? (
+            <DropdownMenuItem disabled>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading actions...
+            </DropdownMenuItem>
           ) : (
-            <Zap className="mr-1.5 h-3.5 w-3.5" />
+            actions.map((action, index) => {
+              const Icon = ACTION_TYPE_ICONS[action.type] || Zap
+              return (
+                <React.Fragment key={action.id}>
+                  {index > 0 && action.type !== actions[index - 1].type && (
+                    <DropdownMenuSeparator />
+                  )}
+                  <DropdownMenuItem onClick={() => handleAction(action)}>
+                    <Icon className="mr-2 h-4 w-4" />
+                    {action.label}
+                  </DropdownMenuItem>
+                </React.Fragment>
+              )
+            })
           )}
-          {label}
-          <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {isLoading ? (
-          <DropdownMenuItem disabled>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading actions...
-          </DropdownMenuItem>
-        ) : (
-          actions.map((action, index) => {
-            const Icon = ACTION_TYPE_ICONS[action.type] || Zap
-            return (
-              <React.Fragment key={action.id}>
-                {index > 0 && action.type !== actions[index - 1].type && <DropdownMenuSeparator />}
-                <DropdownMenuItem onClick={() => handleAction(action)}>
-                  <Icon className="mr-2 h-4 w-4" />
-                  {action.label}
-                </DropdownMenuItem>
-              </React.Fragment>
-            )
-          })
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {customAction && (
+        <customAction.Component
+          collectionName={executionContext.collectionName}
+          recordId={executionContext.recordId}
+          record={executionContext.record}
+          tenantSlug={executionContext.tenantSlug}
+          config={customAction.props}
+          onComplete={() => {
+            setCustomAction(null)
+            onActionComplete?.()
+          }}
+        />
+      )}
+    </>
   )
 }

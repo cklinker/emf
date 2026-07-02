@@ -45,6 +45,7 @@ ship a change that moves a row.
 
 | Capability | Works | Missing |
 |------------|-------|---------|
+| Record sharing | `record-shares` system collection + `record_share` table (V150, RLS, `uq_record_share` UNIQUE per target). CRUD via the generic dynamic route the record-detail Sharing panel already calls (list/add/remove shares persist). Harness scenario proves create/list/unique on real Postgres | **Runtime enforcement** — record-authz (Cerbos/RLS) does not yet consult `record_share` to widen a user's access; shares are recorded but not enforced. Follow-up |
 | Reports & dashboards | `ReportExecutionController`/`Service` build a real dynamic query from the report def (columns/filters/group/sort/paginate, 30s timeout); **CSV export ships** (`GET /api/reports/{id}/export?format=csv` → `exportCsv`); `DashboardDataController`/`Service` (653 lines). Gateway-routed. (Verified 2026-07-02; prior "no query engine / no CSV export" was stale.) | **PDF** export (needs a PDF lib — deferred; use browser print meanwhile); scheduled report delivery |
 | Approval processes | `ApprovalController` (submit/approve/reject/recall/status/history) + `ApprovalService` (581 lines) + `SubmitForApprovalActionHandler` registered `@Bean`. **Record locking ships**: `ApprovalRecordLockHook` (BeforeSaveHook) blocks a write when the record has a PENDING approval with `record_editability='LOCKED'` (system collections excluded); `ApprovalService.isRecordLocked`. Gateway-routed. (Verified 2026-07-02; prior "no record locking" was stale.) | — (fully wired; enhancements only) |
 | Bulk data operations | `BulkOperationsController` + `BulkJobProcessorService` (real `SELECT FOR UPDATE SKIP LOCKED` poller → `BulkOperationService.processJob`, INSERT/UPDATE/UPSERT/DELETE). Gateway-routed `/api/bulk-jobs/**`. (Verified 2026-07-02; prior 🔴 "no batch processor" was stale.) | **File upload/download** for payloads (inline JSON only today) |
@@ -73,7 +74,6 @@ ship a change that moves a row.
 | Capability | Built (UI) | Not built (backend) |
 |------------|-----------|---------------------|
 | Record types | Data model + Record Type editor | No runtime enforcement of picklist restriction or layout association (backend reachability unverified) |
-| Record sharing | `ResourceDetailPage` sharing panel | `record-shares` is **not** a system collection and has no controller; UI try/catches `/api/record-shares` → `[]`. Genuine UI-without-backend gap |
 | Quick actions | `QuickActionsMenu` (record detail) | `useQuickActions` returns `[]` (no source); the four action handlers fire "coming soon" toasts. No backend |
 | Schema migration planner | `MigrationsPage` (plan/execute) | UI calls `/api/migrations`, `/api/migrations/plan`, `/api/migrations/execute` — **no controller maps these** (only `/api/migration-runs`, a system collection, exists). Genuine gap |
 

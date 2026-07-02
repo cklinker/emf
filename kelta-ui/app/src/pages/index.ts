@@ -217,6 +217,10 @@ export type { ModulesPageProps } from './ModulesPage'
 export { BulkJobsPage } from './BulkJobsPage'
 export type { BulkJobsPageProps } from './BulkJobsPage'
 
+// DeduplicationPage - duplicate detection + merge workbench
+export { DeduplicationPage } from './DeduplicationPage'
+export type { DeduplicationPageProps } from './DeduplicationPage'
+
 // SetupHomePage - Setup directory page
 export { SetupHomePage } from './SetupHomePage'
 export type { SetupHomePageProps } from './SetupHomePage'

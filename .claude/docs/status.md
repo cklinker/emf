@@ -40,6 +40,7 @@ ship a change that moves a row.
 | SCIM 2.0 provisioning | Full `scim/` package: `ScimUser/Group/DiscoveryController` + services + `ScimFilterParser` + `ScimAuthenticationFilter`; gateway route `/scim/v2/**`; 6 test classes. (Verified 2026-07-02; the prior ⚪ "not started" was stale.) |
 | Data export | `DataExportController` (`/api/data-exports`, CSV/JSON, presigned-download) + `DataExportService`; gateway static route added + gated on `VIEW_ALL_DATA` (2026-07-02). Scheduled `DATA_EXPORT`/`REPORT_EXPORT`/`FLOW` jobs run via `ScheduledJobExecutorService` |
 | Standalone script execution | `ScriptExecutionController` `POST /api/scripts/{id}/execute` runs an active, HTTP-invocable (`API_ENDPOINT`/`EVENT_HANDLER`) script through the sandboxed `GraalVmScriptExecutor` with `input`+`context` bindings; logs to `script_execution_log`; end-user Quick Actions `useScriptExecution` calls it (script `output.action` drives refresh/redirect/toast/open_record). Per-script authz is a follow-up |
+| Duplicate detection | `POST /api/collections/{name}/duplicates` `{matchFields,limit}` → groups of records sharing the same match-field values (`DuplicateDetectionService`, read-only, MANAGE_DATA-gated). Bounded scan (5000 rows via the authorized query path — no raw SQL, schema/RLS-safe); reports `truncated`. 4 unit tests | Merge/resolve UI + write path is a follow-up |
 
 ## 🟡 Partial — backend exists, gaps remain
 

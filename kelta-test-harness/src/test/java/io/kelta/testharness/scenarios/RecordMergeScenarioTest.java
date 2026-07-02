@@ -43,9 +43,12 @@ class RecordMergeScenarioTest extends ScenarioBase {
 
         waitForStatus(gatewayClientWithToken(token), "/" + slug + "/api/customers", HttpStatus.OK, 20);
 
-        // Two duplicate customers: the master we keep and the duplicate we fold in.
-        String masterId = createCustomer(token, slug, "dupe@example.com", "Dupe", "Master");
-        String dupId = createCustomer(token, slug, "dupe@example.com", "Dupe", "Duplicate");
+        // Two duplicate customers: the master we keep and the duplicate we fold in. They share a
+        // name but need distinct emails — the seeded `customers.email` field is uniquely constrained
+        // (the merge takes record ids directly, so an exact match-field value isn't required here).
+        String suffix = Long.toHexString(System.nanoTime());
+        String masterId = createCustomer(token, slug, "dupe-master-" + suffix + "@example.com", "Dupe", "Master");
+        String dupId = createCustomer(token, slug, "dupe-dup-" + suffix + "@example.com", "Dupe", "Duplicate");
         assertThat(masterId).isNotBlank();
         assertThat(dupId).isNotBlank().isNotEqualTo(masterId);
 

@@ -174,6 +174,43 @@ class DefaultEmailServiceTest {
     }
 
     @Nested
+    @DisplayName("sendById")
+    class SendById {
+
+        @Test
+        @DisplayName("Should resolve tenant template by id, substitute vars, and queue")
+        void shouldResolveByIdAndSubstitute() {
+            when(emailRepository.findTemplateByTenantAndId("t1", "tpl-1"))
+                    .thenReturn(Optional.of(Map.of(
+                            "subject", "Hello ${firstName}",
+                            "body_html", "<p>Welcome ${firstName}</p>"
+                    )));
+            when(emailRepository.createEmailLog(anyString(), anyString(), anyString(), anyString(), any()))
+                    .thenReturn("log-id-1");
+
+            Optional<String> logId = service.sendById("t1", "u@x.com", "tpl-1",
+                    Map.of("firstName", "Ada"), "QUICK_ACTION", null);
+
+            assertThat(logId).contains("log-id-1");
+            verify(emailRepository).createEmailLog("t1", "u@x.com",
+                    "Hello Ada", "QUICK_ACTION", null);
+        }
+
+        @Test
+        @DisplayName("Should return empty when the id-based template is missing (no system fallback)")
+        void shouldReturnEmptyWhenMissing() {
+            when(emailRepository.findTemplateByTenantAndId("t1", "missing"))
+                    .thenReturn(Optional.empty());
+
+            Optional<String> logId = service.sendById("t1", "u@x.com", "missing",
+                    Map.of(), "QUICK_ACTION", null);
+
+            assertThat(logId).isEmpty();
+            verify(emailRepository, never()).createEmailLog(anyString(), anyString(), anyString(), anyString(), any());
+        }
+    }
+
+    @Nested
     @DisplayName("sendAsync")
     class SendAsync {
 

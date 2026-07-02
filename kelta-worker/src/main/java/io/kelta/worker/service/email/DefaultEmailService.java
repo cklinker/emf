@@ -118,6 +118,20 @@ public class DefaultEmailService implements EmailService {
         return Optional.of(queueEmail(tenantId, to, subject, body, source, sourceId));
     }
 
+    @Override
+    public Optional<String> sendById(String tenantId, String to, String templateId,
+                                     Map<String, Object> vars, String source, String sourceId) {
+        var templateRow = emailRepository.findTemplateByTenantAndId(tenantId, templateId);
+        if (templateRow.isEmpty()) {
+            log.warn("No active template found for id '{}' (tenant {})", templateId, tenantId);
+            return Optional.empty();
+        }
+        Map<String, Object> safeVars = vars == null ? Map.of() : vars;
+        String subject = substitute((String) templateRow.get().get("subject"), safeVars);
+        String body    = substitute((String) templateRow.get().get("body_html"), safeVars);
+        return Optional.of(queueEmail(tenantId, to, subject, body, source, sourceId));
+    }
+
     /**
      * Replaces {@code ${name}} placeholders in {@code template} with values from {@code vars}.
      * Unknown variables are left untouched so the message is still readable when a caller forgets

@@ -104,6 +104,7 @@ import {
   ApiTokensPage,
   ModulesPage,
   BulkJobsPage,
+  DeduplicationPage,
   SetupHomePage,
   LoginPage,
   UnauthorizedPage,
@@ -1120,6 +1121,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_DATA">
               <BulkJobsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Deduplication route */}
+      <Route
+        path="dedup"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_DATA">
+              <DeduplicationPage />
             </RequirePermission>
           </AdminPageRoute>
         }

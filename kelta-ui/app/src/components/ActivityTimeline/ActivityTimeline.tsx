@@ -64,11 +64,21 @@ interface RecordShare {
 type TimelineEntryType =
   | 'CREATED'
   | 'UPDATED'
+  | 'NOTE'
   | 'APPROVAL_SUBMITTED'
   | 'APPROVAL_APPROVED'
   | 'APPROVAL_REJECTED'
   | 'APPROVAL_RECALLED'
   | 'SHARED'
+
+/**
+ * Note on the record (from the notes system collection)
+ */
+interface ActivityNote {
+  id: string
+  content: string
+  createdAt: string
+}
 
 /**
  * Internal timeline entry for rendering
@@ -147,6 +157,7 @@ function getIconClasses(type: TimelineEntryType): string {
   const classMap: Record<TimelineEntryType, string> = {
     CREATED: 'bg-green-50 text-green-700 border-2 border-green-700',
     UPDATED: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
+    NOTE: 'bg-purple-50 text-purple-700 border-2 border-purple-700',
     APPROVAL_SUBMITTED: 'bg-amber-50 text-amber-700 border-2 border-amber-700',
     APPROVAL_APPROVED: 'bg-green-50 text-green-700 border-2 border-green-700',
     APPROVAL_REJECTED: 'bg-red-50 text-red-700 border-2 border-red-700',
@@ -163,6 +174,7 @@ function getIconSymbol(type: TimelineEntryType): string {
   const symbolMap: Record<TimelineEntryType, string> = {
     CREATED: '+',
     UPDATED: '~',
+    NOTE: '✎',
     APPROVAL_SUBMITTED: '!',
     APPROVAL_APPROVED: '\u2713',
     APPROVAL_REJECTED: '\u2717',
@@ -246,6 +258,22 @@ export function ActivityTimeline({
     enabled: !!collectionId && !!recordId,
   })
 
+  // Fetch notes for this record (the notes system collection)
+  const { data: notes } = useQuery({
+    queryKey: ['activity-notes', collectionId, recordId],
+    queryFn: async () => {
+      try {
+        const result = await apiClient.getList<ActivityNote>(
+          `/api/notes?filter[collectionId][eq]=${collectionId}&filter[recordId][eq]=${recordId}`
+        )
+        return result || []
+      } catch {
+        return []
+      }
+    },
+    enabled: !!collectionId && !!recordId,
+  })
+
   // Merge all data sources into a single timeline
   const entries: TimelineEntry[] = useMemo(() => {
     const allEntries: TimelineEntry[] = []
@@ -305,6 +333,20 @@ export function ActivityTimeline({
       }
     }
 
+    // Note events (content is user text; truncate for the feed)
+    if (notes) {
+      for (const note of notes) {
+        const content = note.content ?? ''
+        const preview = content.length > 140 ? `${content.slice(0, 140)}…` : content
+        allEntries.push({
+          id: `note-${note.id}`,
+          type: 'NOTE',
+          description: preview || t('activity.noteAdded'),
+          timestamp: note.createdAt,
+        })
+      }
+    }
+
     // Sharing events
     if (shares) {
       for (const share of shares) {
@@ -324,7 +366,7 @@ export function ActivityTimeline({
     allEntries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
     return allEntries
-  }, [recordCreatedAt, recordUpdatedAt, approvalInstances, shares, t])
+  }, [recordCreatedAt, recordUpdatedAt, approvalInstances, shares, notes, t])
 
   const visibleEntries = expanded ? entries : entries.slice(0, DEFAULT_VISIBLE_COUNT)
   const hasMore = entries.length > DEFAULT_VISIBLE_COUNT

@@ -45,6 +45,12 @@ Trigger: `push` → `main` (path-filtered), plus `workflow_dispatch`.
 5. **`rollback-on-smoke-failure`** — `git revert HEAD` in `homelab-argo` if smoke fails.
 6. **`e2e-test`** — Playwright against production (`app.kelta.io`, `api.kelta.io`) using
    E2E token + Authentik secrets. Timeout 25 min. Files failing-E2E bug tasks to `emf-queue`.
+   Because ArgoCD rolls the worker out **asynchronously** after `deploy` commits the tag,
+   this job first blocks until the `emf-worker` Deployment targets **this commit's**
+   `main-<short-sha>` image and its rollout is fully complete (all pods on the new
+   revision) — *then* polls `/api/collections` for data readiness. Without the rollout gate,
+   the gateway load-balances to not-yet-updated pods that 404 brand-new endpoints, and the
+   data poll can't detect it (it hits an endpoint that exists on the old image too).
 
 ## `auto-merge.yml`
 

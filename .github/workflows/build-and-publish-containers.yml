@@ -539,6 +539,40 @@ jobs:
         working-directory: e2e-tests
         run: npx playwright install --with-deps chromium
 
+      # Deploys are GitOps: the pipeline bumps the kustomize image tag and ArgoCD rolls the
+      # worker out ASYNCHRONOUSLY. Until every worker pod is the new revision the gateway
+      # load-balances some requests to OLD pods, which 404 any brand-new endpoint (e.g. a
+      # just-added admin controller) even though the feature is correct. The data-serving
+      # poll below can't catch this — it hits /api/collections, which exists on the old image
+      # too. So first block until the Deployment actually targets THIS commit's image tag
+      # (ArgoCD synced) and the rollout is fully complete. No "|| true": a stalled rollout
+      # must fail E2E, not silently race it.
+      - name: Wait for worker rollout to this commit's image (avoid old-pod 404s)
+        run: |
+          if kubectl -n kelta get deploy kelta-worker &>/dev/null; then
+            NS=kelta; WORKER=kelta-worker
+          else
+            NS=emf; WORKER=emf-worker
+          fi
+          EXPECT="main-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          echo "Waiting for ${NS}/${WORKER} Deployment to target *:${EXPECT} (ArgoCD sync)…"
+          for i in $(seq 1 50); do
+            IMG=$(kubectl -n "${NS}" get deploy "${WORKER}" \
+              -o jsonpath='{.spec.template.spec.containers[0].image}')
+            case "${IMG}" in
+              *:"${EXPECT}")
+                echo "Deployment targets ${IMG} — waiting for rollout to complete."
+                kubectl -n "${NS}" rollout status deploy/"${WORKER}" --timeout=300s
+                echo "Worker fully rolled out to ${EXPECT} — all pods on the new image."
+                exit 0
+                ;;
+            esac
+            echo "attempt ${i}/50: Deployment still on ${IMG}, want *:${EXPECT} (ArgoCD not synced yet) — retry 6s"
+            sleep 6
+          done
+          echo "::error::Worker Deployment never advanced to main-$(echo "${GITHUB_SHA}" | cut -c1-7) within ~5 min. ArgoCD sync or rollout stalled — E2E would race old pods."
+          exit 1
+
       # The smoke test only proves the GATEWAY is live. A migration-bearing deploy restarts
       # the WORKER (Flyway runs at startup), so the gateway can be UP while data calls still
       # 502/503. Running Playwright in that window fails every data-dependent test and burns

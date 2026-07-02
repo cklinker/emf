@@ -9,6 +9,7 @@ import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.runtime.router.SystemCollectionCache;
 import io.kelta.runtime.storage.SchemaMigrationEngine;
 import io.kelta.runtime.storage.SchemaMigrationEngine.AppliedChange;
 import io.kelta.runtime.storage.SchemaMigrationEngine.SchemaDiff;
@@ -63,6 +64,7 @@ public class MigrationExecutionService {
     private final MigrationFieldRepository fieldRepository;
     private final CollectionLifecycleManager lifecycleManager;
     private final PlatformEventPublisher eventPublisher;
+    private final SystemCollectionCache systemCollectionCache;
     private final ObjectMapper objectMapper;
 
     public MigrationExecutionService(CollectionVersionService versionService,
@@ -72,6 +74,8 @@ public class MigrationExecutionService {
                                      MigrationFieldRepository fieldRepository,
                                      CollectionLifecycleManager lifecycleManager,
                                      PlatformEventPublisher eventPublisher,
+                                     @org.springframework.beans.factory.annotation.Autowired(required = false)
+                                     SystemCollectionCache systemCollectionCache,
                                      ObjectMapper objectMapper) {
         this.versionService = versionService;
         this.migrationEngine = migrationEngine;
@@ -80,6 +84,7 @@ public class MigrationExecutionService {
         this.fieldRepository = fieldRepository;
         this.lifecycleManager = lifecycleManager;
         this.eventPublisher = eventPublisher;
+        this.systemCollectionCache = systemCollectionCache;
         this.objectMapper = objectMapper;
     }
 
@@ -155,6 +160,14 @@ public class MigrationExecutionService {
                     migrationEngine.migrateSchemaDestructive(live, target, tableRef, force);
             collectionRegistry.register(target);
             broadcastCollectionChanged(collectionId, target, tenantId);
+
+            // The raw field-metadata writes bypass the generic CRUD path, so the system-collection
+            // list cache (which backs GET /api/fields, /api/collections) is not auto-evicted —
+            // clear it so subsequent reads reflect the dropped/added fields immediately.
+            if (systemCollectionCache != null) {
+                systemCollectionCache.evict(tenantId, "fields");
+                systemCollectionCache.evict(tenantId, "collections");
+            }
 
             // 4. Record per-step progress + complete the run.
             recordSteps(runId, applied);

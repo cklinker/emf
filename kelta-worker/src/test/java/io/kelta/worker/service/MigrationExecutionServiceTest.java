@@ -40,6 +40,7 @@ class MigrationExecutionServiceTest {
     private MigrationFieldRepository fieldRepository;
     private CollectionLifecycleManager lifecycleManager;
     private PlatformEventPublisher eventPublisher;
+    private io.kelta.runtime.router.SystemCollectionCache systemCollectionCache;
     private MigrationExecutionService service;
 
     @BeforeEach
@@ -51,8 +52,9 @@ class MigrationExecutionServiceTest {
         fieldRepository = mock(MigrationFieldRepository.class);
         lifecycleManager = mock(CollectionLifecycleManager.class);
         eventPublisher = mock(PlatformEventPublisher.class);
+        systemCollectionCache = mock(io.kelta.runtime.router.SystemCollectionCache.class);
         service = new MigrationExecutionService(versionService, engine, registry, runRepository,
-                fieldRepository, lifecycleManager, eventPublisher, new ObjectMapper());
+                fieldRepository, lifecycleManager, eventPublisher, systemCollectionCache, new ObjectMapper());
     }
 
     private CollectionDefinition def(String name, List<FieldDefinition> fields) {
@@ -141,6 +143,8 @@ class MigrationExecutionServiceTest {
         // registry re-registered with the target + broadcast + run completed.
         verify(registry).register(target);
         verify(eventPublisher).publish(startsWith("kelta.config.collection.changed."), any());
+        // Stale system-collection list cache (GET /api/fields) is evicted after the raw metadata writes.
+        verify(systemCollectionCache).evict("t1", "fields");
         verify(runRepository).insertStep(eq("run-1"), eq(1), eq("REMOVE_FIELD"), eq("COMPLETED"), any(), isNull());
         verify(runRepository).updateRunStatus("run-1", "COMPLETED", null);
     }

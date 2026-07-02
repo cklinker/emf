@@ -76,7 +76,7 @@ ship a change that moves a row.
 
 | Capability | Built (UI) | Not built (backend) |
 |------------|-----------|---------------------|
-| Schema migration planner | `MigrationsPage` (plan/execute) | UI calls `/api/migrations`, `/api/migrations/plan`, `/api/migrations/execute` — **no controller maps these** (only `/api/migration-runs`, a system collection, exists). Genuine gap |
+| Schema migration planner | `MigrationsPage` (plan/preview/execute UI) | **Greenfield feature, not a wiring gap.** UI calls `/api/migrations{,/plan,/execute}` — no controller. Primitives exist but the data flow does NOT: `SchemaMigrationEngine` can `detectDifferences(old,new)` (plan) + `migrateSchema` (execute) + `validateTypeChange`/`isTypeChangeCompatible` (safety), and `collection-versions`/`collection_version` is a declared system collection — **but nothing ever writes a version row** (verified 2026-07-02: no INSERT anywhere), so there is no target-version to plan against. Needs, in order: (1) version snapshotting on schema change, (2) a read-only plan endpoint (resolve current+target defs → `detectDifferences` → map `SchemaDiff`→`MigrationStep` + risk + record count), (3) a **destructive** execute endpoint (`migrateSchema`, gated by `validateTypeChange`, with a dry-run/confirm + `migration-runs` progress) — **must** ship with a real-DB `kelta-test-harness` scenario for the destructive DDL paths (live-tenant `ALTER TABLE`/drops; highest-stakes change in the codebase). Do NOT rush. |
 
 ## ⚪ Planned / enterprise gaps (not started)
 

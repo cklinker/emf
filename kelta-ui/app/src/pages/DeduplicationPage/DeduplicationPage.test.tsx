@@ -14,25 +14,50 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { createTestWrapper, setupAuthMocks, mockAxios, resetMockAxios } from '../../test/testUtils'
 import { DeduplicationPage } from './DeduplicationPage'
 
-const collectionsResponse = {
+// The collections *list* (no fields embedded — matches the real endpoint).
+const collectionsListDoc = {
+  data: [
+    { type: 'collections', id: 'c1', attributes: { name: 'contacts', displayName: 'Contacts' } },
+  ],
+  metadata: { totalCount: 1 },
+}
+
+// The single-collection schema (`?include=fields`) that populates the match-field picker.
+const collectionSchemaDoc = {
   data: {
-    data: [
-      {
-        type: 'collections',
-        id: 'c1',
-        attributes: {
-          name: 'contacts',
-          displayName: 'Contacts',
-          fields: [
-            { name: 'id', type: 'STRING' },
-            { name: 'email', displayName: 'Email', type: 'EMAIL' },
-            { name: 'name', displayName: 'Name', type: 'STRING' },
-          ],
-        },
-      },
-    ],
-    metadata: { totalCount: 1 },
+    type: 'collections',
+    id: 'c1',
+    attributes: { name: 'contacts', displayName: 'Contacts' },
   },
+  included: [
+    {
+      type: 'fields',
+      id: 'f0',
+      attributes: { name: 'id', type: 'STRING', active: true, fieldOrder: 0 },
+    },
+    {
+      type: 'fields',
+      id: 'f1',
+      attributes: {
+        name: 'email',
+        displayName: 'Email',
+        type: 'EMAIL',
+        active: true,
+        fieldOrder: 1,
+      },
+    },
+    {
+      type: 'fields',
+      id: 'f2',
+      attributes: {
+        name: 'name',
+        displayName: 'Name',
+        type: 'STRING',
+        active: true,
+        fieldOrder: 2,
+      },
+    },
+  ],
 }
 
 const duplicatesBody = {
@@ -54,7 +79,11 @@ describe('DeduplicationPage', () => {
   beforeEach(() => {
     resetMockAxios()
     setupAuthMocks()
-    mockAxios.get.mockResolvedValue(collectionsResponse)
+    mockAxios.get.mockImplementation((url: string) => {
+      // Schema fetch (?include=fields) → single resource + included fields; else the list.
+      if (url.includes('include=fields')) return Promise.resolve({ data: collectionSchemaDoc })
+      return Promise.resolve({ data: collectionsListDoc })
+    })
     mockAxios.post.mockImplementation((url: string) => {
       if (url.endsWith('/duplicates')) return Promise.resolve({ data: duplicatesBody })
       if (url.endsWith('/merge')) return Promise.resolve({ data: mergeBody })
@@ -70,9 +99,9 @@ describe('DeduplicationPage', () => {
     await waitFor(() => expect(screen.getByTestId('dedup-collection-select')).toBeInTheDocument())
     await user.selectOptions(screen.getByTestId('dedup-collection-select'), 'contacts')
 
-    // Match-field chips appear; scan is disabled until one is chosen.
+    // Match-field chips load from the collection schema; scan is disabled until one is chosen.
     expect(screen.getByTestId('dedup-scan-button')).toBeDisabled()
-    await user.click(screen.getByTestId('dedup-field-email'))
+    await user.click(await screen.findByTestId('dedup-field-email'))
     expect(screen.getByTestId('dedup-scan-button')).toBeEnabled()
 
     // Scan → the duplicate group renders.
@@ -104,7 +133,7 @@ describe('DeduplicationPage', () => {
 
     await waitFor(() => expect(screen.getByTestId('dedup-collection-select')).toBeInTheDocument())
     await user.selectOptions(screen.getByTestId('dedup-collection-select'), 'contacts')
-    await user.click(screen.getByTestId('dedup-field-email'))
+    await user.click(await screen.findByTestId('dedup-field-email'))
     await user.click(screen.getByTestId('dedup-scan-button'))
     await waitFor(() => expect(screen.getByTestId('dedup-group-r1')).toBeInTheDocument())
 

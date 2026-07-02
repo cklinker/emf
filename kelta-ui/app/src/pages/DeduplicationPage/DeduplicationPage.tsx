@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { useCollectionSchema } from '../../hooks/useCollectionSchema'
 import type { CollectionDefinition } from '@kelta/sdk'
 import { cn } from '@/lib/utils'
 
@@ -63,15 +64,11 @@ export function DeduplicationPage({
     queryFn: () => keltaClient.admin.collections.list(),
   })
 
-  const selected: CollectionDefinition | undefined = useMemo(
-    () => collections?.find((c) => c.name === collectionName),
-    [collections, collectionName]
-  )
+  // The collections *list* endpoint doesn't embed fields — load the selected collection's schema
+  // (`?include=fields`) to populate the match-field picker.
+  const { fields, isLoading: fieldsLoading } = useCollectionSchema(collectionName || undefined)
 
-  const availableFields = useMemo(
-    () => (selected?.fields ?? []).filter((f) => f.name !== 'id'),
-    [selected]
-  )
+  const availableFields = useMemo(() => fields.filter((f) => f.name !== 'id'), [fields])
 
   const scanMutation = useMutation({
     mutationFn: () =>
@@ -205,13 +202,21 @@ export function DeduplicationPage({
           </select>
         </div>
 
-        {selected && (
+        {collectionName && (
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-foreground">Match fields</span>
             <p className="text-xs text-muted-foreground">
               Records with equal values on every selected field are grouped as duplicates.
             </p>
             <div className="flex flex-wrap gap-2" data-testid="dedup-match-fields">
+              {fieldsLoading && availableFields.length === 0 && (
+                <span className="text-xs text-muted-foreground">Loading fields…</span>
+              )}
+              {!fieldsLoading && availableFields.length === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  This collection has no matchable fields.
+                </span>
+              )}
               {availableFields.map((f) => {
                 const active = matchFields.includes(f.name)
                 return (

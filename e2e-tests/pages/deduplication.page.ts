@@ -23,17 +23,41 @@ export class DeduplicationPage extends BasePage {
     await this.waitForLoadingComplete();
   }
 
-  /** Selects the first real collection option (index 0 is the placeholder). */
-  async selectFirstCollection(): Promise<string> {
-    const options = this.collectionSelect.locator("option");
-    const value = await options.nth(1).getAttribute("value");
-    await this.collectionSelect.selectOption(value ?? "");
-    return value ?? "";
+  /** Option values in the collection picker, excluding the empty placeholder. */
+  private async collectionValues(): Promise<string[]> {
+    const values = await this.collectionSelect
+      .locator("option")
+      .evaluateAll((opts) =>
+        opts
+          .map((o) => (o as HTMLOptionElement).value)
+          .filter((v) => v !== ""),
+      );
+    return values;
   }
 
-  /** Clicks the first available match-field chip. */
+  /** The first match-field chip (a button inside the match-fields container). */
+  private firstFieldChip(): Locator {
+    return this.matchFields.locator("button").first();
+  }
+
+  /**
+   * Selects the first collection that exposes at least one matchable field, so the
+   * detect flow can proceed. Returns the chosen collection name, or "" if none has fields.
+   */
+  async selectCollectionWithFields(): Promise<string> {
+    for (const value of await this.collectionValues()) {
+      await this.collectionSelect.selectOption(value);
+      // Wait for the field area to settle (loading text clears), then check for a chip.
+      const chip = this.firstFieldChip();
+      if (await chip.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        return value;
+      }
+    }
+    return "";
+  }
+
   async pickFirstMatchField(): Promise<void> {
-    await this.matchFields.locator("button").first().click();
+    await this.firstFieldChip().click();
   }
 
   async scan(): Promise<void> {

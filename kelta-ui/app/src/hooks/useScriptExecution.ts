@@ -7,15 +7,22 @@
  * Scripts are executed with a record context (collection, record ID,
  * record data) and optional user-provided parameters.
  *
- * Script execution is not yet available via JSON:API — returns a
- * graceful error message.
+ * Runs the script server-side via `POST /api/scripts/{id}/execute` (sandboxed
+ * GraalVM). The script's returned `output` may carry `{ action, message }` to
+ * drive the post-run UI behavior handled below.
  */
 
 import { useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import type { ScriptExecutionResult, QuickActionExecutionContext } from '@/types/quickActions'
+import { useApi } from '../context/ApiContext'
+import { parseAxiosError } from '../services/apiClient'
+import type {
+  ScriptExecutionResult,
+  ScriptResultAction,
+  QuickActionExecutionContext,
+} from '@/types/quickActions'
 
 export interface ExecuteScriptParams {
   /** Script ID to execute */
@@ -47,9 +54,27 @@ export interface UseScriptExecutionReturn {
  *
  * @returns Script execution function and state
  */
+/** Shape of the worker `POST /api/scripts/{id}/execute` response. */
+interface ScriptExecuteResponse {
+  success: boolean
+  output?: Record<string, unknown> | null
+  executionTimeMs?: number
+  message?: string
+}
+
+/** Maps the worker execute response onto the UI's ScriptExecutionResult contract. */
+function toScriptResult(response: ScriptExecuteResponse): ScriptExecutionResult {
+  const output = (response.output ?? {}) as Record<string, unknown>
+  const action = output.action as ScriptResultAction | undefined
+  const message =
+    response.message ?? (typeof output.message === 'string' ? output.message : undefined)
+  return { success: response.success, action, message, data: output }
+}
+
 export function useScriptExecution(): UseScriptExecutionReturn {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { apiClient } = useApi()
 
   const handleResultAction = useCallback(
     (result: ScriptExecutionResult, context: QuickActionExecutionContext) => {
@@ -111,12 +136,21 @@ export function useScriptExecution(): UseScriptExecutionReturn {
   )
 
   const mutation = useMutation({
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    mutationFn: async (_params: ExecuteScriptParams): Promise<ScriptExecutionResult> => {
-      // Script execution is not yet available via JSON:API
-      return {
-        success: false,
-        message: 'Script execution is temporarily unavailable.',
+    mutationFn: async (params: ExecuteScriptParams): Promise<ScriptExecutionResult> => {
+      try {
+        const response = await apiClient.post<ScriptExecuteResponse>(
+          `/api/scripts/${params.scriptId}/execute`,
+          {
+            input: params.parameters ?? {},
+            context: {
+              collectionName: params.context.collectionName,
+              recordId: params.context.recordId,
+            },
+          }
+        )
+        return toScriptResult(response)
+      } catch (err) {
+        return { success: false, message: parseAxiosError(err).message }
       }
     },
   })

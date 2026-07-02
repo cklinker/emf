@@ -70,7 +70,8 @@ public class SchemaMigrationEngine {
         CREATE_TABLE,
         ADD_COLUMN,
         DEPRECATE_COLUMN,
-        ALTER_COLUMN_TYPE
+        ALTER_COLUMN_TYPE,
+        DROP_COLUMN
     }
     
     private static final String MIGRATIONS_TABLE = "kelta_migrations";
@@ -285,6 +286,82 @@ public class SchemaMigrationEngine {
             newDefinition.name(), migrations.size());
     }
     
+    /**
+     * Applies a <em>destructive</em> schema migration transforming {@code oldDefinition} into
+     * {@code newDefinition} on live tenant data. Unlike {@link #migrateSchema}, removed fields are
+     * physically <strong>dropped</strong> (real {@code ALTER TABLE ... DROP COLUMN}) rather than
+     * merely deprecated. This is the highest-stakes DDL path in the codebase and is reachable only
+     * from the guarded schema-migration execute endpoint.
+     *
+     * <p>Each change is applied in order (ADD, then DROP, then ALTER) and recorded in
+     * {@code kelta_migrations}. Every {@link SchemaDiff.DiffType#TYPE_CHANGED type change} is gated
+     * by {@link #validateTypeChange}: an incompatible change throws
+     * {@link IncompatibleSchemaChangeException} unless {@code force} is set, in which case it is
+     * attempted anyway (with a warning) — the caller is trusting a {@code USING} cast to succeed.
+     *
+     * @param oldDefinition the current (live) collection definition
+     * @param newDefinition the target collection definition
+     * @param tableRef      the schema-qualified table reference for the live table
+     * @param force         when true, apply type changes even if {@link #isTypeChangeCompatible}
+     *                      reports them incompatible (still fails if Postgres rejects the cast)
+     * @return the list of changes actually applied (operation + field + SQL), in apply order
+     * @throws IncompatibleSchemaChangeException if a type change is incompatible and {@code force} is false
+     * @throws StorageException                  if a DDL statement fails
+     */
+    public List<AppliedChange> migrateSchemaDestructive(CollectionDefinition oldDefinition,
+            CollectionDefinition newDefinition, TableRef tableRef, boolean force) {
+        String qualifiedName = tableRef.toSql();
+        List<AppliedChange> planned = new ArrayList<>();
+
+        // Added fields → ADD COLUMN (idempotent via IF NOT EXISTS).
+        for (FieldDefinition newField : newDefinition.fields()) {
+            if (oldDefinition.getField(newField.name()) == null) {
+                MigrationAction a = createAddColumnMigration(qualifiedName, newDefinition, newField);
+                planned.add(new AppliedChange("ADD_FIELD", newField.name(), a.type(), a.sql()));
+            }
+        }
+
+        // Removed fields → DROP COLUMN (the destructive step migrateSchema will not do).
+        for (FieldDefinition oldField : oldDefinition.fields()) {
+            if (newDefinition.getField(oldField.name()) == null) {
+                MigrationAction a = createDropColumnMigration(qualifiedName, oldDefinition, oldField);
+                planned.add(new AppliedChange("REMOVE_FIELD", oldField.name(), a.type(), a.sql()));
+            }
+        }
+
+        // Type changes → ALTER COLUMN TYPE, gated by compatibility unless forced.
+        for (FieldDefinition newField : newDefinition.fields()) {
+            FieldDefinition oldField = oldDefinition.getField(newField.name());
+            if (oldField != null && !oldField.type().equals(newField.type())) {
+                if (force) {
+                    if (!isTypeChangeCompatible(oldField.type(), newField.type())) {
+                        log.warn("Forcing INCOMPATIBLE type change on '{}.{}': {} -> {} (relying on USING cast)",
+                                newDefinition.name(), oldField.name(), oldField.type(), newField.type());
+                    }
+                } else {
+                    validateTypeChange(newDefinition.name(), oldField, newField);
+                }
+                MigrationAction a = createAlterColumnTypeMigration(qualifiedName, newDefinition, oldField, newField);
+                planned.add(new AppliedChange("MODIFY_FIELD", newField.name(), a.type(), a.sql()));
+            }
+        }
+
+        for (AppliedChange change : planned) {
+            try {
+                jdbcTemplate.execute(change.sql());
+                recordMigration(newDefinition.name(), change.type(), change.sql());
+            } catch (RuntimeException e) {
+                throw new StorageException(String.format(
+                        "Failed to apply %s on field '%s' of collection '%s': %s",
+                        change.operation(), change.field(), newDefinition.name(), e.getMessage()), e);
+            }
+        }
+
+        log.info("Destructive schema migration completed for collection '{}': {} changes applied",
+                newDefinition.name(), planned.size());
+        return planned;
+    }
+
     /**
      * Reconciles the physical database table schema with the collection definition.
      *
@@ -750,6 +827,39 @@ public class SchemaMigrationEngine {
     }
 
     /**
+     * Creates a destructive DROP COLUMN migration action, including any companion columns
+     * (currency code, geolocation longitude). Uses {@code IF EXISTS} so a re-run — or a column
+     * already deprecated/dropped on another pod — is a no-op rather than an error.
+     * The tableIdentifier may be a bare name or schema-qualified SQL expression.
+     */
+    private MigrationAction createDropColumnMigration(String tableIdentifier, CollectionDefinition definition,
+            FieldDefinition field) {
+        if (!field.type().hasPhysicalColumn()) {
+            // FORMULA / ROLLUP_SUMMARY have no physical column to drop.
+            return new MigrationAction(definition.name(), MigrationType.DROP_COLUMN,
+                "-- No physical column for computed field: " + field.name());
+        }
+
+        String columnName = resolvePhysicalColumnName(definition, field);
+        StringBuilder sql = new StringBuilder("ALTER TABLE ");
+        sql.append(tableIdentifier);
+        sql.append(" DROP COLUMN IF EXISTS ");
+        sql.append(sanitizeIdentifier(columnName));
+
+        // Companion columns mirror createAddColumnMigration so no orphan column survives a drop.
+        if (field.type() == FieldType.CURRENCY) {
+            sql.append("; ALTER TABLE ").append(tableIdentifier);
+            sql.append(" DROP COLUMN IF EXISTS ").append(sanitizeIdentifier(columnName + "_currency_code"));
+        }
+        if (field.type() == FieldType.GEOLOCATION) {
+            sql.append("; ALTER TABLE ").append(tableIdentifier);
+            sql.append(" DROP COLUMN IF EXISTS ").append(sanitizeIdentifier(columnName + "_longitude"));
+        }
+
+        return new MigrationAction(definition.name(), MigrationType.DROP_COLUMN, sql.toString());
+    }
+
+    /**
      * Creates an ALTER COLUMN TYPE migration action.
      * The tableIdentifier may be a bare name or schema-qualified SQL expression.
      */
@@ -790,6 +900,22 @@ public class SchemaMigrationEngine {
      */
     private record MigrationAction(
         String collectionName,
+        MigrationType type,
+        String sql
+    ) {}
+
+    /**
+     * A single change applied by {@link #migrateSchemaDestructive}, returned so callers can record
+     * per-step progress (e.g. {@code migration_step} rows).
+     *
+     * @param operation coarse operation label — {@code ADD_FIELD}, {@code REMOVE_FIELD}, or {@code MODIFY_FIELD}
+     * @param field     the field name the change targets
+     * @param type      the {@link MigrationType} of the underlying DDL
+     * @param sql       the executed SQL statement
+     */
+    public record AppliedChange(
+        String operation,
+        String field,
         MigrationType type,
         String sql
     ) {}

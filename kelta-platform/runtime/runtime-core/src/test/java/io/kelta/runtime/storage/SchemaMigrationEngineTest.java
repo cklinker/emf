@@ -938,4 +938,62 @@ class SchemaMigrationEngineTest {
             assertTrue(columns.isEmpty());
         }
     }
+
+    @Nested
+    @DisplayName("Destructive migration (migrateSchemaDestructive)")
+    class DestructiveMigrationTests {
+
+        @Test
+        @DisplayName("physically DROPs a removed column (not deprecate)")
+        void dropsRemovedColumn() {
+            List<FieldDefinition> before = List.of(
+                    FieldDefinition.string("name"), FieldDefinition.integer("amount"));
+            createTestTable("orders", before);
+            CollectionDefinition oldDef = createCollection("orders", before);
+            CollectionDefinition newDef = createCollection("orders", List.of(FieldDefinition.string("name")));
+
+            List<SchemaMigrationEngine.AppliedChange> applied = migrationEngine.migrateSchemaDestructive(
+                    oldDef, newDef, TableRef.publicSchema("orders"), false);
+
+            assertEquals(1, applied.size());
+            assertEquals("REMOVE_FIELD", applied.get(0).operation());
+            assertEquals(MigrationType.DROP_COLUMN, applied.get(0).type());
+            Set<String> columns = migrationEngine.getExistingColumns("orders");
+            assertFalse(columns.contains("amount"), "amount column should be physically dropped");
+            assertTrue(columns.contains("name"), "name column should survive");
+        }
+
+        @Test
+        @DisplayName("ADDs a new column and ALTERs a compatible type change")
+        void addsAndAlters() {
+            List<FieldDefinition> before = List.of(FieldDefinition.integer("amount"));
+            createTestTable("things", before);
+            CollectionDefinition oldDef = createCollection("things", before);
+            // amount INTEGER -> STRING (compatible), plus a new 'label' STRING field.
+            CollectionDefinition newDef = createCollection("things",
+                    List.of(FieldDefinition.string("amount"), FieldDefinition.string("label")));
+
+            List<SchemaMigrationEngine.AppliedChange> applied = migrationEngine.migrateSchemaDestructive(
+                    oldDef, newDef, TableRef.publicSchema("things"), false);
+
+            assertEquals(2, applied.size());
+            Set<String> columns = migrationEngine.getExistingColumns("things");
+            assertTrue(columns.contains("amount"));
+            assertTrue(columns.contains("label"));
+        }
+
+        @Test
+        @DisplayName("rejects an incompatible type change unless forced")
+        void rejectsIncompatibleTypeChange() {
+            List<FieldDefinition> before = List.of(FieldDefinition.bool("flag"));
+            createTestTable("toggles", before);
+            CollectionDefinition oldDef = createCollection("toggles", before);
+            // BOOLEAN -> INTEGER is not in the compatibility matrix.
+            CollectionDefinition newDef = createCollection("toggles", List.of(FieldDefinition.integer("flag")));
+
+            assertThrows(IncompatibleSchemaChangeException.class, () ->
+                    migrationEngine.migrateSchemaDestructive(
+                            oldDef, newDef, TableRef.publicSchema("toggles"), false));
+        }
+    }
 }

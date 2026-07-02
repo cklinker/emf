@@ -153,6 +153,8 @@ export type ScriptResultAction =
 export interface QuickActionExecutionContext {
   /** Current collection name */
   collectionName: string
+  /** Current collection id (UUID) — needed to write a note (log_activity) */
+  collectionId?: string
   /** Current record ID (for record-scoped actions) */
   recordId?: string
   /** Current record data (for record-scoped actions) */

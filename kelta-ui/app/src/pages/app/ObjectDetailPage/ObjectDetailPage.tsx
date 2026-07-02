@@ -550,11 +550,12 @@ export function ObjectDetailPage(): React.ReactElement {
   const quickActionContext = useMemo<QuickActionExecutionContext>(
     () => ({
       collectionName: collectionName || '',
+      collectionId: schema?.id,
       recordId,
       record: record || undefined,
       tenantSlug: tenantSlug || '',
     }),
-    [collectionName, recordId, record, tenantSlug]
+    [collectionName, schema?.id, recordId, record, tenantSlug]
   )
 
   const isLoading = schemaLoading || recordLoading || permissionsLoading || layoutLoading

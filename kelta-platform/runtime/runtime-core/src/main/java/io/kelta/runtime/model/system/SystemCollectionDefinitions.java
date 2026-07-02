@@ -91,6 +91,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(validationRules());
         definitions.add(recordScripts());
         definitions.add(recordShares());
+        definitions.add(quickActions());
 
         // Workflows & Automation
         definitions.add(scripts());
@@ -495,6 +496,33 @@ public final class SystemCollectionDefinitions {
                 .withDefault("READ")
                 .withEnumValues(List.of("READ", "EDIT")))
             .addField(FieldDefinition.string("reason", 500))
+            .build();
+    }
+
+    /**
+     * Per-collection record/list quick actions surfaced by the `QuickActionsMenu`. Each row is a
+     * button definition (label + icon + action type + type-specific `config` JSON). CRUD via the
+     * generic dynamic path (`/api/quick-actions`); `useQuickActions` fetches the active actions for
+     * a collection. `actionType` (not `type`) avoids clashing with the JSON:API resource `type`.
+     */
+    public static CollectionDefinition quickActions() {
+        return systemBuilder("quick-actions", "Quick Actions", "quick_action")
+            .displayFieldName("label")
+            .addField(FieldDefinition.requiredString("collectionName", 200).withColumnName("collection_name"))
+            .addField(FieldDefinition.requiredString("label", 200))
+            .addField(FieldDefinition.string("icon", 50))
+            .addField(FieldDefinition.requiredString("actionType", 30).withColumnName("action_type")
+                .withEnumValues(List.of("create_related", "update_field", "run_script",
+                    "log_activity", "send_email", "custom")))
+            .addField(FieldDefinition.requiredString("context", 10)
+                .withDefault("record")
+                .withEnumValues(List.of("record", "list", "both")))
+            .addField(FieldDefinition.integer("sortOrder").withColumnName("sort_order").withDefault(0))
+            .addField(FieldDefinition.bool("requiresConfirmation")
+                .withColumnName("requires_confirmation").withDefault(false))
+            .addField(FieldDefinition.string("confirmationMessage", 500).withColumnName("confirmation_message"))
+            .addField(FieldDefinition.json("config"))
+            .addField(FieldDefinition.bool("active").withDefault(true))
             .build();
     }
 

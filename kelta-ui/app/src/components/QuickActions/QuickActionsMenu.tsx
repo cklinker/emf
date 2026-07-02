@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useApi } from '@/context/ApiContext'
 import { useQuickActions } from '@/hooks/useQuickActions'
 import { useScriptExecution } from '@/hooks/useScriptExecution'
 import type {
@@ -39,6 +40,7 @@ import type {
   RunScriptConfig,
   CreateRelatedConfig,
   UpdateFieldConfig,
+  LogActivityConfig,
 } from '@/types/quickActions'
 
 /**
@@ -80,6 +82,7 @@ export function QuickActionsMenu({
   size = 'sm',
 }: QuickActionsMenuProps): React.ReactElement | null {
   const navigate = useNavigate()
+  const { apiClient } = useApi()
   const { actions, isLoading } = useQuickActions({
     collectionName,
     context,
@@ -109,12 +112,20 @@ export function QuickActionsMenu({
 
           case 'update_field': {
             const config = action.config as UpdateFieldConfig
+            if (!executionContext.recordId) {
+              toast.error('No record to update')
+              break
+            }
             if (config.setValue !== undefined) {
-              toast.info(`Updating ${config.fieldName}...`)
+              await apiClient.patch(
+                `/api/${executionContext.collectionName}/${executionContext.recordId}`,
+                { [config.fieldName]: config.setValue }
+              )
               toast.success(`${config.fieldName} updated`)
               onActionComplete?.()
             } else {
-              toast.info('Field update dialog coming soon')
+              // Interactive value-entry dialog is a follow-up; setValue actions are supported now.
+              toast.info('This action needs a value configured (setValue).')
             }
             break
           }
@@ -129,16 +140,31 @@ export function QuickActionsMenu({
             break
           }
 
-          case 'log_activity':
-            toast.info('Activity logging coming soon')
+          case 'log_activity': {
+            const config = action.config as LogActivityConfig
+            if (!executionContext.collectionId || !executionContext.recordId) {
+              toast.error('No record to log activity on')
+              break
+            }
+            const label = config.activityType ? `${config.activityType}: ` : ''
+            await apiClient.postResource(`/api/notes`, {
+              collectionId: executionContext.collectionId,
+              recordId: executionContext.recordId,
+              content: `${label}${action.label}`,
+            })
+            toast.success('Activity logged')
+            onActionComplete?.()
             break
+          }
 
           case 'send_email':
-            toast.info('Email compose coming soon')
+            // No FE-reachable transactional-send endpoint yet; wire via a flow (run_script) or a
+            // future /api email-send endpoint. Kept explicit rather than silently succeeding.
+            toast.info('Configure email sending via a flow action for now.')
             break
 
           case 'custom':
-            toast.info('Custom action coming soon')
+            toast.info('Custom action requires a registered plugin component.')
             break
         }
       } catch (error) {
@@ -146,7 +172,7 @@ export function QuickActionsMenu({
         toast.error(message)
       }
     },
-    [executionContext, execute, navigate, onActionComplete]
+    [executionContext, execute, navigate, onActionComplete, apiClient]
   )
 
   // Don't render anything if there are no actions and we're done loading

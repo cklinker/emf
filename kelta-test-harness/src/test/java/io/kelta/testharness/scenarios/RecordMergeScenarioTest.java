@@ -74,12 +74,24 @@ class RecordMergeScenarioTest extends ScenarioBase {
                 .as("the order FK was re-parented").isGreaterThanOrEqualTo(1);
 
         // The order now points at the master — proves the inbound FK was re-parented (not SET NULL).
-        ResponseEntity<Map> order = gatewayClientWithToken(token)
-                .get().uri("/" + slug + "/api/orders/" + orderId)
+        // A relationship field is serialized as a JSON:API relationship, not an `attributes` value,
+        // so assert against the stored FK column via a filter query (serialization-agnostic).
+        ResponseEntity<Map> byMaster = gatewayClientWithToken(token)
+                .get().uri("/" + slug + "/api/orders?filter[customer][eq]=" + masterId)
                 .retrieve().toEntity(Map.class);
-        Map<String, Object> orderAttrs = (Map<String, Object>) ((Map<String, Object>) order.getBody().get("data")).get("attributes");
-        assertThat(orderAttrs.get("customer"))
-                .as("order re-parented from duplicate to master").isEqualTo(masterId);
+        List<Map<String, Object>> masterOrders = (List<Map<String, Object>>) byMaster.getBody().get("data");
+        assertThat(masterOrders)
+                .as("order re-parented from duplicate to master")
+                .anySatisfy(o -> assertThat(o.get("id")).isEqualTo(orderId));
+
+        // ...and no order still points at the deleted duplicate.
+        ResponseEntity<Map> byDup = gatewayClientWithToken(token)
+                .get().uri("/" + slug + "/api/orders?filter[customer][eq]=" + dupId)
+                .retrieve().toEntity(Map.class);
+        List<Map<String, Object>> dupOrders = (List<Map<String, Object>>) byDup.getBody().get("data");
+        assertThat(dupOrders)
+                .as("no order left pointing at the merged-away duplicate")
+                .noneSatisfy(o -> assertThat(o.get("id")).isEqualTo(orderId));
 
         // The duplicate is gone; the master survives.
         assertThat(recordStatus(token, slug, "customers", dupId))

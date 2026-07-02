@@ -539,8 +539,31 @@ jobs:
         working-directory: e2e-tests
         run: npx playwright install --with-deps chromium
 
-      - name: Wait for services to stabilize
-        run: sleep 30
+      # The smoke test only proves the GATEWAY is live. A migration-bearing deploy restarts
+      # the WORKER (Flyway runs at startup), so the gateway can be UP while data calls still
+      # 502/503. Running Playwright in that window fails every data-dependent test and burns
+      # the full 18-min timeout. Poll an authenticated data path until the worker actually
+      # serves, then run — or fail fast with a clear message instead of a cascade of timeouts.
+      - name: Wait for the worker to serve data (post-deploy readiness)
+        env:
+          E2E_API_BASE_URL: https://api.kelta.io
+          E2E_TENANT_SLUG: default
+          E2E_API_TOKEN: ${{ secrets.E2E_API_TOKEN }}
+        run: |
+          url="${E2E_API_BASE_URL}/${E2E_TENANT_SLUG}/api/collections"
+          echo "Waiting for authenticated data from ${url} …"
+          for i in $(seq 1 40); do
+            code=$(curl -sk -g -m 10 -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${E2E_API_TOKEN}" "${url}" || echo 000)
+            if [ "${code}" = "200" ]; then
+              echo "Worker serving data (HTTP 200) after ~$((i*6))s — running E2E."
+              exit 0
+            fi
+            echo "attempt ${i}/40: HTTP ${code} — worker not ready, retrying in 6s"
+            sleep 6
+          done
+          echo "::error::Worker did not serve data within ~4 min of deploy; failing fast instead of an 18-min Playwright timeout. Check the worker rollout / Flyway migration."
+          exit 1
 
       - name: Run E2E tests
         timeout-minutes: 18

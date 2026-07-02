@@ -39,6 +39,7 @@ ship a change that moves a row.
 | Configuration packages | `PackageController` (`/api/packages/{export,import/preview,import,history}`) + `PackageService` — real export/import/dry-run. `packages`/`package-items` system collections. (Verified 2026-07-02; the prior 🔴 "no PackageController" was stale.) |
 | SCIM 2.0 provisioning | Full `scim/` package: `ScimUser/Group/DiscoveryController` + services + `ScimFilterParser` + `ScimAuthenticationFilter`; gateway route `/scim/v2/**`; 6 test classes. (Verified 2026-07-02; the prior ⚪ "not started" was stale.) |
 | Data export | `DataExportController` (`/api/data-exports`, CSV/JSON, presigned-download) + `DataExportService`; gateway static route added + gated on `VIEW_ALL_DATA` (2026-07-02). Scheduled `DATA_EXPORT`/`REPORT_EXPORT`/`FLOW` jobs run via `ScheduledJobExecutorService` |
+| Standalone script execution | `ScriptExecutionController` `POST /api/scripts/{id}/execute` runs an active, HTTP-invocable (`API_ENDPOINT`/`EVENT_HANDLER`) script through the sandboxed `GraalVmScriptExecutor` with `input`+`context` bindings; logs to `script_execution_log`; end-user Quick Actions `useScriptExecution` calls it (script `output.action` drives refresh/redirect/toast/open_record). Per-script authz is a follow-up |
 
 ## 🟡 Partial — backend exists, gaps remain
 
@@ -74,7 +75,6 @@ ship a change that moves a row.
 | Record types | Data model + Record Type editor | No runtime enforcement of picklist restriction or layout association (backend reachability unverified) |
 | Record sharing | `ResourceDetailPage` sharing panel | `record-shares` is **not** a system collection and has no controller; UI try/catches `/api/record-shares` → `[]`. Genuine UI-without-backend gap |
 | Quick actions | `QuickActionsMenu` (record detail) | `useQuickActions` returns `[]` (no source); the four action handlers fire "coming soon" toasts. No backend |
-| Standalone script execution | `useScriptExecution` / run buttons | No `ScriptController`, no `/api/scripts/{id}/execute`; scripts run only via flow `InvokeScript` + record-event hooks. `useScriptExecution` returns "temporarily unavailable" |
 | Schema migration planner | `MigrationsPage` (plan/execute) | UI calls `/api/migrations`, `/api/migrations/plan`, `/api/migrations/execute` — **no controller maps these** (only `/api/migration-runs`, a system collection, exists). Genuine gap |
 
 ## ⚪ Planned / enterprise gaps (not started)

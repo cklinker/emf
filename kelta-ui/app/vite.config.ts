@@ -53,11 +53,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // Heavy admin pages (react-flow / recharts / dnd-kit) are route-split into their own
-        // lazy chunks, so the main bundle no longer carries them and the end-user PWA loads
-        // them only if those admin routes are visited. The remaining main chunk is still a
-        // few MB, so keep the precache limit above the default 2 MiB. Further lazy-loading of
-        // the remaining admin pages + excluding admin chunks from precache is a follow-up.
+        // Admin-only page chunks are emitted under assets/admin/ (see build.rollupOptions
+        // below) and kept OUT of the precache — the installable end-user PWA shouldn't
+        // download the admin/builder code up front. They're runtime-cached on demand instead
+        // (see runtimeCaching), so an admin who visits those routes still gets a warm cache.
+        globIgnores: ['**/assets/admin/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // SPA fallback to index.html for client routes, but never for backend paths.
         navigateFallback: '/index.html',
@@ -68,9 +68,36 @@ export default defineConfig({
           /^\/actuator/,
           /^\/openapi/,
         ],
+        // Admin chunks aren't precached — cache them on demand so repeat admin visits are
+        // fast (and offline-capable) without bloating the install.
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/admin\/.*\.js$/,
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'admin-chunks', expiration: { maxEntries: 100 } },
+          },
+        ],
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Emit admin-only page chunks under assets/admin/ so the service worker can keep
+        // them out of the precache (workbox.globIgnores). A lazy page chunk's facadeModuleId
+        // is its own module path — src/pages/* is admin, src/pages/app/* is the end-user
+        // runtime (stays in the default assets/ + precache). Shared chunks (facadeModuleId
+        // null) also keep the default path.
+        chunkFileNames: (chunkInfo) => {
+          const id = chunkInfo.facadeModuleId
+          if (id && id.includes('/src/pages/') && !id.includes('/src/pages/app/')) {
+            return 'assets/admin/[name]-[hash].js'
+          }
+          return 'assets/[name]-[hash].js'
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

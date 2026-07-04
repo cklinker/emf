@@ -326,6 +326,60 @@ class ReportExecutionServiceTest {
     }
 
     @Test
+    void shouldExportPdf() throws Exception {
+        when(jdbcTemplate.queryForList(contains("SELECT name FROM collection"), eq("col-1")))
+            .thenReturn(List.of(Map.of("name", "contacts")));
+        CollectionDefinition contactsDef = buildCollectionDef("contacts");
+        when(collectionRegistry.get("contacts")).thenReturn(contactsDef);
+
+        List<Map<String, Object>> records = List.of(
+            Map.of("id", "r1", "name", "Alice", "email", "alice@example.com"),
+            Map.of("id", "r2", "name", "Bob", "email", "bob@example.com")
+        );
+        PaginationMetadata meta = new PaginationMetadata(2, 1, 1000, 1);
+        when(queryEngine.executeQuery(eq(contactsDef), any(QueryRequest.class)))
+            .thenReturn(new QueryResult(records, meta));
+
+        Map<String, Object> reportConfig = new HashMap<>();
+        reportConfig.put("id", "report-pdf");
+        reportConfig.put("name", "Contact List");
+        reportConfig.put("primaryCollectionId", "col-1");
+        reportConfig.put("columns", "[{\"fieldName\":\"name\",\"label\":\"Name\",\"type\":\"string\"},"
+            + "{\"fieldName\":\"email\",\"label\":\"Email\",\"type\":\"string\"}]");
+
+        var out = new java.io.ByteArrayOutputStream();
+        service.exportPdf(reportConfig, out);
+
+        byte[] pdf = out.toByteArray();
+        assertTrue(pdf.length > 0);
+        assertEquals("%PDF", new String(pdf, 0, 4));
+        // Parse back and assert content actually landed on the page
+        try (var document = org.apache.pdfbox.Loader.loadPDF(pdf)) {
+            assertEquals(1, document.getNumberOfPages());
+            String text = new org.apache.pdfbox.text.PDFTextStripper().getText(document);
+            assertTrue(text.contains("Contact List"), "title on first page");
+            assertTrue(text.contains("Name"), "header row");
+            assertTrue(text.contains("Alice"), "data row 1");
+            assertTrue(text.contains("bob@example.com"), "data row 2");
+            assertTrue(text.contains("Page 1"), "footer page number");
+        }
+    }
+
+    @Test
+    void shouldFailPdfExportWithoutColumns() {
+        when(jdbcTemplate.queryForList(contains("SELECT name FROM collection"), eq("col-1")))
+            .thenReturn(List.of(Map.of("name", "contacts")));
+        when(collectionRegistry.get("contacts")).thenReturn(buildCollectionDef("contacts"));
+
+        Map<String, Object> reportConfig = new HashMap<>();
+        reportConfig.put("name", "Empty");
+        reportConfig.put("primaryCollectionId", "col-1");
+
+        assertThrows(ReportExecutionService.ReportExecutionException.class,
+            () -> service.exportPdf(reportConfig, new java.io.ByteArrayOutputStream()));
+    }
+
+    @Test
     void shouldEscapeCsvValues() throws Exception {
         when(jdbcTemplate.queryForList(contains("SELECT name FROM collection"), eq("col-1")))
             .thenReturn(List.of(Map.of("name", "notes")));

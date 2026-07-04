@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { componentRegistry } from '../../services/componentRegistry'
 import { Button } from '@/components/ui/button'
 import {
   Package,
@@ -9,6 +10,7 @@ import {
   PowerOff,
   Trash2,
   Plus,
+  Puzzle,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
@@ -199,6 +201,31 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
 
   const moduleList = modules || []
 
+  // Plugin components registered in this browser session (global client-side registry)
+  const componentGroups = [
+    {
+      key: 'field-renderers',
+      label: 'Field Renderers',
+      names: componentRegistry.listFieldRenderers(),
+    },
+    {
+      key: 'page-components',
+      label: 'Page Components',
+      names: componentRegistry.listPageComponents(),
+    },
+    {
+      key: 'quick-actions',
+      label: 'Quick Actions',
+      names: componentRegistry.listQuickActions(),
+    },
+    {
+      key: 'column-renderers',
+      label: 'Column Renderers',
+      names: componentRegistry.listColumnRenderers(),
+    },
+  ]
+  const totalPluginComponents = componentGroups.reduce((sum, group) => sum + group.names.length, 0)
+
   return (
     <div data-testid={testId} className="mx-auto max-w-5xl px-6 py-6">
       {/* Header */}
@@ -291,6 +318,57 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
           </div>
         </div>
       )}
+
+      {/* Plugin Components */}
+      <div
+        data-testid="plugin-components-section"
+        className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+      >
+        <div className="mb-1 flex items-center gap-2">
+          <Puzzle size={18} className="text-blue-600" />
+          <h2 className="text-lg font-medium text-gray-900">Plugin Components</h2>
+        </div>
+        <p className="mb-4 text-sm text-gray-500">
+          UI components registered by plugin frontend bundles in this browser session
+        </p>
+        {totalPluginComponents === 0 ? (
+          <p data-testid="plugin-components-empty" className="text-sm text-gray-400">
+            No plugin components registered — components register when a module&apos;s frontend
+            bundle loads.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {componentGroups.map((group) => (
+              <div
+                key={group.key}
+                data-testid={`plugin-components-${group.key}`}
+                className="rounded-md bg-gray-50 p-4"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-gray-700">{group.label}</h3>
+                  <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">
+                    {group.names.length}
+                  </span>
+                </div>
+                {group.names.length === 0 ? (
+                  <p className="text-xs text-gray-400">None registered</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.names.map((name) => (
+                      <code
+                        key={name}
+                        className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700"
+                      >
+                        {name}
+                      </code>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Empty State */}
       {moduleList.length === 0 && !isInstallOpen && (

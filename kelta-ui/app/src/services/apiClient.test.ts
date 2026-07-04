@@ -211,6 +211,61 @@ describe('ApiClient error handling', () => {
     })
   })
 
+  describe('getBlob', () => {
+    it('should request with responseType blob and return the Blob', async () => {
+      const pdf = new Blob(['%PDF-1.7'], { type: 'application/pdf' })
+      mockAxios.get.mockResolvedValueOnce({ data: pdf })
+
+      const result = await client.getBlob('/api/reports/rep-1/export?format=pdf')
+
+      expect(result).toBe(pdf)
+      expect(mockAxios.get).toHaveBeenCalledWith('/api/reports/rep-1/export?format=pdf', {
+        responseType: 'blob',
+      })
+    })
+
+    it('should decode a JSON:API error Blob into a structured ApiError', async () => {
+      const errorBody = {
+        errors: [
+          {
+            status: '400',
+            title: 'Bad Request',
+            detail: 'Unsupported export format: xml. Supported: csv, pdf',
+          },
+        ],
+      }
+      mockAxios.get.mockRejectedValueOnce(
+        createAxiosError(400, new Blob([JSON.stringify(errorBody)], { type: 'application/json' }))
+      )
+
+      try {
+        await client.getBlob('/api/reports/rep-1/export?format=xml')
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        const apiError = error as ApiError
+        expect(apiError.status).toBe(400)
+        expect(apiError.message).toBe('Unsupported export format: xml. Supported: csv, pdf')
+      }
+    })
+
+    it('should fall back to statusText when the error Blob is not JSON', async () => {
+      mockAxios.get.mockRejectedValueOnce(
+        createAxiosError(500, new Blob(['boom'], { type: 'text/plain' }), 'Internal Server Error')
+      )
+
+      try {
+        await client.getBlob('/api/reports/rep-1/export?format=pdf')
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        const apiError = error as ApiError
+        expect(apiError.status).toBe(500)
+        expect(apiError.message).toBe('Internal Server Error')
+      }
+    })
+  })
+
   describe('optimistic locking (slice 5)', () => {
     it('getWithMeta returns the raw body and the ETag header', async () => {
       mockAxios.get.mockResolvedValueOnce({

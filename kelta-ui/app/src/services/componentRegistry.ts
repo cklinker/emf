@@ -127,6 +127,13 @@ class ComponentRegistry {
     return this.fieldRenderers.has(fieldType)
   }
 
+  /**
+   * List registered field renderer types, sorted alphabetically.
+   */
+  listFieldRenderers(): string[] {
+    return Array.from(this.fieldRenderers.keys()).sort()
+  }
+
   // --- Page Components ---
 
   /**
@@ -148,6 +155,13 @@ class ComponentRegistry {
    */
   hasPageComponent(name: string): boolean {
     return this.pageComponents.has(name)
+  }
+
+  /**
+   * List registered page component names, sorted alphabetically.
+   */
+  listPageComponents(): string[] {
+    return Array.from(this.pageComponents.keys()).sort()
   }
 
   // --- Quick Actions ---
@@ -173,6 +187,13 @@ class ComponentRegistry {
     return this.quickActions.has(name)
   }
 
+  /**
+   * List registered quick action names, sorted alphabetically.
+   */
+  listQuickActions(): string[] {
+    return Array.from(this.quickActions.keys()).sort()
+  }
+
   // --- Column Renderers ---
 
   /**
@@ -194,6 +215,13 @@ class ComponentRegistry {
    */
   hasColumnRenderer(name: string): boolean {
     return this.columnRenderers.has(name)
+  }
+
+  /**
+   * List registered column renderer names, sorted alphabetically.
+   */
+  listColumnRenderers(): string[] {
+    return Array.from(this.columnRenderers.keys()).sort()
   }
 
   // --- Utilities ---

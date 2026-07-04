@@ -36,6 +36,13 @@ export class ComponentRegistry {
   }
 
   /**
+   * List all registered field renderer types, sorted alphabetically
+   */
+  static listFieldRenderers(): string[] {
+    return Array.from(ComponentRegistry.fieldRenderers.keys()).sort();
+  }
+
+  /**
    * Register a custom page component with a route
    */
   static registerPageComponent(name: string, route: string, component: PageComponent): void {
@@ -61,6 +68,13 @@ export class ComponentRegistry {
    */
   static getAllPageComponents(): RegisteredPageComponent[] {
     return Array.from(ComponentRegistry.pageComponents.values());
+  }
+
+  /**
+   * List all registered page component names, sorted alphabetically
+   */
+  static listPageComponents(): string[] {
+    return Array.from(ComponentRegistry.pageComponents.keys()).sort();
   }
 
   /**

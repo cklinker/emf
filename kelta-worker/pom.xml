@@ -219,6 +219,13 @@
             <version>0.4.20</version>
         </dependency>
 
+        <!-- PDF report export (Apache-2.0) -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.5</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

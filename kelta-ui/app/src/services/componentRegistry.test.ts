@@ -70,6 +70,40 @@ describe('ComponentRegistry', () => {
     })
   })
 
+  describe('List Methods', () => {
+    it('returns empty arrays when nothing is registered', () => {
+      expect(componentRegistry.listFieldRenderers()).toEqual([])
+      expect(componentRegistry.listPageComponents()).toEqual([])
+      expect(componentRegistry.listQuickActions()).toEqual([])
+      expect(componentRegistry.listColumnRenderers()).toEqual([])
+    })
+
+    it('lists registered names per type, sorted alphabetically', () => {
+      const Mock = () => null
+      componentRegistry.registerFieldRenderer('zeta_field', Mock)
+      componentRegistry.registerFieldRenderer('alpha_field', Mock)
+      componentRegistry.registerPageComponent('widgets', Mock)
+      componentRegistry.registerPageComponent('analytics', Mock)
+      componentRegistry.registerQuickAction('approve', Mock)
+      componentRegistry.registerColumnRenderer('progress', Mock)
+      componentRegistry.registerColumnRenderer('badge', Mock)
+
+      expect(componentRegistry.listFieldRenderers()).toEqual(['alpha_field', 'zeta_field'])
+      expect(componentRegistry.listPageComponents()).toEqual(['analytics', 'widgets'])
+      expect(componentRegistry.listQuickActions()).toEqual(['approve'])
+      expect(componentRegistry.listColumnRenderers()).toEqual(['badge', 'progress'])
+    })
+
+    it('reflects clear() in list results', () => {
+      const Mock = () => null
+      componentRegistry.registerFieldRenderer('a', Mock)
+      componentRegistry.registerQuickAction('q1', Mock)
+      componentRegistry.clear()
+      expect(componentRegistry.listFieldRenderers()).toEqual([])
+      expect(componentRegistry.listQuickActions()).toEqual([])
+    })
+  })
+
   describe('Utilities', () => {
     it('returns stats with all counts', () => {
       const stats = componentRegistry.getStats()

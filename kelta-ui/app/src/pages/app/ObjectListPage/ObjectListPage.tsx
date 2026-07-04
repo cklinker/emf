@@ -47,6 +47,7 @@ import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { REFERENCE_FIELD_TYPES, referenceIncludeParam } from './listIncludes'
 import type { SortState, FilterCondition, CollectionRecord } from '@/hooks/useCollectionRecords'
+import { ListShell } from '@/components/record/ListShell'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
 import { ListViewToolbar } from '@/components/ListViewToolbar'
@@ -434,189 +435,186 @@ export function ObjectListPage(): React.ReactElement {
     [collectionName, selectedIds, tenantSlug]
   )
 
-  // Loading state for schema and permissions
-  if (schemaLoading || permissionsLoading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  // Permission check: user must have canRead
-  if (!permissions.canRead) {
-    return (
-      <InsufficientPrivileges
-        action="view"
-        resource={collectionLabel}
-        backPath={`${basePath}/home`}
-      />
-    )
-  }
-
-  // Error state
-  if (schemaError) {
-    return (
-      <div className="space-y-4 p-6">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error loading collection</AlertTitle>
-          <AlertDescription>
-            {schemaError.message || 'Failed to load collection schema.'}
-          </AlertDescription>
-        </Alert>
-        <Button variant="outline" onClick={() => refetch()}>
-          Retry
-        </Button>
-      </div>
-    )
-  }
+  // Status branch (permission gate / schema error), rendered by the shell in
+  // place of the list frame. Order matches the legacy early-returns.
+  const statusSlot: React.ReactNode = !permissions.canRead ? (
+    <InsufficientPrivileges
+      action="view"
+      resource={collectionLabel}
+      backPath={`${basePath}/home`}
+    />
+  ) : schemaError ? (
+    <div className="space-y-4 p-6">
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error loading collection</AlertTitle>
+        <AlertDescription>
+          {schemaError.message || 'Failed to load collection schema.'}
+        </AlertDescription>
+      </Alert>
+      <Button variant="outline" onClick={() => refetch()}>
+        Retry
+      </Button>
+    </div>
+  ) : null
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      {/* Breadcrumb */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to={`${basePath}/home`}>Home</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{collectionLabel}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      {/* Toolbar */}
-      <ListViewToolbar
-        collectionLabel={collectionLabel}
-        selectedCount={selectedIds.size}
-        totalCount={total}
-        onNew={handleNew}
-        onBulkDelete={handleBulkDeleteClick}
-        onExportCsv={handleExportCsv}
-        onExportJson={handleExportJson}
-        onImportCsv={permissions.canCreate ? () => setShowImportDialog(true) : undefined}
-        onClearSelection={handleClearSelection}
-        canCreate={permissions.canCreate}
-        canDelete={permissions.canDelete}
-        quickActionsSlot={
-          <QuickActionsMenu
-            collectionName={collectionName || ''}
-            context="list"
-            executionContext={quickActionContext}
-          />
-        }
-      />
-
-      {/* Active filters bar */}
-      <FilterBar
-        filters={filters}
-        onRemoveFilter={handleRemoveFilter}
-        onClearAll={handleClearAllFilters}
-      />
-
-      {/* Error state for records */}
-      {recordsError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error loading records</AlertTitle>
-          <AlertDescription>{recordsError.message || 'Failed to load records.'}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Data table */}
-      <ObjectDataTable
-        records={records}
-        fields={visibleFields}
-        sort={sort}
-        onSortChange={handleSortChange}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        isLoading={recordsLoading}
-        collectionName={collectionName || ''}
-        onEdit={permissions.canEdit ? handleEdit : undefined}
-        onDelete={permissions.canDelete ? handleDeleteClick : undefined}
-        lookupDisplayMap={lookupDisplayMap}
-        editable={permissions.canEdit}
-        onCellCommit={handleCellCommit}
-      />
-
-      {/* Pagination */}
-      {!recordsLoading && records.length > 0 && (
-        <DataTablePagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
+    <ListShell
+      variant="enduser"
+      isLoading={schemaLoading || permissionsLoading}
+      statusSlot={statusSlot}
+      breadcrumb={
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to={`${basePath}/home`}>Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{collectionLabel}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      }
+      toolbar={
+        <ListViewToolbar
+          collectionLabel={collectionLabel}
           selectedCount={selectedIds.size}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
+          totalCount={total}
+          onNew={handleNew}
+          onBulkDelete={handleBulkDeleteClick}
+          onExportCsv={handleExportCsv}
+          onExportJson={handleExportJson}
+          onImportCsv={permissions.canCreate ? () => setShowImportDialog(true) : undefined}
+          onClearSelection={handleClearSelection}
+          canCreate={permissions.canCreate}
+          canDelete={permissions.canDelete}
+          quickActionsSlot={
+            <QuickActionsMenu
+              collectionName={collectionName || ''}
+              context="list"
+              executionContext={quickActionContext}
+            />
+          }
         />
-      )}
+      }
+      filters={
+        <>
+          {/* Active filters bar */}
+          <FilterBar
+            filters={filters}
+            onRemoveFilter={handleRemoveFilter}
+            onClearAll={handleClearAllFilters}
+          />
 
-      {/* CSV import dialog */}
-      <CsvImportDialog
-        open={showImportDialog}
-        onOpenChange={setShowImportDialog}
-        collectionName={collectionName || ''}
-        onImported={refetch}
-      />
+          {/* Error state for records */}
+          {recordsError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error loading records</AlertTitle>
+              <AlertDescription>
+                {recordsError.message || 'Failed to load records.'}
+              </AlertDescription>
+            </Alert>
+          )}
+        </>
+      }
+      table={
+        <ObjectDataTable
+          records={records}
+          fields={visibleFields}
+          sort={sort}
+          onSortChange={handleSortChange}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          isLoading={recordsLoading}
+          collectionName={collectionName || ''}
+          onEdit={permissions.canEdit ? handleEdit : undefined}
+          onDelete={permissions.canDelete ? handleDeleteClick : undefined}
+          lookupDisplayMap={lookupDisplayMap}
+          editable={permissions.canEdit}
+          onCellCommit={handleCellCommit}
+        />
+      }
+      pagination={
+        !recordsLoading && records.length > 0 ? (
+          <DataTablePagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            selectedCount={selectedIds.size}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        ) : undefined
+      }
+      dialogs={
+        <>
+          {/* CSV import dialog */}
+          <CsvImportDialog
+            open={showImportDialog}
+            onOpenChange={setShowImportDialog}
+            collectionName={collectionName || ''}
+            onImported={refetch}
+          />
 
-      {/* Single delete confirmation */}
-      <AlertDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null)
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete record?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this record. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {mutations.remove.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          {/* Single delete confirmation */}
+          <AlertDialog
+            open={!!deleteTarget}
+            onOpenChange={(open) => {
+              if (!open) setDeleteTarget(null)
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete record?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete this record. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteConfirm}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {mutations.remove.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      {/* Bulk delete confirmation */}
-      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedIds.size} records?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete {selectedIds.size} record
-              {selectedIds.size !== 1 ? 's' : ''}. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBulkDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {mutations.bulkDelete.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Delete {selectedIds.size} records
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+          {/* Bulk delete confirmation */}
+          <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {selectedIds.size} records?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete {selectedIds.size} record
+                  {selectedIds.size !== 1 ? 's' : ''}. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleBulkDeleteConfirm}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {mutations.bulkDelete.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Delete {selectedIds.size} records
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      }
+    />
   )
 }

@@ -141,12 +141,19 @@ public class ReportExecutionController {
                     reportExecutionService.exportCsv(reportConfig, writer);
                     writer.flush();
                 }
+            } else if ("pdf".equalsIgnoreCase(format)) {
+                response.setContentType(MediaType.APPLICATION_PDF_VALUE);
+                response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"" + safeFileName + ".pdf\"");
+
+                reportExecutionService.exportPdf(reportConfig, response.getOutputStream());
+                response.getOutputStream().flush();
             } else {
                 response.setStatus(400);
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 response.getWriter().write(
                     "{\"errors\":[{\"status\":\"400\",\"title\":\"Bad Request\","
-                    + "\"detail\":\"Unsupported export format: " + format + ". Supported: csv\"}]}");
+                    + "\"detail\":\"Unsupported export format: " + format + ". Supported: csv, pdf\"}]}");
             }
 
         } catch (ReportExecutionService.ReportExecutionException e) {

@@ -21,14 +21,16 @@ MUST stay intact:
   through the generic collection route (the collections are read-only) — keep it that way.
 
 **Power controllers gated only by blanket `API_ACCESS` + RLS (2026-07-02 audit).**
-`ReportExecutionController`, `DashboardDataController`, `BulkOperationsController`, and
-`PackageController` do **not** enforce a specific system permission in-controller — they
-rely on tenant-scoping (RLS) plus the gateway's blanket `API_ACCESS` check and the fact
-that their UIs sit behind `VIEW_SETUP` nav. A PAT holder with only `API_ACCESS` can call
-them directly. `DataExportController` was the most exfiltration-sensitive (one call →
-whole-tenant dump) and is now gated on `VIEW_ALL_DATA` (2026-07-02); the others should get
-matching in-controller gates (`MANAGE_REPORTS` for reports/dashboards, `MANAGE_DATA` for
-bulk, `CUSTOMIZE_APPLICATION`/`VIEW_SETUP` for packages). Follow-up, not yet done.
+`ReportExecutionController`, `DashboardDataController`, and `PackageController` do
+**not** enforce a specific system permission in-controller — they rely on tenant-scoping
+(RLS) plus the gateway's blanket `API_ACCESS` check and the fact that their UIs sit
+behind `VIEW_SETUP` nav. A PAT holder with only `API_ACCESS` can call them directly.
+`DataExportController` was the most exfiltration-sensitive (one call → whole-tenant dump)
+and is gated on `VIEW_ALL_DATA` (2026-07-02); **`BulkOperationsController` write
+endpoints (create/upload/abort) are now gated on `MANAGE_DATA`** (2026-07-04 — bulk
+writes bypass per-record Cerbos advice, so the in-controller gate is the boundary; reads
+keep `API_ACCESS`). Remaining follow-up: `MANAGE_REPORTS` for reports/dashboards,
+`CUSTOMIZE_APPLICATION`/`VIEW_SETUP` for packages.
 
 **Record merge write path — field-level write-FLS not applied (accepted trade-off).**
 `RecordMergeController` (`POST /api/collections/{name}/merge`) applies the master's
@@ -95,7 +97,7 @@ for removal ("inline the current value"). Findings:
 
 **Other:**
 
-- **Related-list mass-edit is deferred (unified record slice 4).** `RelatedList` inline CRUD does per-row create/edit/delete via the existing JSON:API endpoints. A true mass-edit (spec-optional) would be **N sequential PATCHes**, which consumes per-tenant governor quota and has no atomicity — so it waits on a real bulk write endpoint (a separate 🔴 backend gap), rather than shipping an N-call loop. Deleting a `master_detail` child is a normal delete; deleting the parent cascades server-side (FK CASCADE).
+- **Related-list mass-edit ships via bulk-jobs (2026-07-04; formerly deferred).** `RelatedList` row selection + "Edit field…" submits ONE `POST /api/bulk-jobs` UPDATE job and polls it — no N-sequential-PATCH loop. Two boundaries to keep in mind: (1) the affordance is gated on `MANAGE_DATA` (`useSystemPermissions`) because bulk writes bypass per-record Cerbos advice — the in-controller `MANAGE_DATA` gate is the server boundary; (2) bulk UPDATE runs through `QueryEngine.update`, so validation/hooks fire but field-level write-FLS advice does not (same accepted trade-off as record merge). Deleting a `master_detail` child is a normal delete; deleting the parent cascades server-side (FK CASCADE).
 - `PageBuilderPage.tsx` (`kelta-ui/app/src/pages/PageBuilderPage/`) is still large (~1.3k lines) but net-shrank in slices 2a/2b/2c: the per-type render switches, `AVAILABLE_COMPONENTS`/`ComponentPalette`, the `PropertyPanel` blocks, and (2c) the in-file native-HTML5-DnD `Canvas` + drag handlers were extracted to `widgets/*`, `palette/Palette.tsx`, `inspector/*`, and `canvas/*`. Remaining bulk is the page-list table, the page-config form modal, and the editor shell — candidates for extraction if it grows further; not currently blocking.
 - **`@dnd-kit/{core,sortable,utilities}` (slice 2c)** is a new `kelta-ui/app` runtime dep, **scoped to the page canvas only** — `PageLayoutsPage`/`MenuBuilderPage`/`FlowDesignerPage` stay on native HTML5 DnD; do NOT mix the two libs in one tree. Watch items: ~30–40 kB gz bundle cost; pointer-DnD is flaky in jsdom (interaction tests drive dnd-kit via the **KeyboardSensor** and assert the resulting tree, not pixels — pointer fidelity is covered post-deploy by Playwright). The `vitest.setup.ts` `ResizeObserver` mock is now a real class because `DndContext` does `new ResizeObserver(...)`.
 - **Page save-path silent-drop class (slice 2c — closed for `schemaVersion`).** `mergeConfig` only overlays a key when the `handleSavePage` CALL passes it; widening `mergeConfig`'s accepted keys alone silently drops them. 2c passes the full set `{ components, variables, dataSources, schemaVersion: 2 }`. The invariant — *every page-level sibling must be passed at the call site* — must hold for every future sibling (2d adds `variables`/`dataSources` values, 1h adds `access`). A test asserts the `updateMutation.mutate` payload carries `schemaVersion`.

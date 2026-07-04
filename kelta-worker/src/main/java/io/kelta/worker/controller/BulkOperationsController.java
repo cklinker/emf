@@ -2,8 +2,11 @@ package io.kelta.worker.controller;
 
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.jsonapi.JsonApiResponseBuilder;
+import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.repository.BulkJobRepository;
+import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.CsvImportService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -38,19 +41,53 @@ public class BulkOperationsController {
     private static final int MAX_BATCH_SIZE = 1000;
     private static final Set<String> VALID_OPERATIONS = Set.of("INSERT", "UPDATE", "UPSERT", "DELETE");
 
+    /** System permission required to create or abort bulk jobs (concerns.md follow-up). */
+    static final String WRITE_PERMISSION = "MANAGE_DATA";
+
     private final BulkJobRepository bulkJobRepository;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
     private final CsvImportService csvImportService;
+    private final CerbosPermissionResolver permissionResolver;
+    private final BootstrapRepository bootstrapRepository;
 
     public BulkOperationsController(BulkJobRepository bulkJobRepository,
                                      ObjectMapper objectMapper,
                                      JdbcTemplate jdbcTemplate,
-                                     CsvImportService csvImportService) {
+                                     CsvImportService csvImportService,
+                                     CerbosPermissionResolver permissionResolver,
+                                     BootstrapRepository bootstrapRepository) {
         this.bulkJobRepository = bulkJobRepository;
         this.objectMapper = objectMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.csvImportService = csvImportService;
+        this.permissionResolver = permissionResolver;
+        this.bootstrapRepository = bootstrapRepository;
+    }
+
+    /**
+     * Bulk writes bypass per-record Cerbos advice (power-user path), so the
+     * write endpoints are gated in-controller on {@code MANAGE_DATA} —
+     * fail-closed when identity is missing. Reads keep the blanket
+     * {@code API_ACCESS} gate.
+     *
+     * @return an error response when denied, or null when allowed
+     */
+    private ResponseEntity<Map<String, Object>> requireManageData(HttpServletRequest request) {
+        String profileId = permissionResolver.getProfileId(request);
+        if (profileId == null || profileId.isBlank()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    JsonApiResponseBuilder.error("403", "Forbidden", "No identity"));
+        }
+        boolean granted = bootstrapRepository.findProfileSystemPermissions(profileId).stream()
+                .anyMatch(p -> WRITE_PERMISSION.equals(p.get("permission_name"))
+                        && Boolean.TRUE.equals(p.get("granted")));
+        if (!granted) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    JsonApiResponseBuilder.error("403", "Forbidden",
+                            WRITE_PERMISSION + " permission required for bulk operations"));
+        }
+        return null;
     }
 
     /**
@@ -64,7 +101,13 @@ public class BulkOperationsController {
     public ResponseEntity<Map<String, Object>> createJob(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestHeader("X-User-Email") String userEmail,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body,
+            HttpServletRequest httpRequest) {
+
+        ResponseEntity<Map<String, Object>> denied = requireManageData(httpRequest);
+        if (denied != null) {
+            return denied;
+        }
 
         String collectionId = (String) body.get("collectionId");
         String operation = (String) body.get("operation");
@@ -128,7 +171,13 @@ public class BulkOperationsController {
             @RequestParam("collectionId") String collectionId,
             @RequestParam("operation") String operation,
             @RequestParam(value = "externalIdField", required = false) String externalIdField,
-            @RequestParam(value = "batchSize", required = false) Integer batchSize) {
+            @RequestParam(value = "batchSize", required = false) Integer batchSize,
+            HttpServletRequest httpRequest) {
+
+        ResponseEntity<Map<String, Object>> denied = requireManageData(httpRequest);
+        if (denied != null) {
+            return denied;
+        }
 
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().body(
@@ -391,7 +440,13 @@ public class BulkOperationsController {
     public ResponseEntity<Map<String, Object>> abortJob(
             @PathVariable String id,
             @RequestHeader("X-Tenant-ID") String tenantId,
-            @RequestHeader("X-User-Email") String userEmail) {
+            @RequestHeader("X-User-Email") String userEmail,
+            HttpServletRequest httpRequest) {
+
+        ResponseEntity<Map<String, Object>> denied = requireManageData(httpRequest);
+        if (denied != null) {
+            return denied;
+        }
 
         int updated = bulkJobRepository.abort(id, tenantId);
         if (updated == 0) {

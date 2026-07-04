@@ -1,8 +1,11 @@
 package io.kelta.worker.controller;
 
 import tools.jackson.databind.ObjectMapper;
+import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.repository.BulkJobRepository;
+import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.CsvImportService;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,6 +36,9 @@ class BulkOperationsControllerTest {
     private JdbcTemplate jdbcTemplate;
 
     private CsvImportService csvImportService;
+    private CerbosPermissionResolver permissionResolver;
+    private BootstrapRepository bootstrapRepository;
+    private MockHttpServletRequest request;
 
     private BulkOperationsController controller;
 
@@ -44,8 +50,49 @@ class BulkOperationsControllerTest {
     @BeforeEach
     void setUp() {
         csvImportService = mock(CsvImportService.class);
+        permissionResolver = mock(CerbosPermissionResolver.class);
+        bootstrapRepository = mock(BootstrapRepository.class);
+        request = new MockHttpServletRequest();
+        // Default: caller's profile holds MANAGE_DATA (write endpoints are gated on it)
+        lenient().when(permissionResolver.getProfileId(any())).thenReturn("prof-1");
+        lenient().when(bootstrapRepository.findProfileSystemPermissions("prof-1")).thenReturn(List.of(
+                Map.of("permission_name", "MANAGE_DATA", "granted", true)));
         controller = new BulkOperationsController(bulkJobRepository, new ObjectMapper(), jdbcTemplate,
-                csvImportService);
+                csvImportService, permissionResolver, bootstrapRepository);
+    }
+
+    @Nested
+    @DisplayName("MANAGE_DATA gate")
+    class ManageDataGate {
+
+        @Test
+        @DisplayName("profile without MANAGE_DATA → 403 on create, upload and abort; no writes")
+        void deniedWithoutPermission() {
+            when(bootstrapRepository.findProfileSystemPermissions("prof-1")).thenReturn(List.of(
+                    Map.of("permission_name", "MANAGE_DATA", "granted", false)));
+
+            var create = controller.createJob(TENANT_ID, USER_EMAIL, validCreateBody(), request);
+            var upload = controller.uploadJob(TENANT_ID, USER_EMAIL,
+                    new MockMultipartFile("file", "d.json", "application/json", "[{}]".getBytes()),
+                    COLLECTION_ID, "INSERT", null, null, request);
+            var abort = controller.abortJob(JOB_ID, TENANT_ID, USER_EMAIL, request);
+
+            assertThat(create.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(upload.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(abort.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            verifyNoInteractions(bulkJobRepository);
+        }
+
+        @Test
+        @DisplayName("missing identity → 403 (fail-closed)")
+        void deniedWithoutIdentity() {
+            when(permissionResolver.getProfileId(any())).thenReturn(null);
+
+            var response = controller.createJob(TENANT_ID, USER_EMAIL, validCreateBody(), request);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            verifyNoInteractions(bulkJobRepository);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -139,7 +186,7 @@ class BulkOperationsControllerTest {
                     anyString(), anyInt(), any(), anyString(), anyString(), any(), anyInt()))
                     .thenReturn(JOB_ID);
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             Map<String, Object> attributes = getAttributes(response.getBody());
@@ -155,7 +202,7 @@ class BulkOperationsControllerTest {
             Map<String, Object> body = validCreateBody();
             body.remove("collectionId");
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
@@ -166,7 +213,7 @@ class BulkOperationsControllerTest {
             Map<String, Object> body = validCreateBody();
             body.put("operation", "INVALID");
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
@@ -177,7 +224,7 @@ class BulkOperationsControllerTest {
             Map<String, Object> body = validCreateBody();
             body.put("records", List.of());
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
@@ -188,7 +235,7 @@ class BulkOperationsControllerTest {
             Map<String, Object> body = validCreateBody();
             body.remove("records");
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
@@ -200,7 +247,7 @@ class BulkOperationsControllerTest {
             when(jdbcTemplate.queryForList(anyString(), eq(COLLECTION_ID), eq(TENANT_ID)))
                     .thenReturn(List.of());
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
@@ -215,7 +262,7 @@ class BulkOperationsControllerTest {
                     anyString(), eq(50), any(), anyString(), anyString(), any(), anyInt()))
                     .thenReturn(JOB_ID);
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             Map<String, Object> attributes = getAttributes(response.getBody());
@@ -232,7 +279,7 @@ class BulkOperationsControllerTest {
                     anyString(), eq(1000), any(), anyString(), anyString(), any(), anyInt()))
                     .thenReturn(JOB_ID);
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             Map<String, Object> attributes = getAttributes(response.getBody());
@@ -250,7 +297,7 @@ class BulkOperationsControllerTest {
                         anyString(), anyInt(), any(), anyString(), anyString(), any(), anyInt()))
                         .thenReturn(JOB_ID);
 
-                ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+                ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
                 assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             }
@@ -266,7 +313,7 @@ class BulkOperationsControllerTest {
                     anyString(), anyInt(), any(), anyString(), anyString(), any(), anyInt()))
                     .thenReturn(JOB_ID);
 
-            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body);
+            ResponseEntity<Map<String, Object>> response = controller.createJob(TENANT_ID, USER_EMAIL, body, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         }
@@ -458,7 +505,7 @@ class BulkOperationsControllerTest {
             when(bulkJobRepository.findByIdAndTenant(JOB_ID, TENANT_ID))
                     .thenReturn(Optional.of(abortedJob));
 
-            ResponseEntity<Map<String, Object>> response = controller.abortJob(JOB_ID, TENANT_ID, USER_EMAIL);
+            ResponseEntity<Map<String, Object>> response = controller.abortJob(JOB_ID, TENANT_ID, USER_EMAIL, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             Map<String, Object> attributes = getAttributes(response.getBody());
@@ -472,7 +519,7 @@ class BulkOperationsControllerTest {
             when(bulkJobRepository.findByIdAndTenant(JOB_ID, TENANT_ID))
                     .thenReturn(Optional.empty());
 
-            ResponseEntity<Map<String, Object>> response = controller.abortJob(JOB_ID, TENANT_ID, USER_EMAIL);
+            ResponseEntity<Map<String, Object>> response = controller.abortJob(JOB_ID, TENANT_ID, USER_EMAIL, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         }
@@ -484,7 +531,7 @@ class BulkOperationsControllerTest {
             when(bulkJobRepository.findByIdAndTenant(JOB_ID, TENANT_ID))
                     .thenReturn(Optional.of(Map.of("id", JOB_ID, "status", "COMPLETED")));
 
-            ResponseEntity<Map<String, Object>> response = controller.abortJob(JOB_ID, TENANT_ID, USER_EMAIL);
+            ResponseEntity<Map<String, Object>> response = controller.abortJob(JOB_ID, TENANT_ID, USER_EMAIL, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         }
@@ -510,7 +557,7 @@ class BulkOperationsControllerTest {
                     "[{\"name\":\"A\"},{\"name\":\"B\"}]".getBytes(StandardCharsets.UTF_8));
 
             ResponseEntity<Map<String, Object>> response = controller.uploadJob(
-                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null);
+                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             assertThat(getAttributes(response.getBody())).containsEntry("totalRecords", 2);
@@ -526,7 +573,7 @@ class BulkOperationsControllerTest {
                     "name\nA\nB\nC".getBytes(StandardCharsets.UTF_8));
 
             ResponseEntity<Map<String, Object>> response = controller.uploadJob(
-                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null);
+                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             assertThat(getAttributes(response.getBody())).containsEntry("totalRecords", 3);
@@ -538,7 +585,7 @@ class BulkOperationsControllerTest {
             MultipartFile file = new MockMultipartFile("file", "data.csv", "text/csv", new byte[0]);
 
             ResponseEntity<Map<String, Object>> response = controller.uploadJob(
-                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null);
+                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "INSERT", null, null, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
             verifyNoInteractions(bulkJobRepository);
@@ -551,7 +598,7 @@ class BulkOperationsControllerTest {
                     "[{\"name\":\"A\"}]".getBytes(StandardCharsets.UTF_8));
 
             ResponseEntity<Map<String, Object>> response = controller.uploadJob(
-                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "FROB", null, null);
+                    TENANT_ID, USER_EMAIL, file, COLLECTION_ID, "FROB", null, null, request);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }

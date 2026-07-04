@@ -58,9 +58,21 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
 
     public static final String STORAGE_TYPE = "external-rest";
 
+    /** Response-cache safety cap: beyond this many entries the cache is cleared. */
+    static final int MAX_CACHE_ENTRIES = 1000;
+
     private final RestExecutor executor;
     private final ObjectMapper objectMapper;
     private final CredentialProvider credentialProvider;
+    private final java.util.function.LongSupplier clockMillis;
+
+    /** GET response cache — populated only for collections with {@code cacheTtlSeconds > 0}. */
+    private final java.util.concurrent.ConcurrentMap<String, CachedResponse> responseCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** One token bucket per baseUrl — only for collections with {@code rateLimitPerSecond > 0}. */
+    private final java.util.concurrent.ConcurrentMap<String, TokenBucket> buckets =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     public ExternalRestStorageAdapter(RestExecutor executor, ObjectMapper objectMapper) {
         this(executor, objectMapper, null);
@@ -68,9 +80,17 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
 
     public ExternalRestStorageAdapter(RestExecutor executor, ObjectMapper objectMapper,
                                       CredentialProvider credentialProvider) {
+        this(executor, objectMapper, credentialProvider, System::currentTimeMillis);
+    }
+
+    /** Test seam: inject the clock driving cache TTLs and rate-limit refills. */
+    ExternalRestStorageAdapter(RestExecutor executor, ObjectMapper objectMapper,
+                               CredentialProvider credentialProvider,
+                               java.util.function.LongSupplier clockMillis) {
         this.executor = executor;
         this.objectMapper = objectMapper;
         this.credentialProvider = credentialProvider;
+        this.clockMillis = clockMillis;
     }
 
     @Override
@@ -198,16 +218,87 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
     // --- helpers ------------------------------------------------------------
 
     private RestResponse send(String method, String url, RestConfig cfg, String body) {
+        boolean isGet = "GET".equals(method);
+        boolean cacheable = isGet && cfg.cacheTtlSeconds() > 0;
+
+        if (cacheable) {
+            CachedResponse cached = responseCache.get(url);
+            if (cached != null && cached.expiresAtMillis() > clockMillis.getAsLong()) {
+                return cached.response();
+            }
+        }
+
+        if (cfg.rateLimitPerSecond() > 0) {
+            TokenBucket bucket = buckets.computeIfAbsent(cfg.baseUrl(),
+                    k -> new TokenBucket(cfg.rateLimitPerSecond(), clockMillis.getAsLong()));
+            if (!bucket.tryAcquire(clockMillis.getAsLong())) {
+                throw new StorageException("External REST rate limit exceeded for " + cfg.baseUrl()
+                        + " (" + cfg.rateLimitPerSecond() + "/s)");
+            }
+        }
+
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Accept", "application/json");
         if (body != null) {
             headers.put("Content-Type", "application/json");
         }
         applyAuth(headers, cfg);
+        RestResponse response;
         try {
-            return executor.exchange(new RestRequest(method, url, headers, body));
+            response = executor.exchange(new RestRequest(method, url, headers, body));
         } catch (RuntimeException e) {
             throw new StorageException("External REST transport failure: " + method + " " + url, e);
+        }
+
+        if (cacheable && response.status() >= 200 && response.status() < 300) {
+            if (responseCache.size() >= MAX_CACHE_ENTRIES) {
+                responseCache.clear();
+            }
+            responseCache.put(url, new CachedResponse(response,
+                    clockMillis.getAsLong() + cfg.cacheTtlSeconds() * 1000L));
+        } else if (!isGet) {
+            // A write through this adapter makes cached reads for the same
+            // remote resource stale — drop them.
+            invalidateCache(cfg);
+        }
+        return response;
+    }
+
+    /** Drops every cached GET under the collection's remote URL. */
+    private void invalidateCache(RestConfig cfg) {
+        String prefix = cfg.collectionUrl();
+        responseCache.keySet().removeIf(key -> key.startsWith(prefix));
+    }
+
+    private record CachedResponse(RestResponse response, long expiresAtMillis) {
+    }
+
+    /**
+     * Minimal token bucket: capacity = one second's worth of permits, refilled
+     * continuously. Dependency-free — runtime-core has no Caffeine/Guava.
+     */
+    static final class TokenBucket {
+        private final double ratePerSecond;
+        private double tokens;
+        private long lastRefillMillis;
+
+        TokenBucket(double ratePerSecond, long nowMillis) {
+            this.ratePerSecond = ratePerSecond;
+            this.tokens = ratePerSecond;
+            this.lastRefillMillis = nowMillis;
+        }
+
+        synchronized boolean tryAcquire(long nowMillis) {
+            double refill = (nowMillis - lastRefillMillis) / 1000.0 * ratePerSecond;
+            if (refill > 0) {
+                tokens = Math.min(ratePerSecond, tokens + refill);
+                lastRefillMillis = nowMillis;
+            }
+            if (tokens >= 1.0) {
+                tokens -= 1.0;
+                return true;
+            }
+            return false;
         }
     }
 
@@ -370,7 +461,9 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
             String pageParam,
             String sizeParam,
             String bearerToken,
-            String credentialRef) {
+            String credentialRef,
+            long cacheTtlSeconds,
+            double rateLimitPerSecond) {
 
         static RestConfig from(CollectionDefinition definition) {
             Map<String, String> cfg = definition.storageConfig() != null
@@ -391,7 +484,35 @@ public class ExternalRestStorageAdapter implements ExternalStorageAdapter {
                     cfg.getOrDefault("pageParam", "page"),
                     cfg.getOrDefault("sizeParam", "pageSize"),
                     cfg.get("bearerToken"),
-                    cfg.get("credentialRef"));
+                    cfg.get("credentialRef"),
+                    parseNonNegativeLong(cfg.get("cacheTtlSeconds"), definition.name(), "cacheTtlSeconds"),
+                    parseNonNegativeDouble(cfg.get("rateLimitPerSecond"), definition.name(), "rateLimitPerSecond"));
+        }
+
+        private static long parseNonNegativeLong(String raw, String collection, String key) {
+            if (raw == null || raw.isBlank()) {
+                return 0L;
+            }
+            try {
+                long value = Long.parseLong(raw.trim());
+                return Math.max(0L, value);
+            } catch (NumberFormatException e) {
+                throw new StorageException("external-rest collection '" + collection
+                        + "' has a non-numeric adapterConfig." + key + ": " + raw);
+            }
+        }
+
+        private static double parseNonNegativeDouble(String raw, String collection, String key) {
+            if (raw == null || raw.isBlank()) {
+                return 0d;
+            }
+            try {
+                double value = Double.parseDouble(raw.trim());
+                return Math.max(0d, value);
+            } catch (NumberFormatException e) {
+                throw new StorageException("external-rest collection '" + collection
+                        + "' has a non-numeric adapterConfig." + key + ": " + raw);
+            }
         }
 
         String collectionUrl() {

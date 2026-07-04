@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../../context/ApiContext'
-import { LoadingSpinner, ErrorMessage } from '../../components'
+import { LoadingSpinner, ErrorMessage, useToast } from '../../components'
 import { SupersetEmbed } from '../../components/SupersetEmbed'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, BarChart3, ExternalLink, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BarChart3, ExternalLink, FileDown, FileText, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { SupersetDashboard } from '@kelta/sdk'
+import type { Report, SupersetDashboard } from '@kelta/sdk'
+
+type ExportFormat = 'csv' | 'pdf'
 
 export interface AnalyticsPageProps {
   testId?: string
@@ -22,8 +24,10 @@ function getSupersetUrl(): string {
 export function AnalyticsPage({
   testId = 'analytics-page',
 }: AnalyticsPageProps): React.ReactElement {
-  const { keltaClient } = useApi()
+  const { keltaClient, apiClient } = useApi()
+  const { showToast } = useToast()
   const [selectedDashboard, setSelectedDashboard] = useState<SupersetDashboard | null>(null)
+  const [exportingKey, setExportingKey] = useState<string | null>(null)
   const supersetUrl = getSupersetUrl()
 
   const {
@@ -35,6 +39,51 @@ export function AnalyticsPage({
     queryKey: ['superset', 'dashboards'],
     queryFn: () => keltaClient.admin.superset.listDashboards(),
   })
+
+  const {
+    data: reports,
+    isLoading: reportsLoading,
+    error: reportsError,
+    refetch: refetchReports,
+  } = useQuery({
+    queryKey: ['reports'],
+    queryFn: () => keltaClient.admin.reports.list(),
+  })
+
+  const handleExport = useCallback(
+    async (report: Report, format: ExportFormat) => {
+      const key = `${report.id}:${format}`
+      setExportingKey(key)
+      try {
+        let blob: Blob
+        if (format === 'csv') {
+          const csv = await apiClient.get<string>(`/api/reports/${report.id}/export?format=csv`)
+          blob = new Blob([typeof csv === 'string' ? csv : JSON.stringify(csv)], {
+            type: 'text/csv',
+          })
+        } else {
+          blob = await apiClient.getBlob(`/api/reports/${report.id}/export?format=pdf`)
+        }
+        // Same safe-filename pattern the server uses for Content-Disposition
+        const safeFileName = report.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${safeFileName}.${format}`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : `Failed to export ${format.toUpperCase()}`
+        showToast(message, 'error')
+      } finally {
+        setExportingKey(null)
+      }
+    },
+    [apiClient, showToast]
+  )
 
   // Embedded dashboard view
   if (selectedDashboard) {
@@ -150,6 +199,69 @@ export function AnalyticsPage({
           ))}
         </div>
       )}
+
+      {/* Reports */}
+      <div className="space-y-4" data-testid="reports-section">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Reports</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Export saved report data as CSV or PDF
+          </p>
+        </div>
+
+        {reportsLoading && (
+          <div className="flex items-center justify-center py-8">
+            <LoadingSpinner size="medium" label="Loading reports..." />
+          </div>
+        )}
+
+        {Boolean(reportsError) && (
+          <ErrorMessage error="Failed to load reports." onRetry={() => refetchReports()} />
+        )}
+
+        {!reportsLoading && !reportsError && reports && reports.length === 0 && (
+          <p className="text-muted-foreground text-sm">No reports have been created yet.</p>
+        )}
+
+        {!reportsLoading && !reportsError && reports && reports.length > 0 && (
+          <div className="divide-y rounded-lg border bg-card">
+            {reports.map((report: Report) => (
+              <div key={report.id} className="flex items-center justify-between gap-4 p-4">
+                <div className="min-w-0">
+                  <h3 className="font-medium leading-tight">{report.name}</h3>
+                  {report.description && (
+                    <p className="text-muted-foreground mt-0.5 truncate text-sm">
+                      {report.description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={exportingKey === `${report.id}:csv`}
+                    onClick={() => handleExport(report, 'csv')}
+                    data-testid={`report-export-csv-${report.id}`}
+                  >
+                    <FileDown className="mr-1 h-4 w-4" />
+                    {exportingKey === `${report.id}:csv` ? 'Exporting...' : 'Export CSV'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={exportingKey === `${report.id}:pdf`}
+                    onClick={() => handleExport(report, 'pdf')}
+                    data-testid={`report-export-pdf-${report.id}`}
+                  >
+                    <FileText className="mr-1 h-4 w-4" />
+                    {exportingKey === `${report.id}:pdf` ? 'Exporting...' : 'Export PDF'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

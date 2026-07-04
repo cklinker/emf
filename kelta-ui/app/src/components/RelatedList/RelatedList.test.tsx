@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -22,9 +22,10 @@ vi.mock('@/context/ApiContext', () => ({
   })),
 }))
 
-// useToast lives on the @/components barrel; RelatedList uses it for CRUD errors.
+// useToast lives on the @/components barrel; RelatedList uses it for CRUD/mass-edit feedback.
+const { mockShowToast } = vi.hoisted(() => ({ mockShowToast: vi.fn() }))
 vi.mock('@/components', () => ({
-  useToast: () => ({ showToast: vi.fn() }),
+  useToast: () => ({ showToast: mockShowToast }),
 }))
 
 // Mock collection store context
@@ -38,11 +39,27 @@ vi.mock('@/context/CollectionStoreContext', () => ({
   })),
 }))
 
-// Mock object permissions
+// Mock object permissions — mutable so tests can flip individual flags.
+const { mockObjectPermissions } = vi.hoisted(() => ({
+  mockObjectPermissions: { canCreate: true, canRead: true, canEdit: true, canDelete: true },
+}))
 vi.mock('@/hooks/useObjectPermissions', () => ({
   useObjectPermissions: vi.fn(() => ({
-    permissions: { canCreate: true, canRead: true, canEdit: true, canDelete: true },
+    permissions: mockObjectPermissions,
     isLoading: false,
+  })),
+}))
+
+// Mock system permissions (mass edit requires MANAGE_DATA for bulk jobs).
+const { mockSystemPermissions } = vi.hoisted(() => ({
+  mockSystemPermissions: { MANAGE_DATA: true } as Record<string, boolean>,
+}))
+vi.mock('@/hooks/useSystemPermissions', () => ({
+  useSystemPermissions: vi.fn(() => ({
+    permissions: mockSystemPermissions,
+    hasPermission: (permission: string) => mockSystemPermissions[permission] === true,
+    isLoading: false,
+    error: null,
   })),
 }))
 
@@ -68,6 +85,14 @@ describe('RelatedList', () => {
     mockPost.mockReset()
     mockPatch.mockReset()
     mockDelete.mockReset()
+    // Restore default permissions mutated by individual tests.
+    Object.assign(mockObjectPermissions, {
+      canCreate: true,
+      canRead: true,
+      canEdit: true,
+      canDelete: true,
+    })
+    mockSystemPermissions.MANAGE_DATA = true
   })
 
   it('shows empty state when no related records found', async () => {
@@ -511,6 +536,283 @@ describe('RelatedList', () => {
       // No delete control and no inline-edit pencil when read-only.
       expect(screen.queryByTestId('related-delete-rec-1')).toBeNull()
       expect(screen.queryByTestId('inline-field-name')).toBeNull()
+    })
+  })
+
+  describe('mass edit (bulk jobs)', () => {
+    interface MockField {
+      name: string
+      required?: boolean
+    }
+
+    function jobResponse(attributes: Record<string, unknown>) {
+      return { data: { id: 'job-1', type: 'bulk-jobs', attributes } }
+    }
+
+    /**
+     * URL-dispatching GET mock: collection schema (JSON:API), bulk-job status
+     * polls (queue — last response repeats), and the related-records list.
+     */
+    function mockMassEditApi({
+      records,
+      fields = [{ name: 'name' }, { name: 'status' }],
+      pollResponses,
+    }: {
+      records: Array<Record<string, unknown>>
+      fields?: MockField[]
+      pollResponses?: Array<Record<string, unknown>>
+    }) {
+      const polls = [
+        ...(pollResponses ?? [
+          jobResponse({
+            status: 'COMPLETED',
+            processedRecords: records.length,
+            successRecords: records.length,
+            errorRecords: 0,
+          }),
+        ]),
+      ]
+      const schemaResponse = {
+        data: {
+          id: 'col-1',
+          type: 'collections',
+          attributes: { name: 'contacts', displayName: 'Contacts' },
+        },
+        included: fields.map((f, i) => ({
+          id: `f-${i}`,
+          type: 'fields',
+          attributes: {
+            name: f.name,
+            displayName: f.name,
+            type: 'STRING',
+            required: f.required ?? false,
+            active: true,
+            fieldOrder: i,
+          },
+        })),
+      }
+      mockGet.mockImplementation((url: unknown) => {
+        const u = String(url)
+        if (u.startsWith('/api/collections/')) return Promise.resolve(schemaResponse)
+        if (u.startsWith('/api/bulk-jobs/')) {
+          return Promise.resolve(polls.length > 1 ? polls.shift() : polls[0])
+        }
+        return Promise.resolve({
+          data: records,
+          metadata: { totalCount: records.length, currentPage: 1, pageSize: 5, totalPages: 1 },
+        })
+      })
+      mockPost.mockResolvedValue(jobResponse({ status: 'QUEUED' }))
+    }
+
+    const twoRecords = [
+      { id: 'rec-1', accountId: 'rec-123', name: 'Ada', status: 'new' },
+      { id: 'rec-2', accountId: 'rec-123', name: 'Grace', status: 'new' },
+    ]
+
+    function renderList(props: Partial<React.ComponentProps<typeof RelatedList>> = {}) {
+      return render(
+        <TestWrapper>
+          <RelatedList
+            collectionName="contacts"
+            foreignKeyField="accountId"
+            parentRecordId="rec-123"
+            tenantSlug="test-tenant"
+            displayColumns={['name', 'status']}
+            editable
+            {...props}
+          />
+        </TestWrapper>
+      )
+    }
+
+    it('renders row checkboxes and select-all when editable + canEdit + MANAGE_DATA', async () => {
+      mockMassEditApi({ records: twoRecords })
+      renderList()
+
+      await waitFor(() => expect(screen.getByTestId('related-select-rec-1')).toBeDefined())
+      expect(screen.getByTestId('related-select-rec-2')).toBeDefined()
+      expect(screen.getByTestId('related-select-all')).toBeDefined()
+    })
+
+    it('hides checkboxes when not editable', async () => {
+      mockMassEditApi({ records: twoRecords })
+      renderList({ editable: false })
+
+      await waitFor(() => expect(screen.getByText('Ada')).toBeDefined())
+      expect(screen.queryByTestId('related-select-rec-1')).toBeNull()
+      expect(screen.queryByTestId('related-select-all')).toBeNull()
+    })
+
+    it('hides checkboxes without the canEdit object permission', async () => {
+      mockObjectPermissions.canEdit = false
+      mockMassEditApi({ records: twoRecords })
+      renderList()
+
+      await waitFor(() => expect(screen.getByText('Ada')).toBeDefined())
+      expect(screen.queryByTestId('related-select-rec-1')).toBeNull()
+    })
+
+    it('hides checkboxes without the MANAGE_DATA system permission', async () => {
+      mockSystemPermissions.MANAGE_DATA = false
+      mockMassEditApi({ records: twoRecords })
+      renderList()
+
+      await waitFor(() => expect(screen.getByText('Ada')).toBeDefined())
+      expect(screen.queryByTestId('related-select-rec-1')).toBeNull()
+      expect(screen.queryByTestId('related-select-all')).toBeNull()
+    })
+
+    it('shows the action bar with the selection count and clears it', async () => {
+      mockMassEditApi({ records: twoRecords })
+      const user = userEvent.setup()
+      renderList()
+
+      await waitFor(() => expect(screen.getByTestId('related-select-rec-1')).toBeDefined())
+      expect(screen.queryByTestId('related-mass-edit-bar')).toBeNull()
+
+      await user.click(screen.getByTestId('related-select-rec-1'))
+      expect(screen.getByTestId('related-mass-edit-count').textContent).toBe('1 selected')
+
+      await user.click(screen.getByTestId('related-select-rec-2'))
+      expect(screen.getByTestId('related-mass-edit-count').textContent).toBe('2 selected')
+
+      await user.click(screen.getByTestId('related-mass-edit-clear'))
+      expect(screen.queryByTestId('related-mass-edit-bar')).toBeNull()
+    })
+
+    it('select-all selects every visible row', async () => {
+      mockMassEditApi({ records: twoRecords })
+      const user = userEvent.setup()
+      renderList()
+
+      await waitFor(() => expect(screen.getByTestId('related-select-all')).toBeDefined())
+      await user.click(screen.getByTestId('related-select-all'))
+      expect(screen.getByTestId('related-mass-edit-count').textContent).toBe('2 selected')
+    })
+
+    /** Selects all rows, opens the dialog, picks `status`, and enters a value. */
+    async function fillMassEdit(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+      await waitFor(() => expect(screen.getByTestId('related-select-all')).toBeDefined())
+      await user.click(screen.getByTestId('related-select-all'))
+      await user.click(screen.getByTestId('related-mass-edit-open'))
+      const dialog = screen.getByTestId('mass-edit-dialog')
+      fireEvent.change(within(dialog).getByTestId('mass-edit-field-select'), {
+        target: { value: 'status' },
+      })
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'closed' } })
+      return dialog
+    }
+
+    it('POSTs an UPDATE bulk job with one record per selected row', async () => {
+      mockMassEditApi({ records: twoRecords })
+      const user = userEvent.setup()
+      renderList()
+
+      const dialog = await fillMassEdit(user)
+      await user.click(within(dialog).getByTestId('mass-edit-submit'))
+
+      await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1))
+      expect(String(mockPost.mock.calls[0][0])).toBe('/api/bulk-jobs')
+      expect(mockPost.mock.calls[0][1]).toEqual({
+        collectionId: 'col-1',
+        operation: 'UPDATE',
+        records: [
+          { id: 'rec-1', status: 'closed' },
+          { id: 'rec-2', status: 'closed' },
+        ],
+      })
+    })
+
+    it('polls to COMPLETED, toasts, refetches, and clears the selection', async () => {
+      mockMassEditApi({
+        records: twoRecords,
+        pollResponses: [
+          jobResponse({
+            status: 'COMPLETED',
+            processedRecords: 2,
+            successRecords: 2,
+            errorRecords: 0,
+          }),
+        ],
+      })
+      const user = userEvent.setup()
+      renderList()
+
+      const dialog = await fillMassEdit(user)
+      const recordFetchesBefore = mockGet.mock.calls.filter(([u]) =>
+        String(u).startsWith('/api/contacts')
+      ).length
+      await user.click(within(dialog).getByTestId('mass-edit-submit'))
+
+      await waitFor(() =>
+        expect(mockShowToast).toHaveBeenCalledWith('Updated 2 of 2 records', 'success')
+      )
+      // Job status was polled to a terminal state.
+      const pollCalls = mockGet.mock.calls.filter(([u]) =>
+        String(u).startsWith('/api/bulk-jobs/job-1')
+      )
+      expect(pollCalls.length).toBeGreaterThanOrEqual(1)
+      // Dialog closed, selection cleared, and the list refetched.
+      await waitFor(() => expect(screen.queryByTestId('mass-edit-dialog')).toBeNull())
+      expect(screen.queryByTestId('related-mass-edit-bar')).toBeNull()
+      await waitFor(() => {
+        const recordFetchesAfter = mockGet.mock.calls.filter(([u]) =>
+          String(u).startsWith('/api/contacts')
+        ).length
+        expect(recordFetchesAfter).toBeGreaterThan(recordFetchesBefore)
+      })
+    })
+
+    it('surfaces a FAILED job as an error toast and keeps the dialog open', async () => {
+      mockMassEditApi({
+        records: twoRecords,
+        pollResponses: [
+          jobResponse({
+            status: 'FAILED',
+            processedRecords: 2,
+            successRecords: 0,
+            errorRecords: 2,
+          }),
+        ],
+      })
+      const user = userEvent.setup()
+      renderList()
+
+      const dialog = await fillMassEdit(user)
+      await user.click(within(dialog).getByTestId('mass-edit-submit'))
+
+      await waitFor(() =>
+        expect(mockShowToast).toHaveBeenCalledWith(
+          'Bulk update failed — check the Bulk Jobs page for details',
+          'error'
+        )
+      )
+      // Rejection keeps the dialog open with the message inline.
+      expect(screen.getByTestId('mass-edit-dialog')).toBeDefined()
+      expect(screen.getByTestId('mass-edit-error').textContent).toContain('Bulk update failed')
+    })
+
+    it('blocks submit when validation fails (required field left empty)', async () => {
+      mockMassEditApi({
+        records: twoRecords,
+        fields: [{ name: 'name', required: true }],
+      })
+      const user = userEvent.setup()
+      renderList({ displayColumns: ['name'] })
+
+      await waitFor(() => expect(screen.getByTestId('related-select-all')).toBeDefined())
+      await user.click(screen.getByTestId('related-select-all'))
+      await user.click(screen.getByTestId('related-mass-edit-open'))
+      const dialog = screen.getByTestId('mass-edit-dialog')
+
+      // Default field is `name` (required) — submit with no value.
+      await user.click(within(dialog).getByTestId('mass-edit-submit'))
+
+      await waitFor(() =>
+        expect(screen.getByTestId('mass-edit-error').textContent).toContain('is required')
+      )
+      expect(mockPost).not.toHaveBeenCalled()
     })
   })
 })

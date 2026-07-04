@@ -19,7 +19,7 @@ io.kelta.worker/
   scim/            ← SCIM 2.0 protocol (controller, model, service, filter)
   service/         ← Business logic (45+ services)
     email/         ← Email providers (SMTP, templates)
-    push/          ← Push notification providers (FCM)
+    push/          ← Push notification providers (FCM, APNs)
     sms/           ← SMS providers
 ```
 

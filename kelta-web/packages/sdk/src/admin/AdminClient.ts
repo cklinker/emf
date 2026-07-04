@@ -2221,8 +2221,9 @@ export class AdminClient {
       _userId: string,
       request: CreateBulkJobRequest
     ): Promise<BulkJob> => {
-      const body = toJsonApiBody('bulk-jobs', request as unknown as Record<string, unknown>);
-      const response = await this.axios.post('/api/bulk-jobs', body);
+      // The worker's BulkOperationsController reads plain top-level keys
+      // (collectionId, operation, records, ...), not a JSON:API envelope.
+      const response = await this.axios.post('/api/bulk-jobs', request);
       return unwrapJsonApiResource<BulkJob>(response.data);
     },
 

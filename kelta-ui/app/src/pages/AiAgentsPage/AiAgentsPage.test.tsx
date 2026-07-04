@@ -97,7 +97,9 @@ describe('AiAgentsPage', () => {
     await user.click(screen.getByTestId('delete-button-a1'))
     await user.click(screen.getByRole('button', { name: /^confirm$/i }))
 
-    await waitFor(() => expect(mockAxios.delete).toHaveBeenCalledWith('/api/ai/agents/a1'))
+    await waitFor(() =>
+      expect(mockAxios.delete).toHaveBeenCalledWith('/api/ai/agents/a1', undefined)
+    )
   })
 
   it('runs an agent and shows the result', async () => {

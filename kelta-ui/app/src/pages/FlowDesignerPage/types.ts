@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 /** Supported flow trigger types. */
-export type FlowType = 'RECORD_TRIGGERED' | 'SCHEDULED' | 'AUTOLAUNCHED' | 'KAFKA_TRIGGERED'
+export type FlowType = 'RECORD_TRIGGERED' | 'SCHEDULED' | 'AUTOLAUNCHED' | 'NATS_TRIGGERED'
 
 // ---------------------------------------------------------------------------
 // Trigger Configuration
@@ -26,17 +26,16 @@ export interface AutolaunchedTriggerConfig {
   authentication?: 'NONE' | 'API_KEY' | 'WEBHOOK_SECRET'
 }
 
-export interface KafkaTriggerConfig {
+export interface NatsTriggerConfig {
+  /** Names the platform trigger subject `kelta.trigger.<tenantId>.<topic>`. */
   topic: string
-  keyFilter?: string
-  messageFilter?: string
 }
 
 export type TriggerConfig =
   | RecordTriggerConfig
   | ScheduledTriggerConfig
   | AutolaunchedTriggerConfig
-  | KafkaTriggerConfig
+  | NatsTriggerConfig
 
 // ---------------------------------------------------------------------------
 // Retry & Catch Rules

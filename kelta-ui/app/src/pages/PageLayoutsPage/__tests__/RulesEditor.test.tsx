@@ -140,7 +140,12 @@ describe('RulesEditor', () => {
     apiClientMock.post.mockResolvedValue({})
     const user = userEvent.setup()
     renderWithProviders(
-      <RulesEditor layoutId="lay-1" layoutName="Edit" fieldNames={['discount']} onClose={() => {}} />
+      <RulesEditor
+        layoutId="lay-1"
+        layoutName="Edit"
+        fieldNames={['discount']}
+        onClose={() => {}}
+      />
     )
     await waitFor(() => screen.getByTestId('rules-editor-add-script'))
     await user.click(screen.getByTestId('rules-editor-add-script'))

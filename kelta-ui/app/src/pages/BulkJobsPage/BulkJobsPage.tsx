@@ -69,7 +69,7 @@ function getStatusBadgeColor(status: string): string {
 }
 
 interface BulkJobFormProps {
-  onSubmit: (data: BulkJobFormData) => void
+  onSubmit: (data: BulkJobFormData, file: File | null) => void
   onCancel: () => void
   isSubmitting: boolean
 }
@@ -81,9 +81,11 @@ function BulkJobForm({ onSubmit, onCancel, isSubmitting }: BulkJobFormProps): Re
     externalIdField: '',
     batchSize: 200,
   })
+  const [file, setFile] = useState<File | null>(null)
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const collectionInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     collectionInputRef.current?.focus()
@@ -117,11 +119,22 @@ function BulkJobForm({ onSubmit, onCancel, isSubmitting }: BulkJobFormProps): Re
       setErrors(validationErrors)
       setTouched({ collectionId: true, batchSize: true })
       if (Object.keys(validationErrors).length === 0) {
-        onSubmit(formData)
+        onSubmit(formData, file)
       }
     },
-    [formData, onSubmit]
+    [formData, file, onSubmit]
   )
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFile(e.target.files?.[0] ?? null)
+  }, [])
+
+  const handleRemoveFile = useCallback(() => {
+    setFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -267,6 +280,40 @@ function BulkJobForm({ onSubmit, onCancel, isSubmitting }: BulkJobFormProps): Re
               )}
             </div>
 
+            <div className="flex flex-col gap-2">
+              <label htmlFor="bulk-job-file" className="text-sm font-medium text-foreground">
+                Data File
+              </label>
+              <input
+                ref={fileInputRef}
+                id="bulk-job-file"
+                type="file"
+                accept=".csv,.json"
+                className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm file:font-medium file:text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                onChange={handleFileChange}
+                disabled={isSubmitting}
+                data-testid="bulk-job-file-input"
+              />
+              {file ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span data-testid="bulk-job-file-name">{file.name}</span>
+                  <button
+                    type="button"
+                    className="font-medium text-destructive hover:underline disabled:opacity-50"
+                    onClick={handleRemoveFile}
+                    disabled={isSubmitting}
+                    data-testid="bulk-job-file-remove"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Optional. Upload a .csv or .json file to load records from the file.
+                </span>
+              )}
+            </div>
+
             <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
               <button
                 type="button"
@@ -283,7 +330,7 @@ function BulkJobForm({ onSubmit, onCancel, isSubmitting }: BulkJobFormProps): Re
                 disabled={isSubmitting}
                 data-testid="bulk-job-form-submit"
               >
-                {isSubmitting ? 'Creating...' : 'Create Job'}
+                {isSubmitting ? (file ? 'Uploading...' : 'Creating...') : 'Create Job'}
               </button>
             </div>
           </form>
@@ -296,12 +343,13 @@ function BulkJobForm({ onSubmit, onCancel, isSubmitting }: BulkJobFormProps): Re
 export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { keltaClient } = useApi()
+  const { keltaClient, apiClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [abortDialogOpen, setAbortDialogOpen] = useState(false)
   const [jobToAbort, setJobToAbort] = useState<BulkJob | null>(null)
+  const [downloadingJobId, setDownloadingJobId] = useState<string | null>(null)
 
   const {
     data: bulkJobs,
@@ -319,6 +367,28 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
   const createMutation = useMutation({
     mutationFn: (data: BulkJobFormData) =>
       keltaClient.admin.bulkJobs.create('', '', data as CreateBulkJobRequest),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bulk-jobs'] })
+      showToast('Bulk job created successfully', 'success')
+      handleCloseForm()
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'An error occurred', 'error')
+    },
+  })
+
+  const uploadMutation = useMutation({
+    mutationFn: ({ data, file }: { data: BulkJobFormData; file: File }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('collectionId', data.collectionId)
+      formData.append('operation', data.operation)
+      if (data.externalIdField.trim()) {
+        formData.append('externalIdField', data.externalIdField)
+      }
+      formData.append('batchSize', String(data.batchSize))
+      return apiClient.postFormData('/api/bulk-jobs/upload', formData)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bulk-jobs'] })
       showToast('Bulk job created successfully', 'success')
@@ -351,10 +421,40 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
   }, [])
 
   const handleFormSubmit = useCallback(
-    (data: BulkJobFormData) => {
-      createMutation.mutate(data)
+    (data: BulkJobFormData, file: File | null) => {
+      if (file) {
+        uploadMutation.mutate({ data, file })
+      } else {
+        createMutation.mutate(data)
+      }
     },
-    [createMutation]
+    [createMutation, uploadMutation]
+  )
+
+  const handleDownloadResults = useCallback(
+    async (job: BulkJob) => {
+      setDownloadingJobId(job.id)
+      try {
+        const csv = await apiClient.get<string>(`/api/bulk-jobs/${job.id}/results/download`)
+        const blob = new Blob([typeof csv === 'string' ? csv : JSON.stringify(csv)], {
+          type: 'text/csv',
+        })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `bulk-job-${job.id}-results.csv`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to download results'
+        showToast(message, 'error')
+      } finally {
+        setDownloadingJobId(null)
+      }
+    },
+    [apiClient, showToast]
   )
 
   const handleAbortClick = useCallback((job: BulkJob) => {
@@ -394,7 +494,7 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
     )
   }
 
-  const isSubmitting = createMutation.isPending
+  const isSubmitting = createMutation.isPending || uploadMutation.isPending
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
@@ -493,6 +593,9 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
                     ? Math.round((job.processedRecords / job.totalRecords) * 100)
                     : 0
                 const canAbort = job.status === 'QUEUED' || job.status === 'PROCESSING'
+                const canDownloadResults =
+                  job.status === 'COMPLETED' ||
+                  (job.status === 'FAILED' && job.processedRecords > 0)
 
                 return (
                   <tr
@@ -549,6 +652,18 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
                     </td>
                     <td role="gridcell" className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        {canDownloadResults && (
+                          <button
+                            type="button"
+                            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                            onClick={() => handleDownloadResults(job)}
+                            disabled={downloadingJobId === job.id}
+                            aria-label={`Download results for job ${job.id}`}
+                            data-testid={`download-results-button-${index}`}
+                          >
+                            {downloadingJobId === job.id ? 'Downloading...' : 'Download results'}
+                          </button>
+                        )}
                         {canAbort && (
                           <button
                             type="button"

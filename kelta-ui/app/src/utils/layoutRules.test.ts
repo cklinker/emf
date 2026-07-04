@@ -22,7 +22,12 @@ describe('dtoToLayoutRule', () => {
       { ...baseDto, kind: 'COMPUTE', targetField: 'total', body: { formula: 'a + b' } },
       't1'
     )
-    expect(rule).toMatchObject({ kind: 'compute', target: 'total', formula: 'a + b', tenantId: 't1' })
+    expect(rule).toMatchObject({
+      kind: 'compute',
+      target: 'total',
+      formula: 'a + b',
+      tenantId: 't1',
+    })
   })
 
   it('maps a SCRIPT dto to a script rule with expression + optional message', () => {

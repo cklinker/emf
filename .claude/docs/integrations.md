@@ -111,8 +111,8 @@ Every flow execution starts with a canonical state envelope, built by
 
 ```jsonc
 {
-  "trigger": { "type": "API_INVOCATION" | "SCHEDULED" | "RECORD_CHANGE" | "WEBHOOK", ... },
-  "input":   { ...source data... },   // present for API_INVOCATION / SCHEDULED / WEBHOOK
+  "trigger": { "type": "API_INVOCATION" | "SCHEDULED" | "RECORD_CHANGE" | "WEBHOOK" | "NATS_MESSAGE", ... },
+  "input":   { ...source data... },   // present for API_INVOCATION / SCHEDULED / WEBHOOK / NATS_MESSAGE
   "record":  { ...record data... },   // present for RECORD_CHANGE only
   "context": { "tenantId": "...", "flowId": "...", "executionId": "...", "userId": "..." }
 }
@@ -124,6 +124,31 @@ expressions) are evaluated against this envelope. **Always read inputs as `$.inp
 no value, and the downstream task fails with whatever generic error comes out of its
 own input resolution (often a misleading `"Provider … does not exist"` for FETCH-style
 tasks, not a clear "missing input" message).
+
+### NATS-triggered flows
+
+A flow with `flow_type = 'NATS_TRIGGERED'` (V153) and trigger config `{ "topic": "<topic>" }`
+starts whenever a message is published to `kelta.trigger.<tenantId>.<topic>` (the
+KELTA_TRIGGERS JetStream stream; topics may contain dots — the topic is everything after
+the tenant token). `NatsTriggerFlowListener` consumes the namespace as a queue group
+(one pod starts each execution), caches active configs per tenant (invalidated by
+`kelta.config.flow.changed.<tenantId>`), and passes the message body as `$.input`
+(`trigger.type = "NATS_MESSAGE"`, with `subject` + `topic`; a non-JSON body arrives as
+`{ "raw": "<text>" }`). The body is arbitrary publisher JSON — not a `PlatformEvent`.
+
+### Wait states — persistence and resume
+
+A Wait with `Seconds` ≤ 10 sleeps in-process. Longer, timestamp-based
+(`Timestamp`/`TimestampPath`), and event-based (`EventName`) Waits park the execution
+WAITING and record a `flow_pending_resume` row (wake time for timed waits, event name for
+event waits). The worker's `FlowResumePollerConfig` (10s default,
+`kelta.flow.resume.poll-interval-ms`; disable with `kelta.flow.resume.enabled=false`)
+claims due rows with `SELECT FOR UPDATE SKIP LOCKED` — exactly one pod resumes an
+execution — and `FlowEngine.resumeExecution` re-loads the flow definition and continues
+from the Wait's `Next` (a terminal Wait completes). Event-based waits resume through
+`claimPendingResumeByEvent` when an event source calls it. Waits inside Parallel/Map
+branch sub-definitions are **not** resumable (their state ids aren't in the top-level
+definition) — the resume fails the execution with a clear error instead of hanging.
 
 ### Manual / MCP / HTTP invocation — the double-wrap rule
 

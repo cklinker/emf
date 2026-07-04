@@ -29,6 +29,7 @@ public class FlowExecutionContext {
     private int failedCount;
     private boolean cancelled;
     private boolean completed;
+    private boolean waiting;
     private String finalStatus;
     private String finalErrorCode;
     private String finalErrorMessage;
@@ -87,6 +88,16 @@ public class FlowExecutionContext {
     }
 
     public boolean isCompleted() { return completed; }
+
+    /**
+     * True when the state loop parked this execution WAITING (long/event Wait).
+     * A waiting execution must not be marked COMPLETED by the caller — it is
+     * resumed later via {@code FlowEngine.resumeExecution}.
+     */
+    public boolean isWaiting() { return waiting; }
+
+    public void markWaiting() { this.waiting = true; }
+
     public String finalStatus() { return finalStatus; }
     public String finalErrorCode() { return finalErrorCode; }
     public String finalErrorMessage() { return finalErrorMessage; }

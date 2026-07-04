@@ -19,8 +19,22 @@ beforeEach(() => vi.clearAllMocks())
 describe('useQuickActions', () => {
   it('fetches active actions for the collection and maps actionType → type, sorted', async () => {
     mockGetList.mockResolvedValue([
-      { id: '2', label: 'B', actionType: 'run_script', context: 'record', sortOrder: 2, config: null },
-      { id: '1', label: 'A', actionType: 'update_field', context: 'record', sortOrder: 1, config: null },
+      {
+        id: '2',
+        label: 'B',
+        actionType: 'run_script',
+        context: 'record',
+        sortOrder: 2,
+        config: null,
+      },
+      {
+        id: '1',
+        label: 'A',
+        actionType: 'update_field',
+        context: 'record',
+        sortOrder: 1,
+        config: null,
+      },
     ])
 
     const { result } = renderHook(() => useQuickActions({ collectionName: 'orders' }), { wrapper })

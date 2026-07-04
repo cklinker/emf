@@ -5,7 +5,12 @@ import { RecordShell } from './RecordShell'
 describe('RecordShell', () => {
   it('renders only the loading state when isLoading', () => {
     render(
-      <RecordShell variant="enduser" isLoading body={<div>body</div>} breadcrumb={<div>crumb</div>} />
+      <RecordShell
+        variant="enduser"
+        isLoading
+        body={<div>body</div>}
+        breadcrumb={<div>crumb</div>}
+      />
     )
     expect(screen.getByTestId('record-shell-loading')).toBeInTheDocument()
     expect(screen.queryByText('body')).toBeNull()

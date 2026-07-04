@@ -79,6 +79,44 @@ class PerTenantOtlpSpanProcessorTest {
     }
 
     @Test
+    @DisplayName("re-pointing a tenant's target swaps the exporter and shuts down the old one")
+    void repointSwapsExporter() {
+        OtlpTarget first = new OtlpTarget("https://otlp.old/v1/traces", Map.of());
+        OtlpTarget second = new OtlpTarget("https://otlp.new/v1/traces", Map.of());
+        SpanProcessor oldDelegate = mock(SpanProcessor.class);
+        SpanProcessor newDelegate = mock(SpanProcessor.class);
+        when(registry.targetFor("t1")).thenReturn(Optional.of(first)).thenReturn(Optional.of(second));
+        when(factory.create(first)).thenReturn(oldDelegate);
+        when(factory.create(second)).thenReturn(newDelegate);
+
+        ReadableSpan spanA = spanForTenant("t1");
+        ReadableSpan spanB = spanForTenant("t1");
+        processor.onEnd(spanA);
+        processor.onEnd(spanB);
+
+        verify(oldDelegate).onEnd(spanA);
+        verify(oldDelegate).shutdown();
+        verify(newDelegate).onEnd(spanB);
+        verify(newDelegate, never()).shutdown();
+    }
+
+    @Test
+    @DisplayName("unchanged target keeps the cached exporter (no churn per span)")
+    void unchangedTargetNoChurn() {
+        OtlpTarget target = new OtlpTarget("https://otlp.t1/v1/traces", Map.of("x", "y"));
+        SpanProcessor delegate = mock(SpanProcessor.class);
+        when(registry.targetFor("t1")).thenReturn(Optional.of(target));
+        when(factory.create(target)).thenReturn(delegate);
+
+        processor.onEnd(spanForTenant("t1"));
+        processor.onEnd(spanForTenant("t1"));
+        processor.onEnd(spanForTenant("t1"));
+
+        verify(factory, times(1)).create(target);
+        verify(delegate, never()).shutdown();
+    }
+
+    @Test
     @DisplayName("ignores a span with no tenant attribute")
     void ignoresUntaggedSpan() {
         processor.onEnd(spanForTenant(null));

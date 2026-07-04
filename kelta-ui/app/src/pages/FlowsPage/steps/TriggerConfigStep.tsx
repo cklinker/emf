@@ -2,7 +2,7 @@ import {
   RecordTriggerForm,
   ScheduledTriggerForm,
   AutolaunchedTriggerForm,
-  KafkaTriggerForm,
+  NatsTriggerForm,
 } from '@/components/flows'
 import type { FlowType, TriggerConfig } from '@/pages/FlowDesignerPage/types'
 
@@ -33,7 +33,7 @@ export function TriggerConfigStep({ flowType, config, onChange }: TriggerConfigS
             {flowType === 'RECORD_TRIGGERED' && <RecordTriggerForm config={c} onChange={onC} />}
             {flowType === 'SCHEDULED' && <ScheduledTriggerForm config={c} onChange={onC} />}
             {flowType === 'AUTOLAUNCHED' && <AutolaunchedTriggerForm config={c} onChange={onC} />}
-            {flowType === 'KAFKA_TRIGGERED' && <KafkaTriggerForm config={c} onChange={onC} />}
+            {flowType === 'NATS_TRIGGERED' && <NatsTriggerForm config={c} onChange={onC} />}
           </div>
         )
       })()}

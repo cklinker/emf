@@ -6,7 +6,7 @@ import {
   RecordTriggerForm,
   ScheduledTriggerForm,
   AutolaunchedTriggerForm,
-  KafkaTriggerForm,
+  NatsTriggerForm,
 } from '@/components/flows'
 import { useApi } from '@/context/ApiContext'
 import type { CreateFlowRequest } from '@kelta/sdk'
@@ -128,8 +128,8 @@ function TriggerFormRouter({
       return <ScheduledTriggerForm config={c} onChange={onC} />
     case 'AUTOLAUNCHED':
       return <AutolaunchedTriggerForm config={c} onChange={onC} flowId={flowId} />
-    case 'KAFKA_TRIGGERED':
-      return <KafkaTriggerForm config={c} onChange={onC} />
+    case 'NATS_TRIGGERED':
+      return <NatsTriggerForm config={c} onChange={onC} />
     default:
       return <div className="text-sm text-muted-foreground">Unknown flow type: {flowType}</div>
   }

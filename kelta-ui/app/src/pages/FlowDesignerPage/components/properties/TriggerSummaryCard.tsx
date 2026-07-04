@@ -14,14 +14,14 @@ const FLOW_TYPE_ICONS: Record<string, React.ElementType> = {
   RECORD_TRIGGERED: Database,
   SCHEDULED: Clock,
   AUTOLAUNCHED: Globe,
-  KAFKA_TRIGGERED: Radio,
+  NATS_TRIGGERED: Radio,
 }
 
 const FLOW_TYPE_LABELS: Record<string, string> = {
   RECORD_TRIGGERED: 'Record Change',
   SCHEDULED: 'Scheduled',
   AUTOLAUNCHED: 'API / Webhook',
-  KAFKA_TRIGGERED: 'Kafka Event',
+  NATS_TRIGGERED: 'NATS Message',
 }
 
 function safeParseTriggerConfig(triggerConfig: unknown): Record<string, unknown> | null {
@@ -56,9 +56,8 @@ function parseTriggerConfig(flow: Flow): Record<string, string> {
         if (config.webhookPath) summary['Webhook'] = config.webhookPath as string
         if (config.authentication) summary['Auth'] = config.authentication as string
         break
-      case 'KAFKA_TRIGGERED':
+      case 'NATS_TRIGGERED':
         if (config.topic) summary['Topic'] = config.topic as string
-        if (config.keyFilter) summary['Key Filter'] = config.keyFilter as string
         break
     }
     return summary

@@ -1,5 +1,6 @@
 package io.kelta.runtime.event;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -10,6 +11,12 @@ import java.util.function.Consumer;
  * use a shared durable consumer; broadcast subscriptions use ephemeral
  * per-instance consumers.
  *
+ * <p>Handlers normally receive only the message body. When the concrete
+ * subject matters (wildcard subscriptions that encode routing data in subject
+ * tokens, e.g. {@code kelta.trigger.<tenantId>.<topic>}), use a
+ * subject-aware subscription — {@code subjectHandler} then receives
+ * {@code (subject, body)} and {@code handler} is null.
+ *
  * @since 1.0.0
  */
 public record EventSubscription(
@@ -17,8 +24,14 @@ public record EventSubscription(
         String subject,
         DeliveryMode deliveryMode,
         String queueGroup,
-        Consumer<String> handler
+        Consumer<String> handler,
+        BiConsumer<String, String> subjectHandler
 ) {
+
+    public EventSubscription(String name, String subject, DeliveryMode deliveryMode,
+                             String queueGroup, Consumer<String> handler) {
+        this(name, subject, deliveryMode, queueGroup, handler, null);
+    }
 
     /**
      * Determines how messages are delivered to subscribers.
@@ -61,5 +74,21 @@ public record EventSubscription(
      */
     public static EventSubscription broadcast(String name, String subject, Consumer<String> handler) {
         return new EventSubscription(name, subject, DeliveryMode.BROADCAST, null, handler);
+    }
+
+    /**
+     * Creates a queue group subscription whose handler also receives the
+     * concrete subject each message arrived on.
+     *
+     * @param name       subscription name (used for durable consumer naming)
+     * @param subject    the messaging subject pattern (e.g., "kelta.trigger.&gt;")
+     * @param queueGroup the queue group name for load balancing
+     * @param handler    handler receiving {@code (subject, rawBody)}
+     * @return the subscription descriptor
+     */
+    public static EventSubscription queueGroupWithSubject(String name, String subject,
+                                                          String queueGroup,
+                                                          BiConsumer<String, String> handler) {
+        return new EventSubscription(name, subject, DeliveryMode.QUEUE_GROUP, queueGroup, null, handler);
     }
 }

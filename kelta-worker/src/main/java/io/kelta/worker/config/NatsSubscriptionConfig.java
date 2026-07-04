@@ -8,6 +8,7 @@ import io.kelta.worker.listener.CredentialCacheInvalidationListener;
 import io.kelta.worker.listener.CustomDomainCacheInvalidationListener;
 import io.kelta.worker.listener.FlowEventListener;
 import io.kelta.worker.listener.LayoutCacheInvalidationListener;
+import io.kelta.worker.listener.NatsTriggerFlowListener;
 import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SupersetCollectionSyncListener;
 import io.kelta.worker.listener.RecordWebhookPublisher;
@@ -39,6 +40,7 @@ public class NatsSubscriptionConfig {
 
     private final NatsSubscriptionManager subscriptionManager;
     private final FlowEventListener flowEventListener;
+    private final NatsTriggerFlowListener natsTriggerFlowListener;
     private final SearchIndexListener searchIndexListener;
     private final CollectionSchemaListener collectionSchemaListener;
     private final ModuleEventListener moduleEventListener;
@@ -64,6 +66,7 @@ public class NatsSubscriptionConfig {
 
     public NatsSubscriptionConfig(NatsSubscriptionManager subscriptionManager,
                                    FlowEventListener flowEventListener,
+                                   NatsTriggerFlowListener natsTriggerFlowListener,
                                    SearchIndexListener searchIndexListener,
                                    CollectionSchemaListener collectionSchemaListener,
                                    ModuleEventListener moduleEventListener,
@@ -73,6 +76,7 @@ public class NatsSubscriptionConfig {
                                    LayoutCacheInvalidationListener layoutCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.flowEventListener = flowEventListener;
+        this.natsTriggerFlowListener = natsTriggerFlowListener;
         this.searchIndexListener = searchIndexListener;
         this.collectionSchemaListener = collectionSchemaListener;
         this.moduleEventListener = moduleEventListener;
@@ -92,6 +96,13 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.queueGroup(
                 "worker-search-index", "kelta.record.changed.>", "worker-search-index",
                 searchIndexListener::handleRecordChanged));
+
+        // External flow triggers — NATS_TRIGGERED flows. Subject carries the
+        // routing (kelta.trigger.<tenantId>.<topic>), so the handler is
+        // subject-aware. Queue group: one pod starts each execution.
+        subscriptionManager.register(EventSubscription.queueGroupWithSubject(
+                "worker-nats-trigger", "kelta.trigger.>", "worker-nats-trigger",
+                natsTriggerFlowListener::handleTriggerMessage));
 
         // Broadcast subscriptions — every pod receives every message
         subscriptionManager.register(EventSubscription.broadcast(
@@ -124,6 +135,12 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.broadcast(
                 "worker-flow-cache", "kelta.config.flow.changed.>",
                 flowEventListener::handleFlowConfigChanged));
+
+        // NATS-trigger cache invalidation — every pod drops the per-tenant
+        // NatsTriggerFlowListener cache when a flow row changes.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-nats-trigger-cache", "kelta.config.flow.changed.>",
+                natsTriggerFlowListener::handleFlowConfigChanged));
 
         // Custom domain cache invalidation — every pod drops cached domain
         // resolutions when a domain row changes upstream.

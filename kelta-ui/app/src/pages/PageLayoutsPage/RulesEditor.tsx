@@ -337,17 +337,19 @@ export function RulesEditor({ layoutId, layoutName, fieldNames, onClose }: Rules
               <h3 className="m-0 text-sm font-semibold text-foreground">Rules ({rules.length})</h3>
             </div>
             <div className="mb-3 grid grid-cols-2 gap-1">
-              {(['COMPUTE', 'VALIDATE', 'DEFAULT', 'TRANSFORM', 'SCRIPT'] as RuleKind[]).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  className="cursor-pointer rounded border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted"
-                  onClick={() => setDraft(emptyDraft(k, rules.length * 10))}
-                  data-testid={`rules-editor-add-${k.toLowerCase()}`}
-                >
-                  + {RULE_KIND_LABEL[k]}
-                </button>
-              ))}
+              {(['COMPUTE', 'VALIDATE', 'DEFAULT', 'TRANSFORM', 'SCRIPT'] as RuleKind[]).map(
+                (k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className="cursor-pointer rounded border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted"
+                    onClick={() => setDraft(emptyDraft(k, rules.length * 10))}
+                    data-testid={`rules-editor-add-${k.toLowerCase()}`}
+                  >
+                    + {RULE_KIND_LABEL[k]}
+                  </button>
+                )
+              )}
             </div>
 
             {isLoading ? (

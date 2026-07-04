@@ -23,7 +23,7 @@ const flowTypeLabels: Record<string, string> = {
   RECORD_TRIGGERED: 'Record-Triggered',
   SCHEDULED: 'Scheduled',
   AUTOLAUNCHED: 'API / Manual',
-  KAFKA_TRIGGERED: 'Kafka',
+  NATS_TRIGGERED: 'NATS',
   SCREEN: 'Screen',
 }
 

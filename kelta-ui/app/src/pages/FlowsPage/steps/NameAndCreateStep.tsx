@@ -17,7 +17,7 @@ const FLOW_TYPE_META: Record<FlowType, { label: string; icon: React.ElementType 
   RECORD_TRIGGERED: { label: 'Record change', icon: Database },
   SCHEDULED: { label: 'Scheduled', icon: Clock },
   AUTOLAUNCHED: { label: 'API / webhook', icon: Globe },
-  KAFKA_TRIGGERED: { label: 'Kafka event', icon: Radio },
+  NATS_TRIGGERED: { label: 'NATS message', icon: Radio },
 }
 
 export function NameAndCreateStep({

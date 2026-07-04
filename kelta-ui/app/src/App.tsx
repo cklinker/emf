@@ -61,6 +61,9 @@ import {
 // Admin/Setup pages (imported per-module, not via the barrel, so the eager barrel
 // graph doesn't drag the heavy lazy pages into the main chunk).
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
+// LoginPage stays eager — it is the unauthenticated entry point; putting it behind a
+// lazy Suspense boundary raced the login route render (e2e `login.spec` flakes).
+import { LoginPage } from './pages/LoginPage'
 
 // End-User Shell & Pages (lazy-loaded for code splitting)
 import { EndUserShell } from './shells/EndUserShell'
@@ -241,9 +244,6 @@ const DeduplicationPage = React.lazy(() =>
 )
 const SetupHomePage = React.lazy(() =>
   import('./pages/SetupHomePage').then((m) => ({ default: m.SetupHomePage }))
-)
-const LoginPage = React.lazy(() =>
-  import('./pages/LoginPage').then((m) => ({ default: m.LoginPage }))
 )
 const UnauthorizedPage = React.lazy(() =>
   import('./pages/UnauthorizedPage').then((m) => ({ default: m.UnauthorizedPage }))

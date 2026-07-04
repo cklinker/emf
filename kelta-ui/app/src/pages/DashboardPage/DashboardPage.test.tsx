@@ -14,7 +14,7 @@
  *
  * Requirements tested:
  * - 13.1: Dashboard displays system health status
- * - 13.2: Dashboard displays health status for control plane, database, Kafka, and Redis
+ * - 13.2: Dashboard displays health status for control plane, database, NATS, and Redis
  * - 13.3: Dashboard displays key API metrics including request rate, error rate, and latency
  * - 13.4: Dashboard displays recent errors and warnings from the system logs
  * - 13.5: Dashboard allows configuring time range for metrics display
@@ -49,7 +49,7 @@ const mockHealthStatuses: HealthStatus[] = [
     lastChecked: '2024-01-20T10:00:00Z',
   },
   {
-    service: 'Kafka',
+    service: 'NATS',
     status: 'unhealthy',
     details: 'Connection timeout',
     lastChecked: '2024-01-20T10:00:00Z',
@@ -66,8 +66,8 @@ const mockRecentErrors: RecentError[] = [
     id: '1',
     timestamp: '2024-01-20T09:55:00Z',
     level: 'error',
-    message: 'Failed to connect to Kafka broker',
-    source: 'kafka-consumer',
+    message: 'Failed to connect to NATS server',
+    source: 'nats-consumer',
     traceId: 'abc123def456',
   },
   {
@@ -200,10 +200,10 @@ describe('DashboardPage', () => {
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        // Use getAllByText since Kafka appears in both health alerts and health cards
+        // Use getAllByText since NATS appears in both health alerts and health cards
         expect(screen.getAllByText('Control Plane').length).toBeGreaterThanOrEqual(1)
         expect(screen.getAllByText('Database').length).toBeGreaterThanOrEqual(1)
-        expect(screen.getAllByText('Kafka').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByText('NATS').length).toBeGreaterThanOrEqual(1)
         expect(screen.getAllByText('Redis').length).toBeGreaterThanOrEqual(1)
       })
     })
@@ -355,7 +355,7 @@ describe('DashboardPage', () => {
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to connect to Kafka broker')).toBeInTheDocument()
+        expect(screen.getByText('Failed to connect to NATS server')).toBeInTheDocument()
         expect(screen.getByText('High memory usage detected')).toBeInTheDocument()
         expect(screen.getByText('Database query timeout')).toBeInTheDocument()
       })
@@ -377,7 +377,7 @@ describe('DashboardPage', () => {
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('kafka-consumer')).toBeInTheDocument()
+        expect(screen.getByText('nats-consumer')).toBeInTheDocument()
         expect(screen.getByText('system-monitor')).toBeInTheDocument()
         expect(screen.getByText('query-engine')).toBeInTheDocument()
       })
@@ -623,16 +623,16 @@ describe('DashboardPage', () => {
       })
     })
 
-    it('should display alert for unhealthy Kafka service', async () => {
+    it('should display alert for unhealthy NATS service', async () => {
       mockAxios.get.mockResolvedValue({ data: mockDashboardData })
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByTestId('health-alert-kafka')).toBeInTheDocument()
+        expect(screen.getByTestId('health-alert-nats')).toBeInTheDocument()
         // Use within to scope the query to the health alerts section
-        const alertItem = screen.getByTestId('health-alert-kafka')
-        expect(alertItem).toHaveTextContent('Kafka')
+        const alertItem = screen.getByTestId('health-alert-nats')
+        expect(alertItem).toHaveTextContent('NATS')
         expect(alertItem).toHaveTextContent('Connection timeout')
       })
     })

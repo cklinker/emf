@@ -60,69 +60,10 @@ import {
 
 // Admin/Setup pages (imported per-module, not via the barrel, so the eager barrel
 // graph doesn't drag the heavy lazy pages into the main chunk).
-import { AiSettingsPage } from './pages/AiSettingsPage'
-import { EmailSettingsPage } from './pages/EmailSettingsPage'
-import { MapSettingsPage } from './pages/MapSettingsPage'
-import { NetworkAccessPage } from './pages/NetworkAccessPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { CollectionsPage } from './pages/CollectionsPage'
-import { CollectionDetailPage } from './pages/CollectionDetailPage'
-import { CollectionFormPage } from './pages/CollectionFormPage'
-import { CollectionWizardPage } from './pages/CollectionWizardPage'
-import { OIDCProvidersPage } from './pages/OIDCProvidersPage'
-import { MenuBuilderPage } from './pages/MenuBuilderPage'
-import { PackagesPage } from './pages/PackagesPage'
-import { MigrationsPage } from './pages/MigrationsPage'
-import { ResourceBrowserPage } from './pages/ResourceBrowserPage'
-import { ResourceListPage } from './pages/ResourceListPage'
-import { ResourceDetailPage } from './pages/ResourceDetailPage'
-import { ResourceFormPage } from './pages/ResourceFormPage'
-import { PluginsPage } from './pages/PluginsPage'
-import { UsersPage } from './pages/UsersPage'
-import { UserDetailPage } from './pages/UserDetailPage'
-import { SetupAuditTrailPage } from './pages/SetupAuditTrailPage'
-import { GovernorLimitsPage } from './pages/GovernorLimitsPage'
-import { TenantsPage } from './pages/TenantsPage'
-import { TenantDashboardPage } from './pages/TenantDashboardPage'
-import { PicklistsPage } from './pages/PicklistsPage'
-import { AiAgentsPage } from './pages/AiAgentsPage'
-import { PageLayoutsPage } from './pages/PageLayoutsPage'
-import { ListViewsPage } from './pages/ListViewsPage'
-import { AnalyticsPage } from './pages/AnalyticsPage'
-import { ApprovalProcessesPage } from './pages/ApprovalProcessesPage'
-import { FlowsPage } from './pages/FlowsPage'
-import { ScheduledJobsPage } from './pages/ScheduledJobsPage'
-import { EmailTemplatesPage } from './pages/EmailTemplatesPage'
-import { CampaignsPage } from './pages/CampaignsPage'
-import { ScriptsPage } from './pages/ScriptsPage'
-import { WebhooksPage } from './pages/WebhooksPage'
-import { ApiSpecsPage, ApiSpecDetailPage } from './pages/ApiSpecsPage'
-import { ConnectedAppsPage } from './pages/ConnectedAppsPage'
-import { CredentialsPage } from './pages/CredentialsPage'
-import { ApiTokensPage } from './pages/ApiTokensPage'
-import { ModulesPage } from './pages/ModulesPage'
-import { BulkJobsPage } from './pages/BulkJobsPage'
-import { DeduplicationPage } from './pages/DeduplicationPage'
-import { SetupHomePage } from './pages/SetupHomePage'
-import { LoginPage } from './pages/LoginPage'
-import { UnauthorizedPage } from './pages/UnauthorizedPage'
-import { NotFoundPage } from './pages/NotFoundPage'
-import { ProfilesPage } from './pages/ProfilesPage'
-import { ProfileDetailPage } from './pages/ProfileDetailPage'
-import { LoginHistoryPage } from './pages/LoginHistoryPage'
-import { SecurityAuditPage } from './pages/SecurityAuditPage'
-import { RequestLogPage } from './pages/RequestLogPage'
-import { RequestLogDetailPage } from './pages/RequestLogDetailPage'
-import { LogViewerPage } from './pages/LogViewerPage'
-import { ErrorDashboardPage } from './pages/ErrorDashboardPage'
-import { UserActivityPage } from './pages/UserActivityPage'
-import { EndpointPerformancePage } from './pages/EndpointPerformancePage'
-import { ObservabilitySettingsPage } from './pages/ObservabilitySettingsPage'
-import { SearchSettingsPage } from './pages/SearchSettingsPage'
-import { ConfigHealthPage } from './pages/ConfigHealthPage'
-import { PasswordPolicyPanel as PasswordPolicyPage } from './pages/SecuritySettingsPage/PasswordPolicyPanel'
-import { MfaPolicyPanel as MfaPolicyPage } from './pages/SecuritySettingsPage/MfaPolicyPanel'
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
+// LoginPage stays eager — it is the unauthenticated entry point; putting it behind a
+// lazy Suspense boundary raced the login route render (e2e `login.spec` flakes).
+import { LoginPage } from './pages/LoginPage'
 
 // End-User Shell & Pages (lazy-loaded for code splitting)
 import { EndUserShell } from './shells/EndUserShell'
@@ -164,6 +105,200 @@ const MonitoringLayout = React.lazy(() =>
 )
 const MonitoringOverviewPage = React.lazy(() =>
   import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringOverviewPage }))
+)
+
+// Admin/Setup pages — lazy-loaded (code-splitting) so the main bundle carries only
+// the app shell; each admin route's code loads on demand under the TenantRoutes
+// Suspense boundary. App imports them per-module (no ./pages barrel).
+const AiSettingsPage = React.lazy(() =>
+  import('./pages/AiSettingsPage').then((m) => ({ default: m.AiSettingsPage }))
+)
+const EmailSettingsPage = React.lazy(() =>
+  import('./pages/EmailSettingsPage').then((m) => ({ default: m.EmailSettingsPage }))
+)
+const MapSettingsPage = React.lazy(() =>
+  import('./pages/MapSettingsPage').then((m) => ({ default: m.MapSettingsPage }))
+)
+const NetworkAccessPage = React.lazy(() =>
+  import('./pages/NetworkAccessPage').then((m) => ({ default: m.NetworkAccessPage }))
+)
+const DashboardPage = React.lazy(() =>
+  import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
+)
+const CollectionsPage = React.lazy(() =>
+  import('./pages/CollectionsPage').then((m) => ({ default: m.CollectionsPage }))
+)
+const CollectionDetailPage = React.lazy(() =>
+  import('./pages/CollectionDetailPage').then((m) => ({ default: m.CollectionDetailPage }))
+)
+const CollectionFormPage = React.lazy(() =>
+  import('./pages/CollectionFormPage').then((m) => ({ default: m.CollectionFormPage }))
+)
+const CollectionWizardPage = React.lazy(() =>
+  import('./pages/CollectionWizardPage').then((m) => ({ default: m.CollectionWizardPage }))
+)
+const OIDCProvidersPage = React.lazy(() =>
+  import('./pages/OIDCProvidersPage').then((m) => ({ default: m.OIDCProvidersPage }))
+)
+const MenuBuilderPage = React.lazy(() =>
+  import('./pages/MenuBuilderPage').then((m) => ({ default: m.MenuBuilderPage }))
+)
+const PackagesPage = React.lazy(() =>
+  import('./pages/PackagesPage').then((m) => ({ default: m.PackagesPage }))
+)
+const MigrationsPage = React.lazy(() =>
+  import('./pages/MigrationsPage').then((m) => ({ default: m.MigrationsPage }))
+)
+const ResourceBrowserPage = React.lazy(() =>
+  import('./pages/ResourceBrowserPage').then((m) => ({ default: m.ResourceBrowserPage }))
+)
+const ResourceListPage = React.lazy(() =>
+  import('./pages/ResourceListPage').then((m) => ({ default: m.ResourceListPage }))
+)
+const ResourceDetailPage = React.lazy(() =>
+  import('./pages/ResourceDetailPage').then((m) => ({ default: m.ResourceDetailPage }))
+)
+const ResourceFormPage = React.lazy(() =>
+  import('./pages/ResourceFormPage').then((m) => ({ default: m.ResourceFormPage }))
+)
+const PluginsPage = React.lazy(() =>
+  import('./pages/PluginsPage').then((m) => ({ default: m.PluginsPage }))
+)
+const UsersPage = React.lazy(() =>
+  import('./pages/UsersPage').then((m) => ({ default: m.UsersPage }))
+)
+const UserDetailPage = React.lazy(() =>
+  import('./pages/UserDetailPage').then((m) => ({ default: m.UserDetailPage }))
+)
+const SetupAuditTrailPage = React.lazy(() =>
+  import('./pages/SetupAuditTrailPage').then((m) => ({ default: m.SetupAuditTrailPage }))
+)
+const GovernorLimitsPage = React.lazy(() =>
+  import('./pages/GovernorLimitsPage').then((m) => ({ default: m.GovernorLimitsPage }))
+)
+const TenantsPage = React.lazy(() =>
+  import('./pages/TenantsPage').then((m) => ({ default: m.TenantsPage }))
+)
+const TenantDashboardPage = React.lazy(() =>
+  import('./pages/TenantDashboardPage').then((m) => ({ default: m.TenantDashboardPage }))
+)
+const PicklistsPage = React.lazy(() =>
+  import('./pages/PicklistsPage').then((m) => ({ default: m.PicklistsPage }))
+)
+const AiAgentsPage = React.lazy(() =>
+  import('./pages/AiAgentsPage').then((m) => ({ default: m.AiAgentsPage }))
+)
+const PageLayoutsPage = React.lazy(() =>
+  import('./pages/PageLayoutsPage').then((m) => ({ default: m.PageLayoutsPage }))
+)
+const ListViewsPage = React.lazy(() =>
+  import('./pages/ListViewsPage').then((m) => ({ default: m.ListViewsPage }))
+)
+const AnalyticsPage = React.lazy(() =>
+  import('./pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage }))
+)
+const ApprovalProcessesPage = React.lazy(() =>
+  import('./pages/ApprovalProcessesPage').then((m) => ({ default: m.ApprovalProcessesPage }))
+)
+const FlowsPage = React.lazy(() =>
+  import('./pages/FlowsPage').then((m) => ({ default: m.FlowsPage }))
+)
+const ScheduledJobsPage = React.lazy(() =>
+  import('./pages/ScheduledJobsPage').then((m) => ({ default: m.ScheduledJobsPage }))
+)
+const EmailTemplatesPage = React.lazy(() =>
+  import('./pages/EmailTemplatesPage').then((m) => ({ default: m.EmailTemplatesPage }))
+)
+const CampaignsPage = React.lazy(() =>
+  import('./pages/CampaignsPage').then((m) => ({ default: m.CampaignsPage }))
+)
+const ScriptsPage = React.lazy(() =>
+  import('./pages/ScriptsPage').then((m) => ({ default: m.ScriptsPage }))
+)
+const WebhooksPage = React.lazy(() =>
+  import('./pages/WebhooksPage').then((m) => ({ default: m.WebhooksPage }))
+)
+const ApiSpecsPage = React.lazy(() =>
+  import('./pages/ApiSpecsPage').then((m) => ({ default: m.ApiSpecsPage }))
+)
+const ApiSpecDetailPage = React.lazy(() =>
+  import('./pages/ApiSpecsPage').then((m) => ({ default: m.ApiSpecDetailPage }))
+)
+const ConnectedAppsPage = React.lazy(() =>
+  import('./pages/ConnectedAppsPage').then((m) => ({ default: m.ConnectedAppsPage }))
+)
+const CredentialsPage = React.lazy(() =>
+  import('./pages/CredentialsPage').then((m) => ({ default: m.CredentialsPage }))
+)
+const ApiTokensPage = React.lazy(() =>
+  import('./pages/ApiTokensPage').then((m) => ({ default: m.ApiTokensPage }))
+)
+const ModulesPage = React.lazy(() =>
+  import('./pages/ModulesPage').then((m) => ({ default: m.ModulesPage }))
+)
+const BulkJobsPage = React.lazy(() =>
+  import('./pages/BulkJobsPage').then((m) => ({ default: m.BulkJobsPage }))
+)
+const DeduplicationPage = React.lazy(() =>
+  import('./pages/DeduplicationPage').then((m) => ({ default: m.DeduplicationPage }))
+)
+const SetupHomePage = React.lazy(() =>
+  import('./pages/SetupHomePage').then((m) => ({ default: m.SetupHomePage }))
+)
+const UnauthorizedPage = React.lazy(() =>
+  import('./pages/UnauthorizedPage').then((m) => ({ default: m.UnauthorizedPage }))
+)
+const NotFoundPage = React.lazy(() =>
+  import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
+)
+const ProfilesPage = React.lazy(() =>
+  import('./pages/ProfilesPage').then((m) => ({ default: m.ProfilesPage }))
+)
+const ProfileDetailPage = React.lazy(() =>
+  import('./pages/ProfileDetailPage').then((m) => ({ default: m.ProfileDetailPage }))
+)
+const LoginHistoryPage = React.lazy(() =>
+  import('./pages/LoginHistoryPage').then((m) => ({ default: m.LoginHistoryPage }))
+)
+const SecurityAuditPage = React.lazy(() =>
+  import('./pages/SecurityAuditPage').then((m) => ({ default: m.SecurityAuditPage }))
+)
+const RequestLogPage = React.lazy(() =>
+  import('./pages/RequestLogPage').then((m) => ({ default: m.RequestLogPage }))
+)
+const RequestLogDetailPage = React.lazy(() =>
+  import('./pages/RequestLogDetailPage').then((m) => ({ default: m.RequestLogDetailPage }))
+)
+const LogViewerPage = React.lazy(() =>
+  import('./pages/LogViewerPage').then((m) => ({ default: m.LogViewerPage }))
+)
+const ErrorDashboardPage = React.lazy(() =>
+  import('./pages/ErrorDashboardPage').then((m) => ({ default: m.ErrorDashboardPage }))
+)
+const UserActivityPage = React.lazy(() =>
+  import('./pages/UserActivityPage').then((m) => ({ default: m.UserActivityPage }))
+)
+const EndpointPerformancePage = React.lazy(() =>
+  import('./pages/EndpointPerformancePage').then((m) => ({ default: m.EndpointPerformancePage }))
+)
+const ObservabilitySettingsPage = React.lazy(() =>
+  import('./pages/ObservabilitySettingsPage').then((m) => ({
+    default: m.ObservabilitySettingsPage,
+  }))
+)
+const SearchSettingsPage = React.lazy(() =>
+  import('./pages/SearchSettingsPage').then((m) => ({ default: m.SearchSettingsPage }))
+)
+const ConfigHealthPage = React.lazy(() =>
+  import('./pages/ConfigHealthPage').then((m) => ({ default: m.ConfigHealthPage }))
+)
+const PasswordPolicyPage = React.lazy(() =>
+  import('./pages/SecuritySettingsPage/PasswordPolicyPanel').then((m) => ({
+    default: m.PasswordPolicyPanel,
+  }))
+)
+const MfaPolicyPage = React.lazy(() =>
+  import('./pages/SecuritySettingsPage/MfaPolicyPanel').then((m) => ({ default: m.MfaPolicyPanel }))
 )
 
 // Types

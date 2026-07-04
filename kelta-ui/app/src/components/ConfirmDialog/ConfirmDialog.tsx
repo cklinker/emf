@@ -106,11 +106,6 @@ export function ConfirmDialog({
   const resolvedConfirmLabel = confirmLabel ?? t('common.confirm')
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel')
 
-  // Generate unique IDs for accessibility
-  const dialogId = id ?? 'confirm-dialog'
-  const titleId = `${dialogId}-title`
-  const descriptionId = `${dialogId}-description`
-
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen && closeOnOverlayClick) {
       onCancel()
@@ -126,20 +121,23 @@ export function ConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent
+        id={id}
         data-testid="confirm-dialog"
         data-variant={variant}
         className={cn('max-w-md', variant === 'danger' && 'border-destructive/20')}
         onEscapeKeyDown={handleEscapeKeyDown}
       >
         <AlertDialogHeader>
+          {/* Title/Description ids stay Radix-managed so the content's
+              aria-labelledby/aria-describedby wiring (and its dev-mode
+              accessibility checks) keep working. */}
           <AlertDialogTitle
-            id={titleId}
             data-testid="confirm-dialog-title"
             className={cn(variant === 'danger' && 'text-destructive')}
           >
             {title}
           </AlertDialogTitle>
-          <AlertDialogDescription id={descriptionId} data-testid="confirm-dialog-message">
+          <AlertDialogDescription data-testid="confirm-dialog-message">
             {message}
           </AlertDialogDescription>
         </AlertDialogHeader>

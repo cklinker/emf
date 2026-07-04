@@ -6,7 +6,7 @@
  *
  * Requirements:
  * - 13.1: Dashboard displays system health status
- * - 13.2: Dashboard displays health status for control plane, database, Kafka, and Redis
+ * - 13.2: Dashboard displays health status for control plane, database, NATS, and Redis
  * - 13.3: Dashboard displays key API metrics including request rate, error rate, and latency
  * - 13.4: Dashboard displays recent errors and warnings from the system logs
  * - 13.5: Dashboard allows configuring time range for metrics display
@@ -607,7 +607,7 @@ export function DashboardPage({
           lastChecked: new Date().toISOString(),
         },
         { service: 'Database', status: 'unknown' as const, lastChecked: new Date().toISOString() },
-        { service: 'Kafka', status: 'unknown' as const, lastChecked: new Date().toISOString() },
+        { service: 'NATS', status: 'unknown' as const, lastChecked: new Date().toISOString() },
         { service: 'Redis', status: 'unknown' as const, lastChecked: new Date().toISOString() },
       ]
     }

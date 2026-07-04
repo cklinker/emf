@@ -53,6 +53,13 @@ public class ScheduledJobExecutorService {
     private final DataExportService dataExportService;
     private final DataExportRepository dataExportRepository;
     private final TenantSlugResolver tenantSlugResolver;
+
+    /**
+     * Nullable: the {@link DefaultEmailService} bean only exists when
+     * {@code kelta.email.enabled} is true (the harness runs with email
+     * disabled). Absent → report delivery is skipped with a log note; the
+     * export itself still runs.
+     */
     private final DefaultEmailService emailService;
 
     /** Reports larger than this are delivered as a notification without the CSV attached. */
@@ -67,7 +74,7 @@ public class ScheduledJobExecutorService {
                                         DataExportService dataExportService,
                                         DataExportRepository dataExportRepository,
                                         TenantSlugResolver tenantSlugResolver,
-                                        DefaultEmailService emailService) {
+                                        org.springframework.beans.factory.ObjectProvider<DefaultEmailService> emailServiceProvider) {
         this.repository = repository;
         this.flowEngine = flowEngine;
         this.initialStateBuilder = initialStateBuilder;
@@ -77,7 +84,7 @@ public class ScheduledJobExecutorService {
         this.dataExportService = dataExportService;
         this.dataExportRepository = dataExportRepository;
         this.tenantSlugResolver = tenantSlugResolver;
-        this.emailService = emailService;
+        this.emailService = emailServiceProvider.getIfAvailable();
     }
 
     /**
@@ -336,6 +343,10 @@ public class ScheduledJobExecutorService {
                                         String configJson, String csvOutput, int recordCount) {
         if (configJson == null || configJson.isBlank()) {
             return null;
+        }
+        if (emailService == null) {
+            log.warn("Scheduled job {} has delivery config but email is disabled — skipping delivery", jobId);
+            return "Delivery skipped: email disabled";
         }
         List<String> recipients;
         try {

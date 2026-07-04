@@ -49,10 +49,20 @@ class ScheduledJobExecutorServiceTest {
         tenantSlugResolver = mock(TenantSlugResolver.class);
         emailService = mock(io.kelta.worker.service.email.DefaultEmailService.class);
         when(tenantSlugResolver.resolveSlug(anyString())).thenReturn(Optional.of("acme-corp"));
-        executor = new ScheduledJobExecutorService(
+        executor = buildExecutor(emailService);
+    }
+
+    /** Builds the service with an optional DefaultEmailService (null = email disabled, harness mode). */
+    private ScheduledJobExecutorService buildExecutor(
+            io.kelta.worker.service.email.DefaultEmailService email) {
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<io.kelta.worker.service.email.DefaultEmailService> provider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        lenient().when(provider.getIfAvailable()).thenReturn(email);
+        return new ScheduledJobExecutorService(
                 repository, flowEngine, initialStateBuilder, objectMapper,
                 scriptExecutor, reportExecutionService, dataExportService, dataExportRepository,
-                tenantSlugResolver, emailService);
+                tenantSlugResolver, provider);
     }
 
     @AfterEach
@@ -377,6 +387,32 @@ class ScheduledJobExecutorServiceTest {
 
             verifyNoInteractions(emailService);
             verify(repository).updateAfterExecution(eq("job-r5"), eq("SUCCESS"), any(), any());
+        }
+
+        @Test
+        @DisplayName("email disabled (no DefaultEmailService bean) → export succeeds, delivery skipped")
+        void emailDisabledSkipsDelivery() throws Exception {
+            ScheduledJobExecutorService noEmailExecutor = buildExecutor(null);
+            Map<String, Object> job = new HashMap<>(Map.of(
+                    "id", "job-r7", "tenant_id", "t1", "job_type", "REPORT_EXPORT",
+                    "job_reference_id", "report-1", "cron_expression", "0 0 * * * *", "timezone", "UTC",
+                    "name", "Weekly Sales",
+                    "config", "{\"recipients\":[\"a@x.com\"]}"));
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findReportById("report-1")).thenReturn(Optional.of(Map.of(
+                    "id", "report-1", "name", "Test Report",
+                    "primaryCollectionId", "col-1", "columns", "[]")));
+            doAnswer(inv -> {
+                ((Writer) inv.getArgument(1)).write("h\n");
+                return null;
+            }).when(reportExecutionService).exportCsv(any(), any());
+
+            noEmailExecutor.executeAll();
+
+            verify(repository).updateAfterExecution(eq("job-r7"), eq("SUCCESS"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-r7"), eq("SUCCESS"),
+                    contains("email disabled"), any(), any(), anyLong());
+            verifyNoInteractions(emailService);
         }
 
         @Test

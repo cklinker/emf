@@ -23,7 +23,12 @@ export default defineConfig({
     // /api): offline *data* (IndexedDB replica + outbox) is the separate Rec 2B slice.
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'logo.svg'],
+      includeAssets: [
+        'favicon.svg',
+        'logo.svg',
+        'apple-touch-icon-180x180.png',
+        'maskable-icon-192x192.png',
+      ],
       manifest: {
         name: 'Kelta',
         short_name: 'Kelta',
@@ -32,10 +37,22 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
-        icons: [{ src: 'logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
+        // Raster PNG icons — Android/Chrome install requires PNG (an SVG-only `any maskable`
+        // icon does not reliably render on the home screen). `any` = transparent glyph;
+        // `maskable` = opaque-background + safe-zone padded so platform masks don't clip it.
+        icons: [
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          {
+            src: 'maskable-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // Heavy admin pages (react-flow / recharts / dnd-kit) are route-split into their own
         // lazy chunks, so the main bundle no longer carries them and the end-user PWA loads
         // them only if those admin routes are visited. The remaining main chunk is still a

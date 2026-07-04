@@ -5,7 +5,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Per-tenant push notification configuration extracted from the tenant.settings JSONB column.
  *
- * <p>Tenants can override the platform FCM defaults by storing push settings
+ * <p>Tenants can override the platform FCM and/or APNs defaults by storing push settings
  * in their tenant.settings JSON under the {@code "push"} key:
  * <pre>{@code
  * {
@@ -14,36 +14,57 @@ import tools.jackson.databind.JsonNode;
  *       "projectId": "my-project",
  *       "clientEmail": "firebase@my-project.iam.gserviceaccount.com",
  *       "privateKey": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+ *     },
+ *     "apns": {
+ *       "teamId": "TEAM123456",
+ *       "keyId": "KEY7890AB",
+ *       "bundleId": "io.tenant.app",
+ *       "authKey": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
  *     }
  *   }
  * }
  * }</pre>
  *
- * <p>Any field left unset falls back to platform defaults. The {@code privateKey}
- * is deliberately excluded from {@link #toString()} to prevent credential leakage in logs.
+ * <p>Any field left unset falls back to platform defaults. Private keys are deliberately
+ * excluded from {@link #toString()} to prevent credential leakage in logs.
  *
  * @since 1.0.0
  */
 public record TenantPushSettings(
         String fcmProjectId,
         String fcmClientEmail,
-        String fcmPrivateKey
+        String fcmPrivateKey,
+        String apnsTeamId,
+        String apnsKeyId,
+        String apnsBundleId,
+        String apnsAuthKey
 ) {
 
+    /** Back-compat convenience constructor for FCM-only settings. */
+    public TenantPushSettings(String fcmProjectId, String fcmClientEmail, String fcmPrivateKey) {
+        this(fcmProjectId, fcmClientEmail, fcmPrivateKey, null, null, null, null);
+    }
+
     /**
-     * @return true if this settings object contains FCM overrides
+     * @return true if this settings object contains a complete FCM override
      */
     public boolean hasFcmOverride() {
-        return fcmProjectId != null && !fcmProjectId.isBlank()
-                && fcmClientEmail != null && !fcmClientEmail.isBlank()
-                && fcmPrivateKey != null && !fcmPrivateKey.isBlank();
+        return notBlank(fcmProjectId) && notBlank(fcmClientEmail) && notBlank(fcmPrivateKey);
+    }
+
+    /**
+     * @return true if this settings object contains a complete APNs override
+     */
+    public boolean hasApnsOverride() {
+        return notBlank(apnsTeamId) && notBlank(apnsKeyId)
+                && notBlank(apnsBundleId) && notBlank(apnsAuthKey);
     }
 
     /**
      * Parses tenant push settings from the tenant.settings JSONB.
      *
      * @param settingsJson the root settings JSON node from the tenant table
-     * @return parsed settings, or {@code null} if no push section exists
+     * @return parsed settings, or {@code null} if no push overrides exist
      */
     public static TenantPushSettings fromJsonNode(JsonNode settingsJson) {
         if (settingsJson == null || !settingsJson.has("push")) {
@@ -52,20 +73,25 @@ public record TenantPushSettings(
 
         JsonNode push = settingsJson.get("push");
         JsonNode fcm = push.has("fcm") ? push.get("fcm") : null;
+        JsonNode apns = push.has("apns") ? push.get("apns") : null;
 
-        if (fcm == null) {
+        if (fcm == null && apns == null) {
             return null;
         }
 
         return new TenantPushSettings(
-                textOrNull(fcm, "projectId"),
-                textOrNull(fcm, "clientEmail"),
-                textOrNull(fcm, "privateKey")
+                fcm != null ? textOrNull(fcm, "projectId") : null,
+                fcm != null ? textOrNull(fcm, "clientEmail") : null,
+                fcm != null ? textOrNull(fcm, "privateKey") : null,
+                apns != null ? textOrNull(apns, "teamId") : null,
+                apns != null ? textOrNull(apns, "keyId") : null,
+                apns != null ? textOrNull(apns, "bundleId") : null,
+                apns != null ? textOrNull(apns, "authKey") : null
         );
     }
 
     /**
-     * Masks privateKey to prevent credential leakage in logs, error messages, and toString output.
+     * Masks private keys to prevent credential leakage in logs, error messages, and toString.
      */
     @Override
     public String toString() {
@@ -73,7 +99,15 @@ public record TenantPushSettings(
                 "fcmProjectId=" + fcmProjectId +
                 ", fcmClientEmail=" + fcmClientEmail +
                 ", fcmPrivateKey=****" +
+                ", apnsTeamId=" + apnsTeamId +
+                ", apnsKeyId=" + apnsKeyId +
+                ", apnsBundleId=" + apnsBundleId +
+                ", apnsAuthKey=****" +
                 ']';
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.isBlank();
     }
 
     private static String textOrNull(JsonNode node, String field) {

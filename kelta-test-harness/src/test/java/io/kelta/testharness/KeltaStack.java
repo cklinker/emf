@@ -206,6 +206,25 @@ public final class KeltaStack {
         return "http://" + GATEWAY.getHost() + ":" + GATEWAY.getMappedPort(8080);
     }
 
+    /**
+     * JDBC URL for the harness database, reachable from the <em>test JVM</em>
+     * (not the docker network). External CI URLs are host-reachable as-is; the
+     * local Testcontainers PG needs its mapped-port URL. For CI, the URL keeps
+     * its {@code currentSchema=ci_<run-tag>} pin so direct connections land in
+     * the same isolated schema the services use.
+     */
+    public static String dbJdbcUrl() {
+        return DB_CONFIG.external() ? DB_CONFIG.jdbcUrl() : POSTGRES.getJdbcUrl();
+    }
+
+    public static String dbUsername() {
+        return DB_CONFIG.username();
+    }
+
+    public static String dbPassword() {
+        return DB_CONFIG.password();
+    }
+
     // ── Startup ──────────────────────────────────────────────────────────────
 
     /**

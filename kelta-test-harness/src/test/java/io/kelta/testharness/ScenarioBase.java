@@ -7,6 +7,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.RestClient;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
 /**
  * Base class for cross-service scenario tests.
  *
@@ -37,6 +41,29 @@ public abstract class ScenarioBase {
                 .baseUrl(KeltaStack.gatewayBaseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .build();
+    }
+
+    /**
+     * Opens a direct JDBC connection to the harness database as the service DB
+     * user, for asserting DB state the API doesn't expose. Caller closes it.
+     *
+     * <p>Note: this user is typically a Postgres superuser (both the local
+     * Testcontainers PG and the CI pool use the image's bootstrap user), so it
+     * <em>bypasses RLS</em> even on FORCE'd tables. Assertions about RLS must
+     * connect as a non-superuser role instead — see
+     * {@link #openDbConnection(String, String)}.
+     */
+    protected Connection openDbConnection() throws SQLException {
+        return DriverManager.getConnection(
+                KeltaStack.dbJdbcUrl(), KeltaStack.dbUsername(), KeltaStack.dbPassword());
+    }
+
+    /**
+     * Opens a direct JDBC connection as an arbitrary role (e.g. a non-superuser
+     * probe role created by the test to observe RLS). Caller closes it.
+     */
+    protected Connection openDbConnection(String username, String password) throws SQLException {
+        return DriverManager.getConnection(KeltaStack.dbJdbcUrl(), username, password);
     }
 
     /**

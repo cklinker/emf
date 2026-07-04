@@ -7,7 +7,7 @@
 - **AssertJ** fluent assertions
 - **Mockito** 5.21.0
 - **jqwik** 1.8.2 — property-based testing
-- **Testcontainers** 1.20.4 — Docker-based integration tests
+- **Testcontainers** 1.21.3 in `kelta-test-harness` (1.20.4 elsewhere via `kelta-platform`) — Docker-based integration tests. 1.21.x is required on hosts running Docker Engine 29+ (min API 1.44; older docker-java pings `/v1.32` and gets a 400 → "Could not find a valid Docker environment").
 - **MockWebServer** — HTTP service mocks
 - **Awaitility** — async assertions
 
@@ -16,6 +16,8 @@
 Boots a full mini-stack (Postgres, Redis, NATS, Cerbos, worker, auth, gateway) via Testcontainers and runs `*ScenarioTest.java` against it under the `integration-tests` profile.
 
 **Database selection**: `KeltaStack` reads `CI_DB_JDBC_URL` at startup. When set (CI), it skips the Testcontainers PG and points worker + auth at the shared `kelta-ci-db` pool — the URL emitted by `scripts/ci/checkout-db.sh` already pins `currentSchema=ci_<run-tag>` for per-run isolation. When unset (local dev), it falls back to a Testcontainers PG on the docker network alias `postgres`. The Testcontainers dependency stays in `pom.xml` either way.
+
+**Direct DB assertions**: `ScenarioBase.openDbConnection()` opens a JDBC connection from the test JVM (via `KeltaStack.dbJdbcUrl()`, which maps the local container port / passes the CI URL through) for asserting table state the API doesn't expose — e.g. `flow_pending_resume` in `FlowWaitResumeScenarioTest`. Caveat: the harness DB user is the image's bootstrap superuser and **bypasses RLS even on FORCE'd tables**; RLS assertions must run as a non-superuser probe role created by the test (`openDbConnection(user, password)` + `set_config('app.current_tenant_id', …)`) — see `RecordShareWideningScenarioTest`. Also note V77's RLS loop only matches tables in the `public` schema, so on CI (`ci_*` schemas) only migrations that `ALTER TABLE` directly (e.g. V150 `record_share`) have RLS — don't write harness RLS assertions against V77-listed tables.
 
 ### Organization
 - Unit tests: `src/test/java/io/kelta/...Test.java`

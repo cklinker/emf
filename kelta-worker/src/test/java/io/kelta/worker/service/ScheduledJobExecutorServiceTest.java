@@ -13,6 +13,7 @@ import org.junit.jupiter.api.*;
 
 import java.io.Writer;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +33,7 @@ class ScheduledJobExecutorServiceTest {
     private DataExportService dataExportService;
     private DataExportRepository dataExportRepository;
     private TenantSlugResolver tenantSlugResolver;
+    private io.kelta.worker.service.email.DefaultEmailService emailService;
     private ScheduledJobExecutorService executor;
 
     @BeforeEach
@@ -45,11 +47,12 @@ class ScheduledJobExecutorServiceTest {
         dataExportService = mock(DataExportService.class);
         dataExportRepository = mock(DataExportRepository.class);
         tenantSlugResolver = mock(TenantSlugResolver.class);
+        emailService = mock(io.kelta.worker.service.email.DefaultEmailService.class);
         when(tenantSlugResolver.resolveSlug(anyString())).thenReturn(Optional.of("acme-corp"));
         executor = new ScheduledJobExecutorService(
                 repository, flowEngine, initialStateBuilder, objectMapper,
                 scriptExecutor, reportExecutionService, dataExportService, dataExportRepository,
-                tenantSlugResolver);
+                tenantSlugResolver, emailService);
     }
 
     @AfterEach
@@ -319,6 +322,87 @@ class ScheduledJobExecutorServiceTest {
 
             verify(repository).updateAfterExecution(eq("job-r3"), eq("FAILED"), any(), any());
             verify(repository).insertExecutionLog(eq("job-r3"), eq("FAILED"), contains("Collection not found"), any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("config.recipients → CSV emailed as attachment to each recipient")
+        void deliversCsvToRecipients() throws Exception {
+            Map<String, Object> job = new HashMap<>(Map.of(
+                    "id", "job-r4", "tenant_id", "t1", "job_type", "REPORT_EXPORT",
+                    "job_reference_id", "report-1", "cron_expression", "0 0 * * * *", "timezone", "UTC",
+                    "name", "Weekly Sales",
+                    "config", "{\"recipients\":[\"a@x.com\",\"b@y.com\"]}"));
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findReportById("report-1")).thenReturn(Optional.of(Map.of(
+                    "id", "report-1", "name", "Test Report",
+                    "primaryCollectionId", "col-1", "columns", "[]")));
+            doAnswer(inv -> {
+                Writer w = inv.getArgument(1);
+                w.write("Name,Amount\nAlice,100\n");
+                return null;
+            }).when(reportExecutionService).exportCsv(any(), any());
+
+            executor.executeAll();
+
+            org.mockito.ArgumentCaptor<List<io.kelta.worker.service.email.EmailAttachment>> attachCaptor =
+                    org.mockito.ArgumentCaptor.forClass(List.class);
+            verify(emailService).queueEmailWithAttachments(eq("t1"), eq("a@x.com"),
+                    contains("Weekly Sales"), anyString(), eq("SCHEDULED_REPORT"), eq("job-r4"),
+                    attachCaptor.capture());
+            verify(emailService).queueEmailWithAttachments(eq("t1"), eq("b@y.com"),
+                    contains("Weekly Sales"), anyString(), eq("SCHEDULED_REPORT"), eq("job-r4"), any());
+            io.kelta.worker.service.email.EmailAttachment attachment = attachCaptor.getValue().get(0);
+            assertThat(attachment.contentType()).isEqualTo("text/csv");
+            assertThat(new String(attachment.content())).contains("Alice,100");
+            verify(repository).insertExecutionLog(eq("job-r4"), eq("SUCCESS"),
+                    contains("Delivered to 2/2"), any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("no config → export succeeds with no email attempted")
+        void noConfigNoDelivery() throws Exception {
+            Map<String, Object> job = Map.of(
+                    "id", "job-r5", "tenant_id", "t1", "job_type", "REPORT_EXPORT",
+                    "job_reference_id", "report-1", "cron_expression", "0 0 * * * *", "timezone", "UTC");
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findReportById("report-1")).thenReturn(Optional.of(Map.of(
+                    "id", "report-1", "name", "Test Report",
+                    "primaryCollectionId", "col-1", "columns", "[]")));
+            doAnswer(inv -> {
+                ((Writer) inv.getArgument(1)).write("h\n");
+                return null;
+            }).when(reportExecutionService).exportCsv(any(), any());
+
+            executor.executeAll();
+
+            verifyNoInteractions(emailService);
+            verify(repository).updateAfterExecution(eq("job-r5"), eq("SUCCESS"), any(), any());
+        }
+
+        @Test
+        @DisplayName("delivery failure never fails the job — logged on the execution note")
+        void deliveryFailureDoesNotFailJob() throws Exception {
+            Map<String, Object> job = new HashMap<>(Map.of(
+                    "id", "job-r6", "tenant_id", "t1", "job_type", "REPORT_EXPORT",
+                    "job_reference_id", "report-1", "cron_expression", "0 0 * * * *", "timezone", "UTC",
+                    "name", "Weekly Sales",
+                    "config", "{\"recipients\":[\"a@x.com\"]}"));
+            when(repository.findDueJobs()).thenReturn(List.of(job));
+            when(repository.findReportById("report-1")).thenReturn(Optional.of(Map.of(
+                    "id", "report-1", "name", "Test Report",
+                    "primaryCollectionId", "col-1", "columns", "[]")));
+            doAnswer(inv -> {
+                ((Writer) inv.getArgument(1)).write("h\n");
+                return null;
+            }).when(reportExecutionService).exportCsv(any(), any());
+            when(emailService.queueEmailWithAttachments(any(), any(), any(), any(), any(), any(), any()))
+                    .thenThrow(new RuntimeException("smtp down"));
+
+            executor.executeAll();
+
+            verify(repository).updateAfterExecution(eq("job-r6"), eq("SUCCESS"), any(), any());
+            verify(repository).insertExecutionLog(eq("job-r6"), eq("SUCCESS"),
+                    contains("Delivered to 0/1"), any(), any(), anyLong());
         }
     }
 

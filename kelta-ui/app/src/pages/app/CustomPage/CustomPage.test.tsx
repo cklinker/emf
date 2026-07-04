@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nProvider } from '@/context/I18nContext'
+import { OfflineProvider, InMemoryOfflineStore } from '@/offline'
 import { CustomPage } from './CustomPage'
 import { componentRegistry } from '@/services/componentRegistry'
 
@@ -54,10 +55,32 @@ function renderAt(slug = 'my-page') {
   )
 }
 
+/** Renders under an OfflineProvider (as in EndUserShell) with an injected in-memory replica. */
+function renderWithOffline(store: InMemoryOfflineStore, slug = 'my-page') {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <I18nProvider>
+        <OfflineProvider store={store}>
+          <MemoryRouter initialEntries={[`/test-tenant/app/p/${slug}`]}>
+            <Routes>
+              <Route path=":tenantSlug/app/p/:pageSlug" element={<CustomPage />} />
+            </Routes>
+          </MemoryRouter>
+        </OfflineProvider>
+      </I18nProvider>
+    </QueryClientProvider>
+  )
+}
+
 describe('CustomPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     componentRegistry.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('shows page not found when the render endpoint 404s', async () => {
@@ -189,5 +212,68 @@ describe('CustomPage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('page-node-form')).toHaveTextContent(/no data source/i)
     )
+  })
+
+  describe('offline (Rec 2B-2)', () => {
+    it('writes the fetched contract through to the offline replica while online', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+      const store = new InMemoryOfflineStore()
+      mockGet.mockResolvedValueOnce(
+        contract([{ id: 'h', type: 'heading', props: { text: 'Welcome' } }])
+      )
+
+      renderWithOffline(store)
+
+      await waitFor(() =>
+        expect(screen.getByTestId('page-node-heading')).toHaveTextContent('Welcome')
+      )
+      await waitFor(async () =>
+        expect(await store.getPageContract('my-page')).toMatchObject({ slug: 'my-page' })
+      )
+    })
+
+    it('renders the cached contract cold-offline without hitting the network', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const store = new InMemoryOfflineStore()
+      await store.putPageContract(
+        'my-page',
+        contract([{ id: 'h', type: 'heading', props: { text: 'Cached hello' } }])
+      )
+
+      renderWithOffline(store)
+
+      await waitFor(() =>
+        expect(screen.getByTestId('page-node-heading')).toHaveTextContent('Cached hello')
+      )
+      expect(mockGet).not.toHaveBeenCalled()
+    })
+
+    it('shows the offline-unavailable state cold-offline with no cached contract', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+
+      renderWithOffline(new InMemoryOfflineStore(), 'never-visited')
+
+      await waitFor(() =>
+        expect(screen.getByText("This page isn't available offline")).toBeInTheDocument()
+      )
+      expect(screen.queryByText('Page not found')).not.toBeInTheDocument()
+      expect(mockGet).not.toHaveBeenCalled()
+    })
+
+    it('falls back to the cached contract when the online fetch fails', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+      const store = new InMemoryOfflineStore()
+      await store.putPageContract(
+        'my-page',
+        contract([{ id: 'h', type: 'heading', props: { text: 'Stale but served' } }])
+      )
+      mockGet.mockRejectedValueOnce(new Error('network down'))
+
+      renderWithOffline(store)
+
+      await waitFor(() =>
+        expect(screen.getByTestId('page-node-heading')).toHaveTextContent('Stale but served')
+      )
+    })
   })
 })

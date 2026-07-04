@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -71,6 +70,14 @@ public class ConnectedAppTokenController {
         return ResponseEntity.ok(Map.of("data", tokens));
     }
 
+    /**
+     * Tokens are minted only by kelta-auth's OAuth2 {@code client_credentials}
+     * flow — the worker never sees the raw client secret (stored hashed), so it
+     * cannot mint anything a resource server would honor. The previous
+     * implementation wrote a placeholder {@code connected_app_token} row that
+     * violated the NOT-NULL {@code token_hash} constraint; real rows are written
+     * at mint time by kelta-auth's {@code ConnectedAppTokenRecorder}.
+     */
     @PostMapping("/tokens")
     public ResponseEntity<?> generateToken(@PathVariable String appId) {
         String tenantId = TenantContext.get();
@@ -83,51 +90,14 @@ public class ConnectedAppTokenController {
             return ResponseEntity.notFound().build();
         }
 
-        Map<String, Object> app = appOpt.get();
-
-        // Rate limit token generation
-        String rateLimitKey = "connected_app:" + appId + ":token_gen";
-        Long count = redisTemplate.opsForValue().increment(rateLimitKey);
-        if (count != null && count == 1) {
-            redisTemplate.expire(rateLimitKey, Duration.ofMinutes(5));
-        }
-        if (count != null && count > tokenGenRateLimit) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of("error", "Token generation rate limit exceeded. Max " + tokenGenRateLimit + " per 5 minutes."));
-        }
-
-        String clientId = (String) app.get("client_id");
-        String scopes = app.get("scopes") != null ? app.get("scopes").toString() : "";
-
-        // Call kelta-auth OAuth2 token endpoint with client_credentials grant
-        try {
-            // Note: The client_secret is stored hashed in connected_app table.
-            // For token generation, the worker needs the raw secret which was shown view-once on creation.
-            // Instead of storing the raw secret, we generate a token record and return a reference.
-            // The actual OAuth2 token flow is initiated by the SDK/CLI with the client credentials.
-
-            // Create a token tracking record
-            Instant expiresAt = Instant.now().plusSeconds(3600); // 1 hour default
-            String tokenId = repository.createToken(appId, scopes, expiresAt);
-
-            // Audit
-            repository.insertAuditRecord(tenantId, appId, "TOKEN_GENERATED",
-                    "{\"tokenId\":\"" + tokenId + "\"}", null);
-
-            log.info("Token record created for connected app {}: tokenId={}", appId, tokenId);
-
-            return ResponseEntity.ok(Map.of(
-                    "tokenId", tokenId,
-                    "clientId", clientId,
-                    "scopes", scopes,
-                    "expiresAt", expiresAt.toString(),
-                    "message", "Use client_id and client_secret with grant_type=client_credentials at the OAuth2 token endpoint to obtain an access token."
-            ));
-        } catch (Exception e) {
-            log.error("Failed to generate token for connected app {}: {}", appId, e.getMessage());
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Failed to generate token"));
-        }
+        String clientId = (String) appOpt.get().get("client_id");
+        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
+                "error", "This endpoint does not mint tokens",
+                "clientId", clientId != null ? clientId : "",
+                "message", "Request a token from the OAuth2 token endpoint with "
+                        + "grant_type=client_credentials and this app's client_id/client_secret. "
+                        + "Issued tokens appear in this app's token list automatically."
+        ));
     }
 
     @DeleteMapping("/tokens/{tokenId}")

@@ -545,6 +545,8 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredText("sourceCode").withColumnName("source_code"))
             .addField(FieldDefinition.bool("active"))
             .addField(FieldDefinition.integer("version"))
+            .addField(FieldDefinition.string("requiredPermission", 100)
+                .withColumnName("required_permission"))
             .build();
     }
 
@@ -554,7 +556,7 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.string("description", 1000))
             .addField(FieldDefinition.requiredString("flowType", 30).withColumnName("flow_type")
-                .withEnumValues(List.of("RECORD_TRIGGERED", "SCHEDULED",
+                .withEnumValues(List.of("RECORD_TRIGGERED", "NATS_TRIGGERED", "SCHEDULED",
                     "AUTOLAUNCHED", "SCREEN")))
             .addField(FieldDefinition.bool("active").withDefault(false))
             .addField(FieldDefinition.integer("version").withDefault(1))
@@ -604,6 +606,7 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("cron_expression"))
             .addField(FieldDefinition.string("timezone", 50).withDefault("UTC"))
             .addField(FieldDefinition.bool("active").withDefault(true))
+            .addField(FieldDefinition.json("config"))
             .addField(FieldDefinition.datetime("lastRunAt").withColumnName("last_run_at"))
             .addField(FieldDefinition.string("lastStatus", 20).withColumnName("last_status"))
             .addField(FieldDefinition.datetime("nextRunAt").withColumnName("next_run_at"))

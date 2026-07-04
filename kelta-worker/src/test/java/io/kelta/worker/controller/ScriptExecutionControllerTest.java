@@ -3,9 +3,12 @@ package io.kelta.worker.controller;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionRequest;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionResult;
+import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.repository.ScriptRepository;
 import io.kelta.worker.repository.ScriptRepository.Script;
+import io.kelta.worker.service.CerbosPermissionResolver;
 import org.junit.jupiter.api.*;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.*;
 
@@ -18,17 +21,86 @@ class ScriptExecutionControllerTest {
 
     private ScriptRepository scriptRepository;
     private ScriptExecutor scriptExecutor;
+    private CerbosPermissionResolver permissionResolver;
+    private BootstrapRepository bootstrapRepository;
     private ScriptExecutionController controller;
+    private MockHttpServletRequest request;
 
     @BeforeEach
     void setUp() {
         scriptRepository = mock(ScriptRepository.class);
         scriptExecutor = mock(ScriptExecutor.class);
-        controller = new ScriptExecutionController(scriptRepository, scriptExecutor);
+        permissionResolver = mock(CerbosPermissionResolver.class);
+        bootstrapRepository = mock(BootstrapRepository.class);
+        controller = new ScriptExecutionController(scriptRepository, scriptExecutor,
+                permissionResolver, bootstrapRepository);
+        request = new MockHttpServletRequest();
     }
 
     private Script apiScript(String source, boolean active) {
         return new Script("s1", "My Script", "API_ENDPOINT", "javascript", source, active);
+    }
+
+    private Script gatedScript(String permission) {
+        return new Script("s1", "Gated", "API_ENDPOINT", "javascript", "return {}", true, permission);
+    }
+
+    @Nested
+    @DisplayName("per-script permission gate")
+    class PermissionGate {
+
+        @Test
+        @DisplayName("requiredPermission set + profile granted → executes")
+        void grantedExecutes() {
+            when(scriptRepository.findById("s1")).thenReturn(Optional.of(gatedScript("MANAGE_DATA")));
+            when(permissionResolver.getProfileId(any())).thenReturn("prof-1");
+            when(bootstrapRepository.findProfileSystemPermissions("prof-1")).thenReturn(List.of(
+                    Map.of("permission_name", "MANAGE_DATA", "granted", true)));
+            when(scriptExecutor.execute(any(ScriptExecutionRequest.class)))
+                    .thenReturn(ScriptExecutionResult.success(Map.of(), 1L));
+
+            var response = controller.execute("s1", "t1", "u1", Map.of(), request);
+
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+        }
+
+        @Test
+        @DisplayName("requiredPermission set + profile lacks it → 403, no execution")
+        void deniedForbidden() {
+            when(scriptRepository.findById("s1")).thenReturn(Optional.of(gatedScript("MANAGE_DATA")));
+            when(permissionResolver.getProfileId(any())).thenReturn("prof-1");
+            when(bootstrapRepository.findProfileSystemPermissions("prof-1")).thenReturn(List.of(
+                    Map.of("permission_name", "MANAGE_DATA", "granted", false)));
+
+            var response = controller.execute("s1", "t1", "u1", Map.of(), request);
+
+            assertThat(response.getStatusCode().value()).isEqualTo(403);
+            verifyNoInteractions(scriptExecutor);
+        }
+
+        @Test
+        @DisplayName("requiredPermission set + no identity → 403 (fail-closed)")
+        void noIdentityForbidden() {
+            when(scriptRepository.findById("s1")).thenReturn(Optional.of(gatedScript("MANAGE_DATA")));
+            when(permissionResolver.getProfileId(any())).thenReturn(null);
+
+            var response = controller.execute("s1", "t1", "u1", Map.of(), request);
+
+            assertThat(response.getStatusCode().value()).isEqualTo(403);
+            verifyNoInteractions(scriptExecutor);
+        }
+
+        @Test
+        @DisplayName("no requiredPermission → no permission lookup (back-compat)")
+        void ungatedSkipsLookup() {
+            when(scriptRepository.findById("s1")).thenReturn(Optional.of(apiScript("return {}", true)));
+            when(scriptExecutor.execute(any(ScriptExecutionRequest.class)))
+                    .thenReturn(ScriptExecutionResult.success(Map.of(), 1L));
+
+            controller.execute("s1", "t1", "u1", Map.of(), request);
+
+            verifyNoInteractions(bootstrapRepository);
+        }
     }
 
     @Test
@@ -36,7 +108,7 @@ class ScriptExecutionControllerTest {
     void notFound() {
         when(scriptRepository.findById("s1")).thenReturn(Optional.empty());
 
-        var response = controller.execute("s1", "t1", "u1", Map.of());
+        var response = controller.execute("s1", "t1", "u1", Map.of(), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(404);
         verifyNoInteractions(scriptExecutor);
@@ -47,7 +119,7 @@ class ScriptExecutionControllerTest {
     void inactive() {
         when(scriptRepository.findById("s1")).thenReturn(Optional.of(apiScript("return {}", false)));
 
-        var response = controller.execute("s1", "t1", "u1", Map.of());
+        var response = controller.execute("s1", "t1", "u1", Map.of(), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(422);
         verifyNoInteractions(scriptExecutor);
@@ -59,7 +131,7 @@ class ScriptExecutionControllerTest {
         when(scriptRepository.findById("s1")).thenReturn(Optional.of(
                 new Script("s1", "Validator", "VALIDATION", "javascript", "return true", true)));
 
-        var response = controller.execute("s1", "t1", "u1", Map.of());
+        var response = controller.execute("s1", "t1", "u1", Map.of(), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(422);
         assertThat(response.getBody()).containsEntry("success", false);
@@ -71,7 +143,7 @@ class ScriptExecutionControllerTest {
     void blankSource() {
         when(scriptRepository.findById("s1")).thenReturn(Optional.of(apiScript("   ", true)));
 
-        var response = controller.execute("s1", "t1", "u1", Map.of());
+        var response = controller.execute("s1", "t1", "u1", Map.of(), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(422);
         verifyNoInteractions(scriptExecutor);
@@ -88,7 +160,7 @@ class ScriptExecutionControllerTest {
         body.put("input", Map.of("x", 1));
         body.put("context", Map.of("collectionName", "orders", "recordId", "r1"));
 
-        var response = controller.execute("s1", "t1", "u1", body);
+        var response = controller.execute("s1", "t1", "u1", body, request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).containsEntry("success", true);
@@ -109,7 +181,7 @@ class ScriptExecutionControllerTest {
         body.put("input", Map.of("amount", 42));
         body.put("context", Map.of("collectionName", "orders", "recordId", "r1"));
 
-        controller.execute("s1", "t1", "u1", body);
+        controller.execute("s1", "t1", "u1", body, request);
 
         var captor = org.mockito.ArgumentCaptor.forClass(ScriptExecutionRequest.class);
         verify(scriptExecutor).execute(captor.capture());
@@ -130,7 +202,7 @@ class ScriptExecutionControllerTest {
         when(scriptExecutor.execute(any(ScriptExecutionRequest.class)))
                 .thenReturn(ScriptExecutionResult.failure("boom", 3L));
 
-        var response = controller.execute("s1", "t1", "u1", Map.of());
+        var response = controller.execute("s1", "t1", "u1", Map.of(), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).containsEntry("success", false);
@@ -147,7 +219,7 @@ class ScriptExecutionControllerTest {
         doThrow(new RuntimeException("db down")).when(scriptRepository)
                 .insertExecutionLog(anyString(), anyString(), anyString(), anyLong(), any(), any());
 
-        var response = controller.execute("s1", "t1", "u1", Map.of());
+        var response = controller.execute("s1", "t1", "u1", Map.of(), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).containsEntry("success", true);

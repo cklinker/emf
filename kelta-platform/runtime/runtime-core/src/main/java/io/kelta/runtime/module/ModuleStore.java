@@ -27,6 +27,27 @@ public interface ModuleStore {
     void createActions(List<TenantModuleData.TenantModuleActionData> actions);
 
     /**
+     * Persists the publisher signature verified at install so the JAR can be
+     * re-verified on every load. Default no-op for stores without signature
+     * persistence.
+     *
+     * @param moduleRowId     the module primary key
+     * @param signatureBase64 the detached base64 signature over the JAR bytes
+     */
+    default void saveJarSignature(String moduleRowId, String signatureBase64) {
+    }
+
+    /**
+     * Loads the publisher signature stored at install time.
+     *
+     * @param moduleRowId the module primary key
+     * @return the base64 signature, or empty when none was stored
+     */
+    default Optional<String> findJarSignature(String moduleRowId) {
+        return Optional.empty();
+    }
+
+    /**
      * Loads a module by tenant and module identifier.
      *
      * @param tenantId the tenant ID

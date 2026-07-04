@@ -216,6 +216,11 @@ public class RuntimeModuleManager {
         );
 
         moduleStore.createModule(data);
+        if (signatureBase64 != null && !signatureBase64.isBlank()) {
+            // Keep the verified signature so every subsequent load can re-verify
+            // the downloaded JAR (defense-in-depth vs S3 tamper).
+            moduleStore.saveJarSignature(id, signatureBase64);
+        }
 
         // Create action records from manifest
         List<TenantModuleData.TenantModuleActionData> actions = new ArrayList<>();
@@ -336,6 +341,7 @@ public class RuntimeModuleManager {
         String classLoaderKey = tenantId + ":" + module.moduleId();
         try {
             URL jarUrl = jarService.downloadJarToCache(module.s3Key());
+            verifyDownloadedJar(module, jarUrl);
             SandboxedModuleClassLoader classLoader = new SandboxedModuleClassLoader(
                 module.moduleId(), jarUrl, getClass().getClassLoader());
 
@@ -376,6 +382,37 @@ public class RuntimeModuleManager {
 
             // Fall back to stubs
             loadWithStubs(tenantId, module);
+        }
+    }
+
+    /**
+     * Re-verifies a JAR downloaded from S3 before it is classloaded
+     * (defense-in-depth vs storage tamper — the install-time gate already ran):
+     * the bytes must match the checksum persisted at install, and when
+     * signature verification is enabled the install-time publisher signature
+     * must still verify. Failure throws — the caller falls back to inert
+     * stub handlers, never executing unverified code.
+     */
+    private void verifyDownloadedJar(TenantModuleData module, URL jarUrl) throws Exception {
+        byte[] jarBytes = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(jarUrl.toURI()));
+
+        String expectedChecksum = module.jarChecksum();
+        if (expectedChecksum != null && !expectedChecksum.isBlank()) {
+            String actual = ModuleJarService.sha256(jarBytes);
+            if (!expectedChecksum.equals(actual)) {
+                throw new ModuleSignatureException(
+                    "Module '" + module.moduleId() + "' JAR checksum mismatch on load "
+                        + "(expected " + expectedChecksum + ", got " + actual
+                        + ") — possible storage tamper, refusing to load");
+            }
+        }
+
+        if (signatureVerifier != null && signatureVerifier.isEnabled()) {
+            String signature = moduleStore.findJarSignature(module.id()).orElse(null);
+            // verify() throws when the signature is missing or invalid —
+            // modules installed before signing was enabled must be re-installed
+            // with a signature once a public key is configured.
+            signatureVerifier.verify(jarBytes, signature);
         }
     }
 

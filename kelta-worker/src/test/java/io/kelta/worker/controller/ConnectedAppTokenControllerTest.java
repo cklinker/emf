@@ -70,31 +70,28 @@ class ConnectedAppTokenControllerTest {
     class GenerateToken {
 
         @Test
-        @DisplayName("Should generate token record for valid app")
-        void shouldGenerateToken() {
+        @DisplayName("Returns 410 pointing at the client_credentials flow — never writes a placeholder row")
+        void returnsGoneWithGuidance() {
             when(repository.findByIdAndTenant("app-1", "t1"))
                     .thenReturn(Optional.of(Map.of("id", "app-1", "client_id", "cid-1", "scopes", "read:all")));
-            when(valueOps.increment("connected_app:app-1:token_gen")).thenReturn(1L);
-            when(repository.createToken(eq("app-1"), anyString(), any())).thenReturn("tok-new");
 
             var response = controller.generateToken("app-1");
 
-            assertThat(response.getStatusCode().value()).isEqualTo(200);
-            verify(repository).createToken(eq("app-1"), anyString(), any());
-            verify(repository).insertAuditRecord(eq("t1"), eq("app-1"), eq("TOKEN_GENERATED"), anyString(), any());
+            assertThat(response.getStatusCode().value()).isEqualTo(410);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = (Map<String, Object>) response.getBody();
+            assertThat(body.get("clientId")).isEqualTo("cid-1");
+            assertThat((String) body.get("message")).contains("client_credentials");
         }
 
         @Test
-        @DisplayName("Should reject when rate limited")
-        void shouldRejectWhenRateLimited() {
-            when(repository.findByIdAndTenant("app-1", "t1"))
-                    .thenReturn(Optional.of(Map.of("id", "app-1", "client_id", "cid-1")));
-            when(valueOps.increment("connected_app:app-1:token_gen")).thenReturn(11L);
+        @DisplayName("Unknown app → 404")
+        void unknownAppNotFound() {
+            when(repository.findByIdAndTenant("app-x", "t1")).thenReturn(Optional.empty());
 
-            var response = controller.generateToken("app-1");
+            var response = controller.generateToken("app-x");
 
-            assertThat(response.getStatusCode().value()).isEqualTo(429);
-            verify(repository, never()).createToken(anyString(), anyString(), any());
+            assertThat(response.getStatusCode().value()).isEqualTo(404);
         }
     }
 

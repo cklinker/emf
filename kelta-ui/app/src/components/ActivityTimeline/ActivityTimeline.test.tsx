@@ -86,6 +86,111 @@ describe('ActivityTimeline', () => {
     )
   })
 
+  it('merges a flow run from /api/flows/record-executions into the feed', async () => {
+    const getList = vi.fn((url: string) => {
+      if (url.startsWith('/api/flows/record-executions')) {
+        return Promise.resolve([
+          {
+            id: 'fx1',
+            flowId: 'flow-1',
+            flowName: 'Send Welcome',
+            status: 'COMPLETED',
+            startedAt: '2026-02-03T00:00:00Z',
+            completedAt: '2026-02-03T00:00:05Z',
+            durationMs: 5000,
+            errorMessage: null,
+          },
+        ])
+      }
+      return Promise.resolve([])
+    })
+
+    renderTimeline({ getList: getList as unknown as ApiClient['getList'] })
+
+    await waitFor(() => expect(screen.getByText('activity.flowRun')).toBeInTheDocument())
+    expect(getList).toHaveBeenCalledWith(
+      expect.stringContaining('/api/flows/record-executions?recordId=rec-1&limit=20')
+    )
+  })
+
+  it('merges an email log from /api/email/logs into the feed', async () => {
+    const getList = vi.fn((url: string) => {
+      if (url.startsWith('/api/email/logs')) {
+        return Promise.resolve([
+          {
+            id: 'em1',
+            recipientEmail: 'jane@example.com',
+            subject: 'Order shipped',
+            status: 'SENT',
+            sentAt: '2026-02-04T00:00:00Z',
+            createdAt: '2026-02-03T23:59:00Z',
+          },
+        ])
+      }
+      return Promise.resolve([])
+    })
+
+    renderTimeline({ getList: getList as unknown as ApiClient['getList'] })
+
+    await waitFor(() => expect(screen.getByText('activity.emailSent')).toBeInTheDocument())
+    expect(getList).toHaveBeenCalledWith(
+      expect.stringContaining('/api/email/logs?recordId=rec-1&limit=20')
+    )
+  })
+
+  it('sorts flow runs and emails into the merged feed newest-first', async () => {
+    const getList = vi.fn((url: string) => {
+      if (url.startsWith('/api/flows/record-executions')) {
+        return Promise.resolve([
+          {
+            id: 'fx1',
+            flowId: 'flow-1',
+            flowName: 'Send Welcome',
+            status: 'FAILED',
+            startedAt: '2026-03-01T00:00:00Z',
+            completedAt: null,
+            durationMs: null,
+            errorMessage: 'boom',
+          },
+        ])
+      }
+      if (url.startsWith('/api/email/logs')) {
+        return Promise.resolve([
+          {
+            id: 'em1',
+            recipientEmail: 'jane@example.com',
+            subject: 'Order shipped',
+            status: 'QUEUED',
+            sentAt: null,
+            createdAt: '2026-02-01T00:00:00Z',
+          },
+        ])
+      }
+      if (url.startsWith('/api/notes')) {
+        return Promise.resolve([
+          { id: 'n1', content: 'Middle note', createdAt: '2026-02-15T00:00:00Z' },
+        ])
+      }
+      return Promise.resolve([])
+    })
+
+    renderTimeline({ getList: getList as unknown as ApiClient['getList'] })
+
+    await waitFor(() => expect(screen.getByText('activity.flowRun')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('activity.emailSent')).toBeInTheDocument())
+
+    const items = screen.getAllByRole('listitem')
+    const ids = items.map((item) => item.getAttribute('data-testid'))
+    // Newest first: flow run (Mar 1) > note (Feb 15) > email queued (Feb 1, falls
+    // back to createdAt when sentAt is null) > record created (Jan 1).
+    expect(ids).toEqual([
+      'activity-entry-flow-run-fx1',
+      'activity-entry-note-n1',
+      'activity-entry-email-em1',
+      'activity-entry-record-created',
+    ])
+  })
+
   it('still renders lifecycle events when there are no notes', async () => {
     const getList = vi.fn(() => Promise.resolve([]))
     renderTimeline({ getList: getList as unknown as ApiClient['getList'] })

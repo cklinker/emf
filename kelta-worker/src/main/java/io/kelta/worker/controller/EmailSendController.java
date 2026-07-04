@@ -1,5 +1,6 @@
 package io.kelta.worker.controller;
 
+import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.module.integration.spi.EmailService;
 import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.repository.EmailRepository;
@@ -17,6 +18,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -82,8 +85,42 @@ public class EmailSendController {
             String templateId,
             String templateKey,
             @NotBlank @Email String to,
-            Map<String, Object> mergeContext
-    ) {}
+            Map<String, Object> mergeContext,
+            String recordId
+    ) {
+        public SendRequest(String templateId, String templateKey, String to,
+                           Map<String, Object> mergeContext) {
+            this(templateId, templateKey, to, mergeContext, null);
+        }
+    }
+
+    /**
+     * Lists email log entries whose {@code source_id} is the given record —
+     * consumed by the record activity timeline. RLS scopes rows to the tenant.
+     */
+    @GetMapping("/logs")
+    public ResponseEntity<Map<String, Object>> listLogsByRecord(
+            @RequestParam String recordId,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        int effectiveLimit = Math.min(Math.max(limit, 1), 100);
+        List<Map<String, Object>> logs = emailRepository.findLogsBySourceId(recordId, effectiveLimit);
+
+        List<Map<String, Object>> records = logs.stream()
+                .map(row -> {
+                    Map<String, Object> record = new LinkedHashMap<String, Object>();
+                    record.put("id", row.get("id"));
+                    record.put("recipientEmail", row.get("recipient_email"));
+                    record.put("subject", row.get("subject"));
+                    record.put("status", row.get("status"));
+                    record.put("sentAt", row.get("sent_at") != null ? row.get("sent_at").toString() : null);
+                    record.put("createdAt", row.get("created_at") != null ? row.get("created_at").toString() : null);
+                    return record;
+                })
+                .toList();
+
+        return ResponseEntity.ok(JsonApiResponseBuilder.collection("email-logs", records));
+    }
 
     @PostMapping("/send")
     public ResponseEntity<Map<String, String>> send(
@@ -103,9 +140,13 @@ public class EmailSendController {
         enforceRateLimit(tenantId, httpRequest);
 
         Map<String, Object> vars = request.mergeContext() == null ? Map.of() : request.mergeContext();
+        // Stamp the originating record (when provided) as source_id so the
+        // record's activity timeline can list this email.
+        String sourceId = request.recordId() != null && !request.recordId().isBlank()
+                ? request.recordId() : null;
         Optional<String> logId = hasId
-                ? emailService.sendById(tenantId, request.to(), request.templateId(), vars, SOURCE, null)
-                : emailService.sendByKey(tenantId, request.to(), request.templateKey(), vars, SOURCE, null);
+                ? emailService.sendById(tenantId, request.to(), request.templateId(), vars, SOURCE, sourceId)
+                : emailService.sendByKey(tenantId, request.to(), request.templateKey(), vars, SOURCE, sourceId);
 
         if (logId.isEmpty()) {
             String ref = hasId ? request.templateId() : request.templateKey();

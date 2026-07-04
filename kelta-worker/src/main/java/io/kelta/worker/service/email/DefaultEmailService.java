@@ -150,15 +150,42 @@ public class DefaultEmailService implements EmailService {
         return out.toString();
     }
 
+    /**
+     * Queues an email with file attachments. Same log/async pipeline as
+     * {@link #queueEmail}; not part of the {@code EmailService} SPI — callers
+     * needing attachments (scheduled report delivery) inject this class.
+     *
+     * @return the email log id
+     */
+    public String queueEmailWithAttachments(String tenantId, String to, String subject, String body,
+                                            String source, String sourceId,
+                                            java.util.List<EmailAttachment> attachments) {
+        if (!enabled) {
+            log.warn("Email delivery disabled — skipping email to {} with subject '{}'", to, subject);
+            return UUID.randomUUID().toString();
+        }
+        String logId = emailRepository.createEmailLog(tenantId, to, subject, source, sourceId);
+        TenantEmailSettings tenantSettings = resolveTenantSettings(tenantId);
+        sendAsync(logId, to, subject, body, tenantSettings, attachments);
+        return logId;
+    }
+
     @Async("emailExecutor")
     public void sendAsync(String logId, String to, String subject, String body,
                           TenantEmailSettings tenantSettings) {
+        sendAsync(logId, to, subject, body, tenantSettings, java.util.List.of());
+    }
+
+    @Async("emailExecutor")
+    public void sendAsync(String logId, String to, String subject, String body,
+                          TenantEmailSettings tenantSettings,
+                          java.util.List<EmailAttachment> attachments) {
         String smtpHost = resolveSmtpHost(tenantSettings);
 
         try {
             emailRepository.markSending(logId);
 
-            EmailMessage message = new EmailMessage(to, subject, body, null);
+            EmailMessage message = new EmailMessage(to, subject, body, null, attachments);
             emailProvider.send(message, tenantSettings);
 
             emailRepository.markSent(logId, smtpHost);

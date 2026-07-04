@@ -130,40 +130,47 @@ describe('ConfirmDialog Component', () => {
       expect(dialog).toHaveAttribute('role', 'alertdialog')
     })
 
-    it('should have custom id on title', () => {
-      renderWithI18n(<ConfirmDialog {...defaultProps} id="test-dialog" />)
+    it('should label the dialog with the title via aria-labelledby', () => {
+      renderWithI18n(<ConfirmDialog {...defaultProps} />)
 
+      const dialog = screen.getByTestId('confirm-dialog')
       const title = screen.getByTestId('confirm-dialog-title')
-      expect(title).toHaveAttribute('id', 'test-dialog-title')
+      expect(title).toHaveAttribute('id')
+      expect(dialog).toHaveAttribute('aria-labelledby', title.getAttribute('id'))
     })
 
-    it('should have custom id on description', () => {
-      renderWithI18n(<ConfirmDialog {...defaultProps} id="test-dialog" />)
+    it('should describe the dialog with the message via aria-describedby', () => {
+      renderWithI18n(<ConfirmDialog {...defaultProps} />)
 
+      const dialog = screen.getByTestId('confirm-dialog')
       const message = screen.getByTestId('confirm-dialog-message')
-      expect(message).toHaveAttribute('id', 'test-dialog-description')
+      expect(message).toHaveAttribute('id')
+      expect(dialog).toHaveAttribute('aria-describedby', message.getAttribute('id'))
+    })
+
+    it('should not log Radix accessibility warnings', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      try {
+        renderWithI18n(<ConfirmDialog {...defaultProps} />)
+
+        const radixWarnings = [...errorSpy.mock.calls, ...warnSpy.mock.calls].filter((call) =>
+          String(call[0]).includes('AlertDialogContent')
+        )
+        expect(radixWarnings).toEqual([])
+      } finally {
+        errorSpy.mockRestore()
+        warnSpy.mockRestore()
+      }
     })
   })
 
   describe('Custom ID', () => {
-    it('should use custom id for accessibility attributes', () => {
+    it('should apply the custom id to the dialog element', () => {
       renderWithI18n(<ConfirmDialog {...defaultProps} id="custom-dialog" />)
 
-      const title = screen.getByTestId('confirm-dialog-title')
-      expect(title).toHaveAttribute('id', 'custom-dialog-title')
-
-      const message = screen.getByTestId('confirm-dialog-message')
-      expect(message).toHaveAttribute('id', 'custom-dialog-description')
-    })
-
-    it('should use default id when not provided', () => {
-      renderWithI18n(<ConfirmDialog {...defaultProps} />)
-
-      const title = screen.getByTestId('confirm-dialog-title')
-      expect(title).toHaveAttribute('id', 'confirm-dialog-title')
-
-      const message = screen.getByTestId('confirm-dialog-message')
-      expect(message).toHaveAttribute('id', 'confirm-dialog-description')
+      const dialog = screen.getByTestId('confirm-dialog')
+      expect(dialog).toHaveAttribute('id', 'custom-dialog')
     })
   })
 })

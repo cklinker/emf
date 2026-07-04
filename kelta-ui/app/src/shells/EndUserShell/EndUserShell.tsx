@@ -16,14 +16,23 @@ import { OfflineIndicator } from './OfflineIndicator'
 import { OfflineProvider } from '@/offline'
 import { buildNavTabs } from './navTabs'
 import { useAuth } from '@/context/AuthContext'
+import { useApi } from '@/context/ApiContext'
 import { useConfig } from '@/context/ConfigContext'
+import { initPushNotifications } from '@/push/deviceRegistration'
 import { PageLoader } from '@/components/PageLoader'
 import { SkipLinks } from '@/components/SkipLinks'
 
 export function EndUserShell(): React.ReactElement {
   const { user, logout } = useAuth()
+  const { apiClient } = useApi()
   const { config, isLoading: configLoading } = useConfig()
   const [searchOpen, setSearchOpen] = useState(false)
+
+  // Register the device's push token when running in the Capacitor native shell.
+  // No-op on the web (does not touch any Capacitor code).
+  useEffect(() => {
+    void initPushNotifications(apiClient)
+  }, [apiClient])
 
   // Build navigation tabs from bootstrap config menus
   const tabs = buildNavTabs(config?.menus)

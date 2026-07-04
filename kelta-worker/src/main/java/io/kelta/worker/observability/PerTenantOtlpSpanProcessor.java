@@ -23,6 +23,10 @@ import java.util.concurrent.ConcurrentMap;
  * <p>This never touches the platform's default export pipeline — spans always also
  * flow to the platform collector. A span with no tenant attribute, or a tenant with
  * no configured target, is simply not re-exported.
+ *
+ * <p>Each cached delegate remembers the {@link OtlpTarget} it was built for; when a
+ * tenant re-points its endpoint (or changes headers) the stale delegate is shut down
+ * and replaced on the next span — no restart required.
  */
 @Component
 public class PerTenantOtlpSpanProcessor implements SpanProcessor {
@@ -31,7 +35,10 @@ public class PerTenantOtlpSpanProcessor implements SpanProcessor {
 
     private final TenantOtlpRegistry registry;
     private final TenantSpanExporterFactory exporterFactory;
-    private final ConcurrentMap<String, SpanProcessor> delegates = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, TargetedDelegate> delegates = new ConcurrentHashMap<>();
+
+    private record TargetedDelegate(OtlpTarget target, SpanProcessor processor) {
+    }
 
     public PerTenantOtlpSpanProcessor(TenantOtlpRegistry registry, TenantSpanExporterFactory exporterFactory) {
         this.registry = registry;
@@ -63,19 +70,29 @@ public class PerTenantOtlpSpanProcessor implements SpanProcessor {
         if (target.isEmpty()) {
             return;
         }
-        SpanProcessor delegate = delegates.computeIfAbsent(tenantId, t -> exporterFactory.create(target.get()));
-        delegate.onEnd(span);
+        TargetedDelegate delegate = delegates.compute(tenantId, (t, existing) -> {
+            if (existing != null && existing.target().equals(target.get())) {
+                return existing;
+            }
+            if (existing != null) {
+                existing.processor().shutdown();
+            }
+            return new TargetedDelegate(target.get(), exporterFactory.create(target.get()));
+        });
+        delegate.processor().onEnd(span);
     }
 
     @Override
     public CompletableResultCode forceFlush() {
-        List<CompletableResultCode> results = delegates.values().stream().map(SpanProcessor::forceFlush).toList();
+        List<CompletableResultCode> results = delegates.values().stream()
+                .map(d -> d.processor().forceFlush()).toList();
         return CompletableResultCode.ofAll(results);
     }
 
     @Override
     public CompletableResultCode shutdown() {
-        List<CompletableResultCode> results = delegates.values().stream().map(SpanProcessor::shutdown).toList();
+        List<CompletableResultCode> results = delegates.values().stream()
+                .map(d -> d.processor().shutdown()).toList();
         return CompletableResultCode.ofAll(results);
     }
 }

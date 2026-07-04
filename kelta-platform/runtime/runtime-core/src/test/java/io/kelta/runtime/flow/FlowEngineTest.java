@@ -844,6 +844,152 @@ class FlowEngineTest {
     // In-Memory FlowStore for testing
     // -------------------------------------------------------------------------
 
+    @Nested
+    @DisplayName("Wait resume")
+    class WaitResume {
+
+        /** Long Wait (60s > inline cap) then a Task, then Succeed. */
+        private static final String LONG_WAIT_FLOW = """
+            {
+                "StartAt": "Sleep",
+                "States": {
+                    "Sleep": { "Type": "Wait", "Seconds": 60, "Next": "AfterWait" },
+                    "AfterWait": {
+                        "Type": "Task",
+                        "Resource": "LOG_MESSAGE",
+                        "ResultPath": "$.after",
+                        "Next": "Done"
+                    },
+                    "Done": { "Type": "Succeed" }
+                }
+            }
+            """;
+
+        @Test
+        @DisplayName("long Wait parks the execution WAITING (not COMPLETED) and schedules a timed resume")
+        void longWaitParksWaitingAndSchedulesResume() {
+            Instant before = Instant.now();
+            engine.executeSynchronous("t1", "f1", LONG_WAIT_FLOW, Map.of("k", "v"), "u1");
+
+            FlowExecutionData execution = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_WAITING, execution.status(),
+                "a parked Wait must stay WAITING — not be overwritten COMPLETED");
+            assertEquals("Sleep", execution.currentNodeId());
+
+            List<Map<String, Object>> pending = flowStore.getPendingResumes();
+            assertEquals(1, pending.size());
+            Instant resumeAt = (Instant) pending.get(0).get("resumeAt");
+            assertNotNull(resumeAt);
+            assertFalse(resumeAt.isBefore(before.plusSeconds(59)), "resumeAt ≈ now+60s");
+            assertNull(pending.get(0).get("resumeEvent"));
+        }
+
+        @Test
+        @DisplayName("event Wait registers a pending resume under the event name")
+        void eventWaitRegistersEventResume() {
+            String json = """
+                {
+                    "StartAt": "AwaitApproval",
+                    "States": {
+                        "AwaitApproval": { "Type": "Wait", "EventName": "approval.granted", "Next": "Done" },
+                        "Done": { "Type": "Succeed" }
+                    }
+                }
+                """;
+            engine.executeSynchronous("t1", "f1", json, Map.of(), "u1");
+
+            List<Map<String, Object>> pending = flowStore.getPendingResumes();
+            assertEquals(1, pending.size());
+            assertEquals("approval.granted", pending.get(0).get("resumeEvent"));
+            assertNull(pending.get(0).get("resumeAt"));
+        }
+
+        @Test
+        @DisplayName("resumeExecution continues from the Wait's Next state to completion")
+        void resumeContinuesFromWaitNext() throws Exception {
+            flowStore.registerFlow("t1", "flow-wait", "Waiter", LONG_WAIT_FLOW);
+            engine.executeSynchronous("t1", "flow-wait", LONG_WAIT_FLOW, Map.of("k", "v"), "u1");
+            FlowExecutionData waiting = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_WAITING, waiting.status());
+
+            engine.resumeExecution(waiting.id());
+            FlowExecutionData resumed = awaitStatus(waiting.id(), FlowExecutionData.STATUS_COMPLETED);
+
+            assertEquals(FlowExecutionData.STATUS_COMPLETED, resumed.status());
+            assertTrue(flowStore.getPendingResumes().isEmpty(), "pending resume row cleaned up");
+            assertTrue(flowStore.loadStepLogs(waiting.id()).stream()
+                    .anyMatch(s -> "AfterWait".equals(s.stateId())),
+                "the post-Wait task must have executed");
+        }
+
+        @Test
+        @DisplayName("resume fails the execution when the flow definition is gone")
+        void resumeMissingDefinitionFails() throws Exception {
+            // Not registered in flowsById — findFlowDefinitionById returns empty
+            engine.executeSynchronous("t1", "ghost-flow", LONG_WAIT_FLOW, Map.of(), "u1");
+            FlowExecutionData waiting = flowStore.getAllExecutions().get(0);
+
+            engine.resumeExecution(waiting.id());
+            FlowExecutionData failed = awaitStatus(waiting.id(), FlowExecutionData.STATUS_FAILED);
+
+            assertEquals(FlowExecutionData.STATUS_FAILED, failed.status());
+            assertTrue(failed.errorMessage().contains("no longer exists"));
+            assertTrue(flowStore.getPendingResumes().isEmpty());
+        }
+
+        @Test
+        @DisplayName("resume of a non-WAITING execution is a no-op")
+        void resumeNonWaitingIsNoop() {
+            String json = """
+                {
+                    "StartAt": "Done",
+                    "States": { "Done": { "Type": "Succeed" } }
+                }
+                """;
+            engine.executeSynchronous("t1", "f1", json, Map.of(), "u1");
+            FlowExecutionData completed = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_COMPLETED, completed.status());
+
+            engine.resumeExecution(completed.id());
+
+            assertEquals(FlowExecutionData.STATUS_COMPLETED,
+                flowStore.loadExecution(completed.id()).orElseThrow().status());
+        }
+
+        @Test
+        @DisplayName("terminal Wait (End=true) completes on resume")
+        void terminalWaitCompletesOnResume() throws Exception {
+            String json = """
+                {
+                    "StartAt": "Sleep",
+                    "States": {
+                        "Sleep": { "Type": "Wait", "Seconds": 60, "End": true }
+                    }
+                }
+                """;
+            flowStore.registerFlow("t1", "flow-tw", "TerminalWaiter", json);
+            engine.executeSynchronous("t1", "flow-tw", json, Map.of(), "u1");
+            FlowExecutionData waiting = flowStore.getAllExecutions().get(0);
+            assertEquals(FlowExecutionData.STATUS_WAITING, waiting.status());
+
+            engine.resumeExecution(waiting.id());
+            FlowExecutionData resumed = awaitStatus(waiting.id(), FlowExecutionData.STATUS_COMPLETED);
+            assertEquals(FlowExecutionData.STATUS_COMPLETED, resumed.status());
+        }
+
+        private FlowExecutionData awaitStatus(String executionId, String status) throws Exception {
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                Optional<FlowExecutionData> current = flowStore.loadExecution(executionId);
+                if (current.isPresent() && status.equals(current.get().status())) {
+                    return current.get();
+                }
+                Thread.sleep(20);
+            }
+            return flowStore.loadExecution(executionId).orElseThrow();
+        }
+    }
+
     static class InMemoryFlowStore implements FlowStore {
         private final Map<String, FlowExecutionData> executions = new ConcurrentHashMap<>();
         private final Map<String, List<FlowStepLogData>> stepLogs = new ConcurrentHashMap<>();
@@ -987,8 +1133,21 @@ class FlowEngineTest {
         public String createPendingResume(String executionId, String tenantId,
                                           Instant resumeAt, String resumeEvent) {
             String id = UUID.randomUUID().toString();
-            pendingResumes.put(id, Map.of("executionId", executionId));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("executionId", executionId);
+            row.put("tenantId", tenantId);
+            if (resumeAt != null) {
+                row.put("resumeAt", resumeAt);
+            }
+            if (resumeEvent != null) {
+                row.put("resumeEvent", resumeEvent);
+            }
+            pendingResumes.put(id, row);
             return id;
+        }
+
+        List<Map<String, Object>> getPendingResumes() {
+            return new ArrayList<>(pendingResumes.values());
         }
 
         @Override

@@ -8,6 +8,7 @@ import io.kelta.worker.listener.CredentialCacheInvalidationListener;
 import io.kelta.worker.listener.CustomDomainCacheInvalidationListener;
 import io.kelta.worker.listener.FlowEventListener;
 import io.kelta.worker.listener.LayoutCacheInvalidationListener;
+import io.kelta.worker.listener.NatsTriggerFlowListener;
 import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SystemFeatureCacheInvalidationListener;
 import io.kelta.worker.module.ModuleEventListener;
@@ -33,6 +34,7 @@ class NatsSubscriptionConfigTest {
         config = new NatsSubscriptionConfig(
                 subscriptionManager,
                 mock(FlowEventListener.class),
+                mock(NatsTriggerFlowListener.class),
                 mock(SearchIndexListener.class),
                 mock(CollectionSchemaListener.class),
                 mock(ModuleEventListener.class),
@@ -49,10 +51,11 @@ class NatsSubscriptionConfigTest {
         // when kelta.encryption.key is not configured.
         config.registerSubscriptions();
 
-        // Nine always-on subscriptions: worker-flows, worker-search-index, worker-schema,
-        // worker-modules, worker-cerbos, worker-flow-cache, worker-domain-cache,
+        // Eleven always-on subscriptions: worker-flows, worker-nats-trigger,
+        // worker-search-index, worker-schema, worker-modules, worker-cerbos,
+        // worker-flow-cache, worker-nats-trigger-cache, worker-domain-cache,
         // worker-feature-cache, worker-layout-cache. Credential/Superset/Svix are conditional.
-        verify(subscriptionManager, times(9)).register(any(EventSubscription.class));
+        verify(subscriptionManager, times(11)).register(any(EventSubscription.class));
     }
 
     @Test
@@ -63,6 +66,6 @@ class NatsSubscriptionConfigTest {
 
         config.registerSubscriptions();
 
-        verify(subscriptionManager, times(10)).register(any(EventSubscription.class));
+        verify(subscriptionManager, times(12)).register(any(EventSubscription.class));
     }
 }

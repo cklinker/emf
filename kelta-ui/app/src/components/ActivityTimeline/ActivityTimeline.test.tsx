@@ -35,7 +35,9 @@ describe('ActivityTimeline', () => {
   it('merges a note from /api/notes into the feed', async () => {
     const getList = vi.fn((url: string) => {
       if (url.startsWith('/api/notes')) {
-        return Promise.resolve([{ id: 'n1', content: 'Called the customer', createdAt: '2026-02-01T00:00:00Z' }])
+        return Promise.resolve([
+          { id: 'n1', content: 'Called the customer', createdAt: '2026-02-01T00:00:00Z' },
+        ])
       }
       return Promise.resolve([]) // approvals + shares empty
     })
@@ -45,7 +47,9 @@ describe('ActivityTimeline', () => {
     await waitFor(() => expect(screen.getByText('Called the customer')).toBeInTheDocument())
     // The notes endpoint was queried for this record.
     expect(getList).toHaveBeenCalledWith(
-      expect.stringContaining('/api/notes?filter[collectionId][eq]=col-1&filter[recordId][eq]=rec-1')
+      expect.stringContaining(
+        '/api/notes?filter[collectionId][eq]=col-1&filter[recordId][eq]=rec-1'
+      )
     )
   })
 
@@ -65,7 +69,9 @@ describe('ActivityTimeline', () => {
   it('merges an attachment from /api/attachments into the feed', async () => {
     const getList = vi.fn((url: string) => {
       if (url.startsWith('/api/attachments')) {
-        return Promise.resolve([{ id: 'a1', fileName: 'contract.pdf', uploadedAt: '2026-02-02T00:00:00Z' }])
+        return Promise.resolve([
+          { id: 'a1', fileName: 'contract.pdf', uploadedAt: '2026-02-02T00:00:00Z' },
+        ])
       }
       return Promise.resolve([])
     })
@@ -74,7 +80,9 @@ describe('ActivityTimeline', () => {
 
     await waitFor(() => expect(screen.getByText(/contract\.pdf/)).toBeInTheDocument())
     expect(getList).toHaveBeenCalledWith(
-      expect.stringContaining('/api/attachments?filter[collectionId][eq]=col-1&filter[recordId][eq]=rec-1')
+      expect.stringContaining(
+        '/api/attachments?filter[collectionId][eq]=col-1&filter[recordId][eq]=rec-1'
+      )
     )
   })
 

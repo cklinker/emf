@@ -2,6 +2,7 @@ package io.kelta.worker.interceptor;
 
 import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CerbosPermissionResolver;
+import io.kelta.worker.service.RecordShareAccessService;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -22,12 +23,14 @@ class CerbosRecordAuthorizationAdviceTest {
 
     @Mock private CerbosAuthorizationService authzService;
     @Mock private CerbosPermissionResolver permissionResolver;
+    @Mock private RecordShareAccessService recordShareAccessService;
 
     private CerbosRecordAuthorizationAdvice advice;
 
     @BeforeEach
     void setUp() {
-        advice = new CerbosRecordAuthorizationAdvice(authzService, permissionResolver, true);
+        advice = new CerbosRecordAuthorizationAdvice(
+                authzService, permissionResolver, recordShareAccessService, true);
     }
 
     private ServletServerHttpRequest createRequest(String path) {
@@ -231,9 +234,83 @@ class CerbosRecordAuthorizationAdviceTest {
     }
 
     @Test
+    @DisplayName("Record share widens a profile-denied record back into a list response")
+    void shareWidensDeniedListRecord() {
+        var request = createRequest("/api/contacts");
+        when(authzService.batchCheckRecordAccess(any(), any(), any(), any(), anyList(), eq("read")))
+                .thenReturn(Set.of("1"));
+        when(recordShareAccessService.widen(eq("user@example.com"), eq("contacts"),
+                eq(Set.of("2")), eq("read")))
+                .thenReturn(Set.of("2"));
+
+        Map<String, Object> record1 = Map.of("id", "1", "name", "John");
+        Map<String, Object> record2 = Map.of("id", "2", "name", "Jane");
+        Map<String, Object> body = Map.of("data", List.of(record1, record2));
+
+        Object result = advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON, null, request, null);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> data = (List<Map<String, Object>>) ((Map<String, Object>) result).get("data");
+        assertThat(data).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("No share → denied records stay filtered")
+    void noShareKeepsDenial() {
+        var request = createRequest("/api/contacts");
+        when(authzService.batchCheckRecordAccess(any(), any(), any(), any(), anyList(), eq("read")))
+                .thenReturn(Set.of("1"));
+        when(recordShareAccessService.widen(any(), any(), anySet(), any())).thenReturn(Set.of());
+
+        Map<String, Object> body = Map.of("data", List.of(
+                Map.of("id", "1"), Map.of("id", "2")));
+
+        Object result = advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON, null, request, null);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> data = (List<Map<String, Object>>) ((Map<String, Object>) result).get("data");
+        assertThat(data).hasSize(1);
+        assertThat(data.get(0).get("id")).isEqualTo("1");
+    }
+
+    @Test
+    @DisplayName("Record share widens a profile-denied single record")
+    void shareWidensDeniedSingleRecord() {
+        var request = createRequest("/api/contacts/123");
+        when(authzService.checkRecordAccess(any(), any(), any(), any(), eq("123"), anyMap(), eq("read")))
+                .thenReturn(false);
+        when(recordShareAccessService.widen(eq("user@example.com"), eq("contacts"),
+                eq(Set.of("123")), eq("read")))
+                .thenReturn(Set.of("123"));
+
+        Map<String, Object> record = Map.of("id", "123", "attributes", Map.of("name", "John"));
+        Map<String, Object> body = Map.of("data", record);
+
+        Object result = advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON, null, request, null);
+
+        assertThat(result).isSameAs(body);
+    }
+
+    @Test
+    @DisplayName("Fully-allowed list response never consults the share service")
+    void allowedListSkipsShareLookup() {
+        var request = createRequest("/api/contacts");
+        when(authzService.batchCheckRecordAccess(any(), any(), any(), any(), anyList(), eq("read")))
+                .thenReturn(Set.of("1", "2"));
+
+        Map<String, Object> body = Map.of("data", List.of(
+                Map.of("id", "1"), Map.of("id", "2")));
+
+        advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON, null, request, null);
+
+        verify(recordShareAccessService, never()).widen(any(), any(), anySet(), any());
+    }
+
+    @Test
     @DisplayName("Should skip when permissions disabled")
     void shouldDoNothingWhenDisabled() {
-        var disabledAdvice = new CerbosRecordAuthorizationAdvice(authzService, permissionResolver, false);
+        var disabledAdvice = new CerbosRecordAuthorizationAdvice(
+                authzService, permissionResolver, recordShareAccessService, false);
         assertThat(disabledAdvice.supports(null, null)).isFalse();
     }
 

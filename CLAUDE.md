@@ -206,6 +206,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.tenant.email.changed.<tenantId>` | Tenant SMTP config changed |
 | `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist (network access) changed |
 | `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime) |
+| `kelta.trigger.<tenantId>.<topic>` | External flow trigger — starts active `NATS_TRIGGERED` flows whose trigger-config `topic` matches (KELTA_TRIGGERS stream, queue-group consumed; body = arbitrary JSON, not a `PlatformEvent`) |
 
 Envelope: `PlatformEvent<T>` (`eventId`, `eventType`, `tenantId`, `correlationId`, `userId`,
 `timestamp`, `payload`). Subscriptions registered in each service's `NatsSubscriptionConfig`.

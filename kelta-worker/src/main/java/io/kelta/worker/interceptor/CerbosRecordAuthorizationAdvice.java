@@ -2,6 +2,7 @@ package io.kelta.worker.interceptor;
 
 import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CerbosPermissionResolver;
+import io.kelta.worker.service.RecordShareAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +23,9 @@ import java.util.stream.Collectors;
  * Filters records from API responses based on Cerbos record-level authorization.
  *
  * <p>For each record in a JSON:API response, checks Cerbos with all record
- * attributes. Records denied by Cerbos are removed from the response.
+ * attributes. Records denied by Cerbos are removed from the response — unless a
+ * manual record share ({@link RecordShareAccessService}) widens the user's
+ * access to that record (READ share → read; EDIT share → read + edit).
  *
  * <p>Only applies to {@code /api/} paths when permissions are enabled.
  */
@@ -33,14 +36,17 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
 
     private final CerbosAuthorizationService authzService;
     private final CerbosPermissionResolver permissionResolver;
+    private final RecordShareAccessService recordShareAccessService;
     private final boolean permissionsEnabled;
 
     public CerbosRecordAuthorizationAdvice(
             CerbosAuthorizationService authzService,
             CerbosPermissionResolver permissionResolver,
+            RecordShareAccessService recordShareAccessService,
             @Value("${kelta.gateway.security.permissions-enabled:true}") boolean permissionsEnabled) {
         this.authzService = authzService;
         this.permissionResolver = permissionResolver;
+        this.recordShareAccessService = recordShareAccessService;
         this.permissionsEnabled = permissionsEnabled;
     }
 
@@ -96,13 +102,23 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
                 }
             }
 
-            Set<String> allowedIds = authzService.batchCheckRecordAccess(
-                    email, profileId, tenantId, collectionId, typedRecords, action);
+            Set<String> allowedIds = new HashSet<>(authzService.batchCheckRecordAccess(
+                    email, profileId, tenantId, collectionId, typedRecords, action));
+
+            // Manual record shares may widen access to records the profile denied
+            Set<String> deniedIds = typedRecords.stream()
+                    .map(r -> (String) r.get("id"))
+                    .filter(id -> id != null && !allowedIds.contains(id))
+                    .collect(Collectors.toSet());
+            if (!deniedIds.isEmpty()) {
+                allowedIds.addAll(recordShareAccessService.widen(email, collectionId, deniedIds, action));
+            }
+            final Set<String> finalAllowed = allowedIds;
 
             List<Map<String, Object>> filtered = typedRecords.stream()
                     .filter(r -> {
                         String id = (String) r.get("id");
-                        return id == null || allowedIds.contains(id);
+                        return id == null || finalAllowed.contains(id);
                     })
                     .toList();
 
@@ -142,8 +158,14 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
             attributes.putAll((Map<String, Object>) attrMap);
         }
 
-        return authzService.checkRecordAccess(email, profileId, tenantId,
-                collectionId, recordId, attributes, action);
+        if (authzService.checkRecordAccess(email, profileId, tenantId,
+                collectionId, recordId, attributes, action)) {
+            return true;
+        }
+        // A manual record share may still widen access to this record
+        return !recordShareAccessService
+                .widen(email, collectionId, Set.of(recordId), action)
+                .isEmpty();
     }
 
     /**

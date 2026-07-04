@@ -317,6 +317,74 @@ public class BulkOperationsController {
     }
 
     /**
+     * Downloads all per-record results of a bulk job as a CSV attachment.
+     *
+     * <p>Streams the full result set in repository pages so a large job never
+     * materializes every row in one list.
+     */
+    @GetMapping(value = "/{id}/results/download", produces = "text/csv")
+    public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> downloadResults(
+            @PathVariable String id,
+            @RequestHeader("X-Tenant-ID") String tenantId) {
+
+        Optional<Map<String, Object>> jobOpt = bulkJobRepository.findByIdAndTenant(id, tenantId);
+        if (jobOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody body = out -> {
+            var writer = new java.io.BufferedWriter(
+                    new java.io.OutputStreamWriter(out, java.nio.charset.StandardCharsets.UTF_8));
+            writer.write("recordIndex,recordId,status,errorMessage");
+            writer.newLine();
+            int pageSize = 500;
+            int offset = 0;
+            while (true) {
+                List<Map<String, Object>> page =
+                        bulkJobRepository.findResults(id, tenantId, pageSize, offset, null);
+                for (Map<String, Object> r : page) {
+                    writer.write(csvRow(
+                            r.get("record_index"), r.get("record_id"),
+                            r.get("status"), r.get("error_message")));
+                    writer.newLine();
+                }
+                if (page.size() < pageSize) {
+                    break;
+                }
+                offset += pageSize;
+            }
+            writer.flush();
+        };
+
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"bulk-job-" + id + "-results.csv\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(body);
+    }
+
+    private static String csvRow(Object... values) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append(csvEscape(values[i]));
+        }
+        return sb.toString();
+    }
+
+    private static String csvEscape(Object value) {
+        if (value == null) {
+            return "";
+        }
+        String s = value.toString();
+        if (s.contains(",") || s.contains("\"") || s.contains("\n") || s.contains("\r")) {
+            return '"' + s.replace("\"", "\"\"") + '"';
+        }
+        return s;
+    }
+
+    /**
      * Aborts a queued or in-progress bulk job.
      */
     @PostMapping("/{id}/abort")

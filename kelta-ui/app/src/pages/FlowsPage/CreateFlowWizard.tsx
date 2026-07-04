@@ -14,7 +14,7 @@ import { useToast } from '@/components'
 import type { CreateFlowRequest } from '@kelta/sdk'
 import { getTenantSlug } from '@/context/TenantContext'
 import { cn } from '@/lib/utils'
-import type { FlowType, TriggerConfig } from '@/pages/FlowDesignerPage/types'
+import type { FlowType, NatsTriggerConfig, TriggerConfig } from '@/pages/FlowDesignerPage/types'
 import { FlowTypeStep } from './steps/FlowTypeStep'
 import { TriggerConfigStep } from './steps/TriggerConfigStep'
 import { NameAndCreateStep } from './steps/NameAndCreateStep'
@@ -95,7 +95,12 @@ export function CreateFlowWizard({ open, onOpenChange }: CreateFlowWizardProps) 
       case 'Type':
         return flowType !== null
       case 'Trigger':
-        return true // Trigger config is optional
+        if (flowType === 'NATS_TRIGGERED') {
+          // NATS-triggered flows require a topic to name the trigger subject
+          const topic = (triggerConfig as Partial<NatsTriggerConfig>).topic
+          return typeof topic === 'string' && topic.trim().length > 0
+        }
+        return true // Other trigger configs are optional
       case 'Name':
         return name.trim().length > 0
     }

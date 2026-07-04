@@ -39,6 +39,11 @@ public class JetStreamInitializer {
             ensureStream(jsm, "KELTA_CONFIG",
                     List.of("kelta.config.>", "kelta.cerbos.>", "kelta.worker.>", "kelta.data.>"),
                     Duration.ofDays(7));
+            // External flow triggers: kelta.trigger.<tenantId>.<topic> — consumed
+            // by NATS_TRIGGERED flows via the worker's queue-group subscription.
+            ensureStream(jsm, "KELTA_TRIGGERS",
+                    List.of("kelta.trigger.>"),
+                    Duration.ofHours(24));
         } catch (Exception e) {
             log.error("Failed to initialize JetStream streams: {}", e.getMessage(), e);
         }

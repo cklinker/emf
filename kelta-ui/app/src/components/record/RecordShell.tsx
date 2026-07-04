@@ -68,7 +68,10 @@ export function RecordShell({
 }: RecordShellProps): React.ReactElement {
   if (isLoading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center" data-testid={`${testId}-loading`}>
+      <div
+        className="flex min-h-[40vh] items-center justify-center"
+        data-testid={`${testId}-loading`}
+      >
         <LoadingSpinner />
       </div>
     )

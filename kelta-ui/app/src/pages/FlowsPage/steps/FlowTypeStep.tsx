@@ -33,9 +33,9 @@ const FLOW_TYPES: {
     icon: Globe,
   },
   {
-    value: 'KAFKA_TRIGGERED',
-    label: 'Kafka Event',
-    description: 'Triggered by messages from a Kafka topic',
+    value: 'NATS_TRIGGERED',
+    label: 'NATS Message',
+    description: 'Triggered by a message published to a platform NATS trigger topic',
     icon: Radio,
   },
 ]

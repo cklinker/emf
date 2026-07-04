@@ -8,6 +8,8 @@ import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -155,7 +157,11 @@ public class FlowEngine {
     }
 
     /**
-     * Resumes a waiting execution.
+     * Resumes a waiting execution. The flow definition is re-loaded from the
+     * {@link FlowStore}; the persisted Wait state is treated as satisfied and
+     * execution continues from its {@code Next} transition (or completes if the
+     * Wait was terminal). The pending-resume row is deleted before the state
+     * loop restarts.
      *
      * @param executionId the execution ID to resume
      */
@@ -163,30 +169,153 @@ public class FlowEngine {
         Optional<FlowExecutionData> executionOpt = flowStore.loadExecution(executionId);
         if (executionOpt.isEmpty()) {
             log.warn("Cannot resume execution {} — not found", executionId);
+            flowStore.deletePendingResume(executionId);
             return;
         }
 
         FlowExecutionData execution = executionOpt.get();
         if (!FlowExecutionData.STATUS_WAITING.equals(execution.status())) {
             log.warn("Cannot resume execution {} — status is {}", executionId, execution.status());
+            flowStore.deletePendingResume(executionId);
             return;
         }
 
         final String resumeTenantId = execution.tenantId();
         threadPool.submit(() -> TenantContext.runWithTenant(resumeTenantId, () -> {
+            long start = System.currentTimeMillis();
+            String flowId = execution.flowId();
             try {
-                // Re-load to get the current node
+                // Re-load under the tenant scope to get the current node + state data
                 FlowExecutionData fresh = flowStore.loadExecution(executionId).orElseThrow();
-                // We need the definition JSON — for now, mark as resumed and advance
-                // The caller must provide the definition or it must be re-loaded from the flow table
-                log.info("Resuming execution {} from state '{}'",
-                    executionId, fresh.currentNodeId());
-                // TODO: Resume needs the flow definition, which requires FlowStore to load the flow definition
-                // This will be completed in Phase 1C when the full worker integration provides the definition
+                if (!FlowExecutionData.STATUS_WAITING.equals(fresh.status())) {
+                    log.info("Execution {} no longer WAITING (status {}), skipping resume",
+                        executionId, fresh.status());
+                    flowStore.deletePendingResume(executionId);
+                    return;
+                }
+
+                Optional<String> definitionJson =
+                    flowStore.findFlowDefinitionById(resumeTenantId, flowId);
+                if (definitionJson.isEmpty()) {
+                    failResume(executionId, fresh,
+                        "Cannot resume: flow " + flowId + " no longer exists");
+                    return;
+                }
+
+                FlowDefinition definition = parser.parse(definitionJson.get());
+                StateDefinition waitState = definition.getState(fresh.currentNodeId());
+                if (waitState == null) {
+                    // Waits inside Parallel/Map branch sub-definitions are not
+                    // resumable — their state ids don't exist at the top level.
+                    failResume(executionId, fresh,
+                        "Cannot resume: state '" + fresh.currentNodeId()
+                            + "' not found in flow definition");
+                    return;
+                }
+
+                flowStore.deletePendingResume(executionId);
+                log.info("Resuming execution {} from state '{}'", executionId, fresh.currentNodeId());
+
+                // The Wait is satisfied — advance to its transition.
+                if (waitState instanceof StateDefinition.WaitState wait && wait.end()) {
+                    flowStore.completeExecution(executionId, FlowExecutionData.STATUS_COMPLETED,
+                        fresh.stateData(), null,
+                        (int) (System.currentTimeMillis() - start), fresh.stepCount());
+                    listener.onExecutionCompleted(flowId, FlowExecutionData.STATUS_COMPLETED,
+                        System.currentTimeMillis() - start, fresh.isTest());
+                    return;
+                }
+                String nextStateId = (waitState instanceof StateDefinition.WaitState wait)
+                    ? wait.next()
+                    : fresh.currentNodeId();
+
+                FlowExecutionContext context = new FlowExecutionContext(
+                    executionId, resumeTenantId, flowId, fresh.startedBy(),
+                    definition, fresh.stateData());
+                context.setCurrentStateId(nextStateId);
+                flowStore.updateExecutionState(executionId, nextStateId, fresh.stateData(),
+                    FlowExecutionData.STATUS_RUNNING, fresh.stepCount());
+
+                Map<String, Object> finalData = runStateLoop(context);
+                completeIfNeeded(context, finalData);
+
+                String finalStatus = flowStore.loadExecution(executionId)
+                    .map(FlowExecutionData::status)
+                    .orElse(FlowExecutionData.STATUS_FAILED);
+                listener.onExecutionCompleted(flowId, finalStatus,
+                    System.currentTimeMillis() - start, fresh.isTest());
             } catch (Exception e) {
                 log.error("Failed to resume execution {}", executionId, e);
+                flowStore.completeExecution(executionId, FlowExecutionData.STATUS_FAILED,
+                    execution.stateData(), "Resume failed: " + e.getMessage(),
+                    (int) (System.currentTimeMillis() - start), execution.stepCount());
+                listener.onExecutionError(flowId, e.getClass().getSimpleName());
             }
         }));
+    }
+
+    /**
+     * Records a pending-resume row for a Wait state that parked the execution.
+     * Event waits register under their event name (resumed by a future event
+     * hook or manual API); time waits register a wake-up instant claimed by the
+     * worker's resume poller. Failure to schedule is logged but never fails the
+     * execution — the row can be recreated manually.
+     */
+    private void schedulePendingResume(FlowExecutionContext context, StateDefinition state,
+                                       Map<String, Object> stateData) {
+        if (!(state instanceof StateDefinition.WaitState wait)) {
+            return;
+        }
+        try {
+            if (wait.eventName() != null) {
+                flowStore.createPendingResume(context.executionId(), context.tenantId(),
+                    null, wait.eventName());
+                return;
+            }
+            flowStore.createPendingResume(context.executionId(), context.tenantId(),
+                resolveResumeAt(wait, stateData), null);
+        } catch (Exception e) {
+            log.error("Failed to schedule pending resume for execution {}",
+                context.executionId(), e);
+        }
+    }
+
+    /**
+     * Resolves when a time-based Wait should wake up: {@code seconds} → now+n,
+     * {@code timestamp} → that instant, {@code timestampPath} → the instant read
+     * from state data. An unparsable/missing timestamp falls back to "now" so a
+     * misconfigured wait resumes immediately instead of sleeping forever.
+     */
+    private Instant resolveResumeAt(StateDefinition.WaitState wait, Map<String, Object> stateData) {
+        if (wait.seconds() != null) {
+            return Instant.now().plusSeconds(wait.seconds());
+        }
+        String timestamp = wait.timestamp();
+        if (timestamp == null && wait.timestampPath() != null) {
+            Object resolved = dataResolver.readPath(stateData, wait.timestampPath());
+            timestamp = resolved != null ? resolved.toString() : null;
+        }
+        if (timestamp != null) {
+            try {
+                return Instant.parse(timestamp);
+            } catch (DateTimeParseException e) {
+                log.warn("Wait '{}' has unparsable timestamp '{}', resuming immediately",
+                    wait.name(), timestamp);
+            }
+        }
+        return Instant.now();
+    }
+
+    /**
+     * Marks a WAITING execution FAILED because it can no longer be resumed
+     * (definition or state missing), and clears its pending-resume row so the
+     * poller doesn't re-claim it.
+     */
+    private void failResume(String executionId, FlowExecutionData execution, String message) {
+        log.error("{} (execution {})", message, executionId);
+        flowStore.deletePendingResume(executionId);
+        flowStore.completeExecution(executionId, FlowExecutionData.STATUS_FAILED,
+            execution.stateData(), message, 0, execution.stepCount());
     }
 
     /**
@@ -302,22 +431,37 @@ public class FlowEngine {
             executionId, flowId, definition.startAt());
 
         Map<String, Object> finalData = runStateLoop(context);
+        return completeIfNeeded(context, finalData);
+    }
 
-        // Only complete if runStateLoop didn't already mark it as complete
+    /**
+     * Completes the execution row unless the state loop already did (terminal
+     * Fail, missing state, …) or the loop parked the execution WAITING.
+     * Returns the (possibly annotated) final state data.
+     */
+    private Map<String, Object> completeIfNeeded(FlowExecutionContext context,
+                                                 Map<String, Object> finalData) {
+        if (context.isWaiting()) {
+            log.info("Flow execution {} parked WAITING at state '{}' ({} steps, {}ms)",
+                context.executionId(), context.currentStateId(),
+                context.stepCount(), context.elapsedMs());
+            return finalData;
+        }
         if (!context.isCompleted()) {
             String status = context.isCancelled()
                 ? FlowExecutionData.STATUS_CANCELLED
                 : FlowExecutionData.STATUS_COMPLETED;
 
             finalData = annotateWithFailedCount(finalData, context);
-            flowStore.completeExecution(executionId, status, finalData, null,
+            flowStore.completeExecution(context.executionId(), status, finalData, null,
                 context.elapsedMs(), context.stepCount());
 
             log.info("Flow execution {} completed with status {} (failedCount={}, {} steps, {}ms)",
-                executionId, status, context.failedCount(), context.stepCount(), context.elapsedMs());
+                context.executionId(), status, context.failedCount(),
+                context.stepCount(), context.elapsedMs());
         } else {
             log.info("Flow execution {} finished with status {} (failedCount={}, {} steps, {}ms)",
-                executionId, context.finalStatus(), context.failedCount(),
+                context.executionId(), context.finalStatus(), context.failedCount(),
                 context.stepCount(), context.elapsedMs());
         }
 
@@ -393,10 +537,12 @@ public class FlowEngine {
 
             // Handle result
             if ("WAITING".equals(result.status())) {
-                // Persist execution as WAITING
+                // Persist execution as WAITING and schedule its resume
                 context.setStateData(result.updatedData());
+                context.markWaiting();
                 flowStore.updateExecutionState(context.executionId(), context.currentStateId(),
                     result.updatedData(), FlowExecutionData.STATUS_WAITING, context.stepCount());
+                schedulePendingResume(context, currentState, result.updatedData());
                 return result.updatedData();
             }
 

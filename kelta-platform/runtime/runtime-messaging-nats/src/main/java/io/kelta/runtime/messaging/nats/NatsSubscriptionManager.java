@@ -146,7 +146,7 @@ public class NatsSubscriptionManager implements DisposableBean {
                                 recordProcessed(sub.name(), start);
                                 continue;
                             }
-                            sub.handler().accept(data);
+                            dispatch(sub, msg.getSubject(), data);
                             msg.ack();
                             recordProcessed(sub.name(), start);
                         } catch (Exception e) {
@@ -169,6 +169,19 @@ public class NatsSubscriptionManager implements DisposableBean {
                 }
             }
         });
+    }
+
+    /**
+     * Routes a message to the subscription's handler — the subject-aware
+     * variant when registered (wildcard subjects carrying routing tokens),
+     * else the body-only handler.
+     */
+    private static void dispatch(EventSubscription sub, String subject, String data) {
+        if (sub.subjectHandler() != null) {
+            sub.subjectHandler().accept(subject, data);
+        } else {
+            sub.handler().accept(data);
+        }
     }
 
     private void startPushConsumer(EventSubscription sub) throws Exception {
@@ -194,7 +207,7 @@ public class NatsSubscriptionManager implements DisposableBean {
                     recordProcessed(sub.name(), start);
                     return;
                 }
-                sub.handler().accept(data);
+                dispatch(sub, msg.getSubject(), data);
                 msg.ack();
                 recordProcessed(sub.name(), start);
             } catch (Exception e) {

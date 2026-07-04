@@ -75,6 +75,55 @@ class BulkOperationsControllerTest {
                 .thenReturn(List.of(Map.of("id", COLLECTION_ID)));
     }
 
+    // ==================== RESULTS DOWNLOAD Tests ====================
+
+    @Nested
+    @DisplayName("GET /api/bulk-jobs/{id}/results/download")
+    class DownloadResultsTests {
+
+        @Test
+        @DisplayName("streams all result pages as CSV with an attachment header")
+        void downloadResults_streamsCsv() throws Exception {
+            when(bulkJobRepository.findByIdAndTenant(JOB_ID, TENANT_ID))
+                    .thenReturn(Optional.of(Map.of("id", JOB_ID)));
+            Map<String, Object> ok = new LinkedHashMap<>();
+            ok.put("record_index", 0);
+            ok.put("record_id", "rec-1");
+            ok.put("status", "SUCCESS");
+            ok.put("error_message", null);
+            Map<String, Object> failed = new LinkedHashMap<>();
+            failed.put("record_index", 1);
+            failed.put("record_id", null);
+            failed.put("status", "FAILURE");
+            failed.put("error_message", "boom, with \"quotes\"");
+            when(bulkJobRepository.findResults(eq(JOB_ID), eq(TENANT_ID), anyInt(), eq(0), isNull()))
+                    .thenReturn(List.of(ok, failed));
+
+            var response = controller.downloadResults(JOB_ID, TENANT_ID);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getHeaders().getFirst("Content-Disposition"))
+                    .contains("bulk-job-" + JOB_ID + "-results.csv");
+
+            var out = new java.io.ByteArrayOutputStream();
+            response.getBody().writeTo(out);
+            String csv = out.toString(StandardCharsets.UTF_8);
+            assertThat(csv).startsWith("recordIndex,recordId,status,errorMessage");
+            assertThat(csv).contains("0,rec-1,SUCCESS,");
+            assertThat(csv).contains("1,,FAILURE,\"boom, with \"\"quotes\"\"\"");
+        }
+
+        @Test
+        @DisplayName("unknown job → 404")
+        void downloadResults_notFound() {
+            when(bulkJobRepository.findByIdAndTenant(JOB_ID, TENANT_ID)).thenReturn(Optional.empty());
+
+            var response = controller.downloadResults(JOB_ID, TENANT_ID);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
     // ==================== CREATE Tests ====================
 
     @Nested

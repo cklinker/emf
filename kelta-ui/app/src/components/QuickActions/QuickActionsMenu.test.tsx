@@ -35,6 +35,15 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
+vi.mock('@/hooks/useCollectionSchema', () => ({
+  useCollectionSchema: vi.fn(() => ({
+    schema: undefined,
+    fields: [],
+    isLoading: false,
+    error: null,
+  })),
+}))
+
 // Render shadcn DropdownMenu children directly so menu items are clickable in jsdom
 // (avoids Radix/floating-ui pointer-capture issues) — same approach as UserMenu.test.
 vi.mock('@/components/ui/dropdown-menu', () => ({
@@ -61,10 +70,12 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
 
 import { useQuickActions } from '@/hooks/useQuickActions'
 import { useApi } from '@/context/ApiContext'
+import { useCollectionSchema, type FieldDefinition } from '@/hooks/useCollectionSchema'
 import { toast } from 'sonner'
 
 const mockUseQuickActions = vi.mocked(useQuickActions)
 const mockUseApi = vi.mocked(useApi)
+const mockUseCollectionSchema = vi.mocked(useCollectionSchema)
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({
@@ -305,6 +316,167 @@ describe('QuickActionsMenu', () => {
         expect(toast.error).toHaveBeenCalledWith('No recipient email found on this record')
       )
       expect(post).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('update_field action without setValue', () => {
+    const recordContext: QuickActionExecutionContext = {
+      collectionName: 'accounts',
+      recordId: 'rec-123',
+      record: { status: 'Open' },
+      tenantSlug: 'test-tenant',
+    }
+
+    const statusField: FieldDefinition = {
+      id: 'field-1',
+      name: 'status',
+      displayName: 'Status',
+      type: 'string',
+      required: false,
+    }
+
+    function mockApiPatch() {
+      const patch = vi.fn().mockResolvedValue({})
+      mockUseApi.mockReturnValue({
+        apiClient: { get: vi.fn(), post: vi.fn(), patch, postResource: vi.fn() },
+      } as unknown as ReturnType<typeof useApi>)
+      return patch
+    }
+
+    function mockActions(config: { allowedValues?: unknown[] }) {
+      mockUseQuickActions.mockReturnValue({
+        actions: [
+          {
+            id: 'a1',
+            label: 'Set Status',
+            type: 'update_field',
+            context: 'record',
+            sortOrder: 1,
+            config: { type: 'update_field', fieldName: 'status', ...config },
+          },
+        ],
+        isLoading: false,
+        error: null,
+      })
+    }
+
+    beforeEach(() => {
+      mockUseCollectionSchema.mockReturnValue({
+        schema: undefined,
+        fields: [statusField],
+        isLoading: false,
+        error: null,
+      })
+    })
+
+    it('opens a value-entry dialog instead of PATCHing immediately', async () => {
+      const patch = mockApiPatch()
+      mockActions({})
+
+      render(
+        <TestWrapper>
+          <QuickActionsMenu
+            collectionName="accounts"
+            context="record"
+            executionContext={recordContext}
+          />
+        </TestWrapper>
+      )
+
+      fireEvent.click(screen.getByText('Set Status'))
+
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Set Status' })).toBeDefined())
+      // Typed editor for the field, pre-filled with the record's current value
+      const input = screen.getByLabelText('Status') as HTMLInputElement
+      expect(input.value).toBe('Open')
+      expect(patch).not.toHaveBeenCalled()
+      expect(toast.info).not.toHaveBeenCalled()
+    })
+
+    it('PATCHes the entered value on save and calls onActionComplete', async () => {
+      const patch = mockApiPatch()
+      mockActions({})
+      const onActionComplete = vi.fn()
+
+      render(
+        <TestWrapper>
+          <QuickActionsMenu
+            collectionName="accounts"
+            context="record"
+            executionContext={recordContext}
+            onActionComplete={onActionComplete}
+          />
+        </TestWrapper>
+      )
+
+      fireEvent.click(screen.getByText('Set Status'))
+      await waitFor(() => expect(screen.getByLabelText('Status')).toBeDefined())
+
+      fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'Closed' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() =>
+        expect(patch).toHaveBeenCalledWith('/api/accounts/rec-123', { status: 'Closed' })
+      )
+      expect(toast.success).toHaveBeenCalledWith('status updated')
+      expect(onActionComplete).toHaveBeenCalled()
+    })
+
+    it('does not PATCH when the dialog is cancelled', async () => {
+      const patch = mockApiPatch()
+      mockActions({})
+
+      render(
+        <TestWrapper>
+          <QuickActionsMenu
+            collectionName="accounts"
+            context="record"
+            executionContext={recordContext}
+          />
+        </TestWrapper>
+      )
+
+      fireEvent.click(screen.getByText('Set Status'))
+      await waitFor(() => expect(screen.getByLabelText('Status')).toBeDefined())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      await waitFor(() => expect(screen.queryByLabelText('Status')).toBeNull())
+      expect(patch).not.toHaveBeenCalled()
+    })
+
+    it('renders a select restricted to allowedValues and PATCHes the selection', async () => {
+      const patch = mockApiPatch()
+      mockActions({ allowedValues: ['Open', 'Closed'] })
+
+      render(
+        <TestWrapper>
+          <QuickActionsMenu
+            collectionName="accounts"
+            context="record"
+            executionContext={recordContext}
+          />
+        </TestWrapper>
+      )
+
+      fireEvent.click(screen.getByText('Set Status'))
+      await waitFor(() => expect(screen.getByLabelText('Status')).toBeDefined())
+
+      const select = screen.getByLabelText('Status') as HTMLSelectElement
+      expect(select.tagName).toBe('SELECT')
+      // Restricted to the configured values (plus the empty placeholder)
+      const options = Array.from(select.options).map((o) => o.value)
+      expect(options).toEqual(['', 'Open', 'Closed'])
+      // Pre-selected with the record's current value
+      expect(select.value).toBe('Open')
+
+      fireEvent.change(select, { target: { value: 'Closed' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() =>
+        expect(patch).toHaveBeenCalledWith('/api/accounts/rec-123', { status: 'Closed' })
+      )
+      expect(toast.success).toHaveBeenCalledWith('status updated')
     })
   })
 

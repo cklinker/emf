@@ -168,4 +168,40 @@ public class InitialStateBuilder {
 
         return state;
     }
+
+    /**
+     * Builds initial state from a NATS trigger message
+     * ({@code kelta.trigger.<tenantId>.<topic>}).
+     *
+     * @param payload     the parsed message body (JSON object; non-JSON raw
+     *                    payloads arrive wrapped as {@code {"raw": "<text>"}})
+     * @param subject     the full NATS subject the message arrived on
+     * @param topic       the flow-facing topic (subject minus the platform prefix)
+     * @param tenantId    the tenant ID
+     * @param flowId      the flow being executed
+     * @param executionId the execution ID
+     * @return the initial state envelope
+     */
+    public Map<String, Object> buildFromNatsMessage(Map<String, Object> payload,
+                                                     String subject, String topic,
+                                                     String tenantId,
+                                                     String flowId, String executionId) {
+        Map<String, Object> state = new LinkedHashMap<>();
+
+        Map<String, Object> trigger = new LinkedHashMap<>();
+        trigger.put("type", "NATS_MESSAGE");
+        trigger.put("subject", subject);
+        trigger.put("topic", topic);
+        state.put("trigger", trigger);
+
+        state.put("input", payload != null ? payload : Map.of());
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("tenantId", tenantId);
+        context.put("flowId", flowId);
+        context.put("executionId", executionId);
+        state.put("context", context);
+
+        return state;
+    }
 }

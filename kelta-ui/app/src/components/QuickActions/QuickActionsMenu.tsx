@@ -34,6 +34,7 @@ import { useApi } from '@/context/ApiContext'
 import { useQuickActions } from '@/hooks/useQuickActions'
 import { useScriptExecution } from '@/hooks/useScriptExecution'
 import { componentRegistry, type QuickActionComponentProps } from '@/services/componentRegistry'
+import { UpdateFieldValueDialog } from './UpdateFieldValueDialog'
 import type {
   QuickActionDefinition,
   QuickActionContext,
@@ -95,6 +96,10 @@ export function QuickActionsMenu({
     Component: React.ComponentType<QuickActionComponentProps>
     props?: Record<string, unknown>
   } | null>(null)
+  const [updateFieldAction, setUpdateFieldAction] = useState<{
+    action: QuickActionDefinition
+    config: UpdateFieldConfig
+  } | null>(null)
 
   const handleAction = useCallback(
     async (action: QuickActionDefinition) => {
@@ -131,8 +136,9 @@ export function QuickActionsMenu({
               toast.success(`${config.fieldName} updated`)
               onActionComplete?.()
             } else {
-              // Interactive value-entry dialog is a follow-up; setValue actions are supported now.
-              toast.info('This action needs a value configured (setValue).')
+              // No preset value — open the value-entry dialog. The dialog itself is the
+              // interaction, so requiresConfirmation never adds a second prompt here.
+              setUpdateFieldAction({ action, config })
             }
             break
           }
@@ -250,6 +256,23 @@ export function QuickActionsMenu({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {updateFieldAction && executionContext.recordId && (
+        <UpdateFieldValueDialog
+          action={updateFieldAction.action}
+          config={updateFieldAction.config}
+          executionContext={executionContext}
+          onSubmit={async (value) => {
+            await apiClient.patch(
+              `/api/${executionContext.collectionName}/${executionContext.recordId}`,
+              { [updateFieldAction.config.fieldName]: value }
+            )
+            toast.success(`${updateFieldAction.config.fieldName} updated`)
+            setUpdateFieldAction(null)
+            onActionComplete?.()
+          }}
+          onClose={() => setUpdateFieldAction(null)}
+        />
+      )}
       {customAction && (
         <customAction.Component
           collectionName={executionContext.collectionName}

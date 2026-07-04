@@ -48,6 +48,21 @@ public class JdbcModuleStore implements ModuleStore {
     }
 
     @Override
+    public void saveJarSignature(String moduleRowId, String signatureBase64) {
+        jdbcTemplate.update(
+                "UPDATE tenant_module SET jar_signature = ?, updated_at = NOW() WHERE id = ?",
+                signatureBase64, moduleRowId);
+    }
+
+    @Override
+    public Optional<String> findJarSignature(String moduleRowId) {
+        List<String> rows = jdbcTemplate.query(
+                "SELECT jar_signature FROM tenant_module WHERE id = ?",
+                (rs, rowNum) -> rs.getString("jar_signature"), moduleRowId);
+        return rows.isEmpty() ? Optional.empty() : Optional.ofNullable(rows.get(0));
+    }
+
+    @Override
     public void createActions(List<TenantModuleData.TenantModuleActionData> actions) {
         for (var action : actions) {
             String id = action.id() != null ? action.id() : UUID.randomUUID().toString();

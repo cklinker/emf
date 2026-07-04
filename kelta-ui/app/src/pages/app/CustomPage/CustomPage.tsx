@@ -11,7 +11,7 @@
 
 import React from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Loader2, FileQuestion } from 'lucide-react'
+import { Loader2, FileQuestion, WifiOff } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Breadcrumb,
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/context/ApiContext'
+import { useOffline } from '@/offline'
 import { PageTreeRenderer, type PageNode } from './PageTreeRenderer'
 import type { PageDataSource, PageVariable } from '@/pages/PageBuilderPage/pageConfig'
 import { usePageVariables } from '@/pages/PageBuilderPage/hooks/usePageVariables'
@@ -64,16 +65,36 @@ export function CustomPage({ slug: slugOverride }: CustomPageProps = {}): React.
   const basePath = `/${tenantSlug}/app`
   const { apiClient } = useApi()
 
+  // Offline replica context (present under EndUserShell; undefined on admin previews, which
+  // then keep the online-only behavior). Online fetches write the contract through to the
+  // replica so the page shell still renders cold-offline (data sources already do the same).
+  const offline = useOffline()
+  const isOnline = offline?.online !== false
+
   const { data: contract, isLoading } = useQuery({
-    queryKey: ['page-render', pageSlug],
-    queryFn: async () => {
+    // `isOnline` in the key so a reconnect re-runs the online fetch path.
+    queryKey: ['page-render', pageSlug, isOnline],
+    queryFn: async (): Promise<PageRenderContract | null> => {
+      const slug = pageSlug!
+      const readCache = async (): Promise<PageRenderContract | null> => {
+        if (!offline) return null
+        const cached = (await offline.store.getPageContract(slug)) as PageRenderContract | undefined
+        return cached ?? null
+      }
+
+      // Offline: serve the cached contract from the local replica.
+      if (offline && !isOnline) return readCache()
+
       try {
-        return await apiClient.get<PageRenderContract>(
-          `/api/pages/${encodeURIComponent(pageSlug!)}/render`
+        const fetched = await apiClient.get<PageRenderContract>(
+          `/api/pages/${encodeURIComponent(slug)}/render`
         )
+        if (offline) await offline.store.putPageContract(slug, fetched)
+        return fetched
       } catch {
-        // 404 (unpublished/unknown) or transient error → render the not-found state.
-        return null
+        // 404 (unpublished/unknown) or transient error → fall back to the replica before
+        // rendering the not-found state.
+        return readCache()
       }
     },
     enabled: !!pageSlug,
@@ -116,6 +137,9 @@ export function CustomPage({ slug: slugOverride }: CustomPageProps = {}): React.
   }
 
   if (!contract) {
+    // Cold-offline with no cached contract is a connectivity gap, not a missing page —
+    // say so instead of the misleading "Page not found".
+    const unavailableOffline = !!offline && !isOnline
     return (
       <div className="space-y-4 p-6">
         <Breadcrumb>
@@ -133,13 +157,30 @@ export function CustomPage({ slug: slugOverride }: CustomPageProps = {}): React.
         </Breadcrumb>
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-            <FileQuestion className="h-12 w-12 text-muted-foreground" />
-            <div className="space-y-2">
-              <h2 className="text-lg font-semibold text-foreground">Page not found</h2>
-              <p className="text-sm text-muted-foreground">
-                The page &quot;{pageSlug}&quot; is not published or does not exist.
-              </p>
-            </div>
+            {unavailableOffline ? (
+              <>
+                <WifiOff className="h-12 w-12 text-muted-foreground" />
+                <div className="space-y-2">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    This page isn&apos;t available offline
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    The page &quot;{pageSlug}&quot; hasn&apos;t been visited while online yet.
+                    Reconnect to load it.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <FileQuestion className="h-12 w-12 text-muted-foreground" />
+                <div className="space-y-2">
+                  <h2 className="text-lg font-semibold text-foreground">Page not found</h2>
+                  <p className="text-sm text-muted-foreground">
+                    The page &quot;{pageSlug}&quot; is not published or does not exist.
+                  </p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

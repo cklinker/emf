@@ -15,8 +15,12 @@
  *   FieldControl registry (`InlineFieldValue`), rows can be deleted, and a new
  *   child can be created inline with the parent FK pre-filled. Child mutations
  *   are owned here (`useRecordMutation`) and refresh both the API-fetch path
- *   (`refetch`) and the parent-included path (`onChanged`). Mass-edit is a
- *   documented follow-up (needs a bulk backend — see concerns.md).
+ *   (`refetch`) and the parent-included path (`onChanged`).
+ * - Mass edit: when inline editing is allowed AND the current user holds the
+ *   MANAGE_DATA system permission, rows gain selection checkboxes and an
+ *   action bar; "Edit field…" applies one value to all selected rows via the
+ *   bulk-jobs backend (POST /api/bulk-jobs, operation UPDATE), polling the job
+ *   to a terminal status before refreshing.
  */
 
 import React, { useEffect, useMemo, useState } from 'react'
@@ -34,14 +38,18 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { InlineFieldValue } from '@/components/record/InlineFieldValue'
 import { getFieldControl } from '@/components/fieldControl'
 import type { FieldControlContext } from '@/components/fieldControl'
+import { MassEditDialog } from './MassEditDialog'
 import { useRelatedRecords } from '@/hooks/useRelatedRecords'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useObjectPermissions } from '@/hooks/useObjectPermissions'
+import { useSystemPermissions } from '@/hooks/useSystemPermissions'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
+import { useApi } from '@/context/ApiContext'
 import { useToast } from '@/components'
 import { buildIncludedDisplayMap, extractIncluded } from '@/utils/jsonapi'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
@@ -68,6 +76,26 @@ const MAX_COLUMNS = 4
 
 /** Maximum number of records to show in the compact view */
 const DEFAULT_LIMIT = 5
+
+/** System permission required to submit bulk jobs (mass edit). */
+const MANAGE_DATA_PERMISSION = 'MANAGE_DATA'
+
+/** Interval between bulk-job status polls. */
+const POLL_INTERVAL_MS = 2000
+
+/** Maximum number of status polls (~60s at 2s intervals). */
+const MAX_POLL_ATTEMPTS = 30
+
+/** Bulk-job statuses that end polling. */
+const TERMINAL_JOB_STATUSES = new Set(['COMPLETED', 'FAILED', 'ABORTED'])
+
+/** JSON:API attributes returned by GET /api/bulk-jobs/{id}. */
+interface BulkJobPollAttributes {
+  status?: string
+  processedRecords?: number
+  successRecords?: number
+  errorRecords?: number
+}
 
 export interface RelatedListProps {
   /** Related collection name */
@@ -167,6 +195,7 @@ function RelatedCreateRow({
   fields,
   tenantSlug,
   columnCount,
+  hasSelectionColumn,
   saving,
   onSubmit,
   onCancel,
@@ -174,6 +203,7 @@ function RelatedCreateRow({
   fields: FieldDefinition[]
   tenantSlug: string
   columnCount: number
+  hasSelectionColumn: boolean
   saving: boolean
   onSubmit: (values: Record<string, unknown>) => void
   onCancel: () => void
@@ -199,6 +229,7 @@ function RelatedCreateRow({
 
   return (
     <TableRow data-testid="related-create-row">
+      {hasSelectionColumn && <TableCell className="w-[32px] py-2" />}
       {fields.map((field) => {
         const control = getFieldControl(field.type)
         const Edit = control.Edit
@@ -268,6 +299,7 @@ export function RelatedList({
   const basePath = `/${tenantSlug}/app`
   const collectionStore = useCollectionStore()
   const { showToast } = useToast()
+  const { apiClient } = useApi()
 
   // Fetch schema for the related collection
   const { schema, fields, isLoading: schemaLoading } = useCollectionSchema(collectionName)
@@ -275,8 +307,14 @@ export function RelatedList({
   // Fetch permissions for the related collection
   const { permissions } = useObjectPermissions(collectionName)
 
+  // Mass edit posts to /api/bulk-jobs, which requires the MANAGE_DATA system
+  // permission (in-controller gate) — hide the affordance without it.
+  const { hasPermission } = useSystemPermissions()
+
   const [creating, setCreating] = useState(false)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [massEditOpen, setMassEditOpen] = useState(false)
 
   // Determine visible columns. When `displayColumns` is provided, render exactly
   // those fields in that order (configured in the page layout). Otherwise fall
@@ -419,9 +457,102 @@ export function RelatedList({
   const canInlineEdit = editable && permissions.canEdit
   const canDeleteRows = editable && permissions.canDelete
   const canInlineCreate = editable && permissions.canCreate
+  // Mass edit additionally requires the MANAGE_DATA system permission — the
+  // bulk-jobs endpoint rejects profiles without it.
+  const canMassEdit = canInlineEdit && hasPermission(MANAGE_DATA_PERMISSION)
   // Extra trailing column for row actions (delete).
   const actionColumns = canDeleteRows ? 1 : 0
   const totalColumns = visibleFields.length + actionColumns
+
+  // Effective selection: drop ids for rows that are no longer visible
+  // (deleted/refetched) without mutating state during render/effects.
+  const visibleSelectedIds = useMemo(() => {
+    if (selectedIds.size === 0) return selectedIds
+    const visible = new Set(records.map((r) => r.id))
+    const next = new Set([...selectedIds].filter((id) => visible.has(id)))
+    return next.size === selectedIds.size ? selectedIds : next
+  }, [records, selectedIds])
+
+  const allSelected = records.length > 0 && records.every((r) => visibleSelectedIds.has(r.id))
+  const someSelected = !allSelected && records.some((r) => visibleSelectedIds.has(r.id))
+
+  const toggleSelectRow = (recordId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(recordId)) next.delete(recordId)
+      else next.add(recordId)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(records.map((r) => r.id)))
+  }
+
+  // Fields offered by the mass-edit picker: user-editable schema fields only
+  // (excludes id, system audit fields, and server-computed types).
+  const massEditableFields = useMemo(
+    () =>
+      fields.filter(
+        (f) => f.name !== 'id' && !SYSTEM_FIELDS.has(f.name) && getFieldControl(f.type).editable
+      ),
+    [fields]
+  )
+
+  /**
+   * Apply one field value to every selected row via the bulk-jobs backend:
+   * POST /api/bulk-jobs (operation UPDATE, partial by record id), then poll the
+   * job to a terminal status. Throws on failure so MassEditDialog stays open
+   * with the error inline.
+   */
+  const submitMassEdit = async (fieldName: string, value: unknown): Promise<void> => {
+    const collectionId = schema?.id
+    if (!collectionId) throw new Error('Collection schema is not loaded yet')
+    const ids = [...visibleSelectedIds]
+    const created = await apiClient.post<{ data?: { id?: string } }>('/api/bulk-jobs', {
+      collectionId,
+      operation: 'UPDATE',
+      records: ids.map((id) => ({ id, [fieldName]: value })),
+    })
+    const jobId = created?.data?.id
+    if (!jobId) throw new Error('Bulk job was not created')
+
+    let finalStatus: string | undefined
+    let successRecords = 0
+    let errorRecords = 0
+    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+      const poll = await apiClient.get<{ data?: { attributes?: BulkJobPollAttributes } }>(
+        `/api/bulk-jobs/${jobId}`
+      )
+      const attrs = poll?.data?.attributes
+      if (attrs?.status && TERMINAL_JOB_STATUSES.has(attrs.status)) {
+        finalStatus = attrs.status
+        successRecords = attrs.successRecords ?? 0
+        errorRecords = attrs.errorRecords ?? 0
+        break
+      }
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+    }
+
+    if (finalStatus !== 'COMPLETED') {
+      const message = finalStatus
+        ? `Bulk update ${finalStatus.toLowerCase()} — check the Bulk Jobs page for details`
+        : 'Bulk update is still running — check the Bulk Jobs page for its result'
+      showToast(message, 'error')
+      throw new Error(message)
+    }
+
+    if (errorRecords > 0) {
+      showToast(
+        `Updated ${successRecords} of ${ids.length} records — ${errorRecords} failed. Check the Bulk Jobs page for details.`,
+        'error'
+      )
+    } else {
+      showToast(`Updated ${successRecords} of ${ids.length} records`, 'success')
+    }
+    refreshAfterMutation()
+    setSelectedIds(new Set())
+  }
 
   // Handle row click → navigate to record detail
   const handleRowClick = (record: CollectionRecord) => {
@@ -524,9 +655,46 @@ export function RelatedList({
           </p>
         ) : (
           <div className="rounded-md border">
+            {canMassEdit && visibleSelectedIds.size > 0 && (
+              <div
+                className="flex items-center gap-2 border-b bg-muted/40 px-3 py-1.5 text-xs"
+                data-testid="related-mass-edit-bar"
+              >
+                <span className="text-muted-foreground" data-testid="related-mass-edit-count">
+                  {visibleSelectedIds.size} selected
+                </span>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => setMassEditOpen(true)}
+                  disabled={massEditableFields.length === 0}
+                  data-testid="related-mass-edit-open"
+                >
+                  Edit field…
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setSelectedIds(new Set())}
+                  data-testid="related-mass-edit-clear"
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
+                  {canMassEdit && (
+                    <TableHead className="w-[32px]">
+                      <Checkbox
+                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label={allSelected ? 'Deselect all rows' : 'Select all rows'}
+                        data-testid="related-select-all"
+                      />
+                    </TableHead>
+                  )}
                   {visibleFields.map((field) => (
                     <TableHead key={field.name} className="whitespace-nowrap text-xs">
                       {field.displayName || field.name}
@@ -546,6 +714,16 @@ export function RelatedList({
                     className="cursor-pointer"
                     onClick={() => handleRowClick(record)}
                   >
+                    {canMassEdit && (
+                      <TableCell className="w-[32px] py-2" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={visibleSelectedIds.has(record.id)}
+                          onCheckedChange={() => toggleSelectRow(record.id)}
+                          aria-label={`Select row ${record.id}`}
+                          data-testid={`related-select-${record.id}`}
+                        />
+                      </TableCell>
+                    )}
                     {visibleFields.map((field) => {
                       const value = record[field.name]
                       const isRef = REFERENCE_FIELD_TYPES.has(field.type)
@@ -629,6 +807,7 @@ export function RelatedList({
                     fields={visibleFields}
                     tenantSlug={tenantSlug}
                     columnCount={Math.max(actionColumns, 1)}
+                    hasSelectionColumn={canMassEdit}
                     saving={mutations.create.isPending}
                     onSubmit={(values) => void commitCreate(values)}
                     onCancel={() => setCreating(false)}
@@ -640,6 +819,15 @@ export function RelatedList({
         )}
         {creating && totalColumns === 0 && (
           <p className="mt-2 text-xs text-muted-foreground">No editable columns configured.</p>
+        )}
+        {massEditOpen && (
+          <MassEditDialog
+            fields={massEditableFields}
+            tenantSlug={tenantSlug}
+            selectedCount={visibleSelectedIds.size}
+            onSubmit={submitMassEdit}
+            onClose={() => setMassEditOpen(false)}
+          />
         )}
       </CardContent>
     </Card>

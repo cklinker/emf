@@ -1704,6 +1704,8 @@
     "rejected": "Rejected",
     "recalled": "Recalled",
     "sharedWith": "Shared with {{id}} ({{level}})",
+    "flowRun": "Flow {{name}} {{status}}",
+    "emailSent": "Email \"{{subject}}\" to {{recipient}} ({{status}})",
     "loading": "Loading activity..."
   },
   "recordActions": {

@@ -41,14 +41,20 @@ public class ScheduledJobRepository {
      * Uses SKIP LOCKED for leader election — concurrent workers won't pick up the same job.
      */
     public List<Map<String, Object>> findDueJobs() {
-        return jdbcTemplate.queryForList(
-                "SELECT id, tenant_id, name, job_type, job_reference_id, cron_expression, timezone " +
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, tenant_id, name, job_type, job_reference_id, cron_expression, timezone, config " +
                         "FROM scheduled_job " +
                         "WHERE active = true AND next_run_at <= NOW() " +
                         "ORDER BY next_run_at " +
                         "LIMIT 50 " +
                         "FOR UPDATE SKIP LOCKED"
         );
+        // Normalize the jsonb config PGobject to its JSON string form (mirrors findFlowById)
+        return rows.stream().map(row -> {
+            Map<String, Object> normalized = new LinkedHashMap<>(row);
+            normalized.computeIfPresent("config", (k, v) -> v.toString());
+            return normalized;
+        }).toList();
     }
 
     /**

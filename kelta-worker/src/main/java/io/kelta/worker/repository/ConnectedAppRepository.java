@@ -66,16 +66,9 @@ public class ConnectedAppRepository {
         );
     }
 
-    public String createToken(String appId, String scopes, Instant expiresAt) {
-        String id = UUID.randomUUID().toString();
-        jdbcTemplate.update(
-                "INSERT INTO connected_app_token (id, connected_app_id, scopes, issued_at, expires_at, revoked) " +
-                        "VALUES (?, ?, ?, ?, ?, false)",
-                id, appId, scopes, Timestamp.from(Instant.now()),
-                expiresAt != null ? Timestamp.from(expiresAt) : null
-        );
-        return id;
-    }
+    // createToken was removed: it omitted the NOT-NULL token_hash and could never
+    // insert a valid row. Real connected_app_token rows are written at mint time
+    // by kelta-auth's ConnectedAppTokenRecorder (client_credentials flow).
 
     public int revokeToken(String tokenId, String appId) {
         return jdbcTemplate.update(

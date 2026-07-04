@@ -2,6 +2,7 @@ package io.kelta.worker.service;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.util.CsvFormatUtils;
+import io.kelta.worker.util.PdfTableWriter;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.query.*;
@@ -169,6 +170,57 @@ public class ReportExecutionService {
         }
 
         log.info("CSV export complete: {} rows written", totalWritten);
+    }
+
+    /**
+     * Exports report data as a PDF table (Apache PDFBox). Same config parsing
+     * and paged query loop as {@link #exportCsv}; layout is a simple repeated
+     * table — title (report name), bold header row, one row per record, new
+     * page when the current one fills, page numbers in the footer. Long cell
+     * values are truncated to fit their column.
+     *
+     * @param reportConfig the report configuration map
+     * @param out          the output stream the PDF document is written to
+     */
+    public void exportPdf(Map<String, Object> reportConfig, java.io.OutputStream out) throws IOException {
+        String primaryCollectionId = (String) reportConfig.get("primaryCollectionId");
+        CollectionDefinition targetCollection = resolveCollection(primaryCollectionId);
+        if (targetCollection == null) {
+            throw new ReportExecutionException("Collection not found for export");
+        }
+
+        List<ColumnConfig> columns = parseColumns(reportConfig.get("columns"));
+        if (columns.isEmpty()) {
+            throw new ReportExecutionException("Report has no columns to export");
+        }
+        List<FilterCondition> filters = parseFilters(reportConfig.get("filters"));
+        List<SortField> sorting = parseSorting(reportConfig);
+        List<String> fieldNames = columns.stream().map(ColumnConfig::fieldName).toList();
+        String title = (String) reportConfig.getOrDefault("name", "Report");
+
+        try (PdfTableWriter pdf = new PdfTableWriter(out, title,
+                columns.stream().map(ColumnConfig::label).toList())) {
+            int page = 1;
+            long totalWritten = 0;
+            while (true) {
+                Pagination pagination = new Pagination(page, MAX_REPORT_PAGE_SIZE);
+                QueryRequest request = new QueryRequest(pagination, sorting, fieldNames, filters);
+                QueryResult result = queryEngine.executeQuery(targetCollection, request);
+
+                for (Map<String, Object> record : result.data()) {
+                    pdf.writeRow(columns.stream()
+                        .map(c -> formatValue(record.get(c.fieldName())))
+                        .toList());
+                    totalWritten++;
+                }
+
+                if (result.data().isEmpty() || totalWritten >= result.metadata().totalCount()) {
+                    break;
+                }
+                page++;
+            }
+            log.info("PDF export complete: {} rows written", totalWritten);
+        }
     }
 
     // =========================================================================

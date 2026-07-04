@@ -74,6 +74,12 @@ public class SmtpEmailProvider implements EmailProvider {
                 helper.setText(message.bodyHtml(), true);
             }
 
+            for (EmailAttachment attachment : message.attachments()) {
+                helper.addAttachment(attachment.filename(),
+                        new org.springframework.core.io.ByteArrayResource(attachment.content()),
+                        attachment.contentType());
+            }
+
             sender.send(mimeMessage);
 
         } catch (MailAuthenticationException e) {

@@ -278,6 +278,7 @@ describe('QuickActionsMenu', () => {
           templateId: 'tpl-1',
           to: 'dest@test.com',
           mergeContext: { email: 'dest@test.com', firstName: 'Ada' },
+          recordId: 'rec-123',
         })
       )
       expect(toast.success).toHaveBeenCalledWith('Email sent')

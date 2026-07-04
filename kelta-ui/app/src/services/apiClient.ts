@@ -299,6 +299,22 @@ function isAlreadyWrapped(data: unknown): boolean {
 }
 
 /**
+ * Read a Blob's contents as text. Prefers the standard `Blob.text()` and
+ * falls back to FileReader for environments that lack it (e.g. jsdom).
+ */
+function readBlobText(blob: Blob): Promise<string> {
+  if (typeof blob.text === 'function') {
+    return blob.text()
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(blob)
+  })
+}
+
+/**
  * Axios-backed API client that wraps the SDK's Axios instance.
  *
  * Preserves the same interface (get, post, put, patch, delete) used by
@@ -391,6 +407,30 @@ export class ApiClient {
       const response = await this.axios.get(url)
       return response.data
     } catch (error) {
+      throw parseAxiosError(error)
+    }
+  }
+
+  /**
+   * GET request for binary content (e.g. file downloads).
+   * Returns the raw response body as a Blob.
+   *
+   * With `responseType: 'blob'` error bodies also arrive as Blobs, so this
+   * decodes JSON error responses back into objects before parsing — callers
+   * still get a structured ApiError carrying the server's detail message.
+   */
+  async getBlob(url: string): Promise<Blob> {
+    try {
+      const response = await this.axios.get(url, { responseType: 'blob' })
+      return response.data as Blob
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response && error.response.data instanceof Blob) {
+        try {
+          error.response.data = JSON.parse(await readBlobText(error.response.data))
+        } catch {
+          error.response.data = undefined
+        }
+      }
       throw parseAxiosError(error)
     }
   }

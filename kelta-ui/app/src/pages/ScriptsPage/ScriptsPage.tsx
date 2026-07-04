@@ -13,6 +13,7 @@ import type { LogColumn } from '../../components'
 import type { CreateScriptRequest } from '@kelta/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { SYSTEM_PERMISSIONS } from '@/components/SecurityEditor/SystemPermissionChecklist'
 
 interface Script {
   id: string
@@ -23,6 +24,7 @@ interface Script {
   sourceCode: string
   active: boolean
   version: number
+  requiredPermission: string | null
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -35,6 +37,16 @@ interface ScriptFormData {
   language: string
   sourceCode: string
   active: boolean
+  /** System permission required to execute the script; empty string = no extra gate. */
+  requiredPermission: string
+}
+
+/** Resolves a system-permission name to its display label ('—' when unset). */
+function permissionLabel(name: string | null | undefined): string {
+  if (!name) {
+    return '—'
+  }
+  return SYSTEM_PERMISSIONS.find((perm) => perm.name === name)?.label ?? name
 }
 
 interface FormErrors {
@@ -100,6 +112,7 @@ function ScriptForm({
     language: script?.language ?? 'javascript',
     sourceCode: script?.sourceCode ?? '',
     active: script?.active ?? true,
+    requiredPermission: script?.requiredPermission ?? '',
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -284,6 +297,33 @@ function ScriptForm({
                 disabled={isSubmitting}
                 data-testid="script-language-input"
               />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="script-required-permission"
+                className="text-sm font-medium text-foreground"
+              >
+                Required permission to execute
+              </label>
+              <select
+                id="script-required-permission"
+                className="rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                value={formData.requiredPermission}
+                onChange={(e) => handleChange('requiredPermission', e.target.value)}
+                disabled={isSubmitting}
+                data-testid="script-required-permission-input"
+              >
+                <option value="">None — any API user</option>
+                {SYSTEM_PERMISSIONS.map((perm) => (
+                  <option key={perm.name} value={perm.name}>
+                    {perm.label}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-muted-foreground">
+                When set, executing this script via the API requires the selected system permission.
+              </span>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -603,6 +643,13 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
                   scope="col"
                   className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
+                  Run Permission
+                </th>
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Created
                 </th>
                 <th
@@ -647,6 +694,13 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
                     >
                       {script.active ? 'Yes' : 'No'}
                     </span>
+                  </td>
+                  <td
+                    role="gridcell"
+                    className="px-4 py-3 text-sm text-foreground"
+                    data-testid={`required-permission-cell-${index}`}
+                  >
+                    {permissionLabel(script.requiredPermission)}
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     {formatDate(new Date(script.createdAt), {

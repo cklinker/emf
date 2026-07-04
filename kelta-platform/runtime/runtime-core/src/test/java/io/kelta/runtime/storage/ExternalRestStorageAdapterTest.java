@@ -65,6 +65,104 @@ class ExternalRestStorageAdapterTest {
                 .build();
     }
 
+    /** Executor that also counts calls, for cache/rate-limit assertions. */
+    private static final class CountingExecutor implements RestExecutor {
+        int calls;
+        Function<RestRequest, RestResponse> handler;
+
+        CountingExecutor(Function<RestRequest, RestResponse> handler) {
+            this.handler = handler;
+        }
+
+        @Override
+        public RestResponse exchange(RestRequest request) {
+            calls++;
+            return handler.apply(request);
+        }
+    }
+
+    /** Mutable fake clock for TTL/refill control. */
+    private static final class FakeClock {
+        long millis = 1_000_000L;
+    }
+
+    @Test
+    @DisplayName("cacheTtlSeconds caches GETs until the TTL lapses; writes invalidate")
+    void cacheTtl() {
+        CountingExecutor executor = new CountingExecutor(r ->
+                "GET".equals(r.method())
+                        ? new RestResponse(200, "[{\"id\":\"o1\",\"name\":\"A\"}]")
+                        : new RestResponse(200, "{\"id\":\"o1\",\"name\":\"B\"}"));
+        FakeClock clock = new FakeClock();
+        ExternalRestStorageAdapter adapter = new ExternalRestStorageAdapter(
+                executor, objectMapper, null, () -> clock.millis);
+        CollectionDefinition def = orders(Map.of("cacheTtlSeconds", "30"));
+        QueryRequest request = new QueryRequest(new Pagination(1, 10), List.of(), List.of(), List.of());
+
+        adapter.query(def, request);
+        adapter.query(def, request);
+        assertThat(executor.calls).as("second read served from cache").isEqualTo(1);
+
+        clock.millis += 31_000L;
+        adapter.query(def, request);
+        assertThat(executor.calls).as("expired TTL refetches").isEqualTo(2);
+
+        // A write through the adapter invalidates cached reads for the collection
+        adapter.update(def, "o1", Map.of("name", "B"));
+        adapter.query(def, request);
+        assertThat(executor.calls).as("write invalidated the cache").isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("no cacheTtlSeconds → every read hits the remote")
+    void noCacheByDefault() {
+        CountingExecutor executor = new CountingExecutor(r -> new RestResponse(200, "[]"));
+        ExternalRestStorageAdapter adapter = new ExternalRestStorageAdapter(
+                executor, objectMapper, null, () -> 0L);
+        CollectionDefinition def = orders(Map.of());
+        QueryRequest request = new QueryRequest(new Pagination(1, 10), List.of(), List.of(), List.of());
+
+        adapter.query(def, request);
+        adapter.query(def, request);
+        assertThat(executor.calls).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("rateLimitPerSecond rejects the burst-exceeding call and refills over time")
+    void rateLimit() {
+        CountingExecutor executor = new CountingExecutor(r -> new RestResponse(200, "[]"));
+        FakeClock clock = new FakeClock();
+        ExternalRestStorageAdapter adapter = new ExternalRestStorageAdapter(
+                executor, objectMapper, null, () -> clock.millis);
+        CollectionDefinition def = orders(Map.of("rateLimitPerSecond", "2"));
+        QueryRequest request = new QueryRequest(new Pagination(1, 10), List.of(), List.of(), List.of());
+
+        adapter.query(def, request);
+        adapter.query(def, request);
+        assertThatThrownBy(() -> adapter.query(def, request))
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("rate limit");
+        assertThat(executor.calls).isEqualTo(2);
+
+        clock.millis += 1_000L; // refill
+        adapter.query(def, request);
+        assertThat(executor.calls).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("non-numeric cache/rate config values fail with a clear error")
+    void invalidHardeningConfig() {
+        ExternalRestStorageAdapter adapter = adapterReturning(r -> new RestResponse(200, "[]"));
+        QueryRequest request = new QueryRequest(new Pagination(1, 10), List.of(), List.of(), List.of());
+
+        assertThatThrownBy(() -> adapter.query(orders(Map.of("cacheTtlSeconds", "soon")), request))
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("cacheTtlSeconds");
+        assertThatThrownBy(() -> adapter.query(orders(Map.of("rateLimitPerSecond", "fast")), request))
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("rateLimitPerSecond");
+    }
+
     @Test
     @DisplayName("reports its storage type")
     void storageType() {

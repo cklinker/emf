@@ -89,6 +89,55 @@ class RuntimeModuleManagerTest {
         verify(verifier).verify(eq(jar), eq("sig"));
         verify(jarService).uploadJar(any(), any(), any(), any());
         verify(moduleStore).createModule(any());
+        // The verified signature is persisted so every load can re-verify the JAR
+        verify(moduleStore).saveJarSignature(any(), eq("sig"));
+    }
+
+    @Test
+    void loadModuleChecksumMismatchRefusesRealCodeAndFallsBackToStubs() throws Exception {
+        // Cached JAR bytes whose SHA-256 does NOT match the checksum persisted at install
+        java.nio.file.Path jarFile = java.nio.file.Files.createTempFile("tampered-module", ".jar");
+        java.nio.file.Files.write(jarFile, "tampered bytes".getBytes());
+        ModuleJarService jarService = mock(ModuleJarService.class);
+        when(jarService.downloadJarToCache("s3/key.jar")).thenReturn(jarFile.toUri().toURL());
+
+        RuntimeModuleManager jarManager = new RuntimeModuleManager(
+                moduleStore, actionHandlerRegistry, objectMapper, jarService, null, null);
+
+        TenantModuleData module = createModuleDataWithS3Key("mod-1", "s3/key.jar");
+        jarManager.loadModule(TENANT_ID, module); // checksum "sha256:abc" ≠ sha256(bytes)
+
+        // No sandboxed classloader was created — only inert stubs registered
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isPresent(),
+                "stub handlers must still register so the module surface stays visible");
+        java.nio.file.Files.deleteIfExists(jarFile);
+    }
+
+    @Test
+    void loadModuleReVerifiesStoredSignatureWhenVerifierEnabled() throws Exception {
+        byte[] jarBytes = "real jar bytes".getBytes();
+        java.nio.file.Path jarFile = java.nio.file.Files.createTempFile("signed-module", ".jar");
+        java.nio.file.Files.write(jarFile, jarBytes);
+        ModuleJarService jarService = mock(ModuleJarService.class);
+        when(jarService.downloadJarToCache("s3/key.jar")).thenReturn(jarFile.toUri().toURL());
+        ModuleSignatureVerifier verifier = mock(ModuleSignatureVerifier.class);
+        when(verifier.isEnabled()).thenReturn(true);
+        when(moduleStore.findJarSignature("mod-1")).thenReturn(Optional.of("stored-sig"));
+
+        RuntimeModuleManager jarManager = new RuntimeModuleManager(
+                moduleStore, actionHandlerRegistry, objectMapper, jarService, null, verifier);
+
+        // Matching checksum so the signature step is reached
+        TenantModuleData module = new TenantModuleData(
+                "mod-1", TENANT_ID, "test-module", "Test Module", "1.0.0",
+                "Test", "https://example.com/module.jar", ModuleJarService.sha256(jarBytes), 14L,
+                "com.test.TestModule", MANIFEST_JSON, TenantModuleData.STATUS_ACTIVE, "user-1",
+                Instant.now(), Instant.now(), "s3/key.jar", List.of());
+        jarManager.loadModule(TENANT_ID, module);
+
+        // The stored install-time signature was re-verified against the downloaded bytes
+        verify(verifier).verify(eq(jarBytes), eq("stored-sig"));
+        java.nio.file.Files.deleteIfExists(jarFile);
     }
 
     @Test

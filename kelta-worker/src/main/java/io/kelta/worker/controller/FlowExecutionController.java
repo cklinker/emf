@@ -278,6 +278,35 @@ public class FlowExecutionController {
     }
 
     /**
+     * Lists executions triggered by a specific record — consumed by the
+     * record activity timeline. Newest first.
+     */
+    @GetMapping("/record-executions")
+    public ResponseEntity<Map<String, Object>> listExecutionsByRecord(
+            @RequestParam String recordId,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        int effectiveLimit = Math.min(Math.max(limit, 1), 100);
+        List<Map<String, Object>> rows = flowRepository.findExecutionsByTriggerRecord(recordId, effectiveLimit);
+
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("id", row.get("id"));
+            record.put("flowId", row.get("flow_id"));
+            record.put("flowName", row.get("flow_name"));
+            record.put("status", row.get("status"));
+            record.put("startedAt", row.get("started_at") != null ? row.get("started_at").toString() : null);
+            record.put("completedAt", row.get("completed_at") != null ? row.get("completed_at").toString() : null);
+            record.put("durationMs", row.get("duration_ms"));
+            record.put("errorMessage", row.get("error_message"));
+            records.add(record);
+        }
+
+        return ResponseEntity.ok(JsonApiResponseBuilder.collection("flow-executions", records));
+    }
+
+    /**
      * Lists executions for a specific flow.
      */
     @GetMapping("/{flowId}/flow-executions")

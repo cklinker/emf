@@ -9,6 +9,8 @@ import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionReq
 import io.kelta.runtime.module.integration.spi.ScriptExecutor.ScriptExecutionResult;
 import io.kelta.worker.repository.DataExportRepository;
 import io.kelta.worker.repository.ScheduledJobRepository;
+import io.kelta.worker.service.email.DefaultEmailService;
+import io.kelta.worker.service.email.EmailAttachment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import java.io.StringWriter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -51,6 +54,17 @@ public class ScheduledJobExecutorService {
     private final DataExportRepository dataExportRepository;
     private final TenantSlugResolver tenantSlugResolver;
 
+    /**
+     * Nullable: the {@link DefaultEmailService} bean only exists when
+     * {@code kelta.email.enabled} is true (the harness runs with email
+     * disabled). Absent → report delivery is skipped with a log note; the
+     * export itself still runs.
+     */
+    private final DefaultEmailService emailService;
+
+    /** Reports larger than this are delivered as a notification without the CSV attached. */
+    static final int MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
     public ScheduledJobExecutorService(ScheduledJobRepository repository,
                                         FlowEngine flowEngine,
                                         InitialStateBuilder initialStateBuilder,
@@ -59,7 +73,8 @@ public class ScheduledJobExecutorService {
                                         ReportExecutionService reportExecutionService,
                                         DataExportService dataExportService,
                                         DataExportRepository dataExportRepository,
-                                        TenantSlugResolver tenantSlugResolver) {
+                                        TenantSlugResolver tenantSlugResolver,
+                                        org.springframework.beans.factory.ObjectProvider<DefaultEmailService> emailServiceProvider) {
         this.repository = repository;
         this.flowEngine = flowEngine;
         this.initialStateBuilder = initialStateBuilder;
@@ -69,6 +84,7 @@ public class ScheduledJobExecutorService {
         this.dataExportService = dataExportService;
         this.dataExportRepository = dataExportRepository;
         this.tenantSlugResolver = tenantSlugResolver;
+        this.emailService = emailServiceProvider.getIfAvailable();
     }
 
     /**
@@ -108,7 +124,9 @@ public class ScheduledJobExecutorService {
                     switch (jobType) {
                         case "FLOW" -> executeFlowJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
                         case "SCRIPT" -> executeScriptJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
-                        case "REPORT_EXPORT" -> executeReportExportJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
+                        case "REPORT_EXPORT" -> executeReportExportJob(jobId, tenantId, jobReferenceId,
+                                cronExpression, timezone, startedAt,
+                                (String) job.get("name"), (String) job.get("config"));
                         case "DATA_EXPORT" -> executeDataExportJob(jobId, tenantId, jobReferenceId, cronExpression, timezone, startedAt);
                         default -> {
                             log.warn("Unsupported job type '{}' for job {}, skipping", jobType, jobId);
@@ -262,7 +280,8 @@ public class ScheduledJobExecutorService {
     // ---------------------------------------------------------------------------
 
     private void executeReportExportJob(String jobId, String tenantId, String reportReferenceId,
-                                         String cronExpression, String timezone, Instant startedAt) {
+                                         String cronExpression, String timezone, Instant startedAt,
+                                         String jobName, String configJson) {
         var reportOpt = repository.findReportById(reportReferenceId);
         if (reportOpt.isEmpty()) {
             log.error("Report {} not found for scheduled job {}", reportReferenceId, jobId);
@@ -300,11 +319,86 @@ public class ScheduledJobExecutorService {
         long lineCount = csvOutput.lines().count();
         int recordsProcessed = (int) Math.max(0, lineCount - 1);
 
+        String deliveryNote = deliverReportByEmail(jobId, tenantId, jobName, configJson,
+                csvOutput, recordsProcessed);
+
         repository.updateAfterExecution(jobId, "SUCCESS", startedAt, nextRun);
-        repository.insertExecutionLog(jobId, "SUCCESS", null, startedAt, completedAt, durationMs);
+        repository.insertExecutionLog(jobId, "SUCCESS", deliveryNote, startedAt, completedAt, durationMs);
 
         log.info("Scheduled job executed: jobId={}, type=REPORT_EXPORT, reportId={}, tenantId={}, records={}, duration={}ms",
                 jobId, reportReferenceId, tenantId, recordsProcessed, durationMs);
+    }
+
+    /**
+     * Emails the exported CSV to the recipients configured on the job
+     * ({@code config.recipients}). No recipients → no-op. Oversized CSVs
+     * (&gt; {@link #MAX_ATTACHMENT_BYTES}) send a notification without the
+     * attachment. Delivery failures never fail the job — the export itself
+     * succeeded — but are noted on the execution log.
+     *
+     * @return a note for the execution log, or null when nothing was sent
+     */
+    @SuppressWarnings("unchecked")
+    private String deliverReportByEmail(String jobId, String tenantId, String jobName,
+                                        String configJson, String csvOutput, int recordCount) {
+        if (configJson == null || configJson.isBlank()) {
+            return null;
+        }
+        if (emailService == null) {
+            log.warn("Scheduled job {} has delivery config but email is disabled — skipping delivery", jobId);
+            return "Delivery skipped: email disabled";
+        }
+        List<String> recipients;
+        try {
+            Map<String, Object> config = objectMapper.readValue(configJson, Map.class);
+            Object raw = config.get("recipients");
+            recipients = raw instanceof List<?> list
+                    ? list.stream().filter(Objects::nonNull).map(Object::toString)
+                          .filter(s -> !s.isBlank()).toList()
+                    : List.of();
+        } catch (Exception e) {
+            log.warn("Unparsable config for scheduled job {}: {}", jobId, e.getMessage());
+            return "Delivery skipped: unparsable job config";
+        }
+        if (recipients.isEmpty()) {
+            return null;
+        }
+
+        byte[] csvBytes = csvOutput.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        String reportName = jobName != null ? jobName : "Scheduled report";
+        String date = java.time.LocalDate.now().toString();
+        String subject = reportName + " — " + date;
+        String filename = reportName.replaceAll("[^A-Za-z0-9._-]+", "-") + "-" + date + ".csv";
+
+        boolean attach = csvBytes.length <= MAX_ATTACHMENT_BYTES;
+        String body = attach
+                ? "<p>Your scheduled report <strong>" + escapeHtml(reportName) + "</strong> ran successfully ("
+                    + recordCount + " records). The CSV is attached.</p>"
+                : "<p>Your scheduled report <strong>" + escapeHtml(reportName) + "</strong> ran successfully ("
+                    + recordCount + " records), but the CSV ("
+                    + (csvBytes.length / (1024 * 1024)) + " MB) exceeds the attachment limit."
+                    + " Run the report export in the app to download it.</p>";
+        List<EmailAttachment> attachments = attach
+                ? List.of(new EmailAttachment(filename, "text/csv", csvBytes))
+                : List.of();
+
+        int sent = 0;
+        for (String recipient : recipients) {
+            try {
+                emailService.queueEmailWithAttachments(tenantId, recipient, subject, body,
+                        "SCHEDULED_REPORT", jobId, attachments);
+                sent++;
+            } catch (Exception e) {
+                log.error("Report delivery to {} failed for job {}: {}", recipient, jobId, e.getMessage());
+            }
+        }
+        String note = "Delivered to " + sent + "/" + recipients.size() + " recipient(s)"
+                + (attach ? "" : " (attachment skipped: CSV too large)");
+        return note;
+    }
+
+    private static String escapeHtml(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     // ---------------------------------------------------------------------------

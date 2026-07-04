@@ -105,6 +105,19 @@ public class EmailRepository {
     }
 
     /**
+     * Lists email log entries whose {@code source_id} references the given
+     * record (newest first) — backs the record activity timeline. RLS scopes
+     * rows to the current tenant.
+     */
+    public java.util.List<java.util.Map<String, Object>> findLogsBySourceId(String sourceId, int limit) {
+        return jdbcTemplate.queryForList(
+                "SELECT id, recipient_email, subject, status, sent_at, created_at " +
+                        "FROM email_log WHERE source_id = ? ORDER BY created_at DESC LIMIT ?",
+                sourceId, limit
+        );
+    }
+
+    /**
      * Counts {@code email_log} rows created for a tenant since {@code since}. Backs the
      * per-tenant send rate limit on the transactional-send endpoint — every queued email
      * (regardless of eventual delivery status) writes a log row, so this reflects real send

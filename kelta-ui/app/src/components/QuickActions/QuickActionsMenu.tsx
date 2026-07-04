@@ -188,6 +188,8 @@ export function QuickActionsMenu({
               to,
               // The template is admin-authored; the record supplies ${field} merge values only.
               mergeContext: executionContext.record ?? {},
+              // Stamped as email_log.source_id so the record's activity timeline lists this email
+              recordId: executionContext.recordId,
             })
             toast.success('Email sent')
             onActionComplete?.()

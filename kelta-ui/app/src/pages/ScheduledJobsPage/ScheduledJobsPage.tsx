@@ -14,6 +14,10 @@ import type { CreateScheduledJobRequest } from '@kelta/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
+interface ScheduledJobConfig {
+  recipients?: string[]
+}
+
 interface ScheduledJob {
   id: string
   name: string
@@ -23,6 +27,7 @@ interface ScheduledJob {
   cronExpression: string
   timezone: string
   active: boolean
+  config?: ScheduledJobConfig | null
   lastRun: string | null
   lastStatus: string | null
   createdBy: string
@@ -38,12 +43,25 @@ interface ScheduledJobFormData {
   cronExpression: string
   timezone: string
   active: boolean
+  recipientsText: string
+}
+
+interface ScheduledJobSubmitData {
+  name: string
+  description: string
+  jobType: string
+  jobReferenceId: string
+  cronExpression: string
+  timezone: string
+  active: boolean
+  config?: ScheduledJobConfig
 }
 
 interface FormErrors {
   name?: string
   description?: string
   cronExpression?: string
+  recipientsText?: string
 }
 
 interface JobExecutionLog {
@@ -61,6 +79,20 @@ export interface ScheduledJobsPageProps {
   testId?: string
 }
 
+function parseRecipients(text: string): string[] {
+  const seen = new Set<string>()
+  const recipients: string[] = []
+  for (const raw of text.split(/[\n,]/)) {
+    const entry = raw.trim()
+    if (!entry) continue
+    const key = entry.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    recipients.push(entry)
+  }
+  return recipients
+}
+
 function validateForm(data: ScheduledJobFormData): FormErrors {
   const errors: FormErrors = {}
   if (!data.name.trim()) {
@@ -74,12 +106,18 @@ function validateForm(data: ScheduledJobFormData): FormErrors {
   if (!data.cronExpression.trim()) {
     errors.cronExpression = 'Cron expression is required'
   }
+  if (data.jobType === 'REPORT_EXPORT') {
+    const invalid = parseRecipients(data.recipientsText).filter((entry) => !entry.includes('@'))
+    if (invalid.length > 0) {
+      errors.recipientsText = `Invalid email addresses: ${invalid.join(', ')}`
+    }
+  }
   return errors
 }
 
 interface ScheduledJobFormProps {
   scheduledJob?: ScheduledJob
-  onSubmit: (data: ScheduledJobFormData) => void
+  onSubmit: (data: ScheduledJobSubmitData) => void
   onCancel: () => void
   isSubmitting: boolean
 }
@@ -99,6 +137,7 @@ function ScheduledJobForm({
     cronExpression: scheduledJob?.cronExpression ?? '',
     timezone: scheduledJob?.timezone ?? 'UTC',
     active: scheduledJob?.active ?? true,
+    recipientsText: scheduledJob?.config?.recipients?.join(', ') ?? '',
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -134,9 +173,17 @@ function ScheduledJobForm({
       e.preventDefault()
       const validationErrors = validateForm(formData)
       setErrors(validationErrors)
-      setTouched({ name: true, description: true, cronExpression: true })
+      setTouched({ name: true, description: true, cronExpression: true, recipientsText: true })
       if (Object.keys(validationErrors).length === 0) {
-        onSubmit(formData)
+        const { recipientsText, ...rest } = formData
+        const recipients =
+          formData.jobType === 'REPORT_EXPORT' ? parseRecipients(recipientsText) : []
+        // Send config whenever the job type supports it — an explicit empty
+        // recipients list clears previously saved delivery config on edit
+        // (omitting config would leave the old value in place).
+        onSubmit(
+          formData.jobType === 'REPORT_EXPORT' ? { ...rest, config: { recipients } } : { ...rest }
+        )
       }
     },
     [formData, onSubmit]
@@ -286,6 +333,47 @@ function ScheduledJobForm({
                 data-testid="scheduled-job-reference-id-input"
               />
             </div>
+
+            {formData.jobType === 'REPORT_EXPORT' && (
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="scheduled-job-recipients"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Email recipients
+                </label>
+                <textarea
+                  id="scheduled-job-recipients"
+                  className={cn(
+                    'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
+                    'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                    'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                    touched.recipientsText && errors.recipientsText && 'border-destructive'
+                  )}
+                  value={formData.recipientsText}
+                  onChange={(e) => handleChange('recipientsText', e.target.value)}
+                  onBlur={() => handleBlur('recipientsText')}
+                  placeholder="email1@example.com, email2@example.com"
+                  aria-invalid={touched.recipientsText && !!errors.recipientsText}
+                  disabled={isSubmitting}
+                  rows={3}
+                  data-testid="scheduled-job-recipients-input"
+                />
+                <span className="text-xs text-muted-foreground">
+                  Report CSV is emailed to these addresses after each run; leave empty to skip
+                  delivery
+                </span>
+                {touched.recipientsText && errors.recipientsText && (
+                  <span
+                    className="text-xs text-destructive"
+                    role="alert"
+                    data-testid="scheduled-job-recipients-error"
+                  >
+                    {errors.recipientsText}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <label
@@ -457,7 +545,7 @@ export function ScheduledJobsPage({
   const scheduledJobList: ScheduledJob[] = (scheduledJobs ?? []) as unknown as ScheduledJob[]
 
   const createMutation = useMutation({
-    mutationFn: (data: ScheduledJobFormData) =>
+    mutationFn: (data: ScheduledJobSubmitData) =>
       keltaClient.admin.scheduledJobs.create('', '', data as CreateScheduledJobRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
@@ -470,7 +558,7 @@ export function ScheduledJobsPage({
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: ScheduledJobFormData }) =>
+    mutationFn: ({ id, data }: { id: string; data: ScheduledJobSubmitData }) =>
       keltaClient.admin.scheduledJobs.update(id, data as Partial<CreateScheduledJobRequest>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
@@ -511,7 +599,7 @@ export function ScheduledJobsPage({
   }, [])
 
   const handleFormSubmit = useCallback(
-    (data: ScheduledJobFormData) => {
+    (data: ScheduledJobSubmitData) => {
       if (editingScheduledJob) {
         updateMutation.mutate({ id: editingScheduledJob.id, data })
       } else {
@@ -679,6 +767,18 @@ export function ScheduledJobsPage({
                     <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
                       {scheduledJob.jobType}
                     </span>
+                    {scheduledJob.jobType === 'REPORT_EXPORT' &&
+                      (scheduledJob.config?.recipients?.length ?? 0) > 0 && (
+                        <span
+                          className="ml-2 inline-block rounded-full bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground"
+                          data-testid={`recipients-badge-${index}`}
+                        >
+                          {scheduledJob.config?.recipients?.length}{' '}
+                          {scheduledJob.config?.recipients?.length === 1
+                            ? 'recipient'
+                            : 'recipients'}
+                        </span>
+                      )}
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     {scheduledJob.cronExpression}

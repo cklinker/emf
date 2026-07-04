@@ -71,6 +71,8 @@ type TimelineEntryType =
   | 'APPROVAL_REJECTED'
   | 'APPROVAL_RECALLED'
   | 'SHARED'
+  | 'FLOW_RUN'
+  | 'EMAIL'
 
 /**
  * Note on the record (from the notes system collection)
@@ -88,6 +90,32 @@ interface ActivityAttachment {
   id: string
   fileName: string
   uploadedAt: string
+}
+
+/**
+ * Flow execution triggered by this record (from /api/flows/record-executions)
+ */
+interface ActivityFlowRun {
+  id: string
+  flowId: string
+  flowName: string | null
+  status: string
+  startedAt: string
+  completedAt: string | null
+  durationMs: number | null
+  errorMessage: string | null
+}
+
+/**
+ * Email log entry sourced from this record (from /api/email/logs)
+ */
+interface ActivityEmailLog {
+  id: string
+  recipientEmail: string
+  subject: string
+  status: string
+  sentAt: string | null
+  createdAt: string
 }
 
 /**
@@ -174,6 +202,8 @@ function getIconClasses(type: TimelineEntryType): string {
     APPROVAL_REJECTED: 'bg-red-50 text-red-700 border-2 border-red-700',
     APPROVAL_RECALLED: 'bg-muted text-muted-foreground border-2 border-muted-foreground',
     SHARED: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
+    FLOW_RUN: 'bg-indigo-50 text-indigo-700 border-2 border-indigo-700',
+    EMAIL: 'bg-sky-50 text-sky-700 border-2 border-sky-700',
   }
   return classMap[type] || ''
 }
@@ -192,6 +222,8 @@ function getIconSymbol(type: TimelineEntryType): string {
     APPROVAL_REJECTED: '\u2717',
     APPROVAL_RECALLED: '\u21A9',
     SHARED: '\u21C4',
+    FLOW_RUN: '\u25B6',
+    EMAIL: '\u2709',
   }
   return symbolMap[type] || '\u2022'
 }
@@ -302,6 +334,38 @@ export function ActivityTimeline({
     enabled: !!collectionId && !!recordId,
   })
 
+  // Fetch flow executions triggered by this record
+  const { data: flowRuns } = useQuery({
+    queryKey: ['activity-flow-runs', recordId],
+    queryFn: async () => {
+      try {
+        const result = await apiClient.getList<ActivityFlowRun>(
+          `/api/flows/record-executions?recordId=${recordId}&limit=20`
+        )
+        return result || []
+      } catch {
+        return []
+      }
+    },
+    enabled: !!recordId,
+  })
+
+  // Fetch email logs sourced from this record
+  const { data: emailLogs } = useQuery({
+    queryKey: ['activity-email-logs', recordId],
+    queryFn: async () => {
+      try {
+        const result = await apiClient.getList<ActivityEmailLog>(
+          `/api/email/logs?recordId=${recordId}&limit=20`
+        )
+        return result || []
+      } catch {
+        return []
+      }
+    },
+    enabled: !!recordId,
+  })
+
   // Merge all data sources into a single timeline
   const entries: TimelineEntry[] = useMemo(() => {
     const allEntries: TimelineEntry[] = []
@@ -387,6 +451,37 @@ export function ActivityTimeline({
       }
     }
 
+    // Flow run events
+    if (flowRuns) {
+      for (const run of flowRuns) {
+        allEntries.push({
+          id: `flow-run-${run.id}`,
+          type: 'FLOW_RUN',
+          description: t('activity.flowRun', {
+            name: run.flowName || run.flowId,
+            status: run.status,
+          }),
+          timestamp: run.startedAt,
+        })
+      }
+    }
+
+    // Email events
+    if (emailLogs) {
+      for (const email of emailLogs) {
+        allEntries.push({
+          id: `email-${email.id}`,
+          type: 'EMAIL',
+          description: t('activity.emailSent', {
+            subject: email.subject,
+            recipient: email.recipientEmail,
+            status: email.status,
+          }),
+          timestamp: email.sentAt ?? email.createdAt,
+        })
+      }
+    }
+
     // Sharing events
     if (shares) {
       for (const share of shares) {
@@ -406,7 +501,17 @@ export function ActivityTimeline({
     allEntries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
     return allEntries
-  }, [recordCreatedAt, recordUpdatedAt, approvalInstances, shares, notes, attachments, t])
+  }, [
+    recordCreatedAt,
+    recordUpdatedAt,
+    approvalInstances,
+    shares,
+    notes,
+    attachments,
+    flowRuns,
+    emailLogs,
+    t,
+  ])
 
   const visibleEntries = expanded ? entries : entries.slice(0, DEFAULT_VISIBLE_COUNT)
   const hasMore = entries.length > DEFAULT_VISIBLE_COUNT

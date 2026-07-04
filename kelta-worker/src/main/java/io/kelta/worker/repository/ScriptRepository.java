@@ -32,7 +32,7 @@ public class ScriptRepository {
      */
     public Optional<Script> findById(String id) {
         return jdbcTemplate.query(
-                "SELECT id, name, script_type, language, source_code, active "
+                "SELECT id, name, script_type, language, source_code, active, required_permission "
                         + "FROM script WHERE id = ?",
                 rs -> {
                     if (!rs.next()) {
@@ -44,7 +44,8 @@ public class ScriptRepository {
                             rs.getString("script_type"),
                             rs.getString("language"),
                             rs.getString("source_code"),
-                            rs.getBoolean("active")));
+                            rs.getBoolean("active"),
+                            rs.getString("required_permission")));
                 },
                 id);
     }
@@ -80,6 +81,10 @@ public class ScriptRepository {
      * @param active     whether the script is active
      */
     public record Script(String id, String name, String scriptType, String language,
-                         String source, boolean active) {
+                         String source, boolean active, String requiredPermission) {
+        public Script(String id, String name, String scriptType, String language,
+                      String source, boolean active) {
+            this(id, name, scriptType, language, source, active, null);
+        }
     }
 }

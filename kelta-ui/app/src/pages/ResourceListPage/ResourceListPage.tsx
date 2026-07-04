@@ -25,6 +25,7 @@ import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../com
 import { useSavedViews } from '../../hooks/useSavedViews'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { useObjectPermissions } from '../../hooks/useObjectPermissions'
+import { ListShell } from '../../components/record/ListShell'
 import { ViewSelector } from '../../components/ViewSelector/ViewSelector'
 import { InlineEditCell } from '../../components/InlineEditCell/InlineEditCell'
 import { SummaryStatsBar } from '../../components/SummaryStatsBar/SummaryStatsBar'
@@ -931,618 +932,620 @@ export function ResourceListPage({
     [t, formatDate, lookupDisplayMap]
   )
 
-  // Loading state
-  if (schemaLoading) {
-    return (
-      <div
-        className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
-        data-testid={testId}
-      >
-        <div className="flex justify-center items-center min-h-[400px]">
-          <LoadingSpinner size="large" label={t('common.loading')} />
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (schemaError) {
-    return (
-      <div
-        className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
-        data-testid={testId}
-      >
-        <ErrorMessage
-          error={schemaError instanceof Error ? schemaError : new Error(t('errors.generic'))}
-          onRetry={() =>
-            queryClient.invalidateQueries({ queryKey: ['collection-schema', collectionName] })
-          }
-        />
-      </div>
-    )
-  }
-
-  if (!schema) {
-    return (
-      <div
-        className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
-        data-testid={testId}
-      >
-        <ErrorMessage error={new Error(t('errors.notFound'))} />
-      </div>
-    )
-  }
-
   const resources = resourcesData?.data ?? []
   const totalCount = resourcesData?.total ?? 0
 
-  return (
+  // Status branch (schema error / not-found), rendered by the shell in place
+  // of the list frame. Order matches the legacy early-returns.
+  const statusSlot: React.ReactNode = schemaError ? (
     <div
       className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
       data-testid={testId}
     >
-      {/* Page Header */}
-      <header className="flex justify-between items-start flex-wrap gap-4 max-md:flex-col max-md:items-stretch">
-        <div className="flex flex-col gap-1">
-          <nav
-            className="flex items-center gap-1 text-sm text-muted-foreground"
-            aria-label="Breadcrumb"
-          >
-            <Link
-              to={`/${getTenantSlug()}/resources`}
-              className="text-primary no-underline cursor-pointer hover:underline"
-            >
-              {t('resources.title')}
-            </Link>
-            <span className="text-muted-foreground/60" aria-hidden="true">
-              /
-            </span>
-            <span>{schema.displayName}</span>
-          </nav>
-          <h1 className="m-0 text-2xl font-semibold text-foreground max-md:text-xl">
-            {schema.displayName}
-          </h1>
-        </div>
-        <div className="flex gap-2 items-center max-md:flex-col">
-          {objectPermissions.canCreate && (
-            <button
-              type="button"
-              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 active:bg-primary/80 max-md:w-full"
-              onClick={handleCreate}
-              aria-label={t('resources.createRecord')}
-              data-testid="create-record-button"
-            >
-              {t('resources.createRecord')}
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* View Selector (T10) */}
-      <ViewSelector
-        views={savedViews.views}
-        activeView={savedViews.activeView}
-        onSelectView={handleSelectView}
-        onSaveView={handleSaveView}
-        onDeleteView={handleDeleteView}
-        onRenameView={savedViews.renameView}
-        onSetDefault={savedViews.setDefaultView}
+      <ErrorMessage
+        error={schemaError instanceof Error ? schemaError : new Error(t('errors.generic'))}
+        onRetry={() =>
+          queryClient.invalidateQueries({ queryKey: ['collection-schema', collectionName] })
+        }
       />
+    </div>
+  ) : !schema ? (
+    <div
+      className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
+      data-testid={testId}
+    >
+      <ErrorMessage error={new Error(t('errors.notFound'))} />
+    </div>
+  ) : null
 
-      {/* Toolbar */}
-      <div className="flex justify-between items-center flex-wrap gap-4 p-4 bg-muted rounded-md max-lg:flex-col max-lg:items-stretch">
-        <div className="flex items-center gap-4 flex-wrap max-lg:justify-start">
-          {/* Bulk Actions - Requirement 11.11, 11.12 */}
-          {selectedIds.size > 0 && (
-            <div
-              className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950 rounded-md"
-              data-testid="bulk-actions"
-            >
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                {selectedIds.size} {t('common.selected')}
-              </span>
-
-              {/* Export Dropdown - Requirement 11.12 */}
-              <div className="relative" ref={exportDropdownRef}>
+  return (
+    <ListShell
+      variant="admin"
+      data-testid={testId}
+      isLoading={schemaLoading}
+      statusSlot={statusSlot}
+      header={
+        schema ? (
+          <header className="flex justify-between items-start flex-wrap gap-4 max-md:flex-col max-md:items-stretch">
+            <div className="flex flex-col gap-1">
+              <nav
+                className="flex items-center gap-1 text-sm text-muted-foreground"
+                aria-label="Breadcrumb"
+              >
+                <Link
+                  to={`/${getTenantSlug()}/resources`}
+                  className="text-primary no-underline cursor-pointer hover:underline"
+                >
+                  {t('resources.title')}
+                </Link>
+                <span className="text-muted-foreground/60" aria-hidden="true">
+                  /
+                </span>
+                <span>{schema.displayName}</span>
+              </nav>
+              <h1 className="m-0 text-2xl font-semibold text-foreground max-md:text-xl">
+                {schema.displayName}
+              </h1>
+            </div>
+            <div className="flex gap-2 items-center max-md:flex-col">
+              {objectPermissions.canCreate && (
                 <button
                   type="button"
-                  className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                  onClick={handleToggleExportDropdown}
-                  aria-expanded={showExportDropdown}
-                  aria-haspopup="menu"
-                  aria-label={t('resources.exportSelected')}
-                  data-testid="export-button"
+                  className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 active:bg-primary/80 max-md:w-full"
+                  onClick={handleCreate}
+                  aria-label={t('resources.createRecord')}
+                  data-testid="create-record-button"
                 >
-                  {t('resources.exportSelected')}
-                </button>
-                {showExportDropdown && (
-                  <div
-                    className="absolute top-full left-0 z-20 min-w-[200px] mt-1 py-2 bg-background border border-border rounded-md shadow-lg"
-                    role="menu"
-                    aria-label={t('resources.exportOptions')}
-                    data-testid="export-dropdown"
-                  >
-                    <div className="flex flex-col py-1">
-                      <span className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        {t('resources.exportSelectedLabel', { count: selectedIds.size })}
-                      </span>
-                      <button
-                        type="button"
-                        className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
-                        onClick={() => handleExportSelected('csv')}
-                        role="menuitem"
-                        data-testid="export-selected-csv"
-                      >
-                        {t('resources.exportToCSV')}
-                      </button>
-                      <button
-                        type="button"
-                        className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
-                        onClick={() => handleExportSelected('json')}
-                        role="menuitem"
-                        data-testid="export-selected-json"
-                      >
-                        {t('resources.exportToJSON')}
-                      </button>
-                    </div>
-                    <div className="h-px my-1 bg-border" />
-                    <div className="flex flex-col py-1">
-                      <span className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        {t('resources.exportAllVisible', {
-                          count: resourcesData?.data.length ?? 0,
-                        })}
-                      </span>
-                      <button
-                        type="button"
-                        className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
-                        onClick={() => handleExportAll('csv')}
-                        role="menuitem"
-                        data-testid="export-all-csv"
-                      >
-                        {t('resources.exportToCSV')}
-                      </button>
-                      <button
-                        type="button"
-                        className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
-                        onClick={() => handleExportAll('json')}
-                        role="menuitem"
-                        data-testid="export-all-json"
-                      >
-                        {t('resources.exportToJSON')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {objectPermissions.canDelete && (
-                <button
-                  type="button"
-                  className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                  onClick={handleBulkDeleteClick}
-                  aria-label={t('resources.bulkDelete')}
-                  data-testid="bulk-delete-button"
-                >
-                  {t('resources.bulkDelete')}
+                  {t('resources.createRecord')}
                 </button>
               )}
             </div>
-          )}
+          </header>
+        ) : undefined
+      }
+      toolbar={
+        schema ? (
+          <>
+            {/* View Selector (T10) */}
+            <ViewSelector
+              views={savedViews.views}
+              activeView={savedViews.activeView}
+              onSelectView={handleSelectView}
+              onSaveView={handleSaveView}
+              onDeleteView={handleDeleteView}
+              onRenameView={savedViews.renameView}
+              onSetDefault={savedViews.setDefaultView}
+            />
 
-          {/* Filter Toggle - Requirement 11.3 */}
-          <button
-            type="button"
-            className={cn(
-              'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2',
-              showFilters &&
-                'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-            )}
-            onClick={handleToggleFilters}
-            aria-expanded={showFilters}
-            aria-controls="filter-builder"
-            data-testid="filter-toggle"
-          >
-            {t('common.filter')}
-            {filters.length > 0 && (
-              <span
-                className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-semibold text-primary-foreground bg-primary rounded-full"
-                data-testid="filter-count"
-              >
-                {filters.length}
-              </span>
-            )}
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 max-lg:justify-start">
-          {/* Column Selector */}
-          <div className="relative">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
-              onClick={handleToggleColumnSelector}
-              aria-expanded={showColumnSelector}
-              aria-haspopup="listbox"
-              data-testid="column-selector-button"
-            >
-              Columns ({visibleColumns.size})
-            </button>
-            {showColumnSelector && (
-              <div
-                className="absolute top-full right-0 z-10 min-w-[200px] max-h-[300px] overflow-y-auto mt-1 p-2 bg-background border border-border rounded-md shadow-lg"
-                role="listbox"
-                aria-label="Select columns"
-                data-testid="column-dropdown"
-              >
-                <label className="flex items-center gap-2 px-2 py-1 text-sm text-foreground cursor-pointer rounded hover:bg-muted">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 cursor-pointer"
-                    checked={visibleColumns.has('id')}
-                    onChange={() => handleToggleColumn('id')}
-                  />
-                  ID
-                </label>
-                {(Array.isArray(schema.fields) ? schema.fields : []).map((field) => (
-                  <label
-                    key={field.name}
-                    className="flex items-center gap-2 px-2 py-1 text-sm text-foreground cursor-pointer rounded hover:bg-muted"
+            {/* Toolbar */}
+            <div className="flex justify-between items-center flex-wrap gap-4 p-4 bg-muted rounded-md max-lg:flex-col max-lg:items-stretch">
+              <div className="flex items-center gap-4 flex-wrap max-lg:justify-start">
+                {/* Bulk Actions - Requirement 11.11, 11.12 */}
+                {selectedIds.size > 0 && (
+                  <div
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950 rounded-md"
+                    data-testid="bulk-actions"
                   >
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 cursor-pointer"
-                      checked={visibleColumns.has(field.name)}
-                      onChange={() => handleToggleColumn(field.name)}
-                    />
-                    {field.displayName || field.name}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      {selectedIds.size} {t('common.selected')}
+                    </span>
 
-          {/* Inline Edit Toggle (T11) */}
-          <button
-            type="button"
-            className={cn(
-              'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2',
-              inlineEditEnabled &&
-                'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-            )}
-            onClick={handleToggleInlineEdit}
-            aria-pressed={inlineEditEnabled}
-            data-testid="inline-edit-toggle"
-          >
-            {inlineEditEnabled ? t('inlineEdit.clickToEdit') : t('inlineEdit.clickToEdit')}
-          </button>
-        </div>
-      </div>
+                    {/* Export Dropdown - Requirement 11.12 */}
+                    <div className="relative" ref={exportDropdownRef}>
+                      <button
+                        type="button"
+                        className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                        onClick={handleToggleExportDropdown}
+                        aria-expanded={showExportDropdown}
+                        aria-haspopup="menu"
+                        aria-label={t('resources.exportSelected')}
+                        data-testid="export-button"
+                      >
+                        {t('resources.exportSelected')}
+                      </button>
+                      {showExportDropdown && (
+                        <div
+                          className="absolute top-full left-0 z-20 min-w-[200px] mt-1 py-2 bg-background border border-border rounded-md shadow-lg"
+                          role="menu"
+                          aria-label={t('resources.exportOptions')}
+                          data-testid="export-dropdown"
+                        >
+                          <div className="flex flex-col py-1">
+                            <span className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                              {t('resources.exportSelectedLabel', { count: selectedIds.size })}
+                            </span>
+                            <button
+                              type="button"
+                              className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
+                              onClick={() => handleExportSelected('csv')}
+                              role="menuitem"
+                              data-testid="export-selected-csv"
+                            >
+                              {t('resources.exportToCSV')}
+                            </button>
+                            <button
+                              type="button"
+                              className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
+                              onClick={() => handleExportSelected('json')}
+                              role="menuitem"
+                              data-testid="export-selected-json"
+                            >
+                              {t('resources.exportToJSON')}
+                            </button>
+                          </div>
+                          <div className="h-px my-1 bg-border" />
+                          <div className="flex flex-col py-1">
+                            <span className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                              {t('resources.exportAllVisible', {
+                                count: resourcesData?.data.length ?? 0,
+                              })}
+                            </span>
+                            <button
+                              type="button"
+                              className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
+                              onClick={() => handleExportAll('csv')}
+                              role="menuitem"
+                              data-testid="export-all-csv"
+                            >
+                              {t('resources.exportToCSV')}
+                            </button>
+                            <button
+                              type="button"
+                              className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
+                              onClick={() => handleExportAll('json')}
+                              role="menuitem"
+                              data-testid="export-all-json"
+                            >
+                              {t('resources.exportToJSON')}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-      {/* Filter Builder - Requirements 11.3, 11.4, 11.5 */}
-      {showFilters && (
-        <div
-          id="filter-builder"
-          className="p-4 bg-background border border-border rounded-md"
-          data-testid="filter-builder"
-        >
-          {pendingFilters.length === 0 ? (
-            <p>{t('common.noResults')}</p>
-          ) : (
-            pendingFilters.map((filter) => (
-              <div
-                key={filter.id}
-                className="flex items-center gap-2 mb-2 last:mb-0 max-md:flex-wrap"
-                data-testid={`filter-row-${filter.id}`}
-              >
-                {/* Field Selector */}
-                <select
-                  className="p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[150px] max-md:min-w-full"
-                  value={filter.field}
-                  onChange={(e) => handleFilterFieldChange(filter.id, e.target.value)}
-                  aria-label="Filter field"
-                  data-testid={`filter-field-${filter.id}`}
-                >
-                  {(Array.isArray(schema.fields) ? schema.fields : []).map((field) => (
-                    <option key={field.name} value={field.name}>
-                      {field.displayName || field.name}
-                    </option>
-                  ))}
-                </select>
+                    {objectPermissions.canDelete && (
+                      <button
+                        type="button"
+                        className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                        onClick={handleBulkDeleteClick}
+                        aria-label={t('resources.bulkDelete')}
+                        data-testid="bulk-delete-button"
+                      >
+                        {t('resources.bulkDelete')}
+                      </button>
+                    )}
+                  </div>
+                )}
 
-                {/* Operator Selector - Requirement 11.5 */}
-                <select
-                  className="p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[120px] max-md:min-w-full"
-                  value={filter.operator}
-                  onChange={(e) =>
-                    handleFilterOperatorChange(filter.id, e.target.value as FilterOperator)
-                  }
-                  aria-label="Filter operator"
-                  data-testid={`filter-operator-${filter.id}`}
-                >
-                  {FILTER_OPERATORS.map((op) => (
-                    <option key={op.value} value={op.value}>
-                      {op.label}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Value Input */}
-                <input
-                  type="text"
-                  className="flex-1 p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[150px] max-md:min-w-full"
-                  value={filter.value}
-                  onChange={(e) => handleFilterValueChange(filter.id, e.target.value)}
-                  placeholder="Value"
-                  aria-label="Filter value"
-                  data-testid={`filter-value-${filter.id}`}
-                />
-
-                {/* Remove Filter Button */}
+                {/* Filter Toggle - Requirement 11.3 */}
                 <button
                   type="button"
-                  className="flex items-center justify-center w-8 h-8 p-0 text-lg text-muted-foreground bg-transparent border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                  onClick={() => handleRemoveFilter(filter.id)}
-                  aria-label="Remove filter"
-                  data-testid={`remove-filter-${filter.id}`}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2',
+                    showFilters &&
+                      'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                  )}
+                  onClick={handleToggleFilters}
+                  aria-expanded={showFilters}
+                  aria-controls="filter-builder"
+                  data-testid="filter-toggle"
                 >
-                  &times;
+                  {t('common.filter')}
+                  {filters.length > 0 && (
+                    <span
+                      className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-semibold text-primary-foreground bg-primary rounded-full"
+                      data-testid="filter-count"
+                    >
+                      {filters.length}
+                    </span>
+                  )}
                 </button>
               </div>
-            ))
-          )}
 
-          <div className="flex gap-2 mt-4">
-            <button
-              type="button"
-              className="px-2 py-1 text-sm font-medium text-primary bg-transparent border border-dashed border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-primary focus:outline-2 focus:outline-primary focus:outline-offset-2"
-              onClick={handleAddFilter}
-              data-testid="add-filter-button"
-            >
-              + Add Filter
-            </button>
-            <button
-              type="button"
-              className="px-2 py-1 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
-              onClick={handleApplyFilters}
-              data-testid="apply-filters-button"
-            >
-              Apply Filters
-            </button>
-            {(pendingFilters.length > 0 || filters.length > 0) && (
-              <button
-                type="button"
-                className="px-2 py-1 text-sm font-medium text-muted-foreground bg-transparent border border-border rounded-md cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                onClick={handleClearFilters}
-                data-testid="clear-filters-button"
-              >
-                Clear All
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Summary Stats Bar (T12) */}
-      {!resourcesLoading && !resourcesError && resources.length > 0 && (
-        <SummaryStatsBar
-          totalCount={totalCount}
-          filteredCount={resources.length}
-          filters={filters}
-          visibleFields={visibleFields}
-          records={resources as Array<Record<string, unknown>>}
-          onClearFilters={handleClearFilters}
-        />
-      )}
-
-      {/* Data Table - Requirement 11.2 */}
-      {resourcesLoading ? (
-        <div className="flex justify-center items-center min-h-[400px]">
-          <LoadingSpinner size="medium" label={t('common.loading')} />
-        </div>
-      ) : resourcesError ? (
-        <ErrorMessage
-          error={resourcesError instanceof Error ? resourcesError : new Error(t('errors.generic'))}
-          onRetry={() => refetchResources()}
-        />
-      ) : resources.length === 0 ? (
-        <div
-          className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground bg-muted rounded-md"
-          data-testid="empty-state"
-        >
-          <p className="m-0 text-base">{t('common.noResults')}</p>
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto border border-border rounded-md bg-background">
-            <table
-              className="w-full border-collapse text-sm [&_thead]:bg-muted [&_th]:p-4 [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-b-2 [&_th]:border-border [&_th]:whitespace-nowrap [&_td]:p-4 [&_td]:text-foreground [&_td]:border-b [&_td]:border-border/50 [&_td]:max-w-[300px] [&_td]:overflow-hidden [&_td]:text-ellipsis [&_td]:whitespace-nowrap max-md:[&_th]:p-2 max-md:[&_td]:p-2"
-              role="grid"
-              aria-label={`${schema.displayName} records`}
-              data-testid="resources-table"
-            >
-              <thead>
-                <tr role="row">
-                  {/* Select All Checkbox - Requirement 11.11 */}
-                  <th role="columnheader" className="!w-10 !text-center">
-                    <input
-                      type="checkbox"
-                      className="w-[18px] h-[18px] cursor-pointer"
-                      checked={allSelected}
-                      onChange={handleSelectAll}
-                      aria-label={allSelected ? t('common.deselectAll') : t('common.selectAll')}
-                      data-testid="select-all-checkbox"
-                    />
-                  </th>
-
-                  {/* ID Column */}
-                  {visibleColumns.has('id') && (
-                    <th
-                      role="columnheader"
-                      scope="col"
-                      className="cursor-pointer select-none transition-colors duration-150 hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:-outline-offset-2"
-                      onClick={() => handleSortChange('id')}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          handleSortChange('id')
-                        }
-                      }}
-                      tabIndex={0}
-                      aria-sort={getAriaSort('id')}
-                      data-testid="header-id"
+              <div className="flex items-center gap-2 max-lg:justify-start">
+                {/* Column Selector */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                    onClick={handleToggleColumnSelector}
+                    aria-expanded={showColumnSelector}
+                    aria-haspopup="listbox"
+                    data-testid="column-selector-button"
+                  >
+                    Columns ({visibleColumns.size})
+                  </button>
+                  {showColumnSelector && (
+                    <div
+                      className="absolute top-full right-0 z-10 min-w-[200px] max-h-[300px] overflow-y-auto mt-1 p-2 bg-background border border-border rounded-md shadow-lg"
+                      role="listbox"
+                      aria-label="Select columns"
+                      data-testid="column-dropdown"
                     >
-                      ID
-                      <span className="ml-1 text-xs" aria-hidden="true">
-                        {getSortIndicator('id')}
-                      </span>
-                    </th>
-                  )}
-
-                  {/* Field Columns */}
-                  {visibleFields.map((field) => (
-                    <th
-                      key={field.name}
-                      role="columnheader"
-                      scope="col"
-                      className="cursor-pointer select-none transition-colors duration-150 hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:-outline-offset-2"
-                      onClick={() => handleSortChange(field.name)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          handleSortChange(field.name)
-                        }
-                      }}
-                      tabIndex={0}
-                      aria-sort={getAriaSort(field.name)}
-                      data-testid={`header-${field.name}`}
-                    >
-                      {field.displayName || field.name}
-                      <span className="ml-1 text-xs" aria-hidden="true">
-                        {getSortIndicator(field.name)}
-                      </span>
-                    </th>
-                  ))}
-
-                  {/* Actions Column */}
-                  <th role="columnheader" scope="col">
-                    {t('common.actions')}
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {resources.map((resource, index) => {
-                  const isSelected = selectedIds.has(resource.id)
-                  return (
-                    <tr
-                      key={resource.id}
-                      role="row"
-                      className={cn(
-                        'cursor-pointer transition-colors duration-150 hover:bg-muted focus-within:bg-accent',
-                        isSelected &&
-                          'bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900'
-                      )}
-                      onClick={() => handleView(resource)}
-                      data-testid={`resource-row-${index}`}
-                    >
-                      {/* Row Checkbox - Requirement 11.11 */}
-                      <td
-                        role="gridcell"
-                        className="!w-10 !text-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <label className="flex items-center gap-2 px-2 py-1 text-sm text-foreground cursor-pointer rounded hover:bg-muted">
                         <input
                           type="checkbox"
-                          className="w-[18px] h-[18px] cursor-pointer"
-                          checked={isSelected}
-                          onChange={() => handleSelectRow(resource.id)}
-                          aria-label={`Select row ${index + 1}`}
-                          data-testid={`row-checkbox-${index}`}
+                          className="w-4 h-4 cursor-pointer"
+                          checked={visibleColumns.has('id')}
+                          onChange={() => handleToggleColumn('id')}
                         />
-                      </td>
-
-                      {/* ID Cell */}
-                      {visibleColumns.has('id') && (
-                        <td role="gridcell" data-testid={`cell-id-${index}`}>
-                          {resource.id}
-                        </td>
-                      )}
-
-                      {/* Field Cells (T11: inline edit when enabled) */}
-                      {visibleFields.map((field) => (
-                        <td
+                        ID
+                      </label>
+                      {(Array.isArray(schema.fields) ? schema.fields : []).map((field) => (
+                        <label
                           key={field.name}
-                          role="gridcell"
-                          data-testid={`cell-${field.name}-${index}`}
-                          onClick={inlineEditEnabled ? (e) => e.stopPropagation() : undefined}
+                          className="flex items-center gap-2 px-2 py-1 text-sm text-foreground cursor-pointer rounded hover:bg-muted"
                         >
-                          {inlineEditEnabled ? (
-                            <InlineEditCell
-                              value={resource[field.name]}
-                              fieldName={field.name}
-                              fieldType={
-                                field.type as
-                                  | 'string'
-                                  | 'number'
-                                  | 'boolean'
-                                  | 'date'
-                                  | 'datetime'
-                                  | 'json'
-                                  | 'reference'
-                              }
-                              recordId={resource.id}
-                              collectionName={collectionName!}
-                              displayValue={formatCellValue(resource[field.name], field)}
-                              enabled={true}
-                              apiClient={apiClient}
-                              onSaved={handleInlineEditSaved}
-                            />
-                          ) : (
-                            formatCellValue(resource[field.name], field)
-                          )}
-                        </td>
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 cursor-pointer"
+                            checked={visibleColumns.has(field.name)}
+                            onChange={() => handleToggleColumn(field.name)}
+                          />
+                          {field.displayName || field.name}
+                        </label>
                       ))}
+                    </div>
+                  )}
+                </div>
 
-                      {/* Actions Cell */}
-                      <td role="gridcell" className="!w-[1%] !whitespace-nowrap">
-                        <div
-                          className="flex gap-2 max-md:flex-col max-md:gap-1"
-                          role="toolbar"
+                {/* Inline Edit Toggle (T11) */}
+                <button
+                  type="button"
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2',
+                    inlineEditEnabled &&
+                      'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                  )}
+                  onClick={handleToggleInlineEdit}
+                  aria-pressed={inlineEditEnabled}
+                  data-testid="inline-edit-toggle"
+                >
+                  {inlineEditEnabled ? t('inlineEdit.clickToEdit') : t('inlineEdit.clickToEdit')}
+                </button>
+              </div>
+            </div>
+          </>
+        ) : undefined
+      }
+      filters={
+        schema ? (
+          <>
+            {/* Filter Builder - Requirements 11.3, 11.4, 11.5 */}
+            {showFilters && (
+              <div
+                id="filter-builder"
+                className="p-4 bg-background border border-border rounded-md"
+                data-testid="filter-builder"
+              >
+                {pendingFilters.length === 0 ? (
+                  <p>{t('common.noResults')}</p>
+                ) : (
+                  pendingFilters.map((filter) => (
+                    <div
+                      key={filter.id}
+                      className="flex items-center gap-2 mb-2 last:mb-0 max-md:flex-wrap"
+                      data-testid={`filter-row-${filter.id}`}
+                    >
+                      {/* Field Selector */}
+                      <select
+                        className="p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[150px] max-md:min-w-full"
+                        value={filter.field}
+                        onChange={(e) => handleFilterFieldChange(filter.id, e.target.value)}
+                        aria-label="Filter field"
+                        data-testid={`filter-field-${filter.id}`}
+                      >
+                        {(Array.isArray(schema.fields) ? schema.fields : []).map((field) => (
+                          <option key={field.name} value={field.name}>
+                            {field.displayName || field.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Operator Selector - Requirement 11.5 */}
+                      <select
+                        className="p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[120px] max-md:min-w-full"
+                        value={filter.operator}
+                        onChange={(e) =>
+                          handleFilterOperatorChange(filter.id, e.target.value as FilterOperator)
+                        }
+                        aria-label="Filter operator"
+                        data-testid={`filter-operator-${filter.id}`}
+                      >
+                        {FILTER_OPERATORS.map((op) => (
+                          <option key={op.value} value={op.value}>
+                            {op.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Value Input */}
+                      <input
+                        type="text"
+                        className="flex-1 p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[150px] max-md:min-w-full"
+                        value={filter.value}
+                        onChange={(e) => handleFilterValueChange(filter.id, e.target.value)}
+                        placeholder="Value"
+                        aria-label="Filter value"
+                        data-testid={`filter-value-${filter.id}`}
+                      />
+
+                      {/* Remove Filter Button */}
+                      <button
+                        type="button"
+                        className="flex items-center justify-center w-8 h-8 p-0 text-lg text-muted-foreground bg-transparent border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                        onClick={() => handleRemoveFilter(filter.id)}
+                        aria-label="Remove filter"
+                        data-testid={`remove-filter-${filter.id}`}
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))
+                )}
+
+                <div className="flex gap-2 mt-4">
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-sm font-medium text-primary bg-transparent border border-dashed border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-primary focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                    onClick={handleAddFilter}
+                    data-testid="add-filter-button"
+                  >
+                    + Add Filter
+                  </button>
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                    onClick={handleApplyFilters}
+                    data-testid="apply-filters-button"
+                  >
+                    Apply Filters
+                  </button>
+                  {(pendingFilters.length > 0 || filters.length > 0) && (
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-sm font-medium text-muted-foreground bg-transparent border border-border rounded-md cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                      onClick={handleClearFilters}
+                      data-testid="clear-filters-button"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Summary Stats Bar (T12) — rendered here (above the table) to
+                preserve the pre-shell DOM order. */}
+            {!resourcesLoading && !resourcesError && resources.length > 0 && (
+              <SummaryStatsBar
+                totalCount={totalCount}
+                filteredCount={resources.length}
+                filters={filters}
+                visibleFields={visibleFields}
+                records={resources as Array<Record<string, unknown>>}
+                onClearFilters={handleClearFilters}
+              />
+            )}
+          </>
+        ) : undefined
+      }
+      table={
+        // Data Table - Requirement 11.2
+        schema ? (
+          resourcesLoading ? (
+            <div className="flex justify-center items-center min-h-[400px]">
+              <LoadingSpinner size="medium" label={t('common.loading')} />
+            </div>
+          ) : resourcesError ? (
+            <ErrorMessage
+              error={
+                resourcesError instanceof Error ? resourcesError : new Error(t('errors.generic'))
+              }
+              onRetry={() => refetchResources()}
+            />
+          ) : resources.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground bg-muted rounded-md"
+              data-testid="empty-state"
+            >
+              <p className="m-0 text-base">{t('common.noResults')}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-border rounded-md bg-background">
+              <table
+                className="w-full border-collapse text-sm [&_thead]:bg-muted [&_th]:p-4 [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-b-2 [&_th]:border-border [&_th]:whitespace-nowrap [&_td]:p-4 [&_td]:text-foreground [&_td]:border-b [&_td]:border-border/50 [&_td]:max-w-[300px] [&_td]:overflow-hidden [&_td]:text-ellipsis [&_td]:whitespace-nowrap max-md:[&_th]:p-2 max-md:[&_td]:p-2"
+                role="grid"
+                aria-label={`${schema.displayName} records`}
+                data-testid="resources-table"
+              >
+                <thead>
+                  <tr role="row">
+                    {/* Select All Checkbox - Requirement 11.11 */}
+                    <th role="columnheader" className="!w-10 !text-center">
+                      <input
+                        type="checkbox"
+                        className="w-[18px] h-[18px] cursor-pointer"
+                        checked={allSelected}
+                        onChange={handleSelectAll}
+                        aria-label={allSelected ? t('common.deselectAll') : t('common.selectAll')}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+
+                    {/* ID Column */}
+                    {visibleColumns.has('id') && (
+                      <th
+                        role="columnheader"
+                        scope="col"
+                        className="cursor-pointer select-none transition-colors duration-150 hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:-outline-offset-2"
+                        onClick={() => handleSortChange('id')}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleSortChange('id')
+                          }
+                        }}
+                        tabIndex={0}
+                        aria-sort={getAriaSort('id')}
+                        data-testid="header-id"
+                      >
+                        ID
+                        <span className="ml-1 text-xs" aria-hidden="true">
+                          {getSortIndicator('id')}
+                        </span>
+                      </th>
+                    )}
+
+                    {/* Field Columns */}
+                    {visibleFields.map((field) => (
+                      <th
+                        key={field.name}
+                        role="columnheader"
+                        scope="col"
+                        className="cursor-pointer select-none transition-colors duration-150 hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:-outline-offset-2"
+                        onClick={() => handleSortChange(field.name)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleSortChange(field.name)
+                          }
+                        }}
+                        tabIndex={0}
+                        aria-sort={getAriaSort(field.name)}
+                        data-testid={`header-${field.name}`}
+                      >
+                        {field.displayName || field.name}
+                        <span className="ml-1 text-xs" aria-hidden="true">
+                          {getSortIndicator(field.name)}
+                        </span>
+                      </th>
+                    ))}
+
+                    {/* Actions Column */}
+                    <th role="columnheader" scope="col">
+                      {t('common.actions')}
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {resources.map((resource, index) => {
+                    const isSelected = selectedIds.has(resource.id)
+                    return (
+                      <tr
+                        key={resource.id}
+                        role="row"
+                        className={cn(
+                          'cursor-pointer transition-colors duration-150 hover:bg-muted focus-within:bg-accent',
+                          isSelected &&
+                            'bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900'
+                        )}
+                        onClick={() => handleView(resource)}
+                        data-testid={`resource-row-${index}`}
+                      >
+                        {/* Row Checkbox - Requirement 11.11 */}
+                        <td
+                          role="gridcell"
+                          className="!w-10 !text-center"
                           onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
                         >
-                          {objectPermissions.canEdit && (
-                            <button
-                              type="button"
-                              className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                              onClick={() => handleEdit(resource)}
-                              aria-label={`${t('common.edit')} ${resource.id}`}
-                              data-testid={`edit-button-${index}`}
-                            >
-                              {t('common.edit')}
-                            </button>
-                          )}
-                          {objectPermissions.canDelete && (
-                            <button
-                              type="button"
-                              className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                              onClick={() => handleDeleteClick(resource)}
-                              aria-label={`${t('common.delete')} ${resource.id}`}
-                              data-testid={`delete-button-${index}`}
-                            >
-                              {t('common.delete')}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                          <input
+                            type="checkbox"
+                            className="w-[18px] h-[18px] cursor-pointer"
+                            checked={isSelected}
+                            onChange={() => handleSelectRow(resource.id)}
+                            aria-label={`Select row ${index + 1}`}
+                            data-testid={`row-checkbox-${index}`}
+                          />
+                        </td>
 
-          {/* Pagination - Requirement 11.2 */}
+                        {/* ID Cell */}
+                        {visibleColumns.has('id') && (
+                          <td role="gridcell" data-testid={`cell-id-${index}`}>
+                            {resource.id}
+                          </td>
+                        )}
+
+                        {/* Field Cells (T11: inline edit when enabled) */}
+                        {visibleFields.map((field) => (
+                          <td
+                            key={field.name}
+                            role="gridcell"
+                            data-testid={`cell-${field.name}-${index}`}
+                            onClick={inlineEditEnabled ? (e) => e.stopPropagation() : undefined}
+                          >
+                            {inlineEditEnabled ? (
+                              <InlineEditCell
+                                value={resource[field.name]}
+                                fieldName={field.name}
+                                fieldType={
+                                  field.type as
+                                    | 'string'
+                                    | 'number'
+                                    | 'boolean'
+                                    | 'date'
+                                    | 'datetime'
+                                    | 'json'
+                                    | 'reference'
+                                }
+                                recordId={resource.id}
+                                collectionName={collectionName!}
+                                displayValue={formatCellValue(resource[field.name], field)}
+                                enabled={true}
+                                apiClient={apiClient}
+                                onSaved={handleInlineEditSaved}
+                              />
+                            ) : (
+                              formatCellValue(resource[field.name], field)
+                            )}
+                          </td>
+                        ))}
+
+                        {/* Actions Cell */}
+                        <td role="gridcell" className="!w-[1%] !whitespace-nowrap">
+                          <div
+                            className="flex gap-2 max-md:flex-col max-md:gap-1"
+                            role="toolbar"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            {objectPermissions.canEdit && (
+                              <button
+                                type="button"
+                                className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                                onClick={() => handleEdit(resource)}
+                                aria-label={`${t('common.edit')} ${resource.id}`}
+                                data-testid={`edit-button-${index}`}
+                              >
+                                {t('common.edit')}
+                              </button>
+                            )}
+                            {objectPermissions.canDelete && (
+                              <button
+                                type="button"
+                                className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                                onClick={() => handleDeleteClick(resource)}
+                                aria-label={`${t('common.delete')} ${resource.id}`}
+                                data-testid={`delete-button-${index}`}
+                              >
+                                {t('common.delete')}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : undefined
+      }
+      pagination={
+        // Pagination - Requirement 11.2
+        !resourcesLoading && !resourcesError && resources.length > 0 ? (
           <nav
             className="flex justify-between items-center flex-wrap gap-4 py-4 max-md:flex-col max-md:items-stretch"
             role="navigation"
@@ -1598,33 +1601,36 @@ export function ResourceListPage({
               {totalCount} total records
             </div>
           </nav>
+        ) : undefined
+      }
+      dialogs={
+        <>
+          {/* Delete Confirmation Dialog */}
+          <ConfirmDialog
+            open={deleteDialogOpen}
+            title={t('resources.deleteRecord')}
+            message={t('resources.confirmDelete', { count: 1 })}
+            confirmLabel={t('common.delete')}
+            cancelLabel={t('common.cancel')}
+            onConfirm={handleDeleteConfirm}
+            onCancel={handleDeleteCancel}
+            variant="danger"
+          />
+
+          {/* Bulk Delete Confirmation Dialog - Requirement 11.11 */}
+          <ConfirmDialog
+            open={bulkDeleteDialogOpen}
+            title={t('resources.bulkDelete')}
+            message={t('resources.confirmBulkDelete', { count: selectedIds.size })}
+            confirmLabel={t('common.delete')}
+            cancelLabel={t('common.cancel')}
+            onConfirm={handleBulkDeleteConfirm}
+            onCancel={handleBulkDeleteCancel}
+            variant="danger"
+          />
         </>
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        title={t('resources.deleteRecord')}
-        message={t('resources.confirmDelete', { count: 1 })}
-        confirmLabel={t('common.delete')}
-        cancelLabel={t('common.cancel')}
-        onConfirm={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
-        variant="danger"
-      />
-
-      {/* Bulk Delete Confirmation Dialog - Requirement 11.11 */}
-      <ConfirmDialog
-        open={bulkDeleteDialogOpen}
-        title={t('resources.bulkDelete')}
-        message={t('resources.confirmBulkDelete', { count: selectedIds.size })}
-        confirmLabel={t('common.delete')}
-        cancelLabel={t('common.cancel')}
-        onConfirm={handleBulkDeleteConfirm}
-        onCancel={handleBulkDeleteCancel}
-        variant="danger"
-      />
-    </div>
+      }
+    />
   )
 }
 

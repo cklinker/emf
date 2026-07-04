@@ -24,6 +24,10 @@ export interface OfflineStore {
   enqueue(op: OutboxOp): Promise<void>
   listOutbox(): Promise<OutboxOp[]>
   removeOutbox(opId: string): Promise<void>
+
+  /** Cached page render contract for a custom-page slug (cold-offline page loads). */
+  getPageContract(slug: string): Promise<unknown | undefined>
+  putPageContract(slug: string, contract: unknown): Promise<void>
 }
 
 function byQueuedAt(a: OutboxOp, b: OutboxOp): number {
@@ -38,6 +42,7 @@ export class InMemoryOfflineStore implements OfflineStore {
   private cursors = new Map<string, string>()
   private records = new Map<string, Map<string, ReplicaRecord>>()
   private outbox = new Map<string, OutboxOp>()
+  private pageContracts = new Map<string, unknown>()
 
   private bucket(collection: string): Map<string, ReplicaRecord> {
     let b = this.records.get(collection)
@@ -85,6 +90,14 @@ export class InMemoryOfflineStore implements OfflineStore {
   async removeOutbox(opId: string): Promise<void> {
     this.outbox.delete(opId)
   }
+
+  async getPageContract(slug: string): Promise<unknown | undefined> {
+    return this.pageContracts.get(slug)
+  }
+
+  async putPageContract(slug: string, contract: unknown): Promise<void> {
+    this.pageContracts.set(slug, contract)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +116,13 @@ interface CursorRow {
   cursor: string
 }
 
+/** Cached render contract for a custom-page slug, so the page shell loads cold-offline. */
+interface PageContractRow {
+  slug: string
+  contract: unknown
+  cachedAt: string
+}
+
 interface OfflineDbSchema extends DBSchema {
   records: {
     key: [string, string]
@@ -118,9 +138,14 @@ interface OfflineDbSchema extends DBSchema {
     value: OutboxOp
     indexes: { 'by-queuedAt': string }
   }
+  pages: {
+    key: string
+    value: PageContractRow
+  }
 }
 
-const DB_VERSION = 1
+// v1: records/cursors/outbox · v2: + pages (custom-page render contracts).
+const DB_VERSION = 2
 
 export class IndexedDbOfflineStore implements OfflineStore {
   private dbPromise: Promise<IDBPDatabase<OfflineDbSchema>>
@@ -131,12 +156,19 @@ export class IndexedDbOfflineStore implements OfflineStore {
    */
   constructor(dbName = 'kelta-offline') {
     this.dbPromise = openDB<OfflineDbSchema>(dbName, DB_VERSION, {
-      upgrade(db) {
-        const records = db.createObjectStore('records', { keyPath: ['collection', 'id'] })
-        records.createIndex('by-collection', 'collection')
-        db.createObjectStore('cursors', { keyPath: 'collection' })
-        const outbox = db.createObjectStore('outbox', { keyPath: 'id' })
-        outbox.createIndex('by-queuedAt', 'queuedAt')
+      // Incremental per-version upgrade so both fresh DBs and live v1 replicas converge on v2
+      // without dropping cached data.
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const records = db.createObjectStore('records', { keyPath: ['collection', 'id'] })
+          records.createIndex('by-collection', 'collection')
+          db.createObjectStore('cursors', { keyPath: 'collection' })
+          const outbox = db.createObjectStore('outbox', { keyPath: 'id' })
+          outbox.createIndex('by-queuedAt', 'queuedAt')
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore('pages', { keyPath: 'slug' })
+        }
       },
     })
   }
@@ -187,5 +219,20 @@ export class IndexedDbOfflineStore implements OfflineStore {
 
   async removeOutbox(opId: string): Promise<void> {
     await (await this.dbPromise).delete('outbox', opId)
+  }
+
+  async getPageContract(slug: string): Promise<unknown | undefined> {
+    const row = await (await this.dbPromise).get('pages', slug)
+    return row?.contract
+  }
+
+  async putPageContract(slug: string, contract: unknown): Promise<void> {
+    await (
+      await this.dbPromise
+    ).put('pages', {
+      slug,
+      contract,
+      cachedAt: new Date().toISOString(),
+    })
   }
 }

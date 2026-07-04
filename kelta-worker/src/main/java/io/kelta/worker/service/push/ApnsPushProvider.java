@@ -123,7 +123,8 @@ public class ApnsPushProvider implements PushProvider {
 
     @Override
     public void send(PushMessage message, TenantPushSettings tenantSettings) throws PushDeliveryException {
-        if (authKey == null) {
+        boolean override = tenantSettings != null && tenantSettings.hasApnsOverride();
+        if (!override && authKey == null) {
             throw new PushDeliveryException("No APNs auth key configured", false);
         }
         if (!"ios".equals(message.platform())) {
@@ -131,13 +132,19 @@ public class ApnsPushProvider implements PushProvider {
                     "APNs only supports iOS device tokens, got: " + message.platform(), false);
         }
 
-        String jwt = resolveJwt();
+        // Per-tenant override (tenant.settings.push.apns) or platform defaults.
+        String team = override ? tenantSettings.apnsTeamId() : teamId;
+        String kid = override ? tenantSettings.apnsKeyId() : keyId;
+        String topic = override ? tenantSettings.apnsBundleId() : bundleId;
+
+        String jwt = resolveJwt(team, kid,
+                () -> override ? parseEcPrivateKey(tenantSettings.apnsAuthKey()) : authKey);
         String body = buildApnsPayload(message);
         String url = baseUrl + "/3/device/" + message.deviceToken();
 
         Map<String, String> headers = new HashMap<>();
         headers.put("authorization", "bearer " + jwt);
-        headers.put("apns-topic", bundleId);
+        headers.put("apns-topic", topic);
         headers.put("apns-push-type", "alert");
         headers.put("apns-priority", "10");
 
@@ -203,26 +210,28 @@ public class ApnsPushProvider implements PushProvider {
         throw new PushDeliveryException("APNs error (" + response.status() + "): " + detail, isInvalidToken);
     }
 
-    private String resolveJwt() {
-        CachedToken cached = tokenCache.getIfPresent(keyId);
+    private String resolveJwt(String team, String kid, java.util.function.Supplier<PrivateKey> keySupplier) {
+        // Cache per team+key so tenant-override and platform tokens never collide.
+        String cacheKey = team + ":" + kid;
+        CachedToken cached = tokenCache.getIfPresent(cacheKey);
         if (cached != null) {
             return cached.token();
         }
-        String jwt = createSignedJwt();
-        tokenCache.put(keyId, new CachedToken(jwt));
+        String jwt = createSignedJwt(team, kid, keySupplier.get());
+        tokenCache.put(cacheKey, new CachedToken(jwt));
         return jwt;
     }
 
-    private String createSignedJwt() {
+    private String createSignedJwt(String team, String kid, PrivateKey signingKey) {
         long now = Instant.now().getEpochSecond();
 
-        String header = base64Url("{\"alg\":\"ES256\",\"kid\":\"" + keyId + "\"}");
-        String payload = base64Url("{\"iss\":\"" + teamId + "\",\"iat\":" + now + "}");
+        String header = base64Url("{\"alg\":\"ES256\",\"kid\":\"" + kid + "\"}");
+        String payload = base64Url("{\"iss\":\"" + team + "\",\"iat\":" + now + "}");
         String signingInput = header + "." + payload;
 
         try {
             Signature sig = Signature.getInstance("SHA256withECDSA");
-            sig.initSign(authKey);
+            sig.initSign(signingKey);
             sig.update(signingInput.getBytes(StandardCharsets.UTF_8));
             // Java emits a DER-encoded ECDSA signature; JOSE ES256 needs raw R||S (64 bytes).
             byte[] rawSignature = derToJoseSignature(sig.sign(), 64);

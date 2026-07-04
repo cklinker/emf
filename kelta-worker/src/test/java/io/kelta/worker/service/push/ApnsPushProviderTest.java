@@ -34,19 +34,34 @@ class ApnsPushProviderTest {
     private static PublicKey ecPublicKey;
     private static String ecPrivateKeyPem;
 
+    private static PublicKey tenantPublicKey;
+    private static String tenantPrivateKeyPem;
+
     private ObjectMapper objectMapper;
     private FakeSender sender;
     private ApnsPushProvider provider;
 
     @BeforeAll
     static void generateKey() throws Exception {
+        KeyPair platform = generateEcKeyPair();
+        ecPrivateKey = platform.getPrivate();
+        ecPublicKey = platform.getPublic();
+        ecPrivateKeyPem = toPem(platform.getPrivate());
+
+        KeyPair tenant = generateEcKeyPair();
+        tenantPublicKey = tenant.getPublic();
+        tenantPrivateKeyPem = toPem(tenant.getPrivate());
+    }
+
+    private static KeyPair generateEcKeyPair() throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
         kpg.initialize(new ECGenParameterSpec("secp256r1"));
-        KeyPair kp = kpg.generateKeyPair();
-        ecPrivateKey = kp.getPrivate();
-        ecPublicKey = kp.getPublic();
-        ecPrivateKeyPem = "-----BEGIN PRIVATE KEY-----\n"
-                + Base64.getMimeEncoder(64, "\n".getBytes()).encodeToString(ecPrivateKey.getEncoded())
+        return kpg.generateKeyPair();
+    }
+
+    private static String toPem(PrivateKey key) {
+        return "-----BEGIN PRIVATE KEY-----\n"
+                + Base64.getMimeEncoder(64, "\n".getBytes()).encodeToString(key.getEncoded())
                 + "\n-----END PRIVATE KEY-----";
     }
 
@@ -208,6 +223,75 @@ class ApnsPushProviderTest {
             sig.update("payload".getBytes(StandardCharsets.UTF_8));
             byte[] raw = ApnsPushProvider.derToJoseSignature(sig.sign(), 64);
             assertThat(raw).hasSize(64);
+        }
+    }
+
+    @Nested
+    @DisplayName("per-tenant overrides")
+    class TenantOverrides {
+
+        private TenantPushSettings apnsOverride() {
+            return new TenantPushSettings(null, null, null,
+                    "TENANTTEAM", "TENANTKEY", "io.tenant.app", tenantPrivateKeyPem);
+        }
+
+        @Test
+        @DisplayName("signs the JWT with the tenant key + team/kid and uses the tenant topic")
+        void usesTenantOverride() throws Exception {
+            provider.send(iosMessage(), apnsOverride());
+
+            assertThat(sender.headers).containsEntry("apns-topic", "io.tenant.app");
+
+            String jwt = sender.headers.get("authorization").substring("bearer ".length());
+            String[] parts = jwt.split("\\.");
+            JsonNode header = objectMapper.readTree(base64UrlDecode(parts[0]));
+            JsonNode payload = objectMapper.readTree(base64UrlDecode(parts[1]));
+            assertThat(header.get("kid").asText()).isEqualTo("TENANTKEY");
+            assertThat(payload.get("iss").asText()).isEqualTo("TENANTTEAM");
+
+            // Signed with the tenant key → verifies against the tenant public key, not the platform one.
+            byte[] der = joseToDer(Base64.getUrlDecoder().decode(parts[2]));
+            Signature verifier = Signature.getInstance("SHA256withECDSA");
+            verifier.initVerify(tenantPublicKey);
+            verifier.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.UTF_8));
+            assertThat(verifier.verify(der)).isTrue();
+        }
+
+        @Test
+        @DisplayName("a tenant override works even with no platform auth key configured")
+        void overrideWithoutPlatformKey() {
+            ApnsPushProvider noPlatformKey = new ApnsPushProvider(
+                    "TEAM", "KID", "io.platform.app", HOST, null, sender, objectMapper);
+
+            noPlatformKey.send(iosMessage(), apnsOverride());
+
+            assertThat(sender.called).isTrue();
+            assertThat(sender.headers).containsEntry("apns-topic", "io.tenant.app");
+        }
+    }
+
+    @Nested
+    @DisplayName("TenantPushSettings APNs parsing")
+    class Settings {
+
+        @Test
+        @DisplayName("hasApnsOverride requires team, key, bundle and authKey")
+        void completeOverride() {
+            assertThat(new TenantPushSettings(null, null, null, "t", "k", "b", "key").hasApnsOverride()).isTrue();
+            assertThat(new TenantPushSettings(null, null, null, "t", "k", "b", null).hasApnsOverride()).isFalse();
+            assertThat(new TenantPushSettings("p", "e", "k").hasApnsOverride()).isFalse();
+        }
+
+        @Test
+        @DisplayName("fromJsonNode parses a push.apns section")
+        void parsesApnsJson() {
+            String json = "{\"push\":{\"apns\":{\"teamId\":\"T\",\"keyId\":\"K\","
+                    + "\"bundleId\":\"io.b\",\"authKey\":\"pem\"}}}";
+            TenantPushSettings settings = TenantPushSettings.fromJsonNode(objectMapper.readTree(json));
+            assertThat(settings).isNotNull();
+            assertThat(settings.hasApnsOverride()).isTrue();
+            assertThat(settings.apnsBundleId()).isEqualTo("io.b");
+            assertThat(settings.hasFcmOverride()).isFalse();
         }
     }
 

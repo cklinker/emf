@@ -15,6 +15,9 @@ interface ConnectedApp {
   ipRestrictions: string[] | null
   active: boolean
   rateLimitPerHour: number
+  grantTypes: string[] | null
+  requirePkce: boolean | null
+  consentRequired: boolean | null
   lastUsedAt: string | null
   createdBy: string
   createdAt: string
@@ -41,6 +44,10 @@ interface ConnectedAppFormData {
   ipRestrictions: string
   rateLimitPerHour: number
   active: boolean
+  allowClientCredentials: boolean
+  allowAuthorizationCode: boolean
+  requirePkce: boolean
+  consentRequired: boolean
 }
 
 interface FormErrors {
@@ -54,6 +61,23 @@ interface FormErrors {
 
 export interface ConnectedAppsPageProps {
   testId?: string
+}
+
+/**
+ * Builds the `grant_types` JSON array string persisted for a connected app.
+ * Never emits an empty set — falls back to client_credentials so an app always
+ * has at least one usable grant.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildGrantTypesJson(
+  allowClientCredentials: boolean,
+  allowAuthorizationCode: boolean
+): string {
+  const grants: string[] = []
+  if (allowClientCredentials) grants.push('client_credentials')
+  if (allowAuthorizationCode) grants.push('authorization_code')
+  if (grants.length === 0) grants.push('client_credentials')
+  return JSON.stringify(grants)
 }
 
 function validateForm(data: ConnectedAppFormData): FormErrors {
@@ -132,6 +156,14 @@ function ConnectedAppForm({
     ipRestrictions: connectedApp?.ipRestrictions?.join('\n') ?? '',
     rateLimitPerHour: connectedApp?.rateLimitPerHour ?? 10000,
     active: connectedApp?.active ?? true,
+    // Default a brand-new app to client_credentials only (matches the DB default);
+    // an existing app reflects its stored grant_types.
+    allowClientCredentials: connectedApp
+      ? (connectedApp.grantTypes?.includes('client_credentials') ?? false)
+      : true,
+    allowAuthorizationCode: connectedApp?.grantTypes?.includes('authorization_code') ?? false,
+    requirePkce: connectedApp?.requirePkce ?? false,
+    consentRequired: connectedApp?.consentRequired ?? true,
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -416,6 +448,76 @@ function ConnectedAppForm({
               )}
             </div>
 
+            <fieldset className="space-y-2 rounded-md border border-border p-3">
+              <legend className="px-1 text-sm font-medium text-foreground">
+                OAuth grant types
+              </legend>
+              <p className="text-xs text-muted-foreground">
+                Client credentials mints machine tokens from the app&apos;s secret. Authorization
+                code lets the app sign a user in (redirect + consent) and act on their behalf.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  id="connected-app-grant-cc"
+                  type="checkbox"
+                  checked={formData.allowClientCredentials}
+                  onChange={(e) => handleChange('allowClientCredentials', e.target.checked)}
+                  disabled={isSubmitting}
+                  className="h-4 w-4 accent-primary"
+                  data-testid="connected-app-grant-cc-input"
+                />
+                <label htmlFor="connected-app-grant-cc" className="text-sm text-foreground">
+                  Client credentials
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="connected-app-grant-ac"
+                  type="checkbox"
+                  checked={formData.allowAuthorizationCode}
+                  onChange={(e) => handleChange('allowAuthorizationCode', e.target.checked)}
+                  disabled={isSubmitting}
+                  className="h-4 w-4 accent-primary"
+                  data-testid="connected-app-grant-ac-input"
+                />
+                <label htmlFor="connected-app-grant-ac" className="text-sm text-foreground">
+                  Authorization code
+                </label>
+              </div>
+              {formData.allowAuthorizationCode && (
+                <div className="ml-6 space-y-2 border-l border-border pl-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="connected-app-pkce"
+                      type="checkbox"
+                      checked={formData.requirePkce}
+                      onChange={(e) => handleChange('requirePkce', e.target.checked)}
+                      disabled={isSubmitting}
+                      className="h-4 w-4 accent-primary"
+                      data-testid="connected-app-pkce-input"
+                    />
+                    <label htmlFor="connected-app-pkce" className="text-sm text-foreground">
+                      Require PKCE (public client — no secret, e.g. an SPA/mobile app)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="connected-app-consent"
+                      type="checkbox"
+                      checked={formData.consentRequired}
+                      onChange={(e) => handleChange('consentRequired', e.target.checked)}
+                      disabled={isSubmitting}
+                      className="h-4 w-4 accent-primary"
+                      data-testid="connected-app-consent-input"
+                    />
+                    <label htmlFor="connected-app-consent" className="text-sm text-foreground">
+                      Show a consent screen
+                    </label>
+                  </div>
+                </div>
+              )}
+            </fieldset>
+
             <div className="flex items-center gap-2">
               <input
                 id="connected-app-active"
@@ -617,6 +719,9 @@ export function ConnectedAppsPage({
     ipRestrictions: toJsonArray(data.ipRestrictions),
     rateLimitPerHour: data.rateLimitPerHour,
     active: data.active,
+    grantTypes: buildGrantTypesJson(data.allowClientCredentials, data.allowAuthorizationCode),
+    requirePkce: data.allowAuthorizationCode ? data.requirePkce : false,
+    consentRequired: data.allowAuthorizationCode ? data.consentRequired : false,
   })
 
   const createMutation = useMutation({

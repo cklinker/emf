@@ -5,6 +5,7 @@ import { registerAuthCommands } from './commands/auth.js';
 import { registerCollectionCommands } from './commands/collections.js';
 import { registerRecordCommands } from './commands/records.js';
 import { registerMetadataCommands } from './commands/metadata.js';
+import { registerEnvironmentCommands } from './commands/environments.js';
 import { registerSdkCommands } from './commands/sdk.js';
 
 const program = new Command();
@@ -18,6 +19,7 @@ registerAuthCommands(program);
 registerCollectionCommands(program);
 registerRecordCommands(program);
 registerMetadataCommands(program);
+registerEnvironmentCommands(program);
 registerSdkCommands(program);
 
 program.parse();

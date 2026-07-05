@@ -153,6 +153,8 @@ public final class KeltaStack {
             .withEnv("SCHEDULER_ENABLED",          "false")
             .withEnv("SPRING_FLYWAY_ENABLED",      "true")   // disabled by default (K8s PreSync Job); re-enable for the test harness
             .withExposedPorts(8080)
+            .withLogConsumer(new org.testcontainers.containers.output.Slf4jLogConsumer(
+                    org.slf4j.LoggerFactory.getLogger("kelta-worker-container")))
             .waitingFor(Wait.forHttp("/actuator/health").withStartupTimeout(Duration.ofMinutes(3)));
 
     public static final GenericContainer<?> AUTH = serviceContainer("kelta-auth")

@@ -7,20 +7,36 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @DisplayName("PackageService")
 class PackageServiceTest {
 
     private PackageRepository repository;
+    private PackageImportService importService;
     private ObjectMapper objectMapper;
     private PackageService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(PackageRepository.class);
+        importService = mock(PackageImportService.class);
         objectMapper = new ObjectMapper();
-        service = new PackageService(repository, objectMapper);
+        service = new PackageService(repository, objectMapper, importService);
+    }
+
+    private static PackageImportService.ImportReport report(PackageImportService.ItemResult... items) {
+        int created = 0, updated = 0, skipped = 0, failed = 0;
+        for (var item : items) {
+            switch (item.action()) {
+                case "CREATED" -> created++;
+                case "UPDATED" -> updated++;
+                case "SKIPPED" -> skipped++;
+                case "FAILED" -> failed++;
+            }
+        }
+        return new PackageImportService.ImportReport(created, updated, skipped, failed, List.of(items));
     }
 
     @Nested
@@ -34,10 +50,6 @@ class PackageServiceTest {
             options.put("name", "test-export");
             options.put("version", "1.0.0");
             options.put("collectionIds", List.of("col-1"));
-            options.put("roleIds", List.of());
-            options.put("policyIds", List.of());
-            options.put("uiPageIds", List.of());
-            options.put("uiMenuIds", List.of());
 
             Map<String, Object> collection = new LinkedHashMap<>();
             collection.put("id", "col-1");
@@ -48,23 +60,18 @@ class PackageServiceTest {
             Map<String, Object> field = new LinkedHashMap<>();
             field.put("id", "f-1");
             field.put("collection_id", "col-1");
+            field.put("collection_name", "users");
             field.put("name", "email");
             field.put("type", "STRING");
-            when(repository.findFieldsByCollectionIds("t1", List.of("col-1"))).thenReturn(List.of(field));
-
-            when(repository.findRolesByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findPoliciesByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findRoutePoliciesByPolicyIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findFieldPoliciesByPolicyIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findUiPagesByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findUiMenusByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findUiMenuItemsByMenuIds(eq("t1"), anyList())).thenReturn(List.of());
+            when(repository.findFieldsWithNamesByCollectionIds("t1", List.of("col-1")))
+                    .thenReturn(List.of(field));
             when(repository.save(any(), any(), any(), any(), any(), any(), any())).thenReturn("hist-1");
 
             var result = service.exportPackage("t1", options);
 
             assertThat(result.get("name")).isEqualTo("test-export");
             assertThat(result.get("version")).isEqualTo("1.0.0");
+            assertThat(result.get("formatVersion")).isEqualTo(2);
 
             @SuppressWarnings("unchecked")
             var items = (List<Map<String, Object>>) result.get("items");
@@ -84,14 +91,8 @@ class PackageServiceTest {
             Map<String, Object> options = new LinkedHashMap<>();
             options.put("name", "role-pkg");
             options.put("version", "1.0.0");
-            options.put("collectionIds", List.of());
             options.put("roleIds", List.of("role-1"));
             options.put("policyIds", List.of("pol-1"));
-            options.put("uiPageIds", List.of());
-            options.put("uiMenuIds", List.of());
-
-            when(repository.findCollectionsByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findFieldsByCollectionIds(eq("t1"), anyList())).thenReturn(List.of());
 
             Map<String, Object> role = new LinkedHashMap<>();
             role.put("id", "role-1");
@@ -104,12 +105,6 @@ class PackageServiceTest {
             policy.put("name", "read-all");
             policy.put("tenant_id", "t1");
             when(repository.findPoliciesByIds("t1", List.of("pol-1"))).thenReturn(List.of(policy));
-
-            when(repository.findRoutePoliciesByPolicyIds("t1", List.of("pol-1"))).thenReturn(List.of());
-            when(repository.findFieldPoliciesByPolicyIds("t1", List.of("pol-1"))).thenReturn(List.of());
-            when(repository.findUiPagesByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findUiMenusByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findUiMenuItemsByMenuIds(eq("t1"), anyList())).thenReturn(List.of());
             when(repository.save(any(), any(), any(), any(), any(), any(), any())).thenReturn("hist-1");
 
             var result = service.exportPackage("t1", options);
@@ -128,21 +123,6 @@ class PackageServiceTest {
             options.put("name", "hist-test");
             options.put("version", "2.0.0");
             options.put("description", "Test export");
-            options.put("collectionIds", List.of());
-            options.put("roleIds", List.of());
-            options.put("policyIds", List.of());
-            options.put("uiPageIds", List.of());
-            options.put("uiMenuIds", List.of());
-
-            when(repository.findCollectionsByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findFieldsByCollectionIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findRolesByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findPoliciesByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findRoutePoliciesByPolicyIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findFieldPoliciesByPolicyIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findUiPagesByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findUiMenusByIds(eq("t1"), anyList())).thenReturn(List.of());
-            when(repository.findUiMenuItemsByMenuIds(eq("t1"), anyList())).thenReturn(List.of());
             when(repository.save(any(), any(), any(), any(), any(), any(), any())).thenReturn("hist-1");
 
             service.exportPackage("t1", options);
@@ -157,14 +137,14 @@ class PackageServiceTest {
     class PreviewImport {
 
         @Test
-        @DisplayName("Should identify new items as creates")
+        @DisplayName("Should classify dry-run creates")
         void shouldIdentifyCreates() {
             Map<String, Object> pkg = new LinkedHashMap<>();
             pkg.put("items", List.of(
-                    Map.of("type", "COLLECTION", "data", Map.of("id", "col-1", "name", "new_col"))
-            ));
-
-            when(repository.findCollectionsByNames("t1", List.of("new_col"))).thenReturn(List.of());
+                    Map.of("type", "COLLECTION", "data", Map.of("id", "col-1", "name", "new_col"))));
+            when(importService.importPackage(eq("t1"), eq(pkg), any()))
+                    .thenReturn(report(new PackageImportService.ItemResult(
+                            "COLLECTION", "new_col", "CREATED", null)));
 
             var result = service.previewImport("t1", pkg);
 
@@ -175,15 +155,14 @@ class PackageServiceTest {
         }
 
         @Test
-        @DisplayName("Should identify existing items as conflicts")
+        @DisplayName("Should classify skipped/failed items as conflicts")
         void shouldIdentifyConflicts() {
             Map<String, Object> pkg = new LinkedHashMap<>();
             pkg.put("items", List.of(
-                    Map.of("type", "ROLE", "data", Map.of("id", "role-1", "name", "admin"))
-            ));
-
-            when(repository.findRolesByNames("t1", List.of("admin")))
-                    .thenReturn(List.of(Map.of("id", "role-existing", "name", "admin")));
+                    Map.of("type", "ROLE", "data", Map.of("id", "role-1", "name", "admin"))));
+            when(importService.importPackage(eq("t1"), eq(pkg), any()))
+                    .thenReturn(report(new PackageImportService.ItemResult(
+                            "ROLE", "admin", "SKIPPED", null)));
 
             var result = service.previewImport("t1", pkg);
 
@@ -193,16 +172,30 @@ class PackageServiceTest {
         }
 
         @Test
-        @DisplayName("Should be idempotent with no side effects")
-        void shouldBeIdempotent() {
+        @DisplayName("Should run the import engine in dry-run mode with no history writes")
+        void shouldBeDryRunOnly() {
             Map<String, Object> pkg = new LinkedHashMap<>();
             pkg.put("items", List.of());
+            when(importService.importPackage(eq("t1"), eq(pkg), any())).thenReturn(report());
 
             service.previewImport("t1", pkg);
-            service.previewImport("t1", pkg);
 
-            // No save calls should be made
+            verify(importService).importPackage(eq("t1"), eq(pkg),
+                    argThat(PackageImportService.ImportOptions::dryRun));
             verify(repository, never()).save(any(), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Should echo package provenance for the caller")
+        void shouldEchoSource() {
+            Map<String, Object> pkg = new LinkedHashMap<>();
+            pkg.put("items", List.of());
+            pkg.put("source", Map.of("instanceId", "inst-1", "tenantId", "other"));
+            when(importService.importPackage(eq("t1"), eq(pkg), any())).thenReturn(report());
+
+            var result = service.previewImport("t1", pkg);
+
+            assertThat(result.get("source")).isEqualTo(pkg.get("source"));
         }
     }
 
@@ -211,45 +204,65 @@ class PackageServiceTest {
     class ImportPackage {
 
         @Test
-        @DisplayName("Should return preview counts for dry run")
+        @DisplayName("Should return report counts for dry run without history")
         void shouldReturnPreviewForDryRun() {
             Map<String, Object> pkg = new LinkedHashMap<>();
             pkg.put("name", "test-pkg");
             pkg.put("version", "1.0.0");
-            pkg.put("items", List.of(
-                    Map.of("type", "COLLECTION", "data", Map.of("id", "col-1", "name", "new_col"))
-            ));
-
-            when(repository.findCollectionsByNames("t1", List.of("new_col"))).thenReturn(List.of());
+            pkg.put("items", List.of());
+            when(importService.importPackage(eq("t1"), eq(pkg), any()))
+                    .thenReturn(report(new PackageImportService.ItemResult(
+                            "COLLECTION", "new_col", "CREATED", null)));
 
             var result = service.importPackage("t1", pkg, true);
 
             assertThat(result.get("success")).isEqualTo(true);
             assertThat(result.get("created")).isEqualTo(1);
             assertThat(result.get("errors")).isEqualTo(List.of());
-
-            // Verify no actual imports happened
-            verify(repository, never()).getJdbcTemplate();
+            verify(repository, never()).save(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
         @DisplayName("Should record import in history")
         void shouldRecordImportHistory() {
-            org.springframework.jdbc.core.JdbcTemplate mockJdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
-            when(repository.getJdbcTemplate()).thenReturn(mockJdbc);
             when(repository.save(any(), any(), any(), any(), any(), any(), any())).thenReturn("hist-1");
 
             Map<String, Object> pkg = new LinkedHashMap<>();
             pkg.put("name", "import-test");
             pkg.put("version", "1.0.0");
-            pkg.put("items", List.of(
-                    Map.of("type", "ROLE", "data", Map.of("id", "role-1", "name", "viewer"))
-            ));
+            pkg.put("items", List.of());
+            when(importService.importPackage(eq("t1"), eq(pkg), any()))
+                    .thenReturn(report(new PackageImportService.ItemResult(
+                            "ROLE", "viewer", "CREATED", null)));
 
             service.importPackage("t1", pkg, false);
 
             verify(repository).save(eq("t1"), eq("import-test"), eq("1.0.0"), any(),
-                    eq("import"), any(), any());
+                    eq("import"), eq("success"), any());
+        }
+
+        @Test
+        @DisplayName("Should surface per-item failures in the errors list")
+        void shouldSurfaceErrors() {
+            when(repository.save(any(), any(), any(), any(), any(), any(), any())).thenReturn("hist-1");
+
+            Map<String, Object> pkg = new LinkedHashMap<>();
+            pkg.put("name", "import-test");
+            pkg.put("version", "1.0.0");
+            pkg.put("items", List.of());
+            when(importService.importPackage(eq("t1"), eq(pkg), any()))
+                    .thenReturn(report(new PackageImportService.ItemResult(
+                            "FIELD", "orders.ghost", "FAILED", "Collection not found in target: ghost")));
+
+            var result = service.importPackage("t1", pkg, false);
+
+            assertThat(result.get("success")).isEqualTo(false);
+            @SuppressWarnings("unchecked")
+            var errors = (List<Map<String, Object>>) result.get("errors");
+            assertThat(errors).hasSize(1);
+            assertThat(errors.get(0).get("message").toString()).contains("ghost");
+            verify(repository).save(eq("t1"), eq("import-test"), eq("1.0.0"), any(),
+                    eq("import"), eq("failed"), any());
         }
     }
 

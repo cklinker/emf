@@ -8,7 +8,6 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class PackageService {
@@ -17,14 +16,46 @@ public class PackageService {
 
     private final PackageRepository repository;
     private final ObjectMapper objectMapper;
+    private final PackageImportService importService;
 
-    public PackageService(PackageRepository repository, ObjectMapper objectMapper) {
+    public PackageService(PackageRepository repository, ObjectMapper objectMapper,
+                          PackageImportService importService) {
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.importService = importService;
+    }
+
+    /**
+     * Gathers export options covering every packageable item in the tenant.
+     * Used by sandbox cloning and full promotions.
+     */
+    public Map<String, Object> exportAllOptions(String tenantId, String name, String version) {
+        Map<String, Object> options = new LinkedHashMap<>();
+        options.put("name", name);
+        options.put("version", version);
+        options.put("collectionIds", repository.getJdbcTemplate().queryForList(
+                "SELECT id FROM collection WHERE tenant_id = ? AND system_collection = false",
+                String.class, tenantId));
+        // role/policy/route_policy/field_policy were dropped in V47 (legacy
+        // security tables) — the real per-tenant authz is profiles +
+        // permission-sets, seeded fresh in a sandbox by TenantProvisioningHook.
+        // Never query the dead tables and never clone/promote authz types.
+        options.put("uiPageIds", repository.findAllIds("ui_page", tenantId));
+        options.put("uiMenuIds", repository.findAllIds("ui_menu", tenantId));
+        options.put("flowIds", repository.findAllIds("flow", tenantId));
+        options.put("pageLayoutIds", repository.findAllIds("page_layout", tenantId));
+        options.put("validationRuleIds", repository.findAllIds("validation_rule", tenantId));
+        options.put("globalPicklistIds", repository.findAllIds("global_picklist", tenantId));
+        return options;
+    }
+
+    public Map<String, Object> exportPackage(String tenantId, Map<String, Object> options) {
+        return exportPackage(tenantId, options, true);
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> exportPackage(String tenantId, Map<String, Object> options) {
+    public Map<String, Object> exportPackage(String tenantId, Map<String, Object> options,
+                                             boolean recordHistory) {
         String name = (String) options.get("name");
         String version = (String) options.get("version");
         String description = (String) options.getOrDefault("description", "");
@@ -34,23 +65,70 @@ public class PackageService {
         List<String> policyIds = getStringList(options, "policyIds");
         List<String> uiPageIds = getStringList(options, "uiPageIds");
         List<String> uiMenuIds = getStringList(options, "uiMenuIds");
+        List<String> flowIds = getStringList(options, "flowIds");
+        List<String> pageLayoutIds = getStringList(options, "pageLayoutIds");
+        List<String> validationRuleIds = getStringList(options, "validationRuleIds");
+        List<String> globalPicklistIds = getStringList(options, "globalPicklistIds");
 
         Map<String, Object> pkg = new LinkedHashMap<>();
+        pkg.put("formatVersion", 2);
         pkg.put("name", name);
         pkg.put("version", version);
         pkg.put("description", description);
         pkg.put("exportedAt", java.time.Instant.now().toString());
 
+        // Provenance: the only cross-topology identity check an importer can make
+        // is source != target — stamp where this package came from (V157).
+        Map<String, Object> source = new LinkedHashMap<>();
+        source.put("instanceId", repository.findInstanceId().orElse(null));
+        source.put("tenantId", tenantId);
+        source.put("tenantSlug", repository.findTenantSlug(tenantId).orElse(null));
+        pkg.put("source", source);
+
         List<Map<String, Object>> items = new ArrayList<>();
 
-        // Export collections and their fields
+        // Export collections and their fields (fields carry owning + referenced
+        // collection names so the importer can remap FKs by natural key)
         var collections = repository.findCollectionsByIds(tenantId, collectionIds);
         for (var col : collections) {
             items.add(buildItem("COLLECTION", col));
         }
-        var fields = repository.findFieldsByCollectionIds(tenantId, collectionIds);
+        var fields = repository.findFieldsWithNamesByCollectionIds(tenantId, collectionIds);
         for (var field : fields) {
             items.add(buildItem("FIELD", field));
+        }
+
+        // Global picklists + values (GLOBAL-source and FIELD-source)
+        var picklists = repository.findGlobalPicklistsByIds(tenantId, globalPicklistIds);
+        for (var pl : picklists) {
+            items.add(buildItem("GLOBAL_PICKLIST", pl));
+        }
+        for (var pv : repository.findGlobalPicklistValues(tenantId, globalPicklistIds)) {
+            items.add(buildItem("PICKLIST_VALUE", pv));
+        }
+        for (var pv : repository.findFieldPicklistValues(tenantId, collectionIds)) {
+            items.add(buildItem("PICKLIST_VALUE", pv));
+        }
+
+        // Validation rules
+        for (var vr : repository.findValidationRulesByIds(tenantId, validationRuleIds)) {
+            items.add(buildItem("VALIDATION_RULE", vr));
+        }
+
+        // Page layouts + sections + layout fields
+        for (var pl : repository.findPageLayoutsByIds(tenantId, pageLayoutIds)) {
+            items.add(buildItem("PAGE_LAYOUT", pl));
+        }
+        for (var ls : repository.findLayoutSectionsByLayoutIds(tenantId, pageLayoutIds)) {
+            items.add(buildItem("LAYOUT_SECTION", ls));
+        }
+        for (var lf : repository.findLayoutFieldsByLayoutIds(tenantId, pageLayoutIds)) {
+            items.add(buildItem("LAYOUT_FIELD", lf));
+        }
+
+        // Flows
+        for (var flow : repository.findFlowsByIds(tenantId, flowIds)) {
+            items.add(buildItem("FLOW", flow));
         }
 
         // Export roles
@@ -84,7 +162,7 @@ public class PackageService {
         for (var menu : menus) {
             items.add(buildItem("UI_MENU", menu));
         }
-        var menuItems = repository.findUiMenuItemsByMenuIds(tenantId, uiMenuIds);
+        var menuItems = repository.findUiMenuItemsWithMenuNames(tenantId, uiMenuIds);
         for (var mi : menuItems) {
             items.add(buildItem("UI_MENU_ITEM", mi));
         }
@@ -102,140 +180,134 @@ public class PackageService {
                 })
                 .toList();
 
-        try {
-            String itemsJson = objectMapper.writeValueAsString(summaryItems);
-            String historyId = repository.save(tenantId, name, version, description, "export", "success", itemsJson);
-            log.info("Package exported: id={}, name={}, version={}, items={}", historyId, name, version, items.size());
-        } catch (Exception e) {
-            log.error("Failed to record export history", e);
+        if (recordHistory) {
+            try {
+                String itemsJson = objectMapper.writeValueAsString(summaryItems);
+                String historyId = repository.save(tenantId, name, version, description, "export", "success", itemsJson);
+                log.info("Package exported: id={}, name={}, version={}, items={}", historyId, name, version, items.size());
+            } catch (Exception e) {
+                log.error("Failed to record export history", e);
+            }
         }
 
         return pkg;
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Read-only preview: classifies every package item as create/update/conflict
+     * via the import engine's dry-run pass (same natural-key resolution as a real
+     * import) and echoes the package's provenance for the caller to display.
+     */
     public Map<String, Object> previewImport(String tenantId, Map<String, Object> pkg) {
-        List<Map<String, Object>> items = (List<Map<String, Object>>) pkg.getOrDefault("items", List.of());
+        var report = importService.importPackage(tenantId, pkg,
+                new PackageImportService.ImportOptions(
+                        PackageImportService.ConflictMode.SKIP, true, null, null, null));
 
         List<Map<String, Object>> creates = new ArrayList<>();
         List<Map<String, Object>> updates = new ArrayList<>();
         List<Map<String, Object>> conflicts = new ArrayList<>();
-
-        // Group items by type
-        Map<String, List<Map<String, Object>>> itemsByType = items.stream()
-                .collect(Collectors.groupingBy(item -> (String) item.get("type")));
-
-        // Check collections
-        checkExisting(tenantId, itemsByType.getOrDefault("COLLECTION", List.of()),
-                creates, updates, conflicts, "collection");
-
-        // Check roles
-        checkExisting(tenantId, itemsByType.getOrDefault("ROLE", List.of()),
-                creates, updates, conflicts, "role");
-
-        // Check policies
-        checkExisting(tenantId, itemsByType.getOrDefault("POLICY", List.of()),
-                creates, updates, conflicts, "policy");
-
-        // Check UI pages
-        checkExisting(tenantId, itemsByType.getOrDefault("UI_PAGE", List.of()),
-                creates, updates, conflicts, "page");
-
-        // Check UI menus
-        checkExisting(tenantId, itemsByType.getOrDefault("UI_MENU", List.of()),
-                creates, updates, conflicts, "menu");
+        for (var item : report.items()) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("type", item.type());
+            entry.put("name", item.naturalKey());
+            switch (item.action()) {
+                case "CREATED" -> creates.add(entry);
+                case "UPDATED" -> updates.add(entry);
+                default -> {
+                    Map<String, Object> conflict = new LinkedHashMap<>();
+                    conflict.put("item", entry);
+                    conflict.put("existingItem", entry);
+                    if (item.error() != null) {
+                        conflict.put("error", item.error());
+                    }
+                    conflicts.add(conflict);
+                }
+            }
+        }
 
         Map<String, Object> preview = new LinkedHashMap<>();
         preview.put("creates", creates);
         preview.put("updates", updates);
         preview.put("conflicts", conflicts);
+        preview.put("items", toItemMaps(report));
+        if (pkg.get("source") != null) {
+            preview.put("source", pkg.get("source"));
+        }
         return preview;
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> importPackage(String tenantId, Map<String, Object> pkg, boolean dryRun) {
-        List<Map<String, Object>> items = (List<Map<String, Object>>) pkg.getOrDefault("items", List.of());
+        return importPackage(tenantId, pkg,
+                new PackageImportService.ImportOptions(
+                        PackageImportService.ConflictMode.SKIP, dryRun, null, null, null));
+    }
+
+    /**
+     * Applies (or dry-runs) a package via {@link PackageImportService} and records
+     * package history. Response keeps the legacy keys the CLI/UI consume
+     * (success/created/updated/skipped/errors) plus the per-item report.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> importPackage(String tenantId, Map<String, Object> pkg,
+                                             PackageImportService.ImportOptions options) {
         String name = (String) pkg.getOrDefault("name", "unnamed");
         String version = (String) pkg.getOrDefault("version", "0.0.0");
 
-        int created = 0;
-        int updated = 0;
-        int skipped = 0;
+        var report = importService.importPackage(tenantId, pkg, options);
+
         List<Map<String, Object>> errors = new ArrayList<>();
-
-        if (dryRun) {
-            // For dry run, just return the preview counts
-            var preview = previewImport(tenantId, pkg);
-            List<?> createsList = (List<?>) preview.get("creates");
-            List<?> updatesList = (List<?>) preview.get("updates");
-            List<?> conflictsList = (List<?>) preview.get("conflicts");
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("created", createsList.size());
-            result.put("updated", updatesList.size());
-            result.put("skipped", conflictsList.size());
-            result.put("errors", List.of());
-            return result;
+        for (var item : report.items()) {
+            if ("FAILED".equals(item.action())) {
+                Map<String, Object> error = new LinkedHashMap<>();
+                error.put("item", Map.of("type", item.type(), "name", item.naturalKey()));
+                error.put("message", item.error());
+                errors.add(error);
+            }
         }
 
-        // Group items by type for ordered processing
-        Map<String, List<Map<String, Object>>> itemsByType = items.stream()
-                .collect(Collectors.groupingBy(item -> (String) item.get("type")));
-
-        // Process in dependency order: collections -> fields -> roles -> policies -> route/field policies -> UI
-        created += importItems(tenantId, itemsByType.getOrDefault("COLLECTION", List.of()),
-                "collection", errors);
-        created += importItems(tenantId, itemsByType.getOrDefault("FIELD", List.of()),
-                "field", errors);
-        created += importItems(tenantId, itemsByType.getOrDefault("ROLE", List.of()),
-                "role", errors);
-        created += importItems(tenantId, itemsByType.getOrDefault("POLICY", List.of()),
-                "policy", errors);
-        created += importItems(tenantId, itemsByType.getOrDefault("ROUTE_POLICY", List.of()),
-                "route_policy", errors);
-        created += importItems(tenantId, itemsByType.getOrDefault("FIELD_POLICY", List.of()),
-                "field_policy", errors);
-        created += importItems(tenantId, itemsByType.getOrDefault("UI_PAGE", List.of()),
-                "page", errors);
-        created += importItems(tenantId, itemsByType.getOrDefault("UI_MENU", List.of()),
-                "menu", errors);
-        created += importItems(tenantId, itemsByType.getOrDefault("UI_MENU_ITEM", List.of()),
-                "menu_item", errors);
-
-        boolean success = errors.isEmpty();
-        String status = success ? "success" : "failed";
-
-        // Record in history
-        try {
-            List<Map<String, Object>> summaryItems = items.stream()
-                    .filter(item -> "COLLECTION".equals(item.get("type"))
-                            || "ROLE".equals(item.get("type"))
-                            || "POLICY".equals(item.get("type"))
-                            || "UI_PAGE".equals(item.get("type"))
-                            || "UI_MENU".equals(item.get("type")))
-                    .map(item -> {
-                        Map<String, Object> data = (Map<String, Object>) item.get("data");
-                        Map<String, Object> summary = new LinkedHashMap<>();
-                        summary.put("type", mapItemTypeToUiType((String) item.get("type")));
-                        summary.put("id", data.get("id"));
-                        summary.put("name", data.get("name"));
-                        return summary;
-                    })
-                    .toList();
-            String itemsJson = objectMapper.writeValueAsString(summaryItems);
-            repository.save(tenantId, name, version, null, "import", status, itemsJson);
-        } catch (Exception e) {
-            log.error("Failed to record import history", e);
+        if (!options.dryRun()) {
+            try {
+                List<Map<String, Object>> summaryItems = report.items().stream()
+                        .map(item -> {
+                            Map<String, Object> summary = new LinkedHashMap<>();
+                            summary.put("type", mapItemTypeToUiType(item.type()));
+                            summary.put("name", item.naturalKey());
+                            summary.put("action", item.action());
+                            return summary;
+                        })
+                        .toList();
+                String itemsJson = objectMapper.writeValueAsString(summaryItems);
+                repository.save(tenantId, name, version, null, "import",
+                        report.success() ? "success" : "failed", itemsJson);
+            } catch (Exception e) {
+                log.error("Failed to record import history", e);
+            }
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", success);
-        result.put("created", created);
-        result.put("updated", updated);
-        result.put("skipped", skipped);
+        result.put("success", report.success());
+        result.put("created", report.created());
+        result.put("updated", report.updated());
+        result.put("skipped", report.skipped());
+        result.put("failed", report.failed());
+        result.put("items", toItemMaps(report));
         result.put("errors", errors);
         return result;
+    }
+
+    private List<Map<String, Object>> toItemMaps(PackageImportService.ImportReport report) {
+        return report.items().stream()
+                .map(item -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("type", item.type());
+                    m.put("naturalKey", item.naturalKey());
+                    m.put("action", item.action());
+                    if (item.error() != null) {
+                        m.put("error", item.error());
+                    }
+                    return m;
+                })
+                .toList();
     }
 
     public List<Map<String, Object>> getHistory(String tenantId) {
@@ -271,188 +343,16 @@ public class PackageService {
 
     private Map<String, Object> buildItem(String type, Map<String, Object> data) {
         Map<String, Object> cleanData = new LinkedHashMap<>(data);
-        // Remove tenant_id from exported data
+        // Remove tenant-bound and user-bound values: ids are remapped on import,
+        // and source-tenant user ids are meaningless in the target tenant.
         cleanData.remove("tenant_id");
+        cleanData.remove("created_by");
+        cleanData.remove("updated_by");
 
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("type", type);
         item.put("data", cleanData);
         return item;
-    }
-
-    @SuppressWarnings("unchecked")
-    private void checkExisting(String tenantId, List<Map<String, Object>> items,
-                               List<Map<String, Object>> creates,
-                               List<Map<String, Object>> updates,
-                               List<Map<String, Object>> conflicts,
-                               String uiType) {
-        for (var item : items) {
-            Map<String, Object> data = (Map<String, Object>) item.get("data");
-            String itemName = (String) data.get("name");
-            String itemPath = (String) data.get("path");
-
-            boolean exists = false;
-            switch (uiType) {
-                case "collection" -> {
-                    var existing = repository.findCollectionsByNames(tenantId, List.of(itemName));
-                    exists = !existing.isEmpty();
-                }
-                case "role" -> {
-                    var existing = repository.findRolesByNames(tenantId, List.of(itemName));
-                    exists = !existing.isEmpty();
-                }
-                case "policy" -> {
-                    var existing = repository.findPoliciesByNames(tenantId, List.of(itemName));
-                    exists = !existing.isEmpty();
-                }
-                case "page" -> {
-                    if (itemPath != null) {
-                        var existing = repository.findUiPagesByPaths(tenantId, List.of(itemPath));
-                        exists = !existing.isEmpty();
-                    }
-                }
-                case "menu" -> {
-                    var existing = repository.findUiMenusByNames(tenantId, List.of(itemName));
-                    exists = !existing.isEmpty();
-                }
-            }
-
-            Map<String, Object> packageItem = new LinkedHashMap<>();
-            packageItem.put("type", uiType);
-            packageItem.put("id", data.get("id"));
-            packageItem.put("name", itemName != null ? itemName : itemPath);
-
-            if (exists) {
-                // Existing item = conflict (user decides skip/overwrite)
-                Map<String, Object> conflict = new LinkedHashMap<>();
-                conflict.put("item", packageItem);
-                conflict.put("existingItem", packageItem);
-                conflicts.add(conflict);
-            } else {
-                creates.add(packageItem);
-            }
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private int importItems(String tenantId, List<Map<String, Object>> items,
-                            String itemType, List<Map<String, Object>> errors) {
-        int count = 0;
-        for (var item : items) {
-            Map<String, Object> data = (Map<String, Object>) item.get("data");
-            try {
-                importSingleItem(tenantId, itemType, data);
-                count++;
-            } catch (Exception e) {
-                Map<String, Object> error = new LinkedHashMap<>();
-                Map<String, Object> packageItem = new LinkedHashMap<>();
-                packageItem.put("type", itemType);
-                packageItem.put("id", data.get("id"));
-                packageItem.put("name", data.get("name"));
-                error.put("item", packageItem);
-                error.put("message", e.getMessage());
-                errors.add(error);
-                log.warn("Failed to import {} item: {}", itemType, data.get("name"), e);
-            }
-        }
-        return count;
-    }
-
-    private void importSingleItem(String tenantId, String itemType, Map<String, Object> data) {
-        String id = UUID.randomUUID().toString();
-        java.sql.Timestamp now = java.sql.Timestamp.from(java.time.Instant.now());
-
-        switch (itemType) {
-            case "collection" -> importCollection(tenantId, id, data, now);
-            case "field" -> importField(tenantId, id, data, now);
-            case "role" -> importRole(tenantId, id, data, now);
-            case "policy" -> importPolicy(tenantId, id, data, now);
-            case "page" -> importUiPage(tenantId, id, data, now);
-            case "menu" -> importUiMenu(tenantId, id, data, now);
-            case "menu_item" -> importUiMenuItem(tenantId, id, data, now);
-            default -> log.debug("Skipping unsupported item type during import: {}", itemType);
-        }
-    }
-
-    private void importCollection(String tenantId, String id, Map<String, Object> data, java.sql.Timestamp now) {
-        repository.getJdbcTemplate().update(
-                "INSERT INTO collection (id, tenant_id, name, description, active, path, system_collection, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, false, ?, ?)",
-                id, tenantId, data.get("name"), data.get("description"),
-                data.getOrDefault("active", true), data.get("path"), now, now
-        );
-    }
-
-    private void importField(String tenantId, String id, Map<String, Object> data, java.sql.Timestamp now) {
-        // Fields reference their collection by collection_id - the collection must already exist
-        repository.getJdbcTemplate().update(
-                "INSERT INTO field (id, collection_id, name, type, required, active, description, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, data.get("collection_id"), data.get("name"), data.get("type"),
-                data.getOrDefault("required", false), data.getOrDefault("active", true),
-                data.get("description"), now, now
-        );
-    }
-
-    private void importRole(String tenantId, String id, Map<String, Object> data, java.sql.Timestamp now) {
-        repository.getJdbcTemplate().update(
-                "INSERT INTO role (id, tenant_id, name, description, created_at) " +
-                        "VALUES (?, ?, ?, ?, ?)",
-                id, tenantId, data.get("name"), data.get("description"), now
-        );
-    }
-
-    private void importPolicy(String tenantId, String id, Map<String, Object> data, java.sql.Timestamp now) {
-        String rulesJson = null;
-        Object rules = data.get("rules");
-        if (rules != null) {
-            try {
-                rulesJson = rules instanceof String ? (String) rules : objectMapper.writeValueAsString(rules);
-            } catch (Exception e) {
-                log.warn("Failed to serialize policy rules", e);
-            }
-        }
-        repository.getJdbcTemplate().update(
-                "INSERT INTO policy (id, tenant_id, name, description, rules, created_at) " +
-                        "VALUES (?, ?, ?, ?, ?::jsonb, ?)",
-                id, tenantId, data.get("name"), data.get("description"), rulesJson, now
-        );
-    }
-
-    private void importUiPage(String tenantId, String id, Map<String, Object> data, java.sql.Timestamp now) {
-        String configJson = null;
-        Object config = data.get("config");
-        if (config != null) {
-            try {
-                configJson = config instanceof String ? (String) config : objectMapper.writeValueAsString(config);
-            } catch (Exception e) {
-                log.warn("Failed to serialize UI page config", e);
-            }
-        }
-        repository.getJdbcTemplate().update(
-                "INSERT INTO ui_page (id, tenant_id, name, path, title, config, active, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?)",
-                id, tenantId, data.get("name"), data.get("path"), data.get("title"),
-                configJson, data.getOrDefault("active", true), now, now
-        );
-    }
-
-    private void importUiMenu(String tenantId, String id, Map<String, Object> data, java.sql.Timestamp now) {
-        repository.getJdbcTemplate().update(
-                "INSERT INTO ui_menu (id, tenant_id, name, description, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?)",
-                id, tenantId, data.get("name"), data.get("description"), now, now
-        );
-    }
-
-    private void importUiMenuItem(String tenantId, String id, Map<String, Object> data, java.sql.Timestamp now) {
-        repository.getJdbcTemplate().update(
-                "INSERT INTO ui_menu_item (id, menu_id, tenant_id, label, path, icon, display_order, active, created_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, data.get("menu_id"), tenantId, data.get("label"), data.get("path"),
-                data.get("icon"), data.getOrDefault("display_order", 0),
-                data.getOrDefault("active", true), now
-        );
     }
 
     @SuppressWarnings("unchecked")
@@ -475,6 +375,10 @@ public class PackageService {
             case "POLICY", "ROUTE_POLICY", "FIELD_POLICY" -> "policy";
             case "UI_PAGE" -> "page";
             case "UI_MENU", "UI_MENU_ITEM" -> "menu";
+            case "FLOW" -> "flow";
+            case "PAGE_LAYOUT", "LAYOUT_SECTION", "LAYOUT_FIELD" -> "layout";
+            case "VALIDATION_RULE" -> "validation-rule";
+            case "GLOBAL_PICKLIST", "PICKLIST_VALUE" -> "picklist";
             default -> type.toLowerCase();
         };
     }

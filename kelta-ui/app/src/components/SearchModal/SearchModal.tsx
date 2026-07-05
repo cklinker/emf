@@ -125,6 +125,13 @@ const NAV_PAGES: SearchResult[] = [
     subtitle: 'Permission profiles',
     path: '/profiles',
   },
+  {
+    id: 'nav-environments',
+    type: 'page',
+    title: 'Environments',
+    subtitle: 'Sandboxes and metadata promotion',
+    path: '/environments',
+  },
 ]
 
 const SEARCH_HISTORY_KEY = 'kelta_search_history'

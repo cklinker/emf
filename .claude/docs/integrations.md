@@ -39,6 +39,8 @@ Files attach to any record via the `attachments` system collection (backed by `f
 |---------|---------|
 | `kelta.config.collection.changed` | Schema change events |
 | `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist changed → gateway refreshes its allowlist cache |
+| `kelta.config.environment.changed.<tenantId>.<envId>` | Sandbox environment lifecycle (created/cloned/refreshed/archived) |
+| `kelta.config.promotion.executed.<tenantId>.<promotionId>` | Metadata promotion executed/failed/rolled back |
 | `kelta.worker.assignment.changed` | Worker assignment changes |
 | `kelta.record.changed` | Record CRUD events (`RecordChangedPayload`; carries `containsMaskedFields` when the collection has data-masking config — the gateway `RealtimeBridge` then omits record `data` from WebSocket fan-out) |
 
@@ -272,3 +274,30 @@ unsubscribe/suppression list).
   `campaignEmailsPerDay` governor limit (`TenantTierQuotas`) caps volume; a configurable
   `send-rate-per-second` throttle paces delivery. Config lives under `kelta.campaigns.*`
   (`CampaignProperties`).
+
+## Sandboxes & metadata promotion (multi-cluster)
+
+Sandbox = a real linked tenant (`tenant.parent_tenant_id`, V158); config moves between
+environments as **metadata packages** (`PackageService` export → `PackageImportService` import).
+
+- **Package format v2** — `{formatVersion: 2, source: {instanceId, tenantId, tenantSlug},
+  exportedAt, items: [{type, data}]}`. `instanceId` is the installation's stable identity
+  (`platform_instance`, V158). Items carry natural-key context (`collection_name`,
+  `reference_collection_name`, `layout_name`, `field_name`, `picklist_name`, `menu_name`) so
+  cross-tenant/cross-cluster import remaps every reference **by name, never by UUID**.
+  Importers accept v1 packages (minus the new types).
+- **Topology rule** — a tenant's dev/qa/staging/prod may span isolated clusters whose databases
+  don't know each other. The only universal identity check is **source ≠ target**: promotion
+  rejects a package whose `source.instanceId` + `source.tenantId` equal the local target.
+  Generic `/api/packages/import` still allows same-tenant reapply (restore).
+- **Remote push promotion** — an environment row may describe a remote target
+  (`remote_base_url`, `remote_tenant_slug`, `credential_ref`). `RemotePromotionClient` POSTs the
+  package to `{base}/{slug}/api/packages/import?conflictMode=` with a **vault PAT**
+  (`CredentialProvider`; the secret never lives on the env row). The remote PAT user needs
+  `CUSTOMIZE_APPLICATION` on the remote cluster. URL scheme allow-list http/https, no userinfo,
+  redirects disabled, bounded timeouts/response. Remote targets have no local snapshot —
+  rollback → 409; restore on the remote side.
+- **Manual cross-cluster path** — `kelta metadata export` on cluster A → move the file →
+  `kelta metadata apply` on cluster B (same hardened import + provenance).
+- **Security types** (`ROLE`/`POLICY`/`ROUTE_POLICY`/`FIELD_POLICY`) are cloned INTO sandboxes
+  but **never promoted** — authz changes reach production only via the explicit packages API.

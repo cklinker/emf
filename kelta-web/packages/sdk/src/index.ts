@@ -165,6 +165,12 @@ export type {
   ImportApiSpecRequest,
   ImportApiSpecResponse,
   ApiSpecValidateResult,
+  DelegatedNamedRef,
+  DelegatedAdminSummary,
+  DelegatedAdminScope,
+  SaveDelegatedAdminScopeRequest,
+  DelegatedCreateUserRequest,
+  DelegatedUpdateUserRequest,
 } from './admin/types';
 
 // Authentication

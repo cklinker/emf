@@ -61,6 +61,18 @@ export type {
   MigrationStatus,
 } from './MigrationsPage'
 
+// EnvironmentsPage - Sandbox environments + metadata promotion page
+export { EnvironmentsPage } from './EnvironmentsPage'
+export type {
+  EnvironmentsPageProps,
+  Environment,
+  EnvironmentStatus,
+  EnvironmentType,
+  Promotion,
+  PromotionStatus,
+  PromotionItem,
+} from './EnvironmentsPage'
+
 // ResourceBrowserPage - Resource browser page
 export { ResourceBrowserPage } from './ResourceBrowserPage'
 export type { ResourceBrowserPageProps, CollectionSummary } from './ResourceBrowserPage'

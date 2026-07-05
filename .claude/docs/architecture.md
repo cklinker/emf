@@ -126,6 +126,16 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   The endpoint resolves its own tenant from the verified token and records events under
   `TenantContext.withTenant`. Campaign management itself is a normal `/api/admin/campaigns`
   endpoint gated in-controller on `MANAGE_CAMPAIGNS` (the DB-lookup pattern above).
+- **Sandbox/promotion/package routes** (2026-07-04): `/api/environments/**` and
+  `/api/promotions/**` (static routes `environments`/`promotions`) are gated in-controller on
+  **`MANAGE_SANDBOXES`**; `/api/packages/**` (static route `packages`) on
+  **`CUSTOMIZE_APPLICATION`**. All three use the `MigrationController` pattern
+  (`CerbosPermissionResolver.getProfileId` + `BootstrapRepository.findProfileSystemPermissions`,
+  fail-closed 403). Creator/approver/executor identity comes from the gateway-forwarded
+  `X-User-Id` header — never from the request body. Cross-tenant work inside these services
+  uses explicit `TenantContext.callWithTenant(<uuid>, …)`; **never `runAsPlatform`** — no RLS
+  policy matches the `__platform__` sentinel, so reads under it silently return zero rows
+  (see concerns.md).
 
 **Worker-side system-permission check — how (use the existing pattern, don't reinvent):**
 - Enforce a specific system permission **in the controller/service** with a DB lookup against

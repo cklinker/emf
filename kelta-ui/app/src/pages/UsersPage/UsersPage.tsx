@@ -504,14 +504,23 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
   })
 
   const statusMutation = useMutation({
-    mutationFn: ({ userId, action }: { userId: string; action: 'deactivate' | 'activate' }) => {
+    mutationFn: async ({
+      userId,
+      action,
+    }: {
+      userId: string
+      action: 'deactivate' | 'activate'
+    }) => {
       const status = action === 'activate' ? 'ACTIVE' : 'INACTIVE'
       if (scoped) {
-        return keltaClient.admin.delegated.users.update(userId, { status })
+        await keltaClient.admin.delegated.users.update(userId, { status })
+        return
       }
-      return action === 'activate'
-        ? keltaClient.admin.users.activate(userId)
-        : keltaClient.admin.users.deactivate(userId)
+      if (action === 'activate') {
+        await keltaClient.admin.users.activate(userId)
+      } else {
+        await keltaClient.admin.users.deactivate(userId)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })

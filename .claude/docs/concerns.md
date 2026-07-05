@@ -115,22 +115,28 @@ ever exposed to a lower-privilege role. It is deliberately **not** auto-invoked 
   `MANAGE_TENANTS` holder → allow), so it hardens access but is not a hard security
   boundary on its own — pair it with the network-level controls above.
 
-**Data masking v1 covers the JSON:API surface only (accepted, documented).** Masking
-(`fieldTypeConfig.masking` + `MASKED` visibility → `unmask` Cerbos deny) is enforced by
-`CerbosFieldSecurityAdvice` (strip→mask), the `MaskedFieldPredicateInterceptor`
-filter/sort guard, and realtime `data` suppression (`containsMaskedFields`). Paths that
-bypass the advice still emit **plaintext** to their (privileged-gated) callers:
-- Data export (`VIEW_ALL_DATA`-gated) and report execution/exports (`MANAGE_REPORTS`
-  follow-up above) — **top v2 priority**: apply `RecordMaskingService.maskRows` at their
-  serialization boundaries; block report groupBy on masked fields (group keys disclose
-  values).
-- Dashboards (`DashboardDataService`) — shared widget cache is not per-viewer; needs a
-  post-cache mask or cache-key redesign.
-- Full-text `search_index` (`display_value` + tsvector) and semantic embeddings — a
-  masked field that is `searchable`/embedded leaks via match-confirmation; v2 excludes
-  masking-configured fields at index/embed time + reindexes on mask-add.
+**Data masking now covers JSON:API + the main egress paths; a few contexts stay v2
+(accepted, documented).** Masking (`fieldTypeConfig.masking` + `MASKED` visibility →
+`unmask` Cerbos deny) is enforced by `CerbosFieldSecurityAdvice` (strip→mask), the
+`MaskedFieldPredicateInterceptor` filter/sort guard, and realtime `data` suppression
+(`containsMaskedFields`). **Covered as of PR 2:**
+- Data export (`VIEW_ALL_DATA`-gated) and report execution/CSV/PDF export — mask via
+  `RecordMaskingService.maskRows` keyed to the requesting user (export threads the
+  requester into the async job; reports resolve it in the controller). Reports also
+  reject filter/sort/group-by on a field masked for the executor.
+- Full-text `search_index` (`display_value` + tsvector) and semantic embeddings —
+  masking-configured fields are excluded at index/embed time (field-config level, since
+  the shared index has no per-viewer identity), and the collection is reindexed when a
+  field's masking config toggles (`FieldConfigEventPublisher` → `rebuildCollectionIndexAsync`).
+**Still v2 (emit plaintext / unmasked to their gated callers):**
+- Dashboards (`DashboardDataService`) — shared Superset widget cache is not per-viewer;
+  needs a post-cache mask or cache-key redesign.
+- Scheduled report delivery + background/system exports run with a `null` principal
+  (system trust tier) and are **not** masked — same contract as flows below.
 - Flows/scripts/webhooks/NATS consumers — system trust tier, same contract as FLS today.
 - Bulk ops / merge — same accepted trade-off as write-FLS above.
+- Re-embedding pre-existing vectors when a field *gains* masking (new writes skip embed;
+  old embeddings are left stale — full re-embed automation is v2).
 Also: between storage-adapter decryption and the advice, plaintext exists in-process —
 never log field values on that path. **`field_history` is now live** (writer:
 `FieldHistoryHook`, wildcard, captures create/update/delete diffs of `trackHistory` fields;

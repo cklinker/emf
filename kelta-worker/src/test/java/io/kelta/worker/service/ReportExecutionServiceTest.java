@@ -24,6 +24,7 @@ class ReportExecutionServiceTest {
     private CollectionLifecycleManager lifecycleManager;
     private JdbcTemplate jdbcTemplate;
     private ObjectMapper objectMapper;
+    private RecordMaskingService recordMaskingService;
     private ReportExecutionService service;
 
     @BeforeEach
@@ -33,8 +34,10 @@ class ReportExecutionServiceTest {
         lifecycleManager = mock(CollectionLifecycleManager.class);
         jdbcTemplate = mock(JdbcTemplate.class);
         objectMapper = new ObjectMapper();
+        recordMaskingService = mock(RecordMaskingService.class);
         service = new ReportExecutionService(
-            queryEngine, collectionRegistry, lifecycleManager, jdbcTemplate, objectMapper);
+            queryEngine, collectionRegistry, lifecycleManager, jdbcTemplate, objectMapper,
+            recordMaskingService);
     }
 
     // =========================================================================
@@ -219,6 +222,61 @@ class ReportExecutionServiceTest {
             assertEquals("name", req.sorting().get(0).fieldName());
             return true;
         }));
+    }
+
+    @Test
+    void shouldMaskColumnValuesForNonUnmaskingPrincipal() {
+        when(jdbcTemplate.queryForList(contains("SELECT name FROM collection"), eq("col-1")))
+            .thenReturn(List.of(Map.of("name", "people")));
+        CollectionDefinition peopleDef = buildCollectionDef("people");
+        when(collectionRegistry.get("people")).thenReturn(peopleDef);
+
+        List<Map<String, Object>> records = new ArrayList<>();
+        records.add(new HashMap<>(Map.of("id", "r1", "ssn", "123-45-6789")));
+        when(queryEngine.executeQuery(eq(peopleDef), any(QueryRequest.class)))
+            .thenReturn(new QueryResult(records, new PaginationMetadata(1, 1, 200, 1)));
+
+        // ssn is masking-configured and denied to this principal.
+        when(recordMaskingService.maskableConfigs(peopleDef)).thenReturn(Map.of(
+            "ssn", new io.kelta.worker.service.FieldMaskingService.MaskingConfig(
+                io.kelta.worker.service.FieldMaskingService.MaskType.LAST4, '*', null)));
+        when(recordMaskingService.maskedFieldsFor(any(), any(), any(), eq("people"), any()))
+            .thenReturn(Set.of("ssn"));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("id", "rep");
+        config.put("primaryCollectionId", "col-1");
+        config.put("columns", "[{\"fieldName\":\"ssn\",\"label\":\"SSN\",\"type\":\"string\"}]");
+
+        var principal = new ReportExecutionService.MaskingPrincipal("u@x.io", "prof-1", "tenant-1");
+        service.execute(config, 1, 200, principal);
+
+        verify(recordMaskingService).maskRows(eq(peopleDef), eq(records),
+            eq("u@x.io"), eq("prof-1"), eq("tenant-1"));
+    }
+
+    @Test
+    void shouldRejectFilterOnMaskedField() {
+        when(jdbcTemplate.queryForList(contains("SELECT name FROM collection"), eq("col-1")))
+            .thenReturn(List.of(Map.of("name", "people")));
+        CollectionDefinition peopleDef = buildCollectionDef("people");
+        when(collectionRegistry.get("people")).thenReturn(peopleDef);
+        when(recordMaskingService.maskableConfigs(peopleDef)).thenReturn(Map.of(
+            "ssn", new io.kelta.worker.service.FieldMaskingService.MaskingConfig(
+                io.kelta.worker.service.FieldMaskingService.MaskType.FULL, '*', null)));
+        when(recordMaskingService.maskedFieldsFor(any(), any(), any(), eq("people"), any()))
+            .thenReturn(Set.of("ssn"));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("id", "rep");
+        config.put("primaryCollectionId", "col-1");
+        config.put("columns", "[{\"fieldName\":\"ssn\",\"label\":\"SSN\",\"type\":\"string\"}]");
+        config.put("filters", "[{\"field\":\"ssn\",\"operator\":\"eq\",\"value\":\"123-45-6789\"}]");
+
+        var principal = new ReportExecutionService.MaskingPrincipal("u@x.io", "prof-1", "tenant-1");
+        assertThrows(ReportExecutionService.ReportExecutionException.class,
+            () -> service.execute(config, 1, 200, principal));
+        verify(queryEngine, never()).executeQuery(any(), any());
     }
 
     @Test

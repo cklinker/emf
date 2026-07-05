@@ -572,6 +572,39 @@ describe('FieldEditor Component', () => {
       })
     })
 
+    it('should show the masking section for a string field and omit it for a number field', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<FieldEditor {...defaultProps} />)
+
+      // string is the default type → masking section present
+      expect(screen.getByTestId('masking-config')).toBeInTheDocument()
+
+      // switch to a non-string type → masking section gone
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'number')
+      expect(screen.queryByTestId('masking-config')).toBeNull()
+    })
+
+    it('should build fieldTypeConfig.masking when a masking strategy is chosen', async () => {
+      const onSave = vi.fn().mockResolvedValue(undefined)
+      const user = userEvent.setup()
+      renderWithProviders(<FieldEditor {...defaultProps} onSave={onSave} />)
+
+      await user.type(screen.getByTestId('field-name-input'), 'ssn')
+      await user.selectOptions(screen.getByTestId('field-masking-type-select'), 'LAST4')
+      await user.click(screen.getByTestId('field-editor-submit'))
+
+      await waitFor(() => {
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'ssn',
+            fieldTypeConfig: expect.objectContaining({
+              masking: expect.objectContaining({ type: 'LAST4' }),
+            }),
+          })
+        )
+      })
+    })
+
     it('should not call onSave when form is invalid', async () => {
       const onSave = vi.fn().mockResolvedValue(undefined)
       const user = userEvent.setup()

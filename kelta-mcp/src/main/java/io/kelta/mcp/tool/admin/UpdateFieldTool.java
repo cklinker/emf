@@ -36,6 +36,12 @@ public class UpdateFieldTool implements AdminTool {
         properties.put("defaultValue", Schemas.anyScalar(
                 "New default value. Pass it in the field's native JSON type — e.g. true for booleans, 360 for numbers, \"hello\" for strings."));
         properties.put("validation", Schemas.freeObject("New validation config."));
+        properties.put("maskingType", Schemas.string(
+                "Set data masking (string-typed fields): FULL, LAST4, EMAIL, CUSTOM, or NONE to remove it."));
+        properties.put("maskingChar", Schemas.string(
+                "Optional single character used for masked positions (default •)."));
+        properties.put("maskingCustomPattern", Schemas.string(
+                "Pattern for maskingType=CUSTOM: '#' reveals a character, any other char is shown literally, right-aligned."));
 
         Tool tool = Tool.builder()
                 .name("update_field")
@@ -67,8 +73,12 @@ public class UpdateFieldTool implements AdminTool {
                         }
                     }
                     if (args.get("validation") instanceof Map<?, ?> v) attrs.put("validation", v);
+                    if (args.get("maskingType") instanceof String mt && !mt.isBlank()) {
+                        String err = applyMasking(mt, args, attrs);
+                        if (err != null) return error(err);
+                    }
                     if (attrs.isEmpty()) {
-                        return error("Provide at least one of required, unique, description, defaultValue, validation.");
+                        return error("Provide at least one of required, unique, description, defaultValue, validation, maskingType.");
                     }
 
                     Map<String, Object> body = Map.of("data", Map.of(
@@ -83,6 +93,37 @@ public class UpdateFieldTool implements AdminTool {
                     }
                 })
                 .build();
+    }
+
+    private static final java.util.Set<String> MASK_STRATEGIES =
+            java.util.Set.of("FULL", "LAST4", "EMAIL", "CUSTOM");
+
+    /**
+     * Writes {@code fieldTypeConfig.masking} from the masking args. {@code NONE}
+     * clears masking (empty {@code fieldTypeConfig}). The worker validates that
+     * the field's type is maskable and ignores masking config on other types.
+     */
+    private static String applyMasking(String maskingType, Map<String, Object> args, Map<String, Object> attrs) {
+        String strategy = maskingType.trim().toUpperCase(java.util.Locale.ROOT);
+        if ("NONE".equals(strategy)) {
+            attrs.put("fieldTypeConfig", new LinkedHashMap<>());
+            return null;
+        }
+        if (!MASK_STRATEGIES.contains(strategy)) {
+            return "\"maskingType\" must be one of FULL, LAST4, EMAIL, CUSTOM, or NONE.";
+        }
+        Map<String, Object> masking = new LinkedHashMap<>();
+        masking.put("type", strategy);
+        if (args.get("maskingChar") instanceof String mc && !mc.isBlank()) {
+            masking.put("maskChar", mc.substring(0, 1));
+        }
+        if ("CUSTOM".equals(strategy) && args.get("maskingCustomPattern") instanceof String cp && !cp.isBlank()) {
+            masking.put("customPattern", cp);
+        }
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("masking", masking);
+        attrs.put("fieldTypeConfig", config);
+        return null;
     }
 
     private static CallToolResult error(String message) {

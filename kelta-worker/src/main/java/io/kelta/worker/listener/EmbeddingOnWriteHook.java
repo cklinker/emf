@@ -7,6 +7,7 @@ import io.kelta.runtime.model.FieldType;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
+import io.kelta.worker.service.FieldMaskingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,11 +59,14 @@ public class EmbeddingOnWriteHook implements BeforeSaveHook {
 
     private final CollectionRegistry collectionRegistry;
     private final EmbeddingService embeddingService;
+    private final FieldMaskingService fieldMaskingService;
 
     public EmbeddingOnWriteHook(CollectionRegistry collectionRegistry,
-                                EmbeddingService embeddingService) {
+                                EmbeddingService embeddingService,
+                                FieldMaskingService fieldMaskingService) {
         this.collectionRegistry = collectionRegistry;
         this.embeddingService = embeddingService;
+        this.fieldMaskingService = fieldMaskingService;
     }
 
     @Override
@@ -108,6 +112,13 @@ public class EmbeddingOnWriteHook implements BeforeSaveHook {
             if (sourceField == null) {
                 continue;
             }
+            // A masking-configured source field must never be embedded: the vector
+            // would encode its plaintext and semantic-search could match against it,
+            // bypassing masking. Skip embedding rather than embed a masked value.
+            FieldDefinition sourceDef = fieldByName(definition, sourceField);
+            if (sourceDef != null && fieldMaskingService.configFor(sourceDef).isPresent()) {
+                continue;
+            }
             // On update, only re-embed when the source field is part of this payload.
             if (isUpdate && !record.containsKey(sourceField)) {
                 continue;
@@ -136,6 +147,15 @@ public class EmbeddingOnWriteHook implements BeforeSaveHook {
         }
 
         return updates.isEmpty() ? BeforeSaveResult.ok() : BeforeSaveResult.withFieldUpdates(updates);
+    }
+
+    private static FieldDefinition fieldByName(CollectionDefinition definition, String name) {
+        for (FieldDefinition field : definition.fields()) {
+            if (field.name().equals(name)) {
+                return field;
+            }
+        }
+        return null;
     }
 
     private static String sourceField(FieldDefinition field) {

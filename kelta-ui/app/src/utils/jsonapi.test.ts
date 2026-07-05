@@ -62,6 +62,17 @@ describe('jsonapi utilities', () => {
 
       expect(result).toEqual({ id: '123' })
     })
+
+    it('should surface meta.maskedFields onto the flat record', () => {
+      const result = flattenResource({
+        id: '123',
+        type: 'person',
+        attributes: { ssn: '***-**-6789' },
+        meta: { maskedFields: ['ssn'] },
+      } as never)
+
+      expect((result as { __maskedFields?: string[] }).__maskedFields).toEqual(['ssn'])
+    })
   })
 
   describe('unwrapResource', () => {

@@ -124,6 +124,11 @@ export function LayoutFieldSections({
 }: LayoutFieldSectionsProps): React.ReactElement {
   const inlineEditing = !!editable && !!onFieldCommit
   const placementOverrides = useMemo(() => buildPlacementOverrides(sections), [sections])
+  // Fields the server masked for this viewer (`meta.maskedFields`, surfaced by flattenResource).
+  const maskedFieldSet = useMemo(() => {
+    const raw = (record as { __maskedFields?: unknown }).__maskedFields
+    return new Set(Array.isArray(raw) ? (raw as string[]) : [])
+  }, [record])
   // Build lookup maps once for efficient field resolution
   const { schemaFieldsByName, schemaFieldsById } = useMemo(() => {
     const byName = new Map<string, FieldDefinition>()
@@ -177,6 +182,7 @@ export function LayoutFieldSections({
                   editable
                   readOnly={placementOverrides.get(field.name)?.readOnly}
                   required={placementOverrides.get(field.name)?.required}
+                  masked={maskedFieldSet.has(field.name)}
                   onCommit={onFieldCommit}
                 />
               ) : (

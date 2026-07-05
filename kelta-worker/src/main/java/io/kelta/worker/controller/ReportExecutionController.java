@@ -4,7 +4,9 @@ import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.ReportExecutionService;
+import io.kelta.worker.service.ReportExecutionService.MaskingPrincipal;
 import io.kelta.worker.service.ReportExecutionService.ReportResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -36,13 +39,24 @@ public class ReportExecutionController {
     private final ReportExecutionService reportExecutionService;
     private final QueryEngine queryEngine;
     private final CollectionRegistry collectionRegistry;
+    private final CerbosPermissionResolver permissionResolver;
 
     public ReportExecutionController(ReportExecutionService reportExecutionService,
                                      QueryEngine queryEngine,
-                                     CollectionRegistry collectionRegistry) {
+                                     CollectionRegistry collectionRegistry,
+                                     CerbosPermissionResolver permissionResolver) {
         this.reportExecutionService = reportExecutionService;
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
+        this.permissionResolver = permissionResolver;
+    }
+
+    /** Builds the data-masking principal for the calling user from the gateway-forwarded identity headers. */
+    private MaskingPrincipal principalOf(HttpServletRequest request) {
+        return new MaskingPrincipal(
+            permissionResolver.getEmail(request),
+            permissionResolver.getProfileId(request),
+            permissionResolver.getTenantId(request));
     }
 
     /**
@@ -57,7 +71,8 @@ public class ReportExecutionController {
     public ResponseEntity<Map<String, Object>> executeReport(
             @PathVariable String reportId,
             @RequestParam(value = "page[number]", defaultValue = "1") int pageNumber,
-            @RequestParam(value = "page[size]", defaultValue = "200") int pageSize) {
+            @RequestParam(value = "page[size]", defaultValue = "200") int pageSize,
+            HttpServletRequest request) {
 
         try {
             // Load the report config from the reports system collection
@@ -66,7 +81,8 @@ public class ReportExecutionController {
                 return ResponseEntity.notFound().build();
             }
 
-            ReportResult result = reportExecutionService.execute(reportConfig, pageNumber, pageSize);
+            ReportResult result = reportExecutionService.execute(
+                reportConfig, pageNumber, pageSize, principalOf(request));
 
             Map<String, Object> attributes = new LinkedHashMap<>();
             attributes.put("reportId", reportId);
@@ -119,6 +135,7 @@ public class ReportExecutionController {
     public void exportReport(
             @PathVariable String reportId,
             @RequestParam(defaultValue = "csv") String format,
+            HttpServletRequest request,
             HttpServletResponse response) {
 
         try {
@@ -128,6 +145,7 @@ public class ReportExecutionController {
                 return;
             }
 
+            MaskingPrincipal principal = principalOf(request);
             String reportName = (String) reportConfig.getOrDefault("name", "report");
             String safeFileName = reportName.replaceAll("[^a-zA-Z0-9._-]", "_");
 
@@ -138,7 +156,7 @@ public class ReportExecutionController {
 
                 try (Writer writer = new OutputStreamWriter(
                         response.getOutputStream(), StandardCharsets.UTF_8)) {
-                    reportExecutionService.exportCsv(reportConfig, writer);
+                    reportExecutionService.exportCsv(reportConfig, writer, principal);
                     writer.flush();
                 }
             } else if ("pdf".equalsIgnoreCase(format)) {
@@ -146,7 +164,7 @@ public class ReportExecutionController {
                 response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
                     "attachment; filename=\"" + safeFileName + ".pdf\"");
 
-                reportExecutionService.exportPdf(reportConfig, response.getOutputStream());
+                reportExecutionService.exportPdf(reportConfig, response.getOutputStream(), principal);
                 response.getOutputStream().flush();
             } else {
                 response.setStatus(400);

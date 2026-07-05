@@ -71,6 +71,12 @@ final class FieldBodyBuilder {
             if (err != null) return Result.error(err);
         }
 
+        // Data masking — additive, string-typed fields only. Merges into any
+        // fieldTypeConfig already assembled above (maskable types don't overlap
+        // picklist/vector, so in practice this is the only writer).
+        String maskErr = applyMaskingConfig(args, nativeType, attrs);
+        if (maskErr != null) return Result.error(maskErr);
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("type", "fields");
         data.put("attributes", attrs);
@@ -153,6 +159,49 @@ final class FieldBodyBuilder {
         }
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("dimension", dim);
+        attrs.put("fieldTypeConfig", config);
+        return null;
+    }
+
+    /** Native field types that accept a data-masking config — mirrors the worker's {@code FieldMaskingService.MASKABLE_TYPES}. */
+    private static final java.util.Set<String> MASKABLE_TYPES = java.util.Set.of(
+            "STRING", "TEXT", "RICH_TEXT", "EMAIL", "PHONE", "URL", "ENCRYPTED", "EXTERNAL_ID");
+
+    private static final java.util.Set<String> MASK_STRATEGIES =
+            java.util.Set.of("FULL", "LAST4", "EMAIL", "CUSTOM");
+
+    /**
+     * Applies an optional {@code masking} config from the {@code maskingType}
+     * (+ optional {@code maskingChar} / {@code maskingCustomPattern}) args onto
+     * {@code fieldTypeConfig.masking}. No-op when {@code maskingType} is absent
+     * or {@code NONE}; errors on a non-maskable type or unknown strategy.
+     */
+    @SuppressWarnings("unchecked")
+    private String applyMaskingConfig(Map<String, Object> args, String nativeType, Map<String, Object> attrs) {
+        Object raw = args.get("maskingType");
+        if (!(raw instanceof String s) || s.isBlank() || "NONE".equalsIgnoreCase(s)) {
+            return null;
+        }
+        String strategy = s.trim().toUpperCase(Locale.ROOT);
+        if (!MASK_STRATEGIES.contains(strategy)) {
+            return "\"maskingType\" must be one of FULL, LAST4, EMAIL, CUSTOM (or NONE).";
+        }
+        if (!MASKABLE_TYPES.contains(nativeType)) {
+            return "Data masking is only supported on string-typed fields; \"" + nativeType + "\" is not maskable.";
+        }
+        Map<String, Object> masking = new LinkedHashMap<>();
+        masking.put("type", strategy);
+        if (args.get("maskingChar") instanceof String mc && !mc.isBlank()) {
+            masking.put("maskChar", mc.substring(0, 1));
+        }
+        if ("CUSTOM".equals(strategy) && args.get("maskingCustomPattern") instanceof String cp && !cp.isBlank()) {
+            masking.put("customPattern", cp);
+        }
+        Object existing = attrs.get("fieldTypeConfig");
+        Map<String, Object> config = existing instanceof Map<?, ?> m
+                ? (Map<String, Object>) m
+                : new LinkedHashMap<>();
+        config.put("masking", masking);
         attrs.put("fieldTypeConfig", config);
         return null;
     }

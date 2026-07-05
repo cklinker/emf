@@ -326,10 +326,11 @@ public class FlowConfig {
             JdbcTemplate jdbcTemplate,
             CollectionLifecycleManager lifecycleManager,
             io.kelta.worker.service.CerbosAuthorizationService cerbosAuthorizationService,
-            io.kelta.worker.service.FormulaRecomputeService formulaRecomputeService) {
+            io.kelta.worker.service.FormulaRecomputeService formulaRecomputeService,
+            io.kelta.worker.service.SearchIndexService searchIndexService) {
         FieldConfigEventPublisher publisher =
                 new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager,
-                        cerbosAuthorizationService, formulaRecomputeService);
+                        cerbosAuthorizationService, formulaRecomputeService, searchIndexService);
         hookRegistry.register(publisher);
         return publisher;
     }
@@ -636,9 +637,11 @@ public class FlowConfig {
     public io.kelta.worker.listener.EmbeddingOnWriteHook embeddingOnWriteHook(
             BeforeSaveHookRegistry hookRegistry,
             CollectionRegistry collectionRegistry,
-            io.kelta.runtime.embedding.EmbeddingService embeddingService) {
+            io.kelta.runtime.embedding.EmbeddingService embeddingService,
+            io.kelta.worker.service.FieldMaskingService fieldMaskingService) {
         io.kelta.worker.listener.EmbeddingOnWriteHook hook =
-                new io.kelta.worker.listener.EmbeddingOnWriteHook(collectionRegistry, embeddingService);
+                new io.kelta.worker.listener.EmbeddingOnWriteHook(
+                        collectionRegistry, embeddingService, fieldMaskingService);
         hookRegistry.register(hook);
         return hook;
     }

@@ -47,6 +47,7 @@ public class DataExportService {
     private final ObjectMapper objectMapper;
     private final Optional<S3StorageService> s3StorageService;
     private final PlatformEventPublisher eventPublisher;
+    private final RecordMaskingService recordMaskingService;
 
     public DataExportService(DataExportRepository exportRepository,
                              QueryEngine queryEngine,
@@ -54,7 +55,8 @@ public class DataExportService {
                              JdbcTemplate jdbcTemplate,
                              ObjectMapper objectMapper,
                              Optional<S3StorageService> s3StorageService,
-                             PlatformEventPublisher eventPublisher) {
+                             PlatformEventPublisher eventPublisher,
+                             RecordMaskingService recordMaskingService) {
         this.exportRepository = exportRepository;
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
@@ -62,6 +64,20 @@ public class DataExportService {
         this.objectMapper = objectMapper;
         this.s3StorageService = s3StorageService;
         this.eventPublisher = eventPublisher;
+        this.recordMaskingService = recordMaskingService;
+    }
+
+    /**
+     * The user an export runs on behalf of, for data-masking. Bulk export is an
+     * egress boundary the JSON:API read advice never sees, so masking-configured
+     * fields the user cannot unmask are masked in the serialized output. A
+     * {@code null}/blank principal (e.g. a legacy caller) exports unmasked —
+     * callers on a request path always pass the real user.
+     */
+    public record ExportPrincipal(String email, String profileId) {
+        boolean isPresent() {
+            return profileId != null && !profileId.isBlank();
+        }
     }
 
     /**
@@ -97,6 +113,15 @@ public class DataExportService {
      */
     @Async
     public void executeExport(String exportId, String tenantId) {
+        executeExport(exportId, tenantId, null);
+    }
+
+    /**
+     * Executes a data export asynchronously, masking every masking-configured
+     * field the given principal may not unmask in the serialized output.
+     */
+    @Async
+    public void executeExport(String exportId, String tenantId, ExportPrincipal principal) {
         var exportOpt = exportRepository.findPendingExport(exportId);
         if (exportOpt.isEmpty()) {
             log.warn("Export {} not found or not pending, skipping", exportId);
@@ -126,12 +151,12 @@ public class DataExportService {
                 int recordsExported;
 
                 if ("JSON".equalsIgnoreCase(format)) {
-                    ExportResult result = exportAsJson(exportId, tenantId, collections);
+                    ExportResult result = exportAsJson(exportId, tenantId, collections, principal);
                     exportData = result.data;
                     totalRecords = result.totalRecords;
                     recordsExported = result.recordsExported;
                 } else {
-                    ExportResult result = exportAsCsv(exportId, tenantId, collections);
+                    ExportResult result = exportAsCsv(exportId, tenantId, collections, principal);
                     exportData = result.data;
                     totalRecords = result.totalRecords;
                     recordsExported = result.recordsExported;
@@ -216,7 +241,8 @@ public class DataExportService {
     // =========================================================================
 
     private ExportResult exportAsCsv(String exportId, String tenantId,
-                                     List<CollectionInfo> collections) throws IOException {
+                                     List<CollectionInfo> collections,
+                                     ExportPrincipal principal) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         Writer writer = new OutputStreamWriter(baos, StandardCharsets.UTF_8);
 
@@ -256,6 +282,8 @@ public class DataExportService {
                     totalRecords += (int) result.metadata().totalCount();
                 }
 
+                maskRows(definition, result.data(), tenantId, principal);
+
                 for (Map<String, Object> record : result.data()) {
                     writer.write(fieldNames.stream()
                             .map(f -> escapeCsv(formatValue(record.get(f))))
@@ -286,7 +314,8 @@ public class DataExportService {
 
     @SuppressWarnings("unchecked")
     private ExportResult exportAsJson(String exportId, String tenantId,
-                                      List<CollectionInfo> collections) throws IOException {
+                                      List<CollectionInfo> collections,
+                                      ExportPrincipal principal) throws IOException {
         Map<String, Object> exportData = new LinkedHashMap<>();
         exportData.put("tenantId", tenantId);
         exportData.put("exportedAt", Instant.now().toString());
@@ -336,6 +365,7 @@ public class DataExportService {
                     totalRecords += (int) result.metadata().totalCount();
                 }
 
+                maskRows(definition, result.data(), tenantId, principal);
                 records.addAll(result.data());
                 recordsExported += result.data().size();
 
@@ -427,6 +457,20 @@ public class DataExportService {
             log.error("Failed to publish export completed event: exportId={}, error={}",
                     exportId, e.getMessage());
         }
+    }
+
+    /**
+     * Masks, in place, every masking-configured field of {@code definition} that
+     * the export's principal may not unmask. No-op for a system/null principal or
+     * a collection without masking config (no Cerbos call in that case).
+     */
+    private void maskRows(CollectionDefinition definition, List<Map<String, Object>> rows,
+                          String tenantId, ExportPrincipal principal) {
+        if (principal == null || !principal.isPresent()) {
+            return;
+        }
+        recordMaskingService.maskRows(definition, rows,
+                principal.email(), principal.profileId(), tenantId);
     }
 
     private String formatValue(Object value) {

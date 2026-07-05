@@ -31,6 +31,7 @@ class FieldConfigEventPublisherTest {
     private CollectionLifecycleManager lifecycleManager;
     private CerbosAuthorizationService cerbosAuthorizationService;
     private FormulaRecomputeService formulaRecomputeService;
+    private io.kelta.worker.service.SearchIndexService searchIndexService;
     private FieldConfigEventPublisher publisher;
 
     @BeforeEach
@@ -40,8 +41,9 @@ class FieldConfigEventPublisherTest {
         lifecycleManager = mock(CollectionLifecycleManager.class);
         cerbosAuthorizationService = mock(CerbosAuthorizationService.class);
         formulaRecomputeService = mock(FormulaRecomputeService.class);
+        searchIndexService = mock(io.kelta.worker.service.SearchIndexService.class);
         publisher = new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager,
-                cerbosAuthorizationService, formulaRecomputeService);
+                cerbosAuthorizationService, formulaRecomputeService, searchIndexService);
     }
 
     @Test
@@ -256,6 +258,41 @@ class FieldConfigEventPublisherTest {
         publisher.afterUpdate("field-1", record, previous, "tenant-1");
 
         verify(formulaRecomputeService).recomputeAsync("tenant-1", "invoices", "total");
+    }
+
+    @Test
+    @DisplayName("Should rebuild the search index when a field gains a masking config")
+    void shouldReindexWhenMaskingAdded() {
+        when(jdbcTemplate.queryForList(anyString(), eq("col-1")))
+                .thenReturn(List.of(Map.of("name", "people")));
+
+        Map<String, Object> record = new HashMap<>(Map.of(
+            "id", "field-1", "name", "ssn", "type", "STRING", "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("masking", Map.of("type", "LAST4"))));
+        Map<String, Object> previous = new HashMap<>(Map.of(
+            "id", "field-1", "name", "ssn", "type", "STRING", "collectionId", "col-1"));
+
+        publisher.afterUpdate("field-1", record, previous, "tenant-1");
+
+        verify(searchIndexService).rebuildCollectionIndexAsync("tenant-1", "people");
+    }
+
+    @Test
+    @DisplayName("Should not rebuild the search index when masking is unchanged")
+    void shouldNotReindexWhenMaskingUnchanged() {
+        when(jdbcTemplate.queryForList(anyString(), eq("col-1")))
+                .thenReturn(List.of(Map.of("name", "people")));
+
+        Map<String, Object> record = new HashMap<>(Map.of(
+            "id", "field-1", "name", "ssn", "type", "STRING", "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("masking", Map.of("type", "LAST4"))));
+        Map<String, Object> previous = new HashMap<>(Map.of(
+            "id", "field-1", "name", "ssn", "type", "STRING", "collectionId", "col-1",
+            "fieldTypeConfig", Map.of("masking", Map.of("type", "FULL"))));
+
+        publisher.afterUpdate("field-1", record, previous, "tenant-1");
+
+        verify(searchIndexService, never()).rebuildCollectionIndexAsync(anyString(), anyString());
     }
 
     @Test

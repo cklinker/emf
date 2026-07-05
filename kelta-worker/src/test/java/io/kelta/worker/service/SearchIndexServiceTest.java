@@ -29,7 +29,8 @@ class SearchIndexServiceTest {
         lifecycleManager = mock(CollectionLifecycleManager.class);
         collectionRegistry = mock(CollectionRegistry.class);
         storageAdapter = mock(StorageAdapter.class);
-        service = new SearchIndexService(jdbcTemplate, lifecycleManager, collectionRegistry, storageAdapter);
+        service = new SearchIndexService(jdbcTemplate, lifecycleManager, collectionRegistry, storageAdapter,
+                new FieldMaskingService());
     }
 
     @Nested
@@ -56,6 +57,38 @@ class SearchIndexServiceTest {
             assertThat(content).contains("A great widget");
             assertThat(content).contains("W-001");
             assertThat(content).doesNotContain("9.99");
+        }
+
+        @Test
+        @DisplayName("should exclude masking-configured fields from search content")
+        void shouldExcludeMaskingConfiguredFields() {
+            when(lifecycleManager.getSearchableFieldNames("people"))
+                    .thenReturn(Set.of("ssn", "bio"));
+            when(lifecycleManager.getDisplayFieldName("people"))
+                    .thenReturn("name");
+
+            io.kelta.runtime.model.FieldDefinition ssn = new io.kelta.runtime.model.FieldDefinitionBuilder()
+                    .name("ssn").type(io.kelta.runtime.model.FieldType.STRING)
+                    .fieldTypeConfig(Map.of("masking", Map.of("type", "LAST4")))
+                    .build();
+            io.kelta.runtime.model.FieldDefinition bio = new io.kelta.runtime.model.FieldDefinitionBuilder()
+                    .name("bio").type(io.kelta.runtime.model.FieldType.STRING).build();
+            io.kelta.runtime.model.FieldDefinition name = new io.kelta.runtime.model.FieldDefinitionBuilder()
+                    .name("name").type(io.kelta.runtime.model.FieldType.STRING).build();
+            when(collectionRegistry.get("people")).thenReturn(
+                    new io.kelta.runtime.model.CollectionDefinitionBuilder()
+                            .name("people").fields(java.util.List.of(name, ssn, bio)).build());
+
+            Map<String, Object> data = Map.of(
+                    "name", "Jane Doe",
+                    "ssn", "123-45-6789",
+                    "bio", "loves widgets");
+
+            String content = service.buildSearchContent("people", data);
+
+            assertThat(content).contains("Jane Doe");
+            assertThat(content).contains("loves widgets");
+            assertThat(content).doesNotContain("123-45-6789");
         }
 
         @Test

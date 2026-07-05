@@ -63,7 +63,8 @@ class EmbeddingOnWriteHookRegistryIntegrationTest {
     @BeforeEach
     void setUp() {
         registry = new BeforeSaveHookRegistry();
-        registry.register(new EmbeddingOnWriteHook(collectionRegistry, embeddingService));
+        registry.register(new EmbeddingOnWriteHook(collectionRegistry, embeddingService,
+                new io.kelta.worker.service.FieldMaskingService()));
         lenient().when(collectionRegistry.get("articles")).thenReturn(articles());
     }
 

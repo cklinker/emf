@@ -10,6 +10,7 @@ import io.kelta.runtime.workflow.BeforeSaveResult;
 import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.FormulaRecomputeService;
+import io.kelta.worker.service.SearchIndexService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -43,17 +44,20 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
     private final CollectionLifecycleManager lifecycleManager;
     private final CerbosAuthorizationService cerbosAuthorizationService;
     private final FormulaRecomputeService formulaRecomputeService;
+    private final SearchIndexService searchIndexService;
 
     public FieldConfigEventPublisher(PlatformEventPublisher eventPublisher,
                                       JdbcTemplate jdbcTemplate,
                                       CollectionLifecycleManager lifecycleManager,
                                       CerbosAuthorizationService cerbosAuthorizationService,
-                                      FormulaRecomputeService formulaRecomputeService) {
+                                      FormulaRecomputeService formulaRecomputeService,
+                                      SearchIndexService searchIndexService) {
         this.eventPublisher = eventPublisher;
         this.jdbcTemplate = jdbcTemplate;
         this.lifecycleManager = lifecycleManager;
         this.cerbosAuthorizationService = cerbosAuthorizationService;
         this.formulaRecomputeService = formulaRecomputeService;
+        this.searchIndexService = searchIndexService;
     }
 
     @Override
@@ -81,6 +85,13 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         publishCollectionUpdated(record, tenantId);
         if (isFormulaField(record) && expressionChanged(record, previous)) {
             scheduleFormulaRecompute(record, tenantId);
+        }
+        // A field gaining (or losing) a data-masking config changes what may be
+        // full-text indexed: masking-configured fields are excluded from the
+        // shared search index. Existing rows were indexed under the old config,
+        // so re-index the collection to purge (or restore) the field's plaintext.
+        if (maskingPresenceChanged(record, previous)) {
+            scheduleReindex(record, tenantId);
         }
     }
 
@@ -172,6 +183,33 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         String current = expressionOf(record);
         String prior = previous == null ? null : expressionOf(previous);
         return !Objects.equals(current, prior);
+    }
+
+    /** True when the field's {@code fieldTypeConfig.masking} presence flipped between save and prior. */
+    private static boolean maskingPresenceChanged(Map<String, Object> record, Map<String, Object> previous) {
+        return hasMaskingConfig(record) != (previous != null && hasMaskingConfig(previous));
+    }
+
+    private static boolean hasMaskingConfig(Map<String, Object> record) {
+        Object config = record.get("fieldTypeConfig");
+        return config instanceof Map<?, ?> m && m.get("masking") != null;
+    }
+
+    private void scheduleReindex(Map<String, Object> record, String tenantId) {
+        if (searchIndexService == null) {
+            return;
+        }
+        String collectionId = getString(record, "collectionId");
+        if (collectionId == null) {
+            return;
+        }
+        String collectionName = resolveCollectionName(collectionId);
+        if (collectionName == null) {
+            return;
+        }
+        log.info("Masking config toggled on a field of '{}' — rebuilding search index (tenant={})",
+                collectionName, tenantId);
+        searchIndexService.rebuildCollectionIndexAsync(tenantId, collectionName);
     }
 
     private void scheduleFormulaRecompute(Map<String, Object> record, String tenantId) {

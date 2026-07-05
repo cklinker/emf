@@ -131,8 +131,11 @@ public class DataExportController {
         securityLog.info("security_event=DATA_EXPORT_CREATED user={} tenant={} exportId={} scope={} format={}",
                 userEmail, tenantId, exportId, exportScope, format);
 
-        // Trigger async execution
-        dataExportService.executeExport(exportId, tenantId);
+        // Trigger async execution, carrying the requester's identity so masked
+        // fields they cannot unmask are masked in the exported file.
+        DataExportService.ExportPrincipal principal = new DataExportService.ExportPrincipal(
+                userEmail, permissionResolver.getProfileId(request));
+        dataExportService.executeExport(exportId, tenantId, principal);
 
         log.info("Data export created: exportId={}, scope={}, format={}, tenant={}",
                 exportId, exportScope, format, tenantId);

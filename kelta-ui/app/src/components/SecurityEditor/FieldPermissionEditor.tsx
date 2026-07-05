@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { Eye, EyeOff, Lock } from 'lucide-react'
+import { Eye, EyeOff, Lock, Asterisk } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select'
 
 /** Visibility options */
-export type FieldVisibility = 'VISIBLE' | 'READ_ONLY' | 'HIDDEN'
+export type FieldVisibility = 'VISIBLE' | 'READ_ONLY' | 'HIDDEN' | 'MASKED'
 
 /** Collection reference */
 export interface CollectionRef {
@@ -59,6 +59,7 @@ interface VisibilityOption {
 const VISIBILITY_OPTIONS: VisibilityOption[] = [
   { value: 'VISIBLE', label: 'Visible', icon: <Eye size={14} /> },
   { value: 'READ_ONLY', label: 'Read Only', icon: <Lock size={14} /> },
+  { value: 'MASKED', label: 'Masked', icon: <Asterisk size={14} /> },
   { value: 'HIDDEN', label: 'Hidden', icon: <EyeOff size={14} /> },
 ]
 
@@ -313,6 +314,9 @@ export function FieldPermissionEditor({
           <span>
             Read Only:{' '}
             {filteredFields.filter((f) => permissionMap.get(f.id) === 'READ_ONLY').length}
+          </span>
+          <span>
+            Masked: {filteredFields.filter((f) => permissionMap.get(f.id) === 'MASKED').length}
           </span>
           <span>
             Hidden: {filteredFields.filter((f) => permissionMap.get(f.id) === 'HIDDEN').length}

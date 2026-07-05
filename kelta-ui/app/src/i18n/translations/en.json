@@ -1667,6 +1667,19 @@
     "descriptionPlaceholder": "Enter a description for this field...",
     "trackHistory": "Track History",
     "searchable": "Searchable",
+    "masking": {
+      "title": "Data Masking",
+      "help": "Users whose profile lacks unmask rights see this field redacted (e.g. ***-**-6789). Note: analytics dashboards are not masked in this release.",
+      "strategy": "Masking strategy",
+      "none": "None",
+      "full": "Full (••••••)",
+      "last4": "Show last 4",
+      "email": "Email (j•••@domain)",
+      "custom": "Custom pattern",
+      "maskChar": "Mask character",
+      "pattern": "Custom pattern",
+      "patternHelp": "# reveals a character; any other character is shown literally, right-aligned."
+    },
     "rollup": {
       "title": "Rollup Summary Configuration",
       "childCollection": "Child Collection",

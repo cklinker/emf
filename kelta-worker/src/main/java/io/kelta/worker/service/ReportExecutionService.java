@@ -40,17 +40,32 @@ public class ReportExecutionService {
     private final CollectionLifecycleManager lifecycleManager;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final RecordMaskingService recordMaskingService;
 
     public ReportExecutionService(QueryEngine queryEngine,
                                   CollectionRegistry collectionRegistry,
                                   CollectionLifecycleManager lifecycleManager,
                                   JdbcTemplate jdbcTemplate,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  RecordMaskingService recordMaskingService) {
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
         this.lifecycleManager = lifecycleManager;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.recordMaskingService = recordMaskingService;
+    }
+
+    /**
+     * The principal a report runs on behalf of, for data-masking enforcement.
+     * {@code null} in every field marks a system-tier execution (e.g. scheduled
+     * delivery) which — like flows and other system contexts — bypasses masking;
+     * interactive controller paths always pass a real principal.
+     */
+    public record MaskingPrincipal(String email, String profileId, String tenantId) {
+        boolean isPresent() {
+            return profileId != null && !profileId.isBlank();
+        }
     }
 
     /**
@@ -62,6 +77,18 @@ public class ReportExecutionService {
      * @return the report execution result
      */
     public ReportResult execute(Map<String, Object> reportConfig, int pageNumber, int pageSize) {
+        return execute(reportConfig, pageNumber, pageSize, null);
+    }
+
+    /**
+     * Executes a report and returns paginated results, masking any field the
+     * given principal may not unmask and rejecting a report that filters, sorts,
+     * or groups by such a field (each would leak the plaintext through the
+     * predicate, ordering, or group key). A {@code null}/system principal skips
+     * masking.
+     */
+    public ReportResult execute(Map<String, Object> reportConfig, int pageNumber, int pageSize,
+                                MaskingPrincipal principal) {
         String reportId = (String) reportConfig.get("id");
         String reportName = (String) reportConfig.get("name");
         String primaryCollectionId = (String) reportConfig.get("primaryCollectionId");
@@ -83,6 +110,11 @@ public class ReportExecutionService {
         List<SortField> sorting = parseSorting(reportConfig);
         String groupBy = (String) reportConfig.get("groupBy");
 
+        // Reject filter/sort/group on a field this principal must see masked — each
+        // is a plaintext side-channel (predicate probe, ordering, group key).
+        Set<String> maskedFields = maskedFieldsForReport(targetCollection, principal);
+        assertNoMaskedPredicate(maskedFields, filters, sorting, groupBy);
+
         // Build field selection from columns
         List<String> fieldNames = columns.stream()
             .map(ColumnConfig::fieldName)
@@ -100,6 +132,13 @@ public class ReportExecutionService {
         log.info("Report executed: id={}, name='{}', collection='{}', page={}, pageSize={}, totalCount={}",
             reportId, reportName, targetCollection.name(),
             clampedPageNumber, clampedPageSize, queryResult.metadata().totalCount());
+
+        // Mask the value of any column the principal may not unmask before it is
+        // grouped or returned. Group keys use non-masked fields (guarded above).
+        if (!maskedFields.isEmpty()) {
+            recordMaskingService.maskRows(targetCollection, queryResult.data(),
+                principal.email(), principal.profileId(), principal.tenantId());
+        }
 
         // Build grouped results if needed
         Map<String, List<Map<String, Object>>> groups = null;
@@ -127,6 +166,16 @@ public class ReportExecutionService {
      * @throws IOException if writing fails
      */
     public void exportCsv(Map<String, Object> reportConfig, Writer writer) throws IOException {
+        exportCsv(reportConfig, writer, null);
+    }
+
+    /**
+     * CSV export masked for the given principal — masks column values the
+     * principal may not unmask and rejects a report filtering/sorting on such a
+     * field. A {@code null}/system principal exports unmasked.
+     */
+    public void exportCsv(Map<String, Object> reportConfig, Writer writer, MaskingPrincipal principal)
+            throws IOException {
         String primaryCollectionId = (String) reportConfig.get("primaryCollectionId");
         CollectionDefinition targetCollection = resolveCollection(primaryCollectionId);
         if (targetCollection == null) {
@@ -136,6 +185,9 @@ public class ReportExecutionService {
         List<ColumnConfig> columns = parseColumns(reportConfig.get("columns"));
         List<FilterCondition> filters = parseFilters(reportConfig.get("filters"));
         List<SortField> sorting = parseSorting(reportConfig);
+
+        Set<String> maskedFields = maskedFieldsForReport(targetCollection, principal);
+        assertNoMaskedPredicate(maskedFields, filters, sorting, null);
 
         List<String> fieldNames = columns.stream()
             .map(ColumnConfig::fieldName)
@@ -154,6 +206,11 @@ public class ReportExecutionService {
             Pagination pagination = new Pagination(page, MAX_REPORT_PAGE_SIZE);
             QueryRequest request = new QueryRequest(pagination, sorting, fieldNames, filters);
             QueryResult result = queryEngine.executeQuery(targetCollection, request);
+
+            if (!maskedFields.isEmpty()) {
+                recordMaskingService.maskRows(targetCollection, result.data(),
+                    principal.email(), principal.profileId(), principal.tenantId());
+            }
 
             for (Map<String, Object> record : result.data()) {
                 writer.write(columns.stream()
@@ -183,6 +240,15 @@ public class ReportExecutionService {
      * @param out          the output stream the PDF document is written to
      */
     public void exportPdf(Map<String, Object> reportConfig, java.io.OutputStream out) throws IOException {
+        exportPdf(reportConfig, out, null);
+    }
+
+    /**
+     * PDF export masked for the given principal — same masking + predicate guard
+     * as {@link #exportCsv(Map, Writer, MaskingPrincipal)}.
+     */
+    public void exportPdf(Map<String, Object> reportConfig, java.io.OutputStream out, MaskingPrincipal principal)
+            throws IOException {
         String primaryCollectionId = (String) reportConfig.get("primaryCollectionId");
         CollectionDefinition targetCollection = resolveCollection(primaryCollectionId);
         if (targetCollection == null) {
@@ -195,6 +261,10 @@ public class ReportExecutionService {
         }
         List<FilterCondition> filters = parseFilters(reportConfig.get("filters"));
         List<SortField> sorting = parseSorting(reportConfig);
+
+        Set<String> maskedFields = maskedFieldsForReport(targetCollection, principal);
+        assertNoMaskedPredicate(maskedFields, filters, sorting, null);
+
         List<String> fieldNames = columns.stream().map(ColumnConfig::fieldName).toList();
         String title = (String) reportConfig.getOrDefault("name", "Report");
 
@@ -206,6 +276,11 @@ public class ReportExecutionService {
                 Pagination pagination = new Pagination(page, MAX_REPORT_PAGE_SIZE);
                 QueryRequest request = new QueryRequest(pagination, sorting, fieldNames, filters);
                 QueryResult result = queryEngine.executeQuery(targetCollection, request);
+
+                if (!maskedFields.isEmpty()) {
+                    recordMaskingService.maskRows(targetCollection, result.data(),
+                        principal.email(), principal.profileId(), principal.tenantId());
+                }
 
                 for (Map<String, Object> record : result.data()) {
                     pdf.writeRow(columns.stream()
@@ -343,6 +418,51 @@ public class ReportExecutionService {
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /**
+     * The subset of the collection's masking-configured fields that {@code principal}
+     * may not unmask. Empty for a system/null principal or a collection with no
+     * masking config (no Cerbos call in that case — see RecordMaskingService).
+     */
+    private Set<String> maskedFieldsForReport(CollectionDefinition definition, MaskingPrincipal principal) {
+        if (principal == null || !principal.isPresent()) {
+            return Set.of();
+        }
+        Set<String> maskable = recordMaskingService.maskableConfigs(definition).keySet();
+        if (maskable.isEmpty()) {
+            return Set.of();
+        }
+        return recordMaskingService.maskedFieldsFor(
+            principal.email(), principal.profileId(), principal.tenantId(),
+            definition.name(), maskable);
+    }
+
+    /**
+     * Rejects a report whose filter, sort, or group-by references a masked field —
+     * each would disclose the plaintext (predicate probe, ordering, or group key)
+     * that masking is meant to hide.
+     */
+    private void assertNoMaskedPredicate(Set<String> maskedFields,
+                                         List<FilterCondition> filters,
+                                         List<SortField> sorting,
+                                         String groupBy) {
+        if (maskedFields.isEmpty()) {
+            return;
+        }
+        for (FilterCondition f : filters) {
+            if (maskedFields.contains(f.fieldName())) {
+                throw new ReportExecutionException("Cannot filter on a masked field: " + f.fieldName());
+            }
+        }
+        for (SortField s : sorting) {
+            if (maskedFields.contains(s.fieldName())) {
+                throw new ReportExecutionException("Cannot sort on a masked field: " + s.fieldName());
+            }
+        }
+        if (groupBy != null && maskedFields.contains(groupBy)) {
+            throw new ReportExecutionException("Cannot group by a masked field: " + groupBy);
+        }
+    }
 
     private CollectionDefinition resolveCollection(String collectionId) {
         // Check activeCollections map in lifecycle manager first

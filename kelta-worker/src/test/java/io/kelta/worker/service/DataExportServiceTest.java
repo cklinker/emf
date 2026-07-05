@@ -40,7 +40,8 @@ class DataExportServiceTest {
 
         service = new DataExportService(
                 exportRepository, queryEngine, collectionRegistry,
-                jdbcTemplate, objectMapper, Optional.empty(), eventPublisher);
+                jdbcTemplate, objectMapper, Optional.empty(), eventPublisher,
+                mock(RecordMaskingService.class));
     }
 
     @AfterEach

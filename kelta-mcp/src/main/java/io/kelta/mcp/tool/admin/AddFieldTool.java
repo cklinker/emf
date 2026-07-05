@@ -62,6 +62,13 @@ public class AddFieldTool implements AdminTool {
                 "UUID of the source picklist for picklist/multiPicklist fields."));
         properties.put("picklistSourceType", Schemas.string(
                 "Source of picklist values: \"GLOBAL\" (default) or \"FIELD\"."));
+        properties.put("maskingType", Schemas.string(
+                "Optional data masking for string-typed fields: FULL, LAST4, EMAIL, or CUSTOM (NONE clears). "
+                + "Users whose profile lacks unmask rights see the value redacted."));
+        properties.put("maskingChar", Schemas.string(
+                "Optional single character used for masked positions (default •)."));
+        properties.put("maskingCustomPattern", Schemas.string(
+                "Pattern for maskingType=CUSTOM: '#' reveals a character, any other char is shown literally, right-aligned."));
 
         Tool tool = Tool.builder()
                 .name("add_field")

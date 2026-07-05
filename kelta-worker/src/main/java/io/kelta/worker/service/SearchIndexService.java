@@ -108,15 +108,40 @@ public class SearchIndexService {
     private final CollectionLifecycleManager lifecycleManager;
     private final CollectionRegistry collectionRegistry;
     private final StorageAdapter storageAdapter;
+    private final FieldMaskingService fieldMaskingService;
 
     public SearchIndexService(JdbcTemplate jdbcTemplate,
                                CollectionLifecycleManager lifecycleManager,
                                CollectionRegistry collectionRegistry,
-                               StorageAdapter storageAdapter) {
+                               StorageAdapter storageAdapter,
+                               FieldMaskingService fieldMaskingService) {
         this.jdbcTemplate = jdbcTemplate;
         this.lifecycleManager = lifecycleManager;
         this.collectionRegistry = collectionRegistry;
         this.storageAdapter = storageAdapter;
+        this.fieldMaskingService = fieldMaskingService;
+    }
+
+    /**
+     * Field names of the collection that carry a data-masking config. These are
+     * excluded from the full-text index entirely — the search index is shared
+     * across all viewers, so a masking-configured field's plaintext must never
+     * enter {@code search_content} or {@code display_value} where a
+     * {@code tsvector} match (or the returned display string) would leak it.
+     * Per-viewer unmask rights don't apply here: index once, for nobody.
+     */
+    private Set<String> maskingConfiguredFields(String collectionName) {
+        CollectionDefinition definition = collectionRegistry.get(collectionName);
+        if (definition == null || definition.fields() == null) {
+            return Set.of();
+        }
+        Set<String> masked = new HashSet<>();
+        for (io.kelta.runtime.model.FieldDefinition field : definition.fields()) {
+            if (fieldMaskingService.configFor(field).isPresent()) {
+                masked.add(field.name());
+            }
+        }
+        return masked;
     }
 
     /**
@@ -130,17 +155,20 @@ public class SearchIndexService {
     public String buildSearchContent(String collectionName, Map<String, Object> recordData) {
         Set<String> searchableFields = lifecycleManager.getSearchableFieldNames(collectionName);
         String displayFieldName = lifecycleManager.getDisplayFieldName(collectionName);
+        Set<String> maskedFields = maskingConfiguredFields(collectionName);
 
         StringBuilder content = new StringBuilder();
 
-        // Always include display field
-        if (displayFieldName != null) {
+        // Always include display field — unless it carries a masking config, whose
+        // plaintext must not enter the shared full-text index.
+        if (displayFieldName != null && !maskedFields.contains(displayFieldName)) {
             appendFieldValue(content, recordData.get(displayFieldName));
         }
 
-        // Include all searchable fields (skip display field to avoid duplication)
+        // Include all searchable fields (skip display field to avoid duplication;
+        // skip masking-configured fields so their plaintext is never indexed)
         for (String fieldName : searchableFields) {
-            if (!fieldName.equals(displayFieldName)) {
+            if (!fieldName.equals(displayFieldName) && !maskedFields.contains(fieldName)) {
                 appendFieldValue(content, recordData.get(fieldName));
             }
         }
@@ -149,7 +177,7 @@ public class SearchIndexService {
         if (displayFieldName == null) {
             for (String fallback : DISPLAY_FIELD_FALLBACKS) {
                 Object val = recordData.get(fallback);
-                if (val != null && !searchableFields.contains(fallback)) {
+                if (val != null && !searchableFields.contains(fallback) && !maskedFields.contains(fallback)) {
                     appendFieldValue(content, val);
                     break;
                 }
@@ -168,15 +196,20 @@ public class SearchIndexService {
      */
     public String extractDisplayValue(String collectionName, Map<String, Object> recordData) {
         String displayFieldName = lifecycleManager.getDisplayFieldName(collectionName);
-        if (displayFieldName != null) {
+        Set<String> maskedFields = maskingConfiguredFields(collectionName);
+        if (displayFieldName != null && !maskedFields.contains(displayFieldName)) {
             Object val = recordData.get(displayFieldName);
             if (val != null) {
                 return String.valueOf(val);
             }
         }
 
-        // Fallback chain
+        // Fallback chain (skip masking-configured fields — display_value is returned
+        // to every searcher, so a masked field's plaintext must not surface here)
         for (String fallback : DISPLAY_FIELD_FALLBACKS) {
+            if (maskedFields.contains(fallback)) {
+                continue;
+            }
             Object val = recordData.get(fallback);
             if (val != null) {
                 return String.valueOf(val);

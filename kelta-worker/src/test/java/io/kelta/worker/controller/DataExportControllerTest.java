@@ -98,7 +98,8 @@ class DataExportControllerTest {
 
         assertThat(response.getStatusCode().value()).isEqualTo(201);
         verify(dataExportService).createExport("t1", "Full Export", null, "FULL", null, "CSV", "user@test.com");
-        verify(dataExportService).executeExport("exp-1", "t1");
+        verify(dataExportService).executeExport(eq("exp-1"), eq("t1"),
+                eq(new DataExportService.ExportPrincipal("user@test.com", "profile-1")));
     }
 
     @Test

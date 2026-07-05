@@ -20,6 +20,11 @@ import type {
   PlatformUser,
   CreatePlatformUserRequest,
   UpdatePlatformUserRequest,
+  DelegatedAdminSummary,
+  DelegatedAdminScope,
+  SaveDelegatedAdminScopeRequest,
+  DelegatedCreateUserRequest,
+  DelegatedUpdateUserRequest,
   LoginHistoryEntry,
   ImportResult,
   Migration,
@@ -536,6 +541,112 @@ export class AdminClient {
     resetPassword: async (userId: string): Promise<{ status: string; userId: string }> => {
       const response = await this.axios.post(`/api/admin/users/${userId}/reset-password`);
       return response.data as { status: string; userId: string };
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Delegated administration (scoped user management for non-admin delegates)
+  // ---------------------------------------------------------------------------
+
+  readonly delegated = {
+    /** The caller's effective delegated-admin summary. Fast {delegated:false} for non-delegates. */
+    me: async (): Promise<DelegatedAdminSummary> => {
+      const response = await this.axios.get('/api/admin/delegated/me');
+      return response.data as DelegatedAdminSummary;
+    },
+
+    users: {
+      list: async (page = 1, limit = 50): Promise<PlatformUser[]> => {
+        const response = await this.axios.get(
+          `/api/admin/delegated/users?page=${page}&limit=${limit}`
+        );
+        return unwrapJsonApiList<PlatformUser>(response.data);
+      },
+
+      create: async (request: DelegatedCreateUserRequest): Promise<PlatformUser> => {
+        const body = toJsonApiBody('users', request as unknown as Record<string, unknown>);
+        const response = await this.axios.post('/api/admin/delegated/users', body);
+        return unwrapJsonApiResource<PlatformUser>(response.data);
+      },
+
+      update: async (id: string, request: DelegatedUpdateUserRequest): Promise<PlatformUser> => {
+        const body = toJsonApiBody('users', request as unknown as Record<string, unknown>, id);
+        const response = await this.axios.patch(`/api/admin/delegated/users/${id}`, body);
+        return unwrapJsonApiResource<PlatformUser>(response.data);
+      },
+
+      invite: async (id: string): Promise<{ status: string }> => {
+        const response = await this.axios.post(`/api/admin/delegated/users/${id}/invite`);
+        return response.data as { status: string };
+      },
+
+      resetPassword: async (id: string): Promise<{ status: string; userId: string }> => {
+        const response = await this.axios.post(`/api/admin/delegated/users/${id}/reset-password`);
+        return response.data as { status: string; userId: string };
+      },
+
+      listPermissionSets: async (id: string): Promise<string[]> => {
+        const response = await this.axios.get<{ assignedPermissionSetIds?: string[] }>(
+          `/api/admin/delegated/users/${id}/permission-sets`
+        );
+        return response.data?.assignedPermissionSetIds ?? [];
+      },
+
+      assignPermissionSet: async (id: string, permissionSetId: string): Promise<void> => {
+        await this.axios.post(
+          `/api/admin/delegated/users/${id}/permission-sets/${permissionSetId}`
+        );
+      },
+
+      removePermissionSet: async (id: string, permissionSetId: string): Promise<void> => {
+        await this.axios.delete(
+          `/api/admin/delegated/users/${id}/permission-sets/${permissionSetId}`
+        );
+      },
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Delegated-admin scopes (MANAGE_DELEGATED_ADMINS)
+  // ---------------------------------------------------------------------------
+
+  readonly delegatedAdminScopes = {
+    list: async (page = 1, limit = 50): Promise<DelegatedAdminScope[]> => {
+      const response = await this.axios.get(
+        `/api/admin/delegated-admin-scopes?page=${page}&limit=${limit}`
+      );
+      return unwrapJsonApiList<DelegatedAdminScope>(response.data);
+    },
+
+    get: async (id: string): Promise<DelegatedAdminScope> => {
+      const response = await this.axios.get(`/api/admin/delegated-admin-scopes/${id}`);
+      return unwrapJsonApiResource<DelegatedAdminScope>(response.data);
+    },
+
+    create: async (request: SaveDelegatedAdminScopeRequest): Promise<DelegatedAdminScope> => {
+      const body = toJsonApiBody(
+        'delegated-admin-scopes',
+        request as unknown as Record<string, unknown>
+      );
+      const response = await this.axios.post('/api/admin/delegated-admin-scopes', body);
+      return unwrapJsonApiResource<DelegatedAdminScope>(response.data);
+    },
+
+    update: async (
+      id: string,
+      request: SaveDelegatedAdminScopeRequest
+    ): Promise<DelegatedAdminScope> => {
+      const body = toJsonApiBody(
+        'delegated-admin-scopes',
+        request as unknown as Record<string, unknown>,
+        id
+      );
+      const response = await this.axios.patch(`/api/admin/delegated-admin-scopes/${id}`, body);
+      return unwrapJsonApiResource<DelegatedAdminScope>(response.data);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/api/admin/delegated-admin-scopes/${id}`);
     },
   };
 

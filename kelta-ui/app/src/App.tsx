@@ -48,6 +48,7 @@ import { ToastProvider } from './components/Toast'
 import { LiveRegionProvider } from './components/LiveRegion'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { RequirePermission } from './components/RequirePermission/RequirePermission'
+import { RequireUserManagementAccess } from './components/RequirePermission/RequireUserManagementAccess'
 import { Header } from './components/Header'
 import { PageTransition } from './components/PageTransition'
 import { PageLoader } from './components/PageLoader'
@@ -172,6 +173,9 @@ const UsersPage = React.lazy(() =>
 )
 const UserDetailPage = React.lazy(() =>
   import('./pages/UserDetailPage').then((m) => ({ default: m.UserDetailPage }))
+)
+const DelegatedAdminsPage = React.lazy(() =>
+  import('./pages/DelegatedAdminsPage').then((m) => ({ default: m.DelegatedAdminsPage }))
 )
 const SetupAuditTrailPage = React.lazy(() =>
   import('./pages/SetupAuditTrailPage').then((m) => ({ default: m.SetupAuditTrailPage }))
@@ -992,14 +996,14 @@ function TenantRoutes(): React.ReactElement {
           }
         />
 
-        {/* User Management routes */}
+        {/* User Management routes — the list page also admits delegated admins (scoped mode) */}
         <Route
           path="users"
           element={
             <AdminPageRoute>
-              <RequirePermission permission="MANAGE_USERS">
+              <RequireUserManagementAccess>
                 <UsersPage />
-              </RequirePermission>
+              </RequireUserManagementAccess>
             </AdminPageRoute>
           }
         />
@@ -1009,6 +1013,16 @@ function TenantRoutes(): React.ReactElement {
             <AdminPageRoute>
               <RequirePermission permission="MANAGE_USERS">
                 <UserDetailPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+        <Route
+          path="delegated-admins"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_DELEGATED_ADMINS">
+                <DelegatedAdminsPage />
               </RequirePermission>
             </AdminPageRoute>
           }

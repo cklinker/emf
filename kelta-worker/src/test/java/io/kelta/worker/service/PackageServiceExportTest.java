@@ -155,8 +155,6 @@ class PackageServiceExportTest {
         when(repository.getJdbcTemplate()).thenReturn(jdbc);
         when(jdbc.queryForList(contains("FROM collection"), eq(String.class), eq(TENANT)))
                 .thenReturn(List.of("c1", "c2"));
-        when(repository.findAllIds("role", TENANT)).thenReturn(List.of("r1"));
-        when(repository.findAllIds("policy", TENANT)).thenReturn(List.of("p1"));
         when(repository.findAllIds("ui_page", TENANT)).thenReturn(List.of("up1"));
         when(repository.findAllIds("ui_menu", TENANT)).thenReturn(List.of("um1"));
         when(repository.findAllIds("flow", TENANT)).thenReturn(List.of("f1"));
@@ -166,17 +164,20 @@ class PackageServiceExportTest {
 
         var options = service.exportAllOptions(TENANT, "sandbox-clone", "1.0.0");
 
+        // role/policy are excluded — the legacy tables were dropped in V47
         assertThat(options)
                 .containsEntry("name", "sandbox-clone")
                 .containsEntry("version", "1.0.0")
                 .containsEntry("collectionIds", List.of("c1", "c2"))
-                .containsEntry("roleIds", List.of("r1"))
-                .containsEntry("policyIds", List.of("p1"))
                 .containsEntry("uiPageIds", List.of("up1"))
                 .containsEntry("uiMenuIds", List.of("um1"))
                 .containsEntry("flowIds", List.of("f1"))
                 .containsEntry("pageLayoutIds", List.of("pl1"))
                 .containsEntry("validationRuleIds", List.of("vr1"))
-                .containsEntry("globalPicklistIds", List.of("gp1"));
+                .containsEntry("globalPicklistIds", List.of("gp1"))
+                .doesNotContainKey("roleIds")
+                .doesNotContainKey("policyIds");
+        verify(repository, never()).findAllIds("role", TENANT);
+        verify(repository, never()).findAllIds("policy", TENANT);
     }
 }

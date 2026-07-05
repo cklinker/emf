@@ -103,6 +103,9 @@ export {
   type UseSystemPermissionsReturn,
 } from './useSystemPermissions'
 
+// Delegated administration summary (scoped user management for non-admins)
+export { useDelegatedAdmin, type UseDelegatedAdminReturn } from './useDelegatedAdmin'
+
 // Included resources hook — extract display maps from JSON:API includes
 export {
   useIncludedResources,

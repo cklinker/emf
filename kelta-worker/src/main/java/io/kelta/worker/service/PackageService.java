@@ -36,8 +36,10 @@ public class PackageService {
         options.put("collectionIds", repository.getJdbcTemplate().queryForList(
                 "SELECT id FROM collection WHERE tenant_id = ? AND system_collection = false",
                 String.class, tenantId));
-        options.put("roleIds", repository.findAllIds("role", tenantId));
-        options.put("policyIds", repository.findAllIds("policy", tenantId));
+        // role/policy/route_policy/field_policy were dropped in V47 (legacy
+        // security tables) — the real per-tenant authz is profiles +
+        // permission-sets, seeded fresh in a sandbox by TenantProvisioningHook.
+        // Never query the dead tables and never clone/promote authz types.
         options.put("uiPageIds", repository.findAllIds("ui_page", tenantId));
         options.put("uiMenuIds", repository.findAllIds("ui_menu", tenantId));
         options.put("flowIds", repository.findAllIds("flow", tenantId));

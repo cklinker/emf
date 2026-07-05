@@ -13,10 +13,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import java.security.SecureRandom;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -52,6 +54,7 @@ public class SandboxProvisioningService {
     private final QueryEngine queryEngine;
     private final CollectionRegistry collectionRegistry;
     private final PlatformEventPublisher eventPublisher;
+    private final ObjectMapper objectMapper;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -61,7 +64,8 @@ public class SandboxProvisioningService {
                                       PackageImportService packageImportService,
                                       QueryEngine queryEngine,
                                       CollectionRegistry collectionRegistry,
-                                      PlatformEventPublisher eventPublisher) {
+                                      PlatformEventPublisher eventPublisher,
+                                      ObjectMapper objectMapper) {
         this.environmentRepository = environmentRepository;
         this.environmentService = environmentService;
         this.packageService = packageService;
@@ -69,6 +73,7 @@ public class SandboxProvisioningService {
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
         this.eventPublisher = eventPublisher;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -121,14 +126,17 @@ public class SandboxProvisioningService {
         tenantData.put("slug", sandboxSlug);
         tenantData.put("name", parent.get("name") + " (" + name + ")");
         tenantData.put("edition", parent.get("edition"));
-        tenantData.put("settings", stringValue(parent.get("settings")));
-        tenantData.put("limits", stringValue(parent.get("limits")));
+        // JSONB columns come back from JDBC as PGobject — the QueryEngine's
+        // JSON-field validation requires actual structures, not strings.
+        tenantData.put("settings", jsonValue(parent.get("settings")));
+        tenantData.put("limits", jsonValue(parent.get("limits")));
         // Sandboxes inherit the parent's network restrictions: the IP-allowlist
         // filter fails open on missing config, so a fresh tenant would otherwise
         // expose a clone of production config to any IP.
         tenantData.put("ipAllowlistEnabled", parent.get("ip_allowlist_enabled"));
-        tenantData.put("ipAllowlistCidrs", stringValue(parent.get("ip_allowlist_cidrs")));
+        tenantData.put("ipAllowlistCidrs", jsonValue(parent.get("ip_allowlist_cidrs")));
         tenantData.put("parentTenantId", parentTenantId);
+        tenantData.values().removeIf(Objects::isNull);
 
         Map<String, Object> createdTenant = queryEngine.create(tenantsDef, tenantData);
         String sandboxTenantId = String.valueOf(createdTenant.get("id"));
@@ -166,21 +174,41 @@ public class SandboxProvisioningService {
     @Async("applicationTaskExecutor")
     public void cloneIntoSandbox(String parentTenantId, String sandboxTenantId, String envId) {
         try {
-            Map<String, Object> pkg = TenantContext.callWithTenant(parentTenantId, () ->
+            // Slug is required in the tenant context: user-collection physical
+            // tables live in the tenant's schema (named by slug), so an import
+            // hop bound to id-only would create the sandbox's tables in the
+            // public schema. Resolve both slugs and bind them.
+            String parentSlug = tenantSlug(parentTenantId);
+            String sandboxSlug = tenantSlug(sandboxTenantId);
+
+            Map<String, Object> pkg = TenantContext.callWithTenant(parentTenantId, parentSlug, () ->
                     packageService.exportPackage(parentTenantId,
                             packageService.exportAllOptions(parentTenantId, "sandbox-clone", "1.0.0")));
 
-            var report = TenantContext.callWithTenant(sandboxTenantId, () ->
+            var report = TenantContext.callWithTenant(sandboxTenantId, sandboxSlug, () ->
                     packageImportService.importPackage(sandboxTenantId, pkg,
                             new PackageImportService.ImportOptions(
                                     PackageImportService.ConflictMode.OVERWRITE, false, null, null, null)));
 
+            boolean ok = report.failed() == 0;
+            if (!ok) {
+                // Surface the failed items so a stuck clone can be diagnosed
+                // (env row has no error column — record onto config).
+                String detail = report.items().stream()
+                        .filter(it -> "FAILED".equals(it.action()))
+                        .map(it -> it.type() + " " + it.naturalKey() + ": " + it.error())
+                        .limit(20)
+                        .reduce((a, b) -> a + " | " + b)
+                        .orElse("unknown");
+                log.error("Sandbox clone import errors for env {} (sandboxTenant={}): {}",
+                        envId, sandboxTenantId, detail);
+                recordCloneError(parentTenantId, envId, detail);
+            }
             TenantContext.runWithTenant(parentTenantId, () ->
-                    environmentRepository.updateStatus(envId, parentTenantId,
-                            report.failed() == 0 ? "ACTIVE" : "FAILED"));
+                    environmentRepository.updateStatus(envId, parentTenantId, ok ? "ACTIVE" : "FAILED"));
             log.info("Sandbox clone finished for env {} (sandboxTenant={}): created={}, updated={}, failed={}",
                     envId, sandboxTenantId, report.created(), report.updated(), report.failed());
-            publishEnvironmentEvent(parentTenantId, envId, report.failed() == 0 ? "CLONED" : "CLONE_FAILED");
+            publishEnvironmentEvent(parentTenantId, envId, ok ? "CLONED" : "CLONE_FAILED");
         } catch (Exception e) {
             log.error("Sandbox clone failed for env {} (sandboxTenant={})", envId, sandboxTenantId, e);
             try {
@@ -369,8 +397,47 @@ public class SandboxProvisioningService {
         return normalized;
     }
 
-    private String stringValue(Object value) {
-        return value == null ? null : value.toString();
+    /** Resolves a tenant's slug — needed to bind schema-per-tenant context. */
+    String tenantSlug(String tenantId) {
+        var rows = environmentRepository.getJdbcTemplate().queryForList(
+                "SELECT slug FROM tenant WHERE id = ?", tenantId);
+        if (rows.isEmpty()) {
+            throw new IllegalStateException("Tenant not found: " + tenantId);
+        }
+        return (String) rows.get(0).get("slug");
+    }
+
+    /**
+     * Parses a JDBC JSONB value (PGobject/String) back into a structure the
+     * QueryEngine's JSON-field validation accepts. Null/empty → null.
+     */
+    private Object jsonValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String json = value.toString();
+        if (json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, Object.class);
+        } catch (Exception e) {
+            log.warn("Could not parse parent tenant JSONB value; omitting from sandbox: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private void recordCloneError(String parentTenantId, String envId, String detail) {
+        try {
+            String cfg = objectMapper.writeValueAsString(Map.of("cloneError", detail));
+            TenantContext.runWithTenant(parentTenantId, () ->
+                    environmentRepository.getJdbcTemplate().update(
+                            "UPDATE environment SET config = ?::jsonb, updated_at = NOW() " +
+                                    "WHERE id = ? AND tenant_id = ?",
+                            cfg, envId, parentTenantId));
+        } catch (Exception e) {
+            log.warn("Could not record clone error for env {}: {}", envId, e.getMessage());
+        }
     }
 
     private void publishEnvironmentEvent(String tenantId, String envId, String changeType) {

@@ -162,6 +162,13 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'MANAGE_USERS',
       },
       {
+        name: 'Delegated Admins',
+        path: '/delegated-admins',
+        description: 'Let selected users manage a limited set of users',
+        icon: ShieldCheck,
+        permission: 'MANAGE_DELEGATED_ADMINS',
+      },
+      {
         name: 'OIDC Providers',
         path: '/oidc-providers',
         description: 'Configure identity providers',

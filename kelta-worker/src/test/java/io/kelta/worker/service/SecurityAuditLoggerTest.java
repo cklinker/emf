@@ -16,8 +16,10 @@ class SecurityAuditLoggerTest {
 
         @Test
         void shouldHaveAllExpectedEventTypes() {
-            assertEquals(17, SecurityAuditLogger.EventType.values().length);
+            assertEquals(19, SecurityAuditLogger.EventType.values().length);
             assertNotNull(SecurityAuditLogger.EventType.valueOf("PASSWORD_CHANGED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("DELEGATED_ADMIN_ACTION"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("DELEGATED_SCOPE_CHANGED"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("PASSWORD_POLICY_UPDATED"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("LOGIN_FAILED"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("ACCOUNT_LOCKED"));

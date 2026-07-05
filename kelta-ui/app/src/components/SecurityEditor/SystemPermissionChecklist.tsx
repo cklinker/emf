@@ -1,7 +1,7 @@
 /**
  * SystemPermissionChecklist Component
  *
- * Displays all 15 system permissions as checkboxes grouped by category.
+ * Displays all system permissions as checkboxes grouped by category.
  * Used within Profile and Permission Set editors to manage system-level access.
  *
  * Categories:
@@ -25,7 +25,7 @@ interface PermissionCategory {
   permissions: Array<{ name: string; label: string; description: string }>
 }
 
-/** All 15 system permissions grouped by category */
+/** All system permissions grouped by category */
 const PERMISSION_CATEGORIES: PermissionCategory[] = [
   {
     name: 'Application Setup',
@@ -66,6 +66,11 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
         name: 'MANAGE_SHARING',
         label: 'Manage Sharing',
         description: 'Configure organization-wide sharing defaults',
+      },
+      {
+        name: 'MANAGE_DELEGATED_ADMINS',
+        label: 'Manage Delegated Admins',
+        description: 'Define delegated-admin scopes for scoped user management',
       },
     ],
   },

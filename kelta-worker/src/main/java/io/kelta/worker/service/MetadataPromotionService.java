@@ -187,9 +187,14 @@ public class MetadataPromotionService {
                     environmentRepository.findByIdAndTenant(targetEnvId, tenantId).orElseThrow());
             String sandboxTenantId = (String) sourceEnv.get("sandbox_tenant_id");
             boolean remoteTarget = targetEnv.get("remote_base_url") != null;
+            // Slug binds the schema-per-tenant context (user-collection physical
+            // tables live in the tenant's slug schema). @Async loses the request
+            // slug, so resolve both explicitly.
+            String sandboxSlug = provisioningService.tenantSlug(sandboxTenantId);
+            String targetSlug = remoteTarget ? null : provisioningService.tenantSlug(tenantId);
 
             // Export the sandbox's full package under the sandbox tenant context
-            Map<String, Object> pkg = TenantContext.callWithTenant(sandboxTenantId, () ->
+            Map<String, Object> pkg = TenantContext.callWithTenant(sandboxTenantId, sandboxSlug, () ->
                     packageService.exportPackage(sandboxTenantId,
                             packageService.exportAllOptions(sandboxTenantId,
                                     "promotion-" + promotionId, "1.0.0"), false));
@@ -229,7 +234,7 @@ public class MetadataPromotionService {
                 assertNotSelfImport(tenantId, filteredPkg);
 
                 // Restore point: snapshot the TARGET before touching it
-                String snapshotId = String.valueOf(TenantContext.callWithTenant(tenantId, () ->
+                String snapshotId = String.valueOf(TenantContext.callWithTenant(tenantId, targetSlug, () ->
                         sandboxEnvironmentService.createSnapshot(tenantId, targetEnvId,
                                 "Pre-promotion target snapshot (" + promotionId + ")", executedBy))
                         .get("id"));
@@ -237,7 +242,7 @@ public class MetadataPromotionService {
                         promotionRepository.setTargetSnapshot(promotionId, snapshotId));
 
                 Set<String> keyFilter = selectedKeys;
-                var report = TenantContext.callWithTenant(tenantId, () ->
+                var report = TenantContext.callWithTenant(tenantId, targetSlug, () ->
                         packageImportService.importPackage(tenantId, filteredPkg,
                                 new PackageImportService.ImportOptions(
                                         PackageImportService.ConflictMode.valueOf(conflictMode),

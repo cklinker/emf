@@ -42,12 +42,16 @@ public class PackageImportService {
 
     private static final Logger log = LoggerFactory.getLogger(PackageImportService.class);
 
-    /** Import order: referenced types strictly before referencing types. */
+    /**
+     * Import order: referenced types strictly before referencing types.
+     * The legacy authz types (ROLE/POLICY/ROUTE_POLICY/FIELD_POLICY) are omitted
+     * — those tables were dropped in V47; per-tenant authz is profiles +
+     * permission-sets, which a sandbox seeds itself via TenantProvisioningHook.
+     */
     private static final List<String> TYPE_ORDER = List.of(
             "COLLECTION", "FIELD", "GLOBAL_PICKLIST", "PICKLIST_VALUE",
             "VALIDATION_RULE", "PAGE_LAYOUT", "LAYOUT_SECTION", "LAYOUT_FIELD",
-            "FLOW", "ROLE", "POLICY", "ROUTE_POLICY", "FIELD_POLICY",
-            "UI_PAGE", "UI_MENU", "UI_MENU_ITEM");
+            "FLOW", "UI_PAGE", "UI_MENU", "UI_MENU_ITEM");
 
     /** Package type → system collection name (QueryEngine import path). */
     private static final Map<String, String> SYSTEM_COLLECTION_BY_TYPE = Map.ofEntries(
@@ -368,6 +372,14 @@ public class PackageImportService {
                                        CollectionDefinition def, String existingId,
                                        Map<String, Object> mapped,
                                        java.util.function.Consumer<String> register) {
+        // Tenant-scoped system collections (ui-menus, layout-sections, picklist-
+        // values, …) need tenant_id: the storage adapter writes it only when the
+        // record carries "tenantId" (the JSON:API layer injects it on the HTTP
+        // path; a direct queryEngine.create must set it itself, or the NOT NULL
+        // tenant_id is violated).
+        if (def.tenantScoped()) {
+            mapped.putIfAbsent("tenantId", ctx.tenantId);
+        }
         if (existingId != null) {
             if (ctx.options.conflictMode() == ConflictMode.SKIP) {
                 return new ItemResult(type, key, "SKIPPED", null);
@@ -671,10 +683,7 @@ public class PackageImportService {
                             (String) r.get("id")));
             jdbc.queryForList("SELECT id, name FROM flow WHERE tenant_id = ?", tenantId)
                     .forEach(r -> flowIdByName.put((String) r.get("name"), (String) r.get("id")));
-            jdbc.queryForList("SELECT id, name FROM role WHERE tenant_id = ?", tenantId)
-                    .forEach(r -> roleIdByName.put((String) r.get("name"), (String) r.get("id")));
-            jdbc.queryForList("SELECT id, name FROM policy WHERE tenant_id = ?", tenantId)
-                    .forEach(r -> policyIdByName.put((String) r.get("name"), (String) r.get("id")));
+            // role/policy tables were dropped in V47 — not seeded, not imported.
             jdbc.queryForList("SELECT id, name, path FROM ui_page WHERE tenant_id = ?", tenantId)
                     .forEach(r -> uiPageIdByPath.put(
                             String.valueOf(r.get("path") != null ? r.get("path") : r.get("name")),

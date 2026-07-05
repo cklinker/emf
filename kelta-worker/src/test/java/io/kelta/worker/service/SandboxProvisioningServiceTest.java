@@ -56,7 +56,8 @@ class SandboxProvisioningServiceTest {
         when(collectionRegistry.get("tenants")).thenReturn(SystemCollectionDefinitions.tenants());
 
         service = new SandboxProvisioningService(environmentRepository, environmentService,
-                packageService, packageImportService, queryEngine, collectionRegistry, eventPublisher);
+                packageService, packageImportService, queryEngine, collectionRegistry, eventPublisher,
+                new tools.jackson.databind.ObjectMapper());
     }
 
     private Map<String, Object> parentRow(String slug) {
@@ -110,6 +111,11 @@ class SandboxProvisioningServiceTest {
                     .thenReturn(Optional.of(envRow));
 
             // Clone phase (invoked synchronously here — no async proxy in unit tests)
+            // The clone resolves both tenants' slugs to bind schema-per-tenant context.
+            when(jdbcTemplate.queryForList(contains("slug FROM tenant WHERE id"), eq("sbx-tenant")))
+                    .thenReturn(List.of(Map.of("slug", "acme--dev")));
+            when(jdbcTemplate.queryForList(contains("slug FROM tenant WHERE id"), eq(PARENT)))
+                    .thenReturn(List.of(Map.of("slug", "acme")));
             Map<String, Object> options = Map.of("name", "sandbox-clone");
             Map<String, Object> pkg = Map.of("items", List.of());
             when(packageService.exportAllOptions(PARENT, "sandbox-clone", "1.0.0")).thenReturn(options);
@@ -134,10 +140,12 @@ class SandboxProvisioningServiceTest {
                     .containsEntry("slug", "acme--dev")
                     .containsEntry("name", "Acme (dev)")
                     .containsEntry("edition", "ENTERPRISE")
-                    .containsEntry("settings", "{\"theme\":\"dark\"}")
-                    .containsEntry("limits", "{\"apiCalls\":1000}")
+                    // JSONB values are parsed to structures — the QueryEngine's
+                    // JSON-field validation rejects raw strings (harness-caught)
+                    .containsEntry("settings", Map.of("theme", "dark"))
+                    .containsEntry("limits", Map.of("apiCalls", 1000))
                     .containsEntry("ipAllowlistEnabled", Boolean.TRUE)
-                    .containsEntry("ipAllowlistCidrs", "[\"10.0.0.0/8\"]")
+                    .containsEntry("ipAllowlistCidrs", java.util.List.of("10.0.0.0/8"))
                     .containsEntry("parentTenantId", PARENT);
 
             assertThat(result.get("sandboxSlug")).isEqualTo("acme--dev");
@@ -250,6 +258,10 @@ class SandboxProvisioningServiceTest {
     @Test
     @DisplayName("cloneIntoSandbox marks the environment FAILED when the import reports failures")
     void cloneMarksFailedOnImportFailures() {
+        when(jdbcTemplate.queryForList(contains("slug FROM tenant WHERE id"), eq(PARENT)))
+                .thenReturn(List.of(Map.of("slug", "acme")));
+        when(jdbcTemplate.queryForList(contains("slug FROM tenant WHERE id"), eq("sbx-tenant")))
+                .thenReturn(List.of(Map.of("slug", "acme--dev")));
         Map<String, Object> options = Map.of("name", "sandbox-clone");
         Map<String, Object> pkg = Map.of("items", List.of());
         when(packageService.exportAllOptions(PARENT, "sandbox-clone", "1.0.0")).thenReturn(options);
@@ -265,6 +277,10 @@ class SandboxProvisioningServiceTest {
     @Test
     @DisplayName("cloneIntoSandbox imports with OVERWRITE so refreshes converge")
     void cloneUsesOverwrite() {
+        when(jdbcTemplate.queryForList(contains("slug FROM tenant WHERE id"), eq(PARENT)))
+                .thenReturn(List.of(Map.of("slug", "acme")));
+        when(jdbcTemplate.queryForList(contains("slug FROM tenant WHERE id"), eq("sbx-tenant")))
+                .thenReturn(List.of(Map.of("slug", "acme--dev")));
         Map<String, Object> options = Map.of("name", "sandbox-clone");
         Map<String, Object> pkg = Map.of("items", List.of());
         when(packageService.exportAllOptions(PARENT, "sandbox-clone", "1.0.0")).thenReturn(options);

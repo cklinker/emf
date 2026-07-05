@@ -428,10 +428,24 @@ public class DefaultQueryEngine implements QueryEngine {
             throw new ReadOnlyCollectionException(definition.name());
         }
 
-        // Pre-fetch record data for the delete event (only when publisher is wired)
+        // Pre-fetch record data for the delete event and hook tenant scoping
         Map<String, Object> recordData = null;
-        if (recordEventPublisher != null) {
+        boolean hasHooks = beforeSaveHookRegistry != null && beforeSaveHookRegistry.hasHooks(definition.name());
+        if (recordEventPublisher != null || hasHooks) {
             recordData = storageAdapter.getById(definition, id).orElse(null);
+        }
+
+        // Evaluate before-delete hooks — any error vetoes the delete
+        if (hasHooks) {
+            BeforeSaveResult hookResult = beforeSaveHookRegistry.evaluateBeforeDelete(
+                    definition.name(), id, recordData != null ? extractTenantId(recordData) : "default");
+            if (!hookResult.isSuccess()) {
+                throw new ValidationException(ValidationResult.failure(hookResult.getErrors().stream()
+                        .map(e -> new FieldError(
+                                e.field() != null ? e.field() : "_record",
+                                e.message(), "beforeSaveHook"))
+                        .toList()));
+            }
         }
 
         boolean deleted = storageAdapter.delete(definition, id);

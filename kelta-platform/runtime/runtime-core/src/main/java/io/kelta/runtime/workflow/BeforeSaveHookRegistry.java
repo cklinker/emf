@@ -202,6 +202,25 @@ public class BeforeSaveHookRegistry {
     }
 
     /**
+     * Evaluates all before-delete hooks for a collection.
+     * Returns the first error result if any hook vetoes the delete.
+     *
+     * @param collectionName the collection name
+     * @param id the record ID being deleted
+     * @param tenantId the tenant ID
+     * @return the combined result
+     */
+    public BeforeSaveResult evaluateBeforeDelete(String collectionName, String id, String tenantId) {
+        for (BeforeSaveHook hook : getHooks(collectionName)) {
+            BeforeSaveResult result = hook.beforeDelete(collectionName, id, tenantId);
+            if (!result.isSuccess()) {
+                return result;
+            }
+        }
+        return BeforeSaveResult.ok();
+    }
+
+    /**
      * Invokes all after-create hooks for a collection, including wildcard hooks.
      *
      * @param collectionName the collection name

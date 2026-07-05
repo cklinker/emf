@@ -277,12 +277,12 @@ unsubscribe/suppression list).
 
 ## Sandboxes & metadata promotion (multi-cluster)
 
-Sandbox = a real linked tenant (`tenant.parent_tenant_id`, V157); config moves between
+Sandbox = a real linked tenant (`tenant.parent_tenant_id`, V158); config moves between
 environments as **metadata packages** (`PackageService` export → `PackageImportService` import).
 
 - **Package format v2** — `{formatVersion: 2, source: {instanceId, tenantId, tenantSlug},
   exportedAt, items: [{type, data}]}`. `instanceId` is the installation's stable identity
-  (`platform_instance`, V157). Items carry natural-key context (`collection_name`,
+  (`platform_instance`, V158). Items carry natural-key context (`collection_name`,
   `reference_collection_name`, `layout_name`, `field_name`, `picklist_name`, `menu_name`) so
   cross-tenant/cross-cluster import remaps every reference **by name, never by UUID**.
   Importers accept v1 packages (minus the new types).

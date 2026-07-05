@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Sandbox provisioning + metadata promotion through the real stack (gateway →
- * worker → per-tenant Postgres → NATS). Exercises the V157 path Mockito tests
+ * worker → per-tenant Postgres → NATS). Exercises the V158 path Mockito tests
  * cannot reach: a real sandbox tenant is created via the tenants write path
  * (lifecycle hooks, RLS), the parent's metadata package is cloned in with a
  * natural-key remap, and a promotion imports a sandbox-side change back into
@@ -269,7 +269,8 @@ class SandboxPromotionScenarioTest extends ScenarioBase {
                     return;
                 }
                 if ("FAILED".equals(lastStatus)) {
-                    throw new AssertionError("Sandbox clone FAILED for environment " + envId);
+                    throw new AssertionError("Sandbox clone FAILED for environment " + envId
+                            + " — config=" + attrs.get("config"));
                 }
             } catch (AssertionError e) {
                 throw e;

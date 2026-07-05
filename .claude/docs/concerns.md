@@ -14,7 +14,7 @@ The sandbox/promotion services deliberately use explicit `callWithTenant(<uuid>,
 instead. Do not introduce new `runAsPlatform` callers until a real `platform_bypass` policy is
 migrated onto every RLS table.
 
-**Sandbox environments + metadata promotion are a destructive prod-config surface (V157).**
+**Sandbox environments + metadata promotion are a destructive prod-config surface (V158).**
 Guardrails that MUST stay intact:
 - In-controller permission gates: `MANAGE_SANDBOXES` on `/api/environments/**` +
   `/api/promotions/**`, `CUSTOMIZE_APPLICATION` on `/api/packages/**`. The gateway static
@@ -38,6 +38,29 @@ Guardrails that MUST stay intact:
   profile as bulk schema authoring); sandbox tenants run the full Svix/Superset hook chain and
   count against platform quotas; ≤60s gateway slug-cache lag after sandbox create (masked by
   the CREATING status while cloning).
+
+**`POST /api/operations` (atomic ops) has no per-collection authorization (open).**
+`AtomicOperationsController` is a static gateway route (blanket `API_ACCESS` only) that writes any
+collection through `QueryEngine` with **no** object-permission check of its own — so any API user
+could batch-write collections the gateway's per-verb Cerbos check would otherwise deny on the
+normal dynamic route. Delegated administration (2026-07-05) closed this **for identity collections**
+(`users`/`user-permission-sets`/`group-memberships`/`delegated-admin-scopes`) via the
+`IdentityCollectionGuardHook` BeforeSaveHook, but **every other collection is still writable through
+`/api/operations` without a Cerbos object-permission gate.** A proper fix — mirroring the gateway's
+per-collection Cerbos verb check inside `AtomicOperationsController` (or a wildcard authorization
+hook that consults object permissions for all collections) — is a separate security task. Until
+then, treat `/api/operations` as authorized only at the `API_ACCESS` level for non-identity
+collections.
+
+**Delegated administration is a privilege-boundary surface (V157).** Guardrails that MUST stay
+intact: the `DelegatedAdminScopeValidationHook` rejection of privileged profiles/permsets at scope
+save, the `DelegatedAdminService.effectiveScope` **request-time re-filter** (a profile granted a
+privileged permission after being scoped must silently drop out — do not "optimize" it into a cache
+that skips the re-check), the `DelegatedUserAdminController` field whitelist (email/managerId/mfa
+immutable, self-edit blocked), and the `IdentityCollectionGuardHook` default-deny for identified
+writes. `MANAGE_DELEGATED_ADMINS` rides the platform's "object perms == config perms" posture for
+the scope collection's own generic route, same as every other setup collection. Security feature →
+**not auto-merged**.
 
 **Mass-email campaigns are a spam-capable, partly-public surface (V152).** Guardrails that
 MUST stay intact:

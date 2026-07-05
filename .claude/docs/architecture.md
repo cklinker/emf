@@ -88,13 +88,32 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
     while still looking up object permissions by the stored UUID. Get this wrong in one direction
     and per-collection allow rules silently never match: a UUID-keyed record CEL denies every
     record to non-`VIEW_ALL_DATA` profiles (they'd see empty lists everywhere).
-- **Static routes** (`/api/admin/**`, `/api/me/**`, `/api/_search/**`, `/api/metrics/**`):
-  `RouteAuthorizationFilter` **skips** ids starting `static-` — they get only the blanket
-  `API_ACCESS` system-permission check. The worker advices **exclude** `/api/admin/`. So a new
-  `/api/admin/...` endpoint is, by default, reachable by **any** authenticated user with API
-  access. To put a *specific* permission on it, **enforce it inside the controller/service**
+- **Static routes** (`/api/admin/**`, `/api/me/**`, `/api/_search/**`, `/api/metrics/**`,
+  `/api/operations`): `RouteAuthorizationFilter` **skips** ids starting `static-` — they get only
+  the blanket `API_ACCESS` system-permission check. The worker advices **exclude** `/api/admin/`.
+  So a new `/api/admin/...` endpoint is, by default, reachable by **any** authenticated user with
+  API access. To put a *specific* permission on it, **enforce it inside the controller/service**
   (see "Worker-side system-permission check" below — inject `CerbosPermissionResolver` and
-  check `profile_system_permission`).
+  check `profile_system_permission`). **`POST /api/operations`** (atomic ops) is a static route
+  with **no** authorization of its own: it writes any collection through `QueryEngine`, so the
+  only server-side gate on identity-collection writes there is the `IdentityCollectionGuardHook`
+  (see "Delegated administration" below). A broader per-collection gate on `/api/operations` is
+  still open (tracked in `concerns.md`).
+- **Delegated administration** (`/api/admin/delegated*`, security feature): full admins define
+  `delegated-admin-scopes` (V157) so listed non-admins manage users within limits without
+  `MANAGE_USERS`. `DelegatedAdminScopeController` (`MANAGE_DELEGATED_ADMINS`) owns scope CRUD;
+  `DelegatedUserAdminController` (`/api/admin/delegated`) resolves each caller's fresh
+  `DelegatedAdminService.effectiveScope` (unions active scopes, re-filters out now-privileged
+  profiles/permsets at request time) and enforces it in-controller (field whitelist, in-scope
+  profile/permset checks, self-edit block). Its validated writes bind `DelegatedWriteContext`.
+  Defense in depth: the wildcard **`IdentityCollectionGuardHook`** (BeforeSaveHook, incl. the new
+  `beforeDelete` SPI) blocks any *identified* HTTP write to `users`/`user-permission-sets`/
+  `group-memberships`/`delegated-admin-scopes` that lacks `MANAGE_USERS`/`MODIFY_ALL_DATA` (or
+  `MANAGE_DELEGATED_ADMINS` for scopes) unless a `DelegatedWriteContext` is bound — this is what
+  makes the delegated path safe against the generic collection route and `/api/operations`. The
+  gateway `IdentityHeaderStripFilter` (order −400) strips client-supplied `X-User-Email`/
+  `X-User-Profile-Id`/`X-User-Profile-Name`/`X-Cerbos-Scope` at the chain head so the worker never
+  trusts a forged identity header on any path.
 - **New top-level path**: a brand-new `/api/<x>/**` segment must be registered as a static
   route in `kelta-gateway/.../service/RouteConfigService.registerStaticRoutes()` (and
   `config/RouteInitializer.registerStaticRoutes()`) or the gateway returns **404**. Sub-paths

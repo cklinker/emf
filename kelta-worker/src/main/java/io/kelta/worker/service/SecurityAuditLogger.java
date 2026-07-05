@@ -36,7 +36,9 @@ public final class SecurityAuditLogger {
         RECOVERY_CODE_USED,
         PASSWORD_RESET_ADMIN,
         PAT_CREATED,
-        PAT_REVOKED
+        PAT_REVOKED,
+        DELEGATED_ADMIN_ACTION,
+        DELEGATED_SCOPE_CHANGED
     }
 
     /**

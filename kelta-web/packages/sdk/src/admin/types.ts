@@ -414,6 +414,86 @@ export interface UpdatePlatformUserRequest {
 }
 
 /**
+ * A named reference (id + display name) inside a delegated-admin summary.
+ */
+export interface DelegatedNamedRef {
+  id: string;
+  name: string;
+}
+
+/**
+ * The caller's effective delegated-administration summary
+ * (GET /api/admin/delegated/me).
+ */
+export interface DelegatedAdminSummary {
+  delegated: boolean;
+  canCreateUsers: boolean;
+  canDeactivateUsers: boolean;
+  canResetPasswords: boolean;
+  manageableProfiles: DelegatedNamedRef[];
+  assignablePermissionSets: DelegatedNamedRef[];
+}
+
+/**
+ * A delegated-admin scope definition (delegated-admin-scopes system collection).
+ */
+export interface DelegatedAdminScope {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  delegatedUserIds: string[];
+  manageableProfileIds: string[];
+  assignablePermissionSetIds: string[];
+  canCreateUsers: boolean;
+  canDeactivateUsers: boolean;
+  canResetPasswords: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Create/update payload for a delegated-admin scope.
+ */
+export interface SaveDelegatedAdminScopeRequest {
+  name?: string;
+  description?: string;
+  active?: boolean;
+  delegatedUserIds?: string[];
+  manageableProfileIds?: string[];
+  assignablePermissionSetIds?: string[];
+  canCreateUsers?: boolean;
+  canDeactivateUsers?: boolean;
+  canResetPasswords?: boolean;
+}
+
+/**
+ * Create payload for a delegated user create (status is forced server-side).
+ */
+export interface DelegatedCreateUserRequest {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  locale?: string;
+  timezone?: string;
+  profileId: string;
+}
+
+/**
+ * Update payload for a delegated user update (whitelisted fields only).
+ */
+export interface DelegatedUpdateUserRequest {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  locale?: string;
+  timezone?: string;
+  profileId?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
+/**
  * Login history entry
  */
 export interface LoginHistoryEntry {

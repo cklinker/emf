@@ -114,6 +114,33 @@ public interface BeforeSaveHook {
     }
 
     /**
+     * Called before a record is deleted. Can veto the delete by returning errors.
+     *
+     * @param id the record ID being deleted
+     * @param tenantId the tenant ID
+     * @return the result (OK to proceed, or validation errors to block the delete)
+     */
+    default BeforeSaveResult beforeDelete(String id, String tenantId) {
+        return BeforeSaveResult.ok();
+    }
+
+    /**
+     * Called before a record is deleted, with the collection name provided.
+     * This variant is useful for wildcard hooks that need to know which collection
+     * triggered the hook.
+     *
+     * <p>The default implementation delegates to {@link #beforeDelete(String, String)}.
+     *
+     * @param collectionName the collection the record is being deleted from
+     * @param id the record ID being deleted
+     * @param tenantId the tenant ID
+     * @return the result (OK to proceed, or validation errors to block the delete)
+     */
+    default BeforeSaveResult beforeDelete(String collectionName, String id, String tenantId) {
+        return beforeDelete(id, tenantId);
+    }
+
+    /**
      * Called after a new record is created. Used for side effects like
      * event publishing, seeding defaults, or cache invalidation.
      *

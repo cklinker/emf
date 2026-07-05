@@ -43,12 +43,12 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
     private static final String X_FORWARDED_GROUPS_HEADER = "X-Forwarded-Groups";
     private static final String X_TENANT_ID_HEADER = "X-Tenant-ID";
     private static final String X_TENANT_SLUG_HEADER = "X-Tenant-Slug";
-    
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         // Retrieve the authenticated principal from exchange attributes
         GatewayPrincipal principal = JwtAuthenticationFilter.getPrincipal(exchange);
-        
+
         // If no principal is present (unauthenticated request like bootstrap endpoint),
         // still propagate tenant headers if available
         if (principal == null) {
@@ -67,12 +67,14 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
             }
             return chain.filter(exchange);
         }
-        
+
         // Build the mutated request with transformed headers
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                 .headers(headers -> {
                     // Strip any client-supplied internal headers to prevent forgery.
                     // These headers are gateway-verified and must not be set by clients.
+                    // (IdentityHeaderStripFilter already removed them at the chain head;
+                    // kept here as defense in depth.)
                     headers.remove(X_FORWARDED_USER_HEADER);
                     headers.remove(X_USER_ID_HEADER);
                     headers.remove(X_FORWARDED_GROUPS_HEADER);

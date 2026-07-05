@@ -473,6 +473,38 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Scope-definition gate for delegated administration: rejects delegated-admin scopes that
+     * would delegate profiles/permission sets granting privileged permissions, and validates
+     * referenced ids. DelegatedAdminService re-checks the privileged filter at request time.
+     */
+    @Bean
+    public io.kelta.worker.listener.DelegatedAdminScopeValidationHook delegatedAdminScopeValidationHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.repository.DelegatedAdminScopeRepository scopeRepository,
+            tools.jackson.databind.ObjectMapper objectMapper) {
+        io.kelta.worker.listener.DelegatedAdminScopeValidationHook hook =
+                new io.kelta.worker.listener.DelegatedAdminScopeValidationHook(scopeRepository, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    /**
+     * Last-line write guard for identity collections (users, user-permission-sets,
+     * group-memberships, delegated-admin-scopes): identified HTTP writes require MANAGE_USERS /
+     * MANAGE_DELEGATED_ADMINS (or MODIFY_ALL_DATA), or a scope-validated DelegatedWriteContext.
+     * Closes the unauthorized /api/operations write path for identity collections.
+     */
+    @Bean
+    public io.kelta.worker.listener.IdentityCollectionGuardHook identityCollectionGuardHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.repository.BootstrapRepository bootstrapRepository) {
+        io.kelta.worker.listener.IdentityCollectionGuardHook hook =
+                new io.kelta.worker.listener.IdentityCollectionGuardHook(bootstrapRepository);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public LayoutRuleRefreshHook layoutRuleRefreshHook(
             BeforeSaveHookRegistry hookRegistry,

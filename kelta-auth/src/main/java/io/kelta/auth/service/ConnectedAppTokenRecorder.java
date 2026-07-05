@@ -49,19 +49,32 @@ public class ConnectedAppTokenRecorder {
     }
 
     /**
-     * Records a freshly issued client_credentials access token.
+     * Records a freshly issued {@code client_credentials} access token.
+     * Convenience overload — see {@link #recordIssuedToken(String, String, String, String, Duration, String)}.
+     */
+    public void recordIssuedToken(String appId, String tenantId, String scopesJson,
+                                  String jti, Duration accessTtl) {
+        recordIssuedToken(appId, tenantId, scopesJson, jti, accessTtl, "client_credentials");
+    }
+
+    /**
+     * Records a freshly issued connected-app access token so it appears in the
+     * app's token list, refreshes {@code last_used_at}, and leaves an audit row.
      *
      * @param appId       connected_app id
      * @param tenantId    owning tenant id (for the audit row)
      * @param scopesJson  the app's scopes as a JSON array string (e.g. {@code ["api"]})
      * @param jti         the JWT id; used as the token row id so a later revoke can match it
      * @param accessTtl   the access token time-to-live; may be {@code null}
+     * @param via         the grant that minted it — {@code client_credentials} or
+     *                    {@code authorization_code} (audit provenance)
      */
     public void recordIssuedToken(String appId, String tenantId, String scopesJson,
-                                  String jti, Duration accessTtl) {
+                                  String jti, Duration accessTtl, String via) {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(accessTtl != null ? accessTtl : DEFAULT_TTL);
         String scopes = (scopesJson == null || scopesJson.isBlank()) ? "[]" : scopesJson;
+        String grant = (via == null || via.isBlank()) ? "client_credentials" : via;
 
         try {
             jdbcTemplate.update(
@@ -82,14 +95,14 @@ public class ConnectedAppTokenRecorder {
                             "(id, tenant_id, connected_app_id, action, details, performed_by, created_at) " +
                             "VALUES (?, ?, ?, 'TOKEN_ISSUED', ?::jsonb, NULL, ?)",
                     java.util.UUID.randomUUID().toString(), tenantId, appId,
-                    "{\"tokenId\":\"" + jti + "\",\"via\":\"client_credentials\"}",
+                    "{\"tokenId\":\"" + jti + "\",\"via\":\"" + grant + "\"}",
                     Timestamp.from(now)
             );
 
-            log.debug("Recorded client_credentials token for connected app {} (jti={})", appId, jti);
+            log.debug("Recorded {} token for connected app {} (jti={})", grant, appId, jti);
         } catch (Exception e) {
             // Never fail token issuance because bookkeeping failed.
-            log.warn("Failed to record client_credentials token for connected app {}: {}", appId, e.getMessage());
+            log.warn("Failed to record {} token for connected app {}: {}", grant, appId, e.getMessage());
         }
     }
 

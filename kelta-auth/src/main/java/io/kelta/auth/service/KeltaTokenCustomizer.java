@@ -107,6 +107,15 @@ public class KeltaTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCo
     }
 
     private void customizeAccessToken(JwtEncodingContext context, KeltaUserDetails userDetails) {
+        // For the authorization_code flow via a connected app, resolve the app so we
+        // can both enrich the token and record it in the app's token list.
+        boolean authCode = AuthorizationGrantType.AUTHORIZATION_CODE.equals(context.getAuthorizationGrantType());
+        Map<String, Object> app = authCode
+                ? lookupConnectedApp(context.getRegisteredClient().getClientId())
+                : null;
+        // Pin a stable jti so the recorded token row and a later revoke reference the same id.
+        String jti = app != null ? java.util.UUID.randomUUID().toString() : null;
+
         context.getClaims().claims(claims -> {
             claims.put("email", userDetails.getEmail());
             claims.put("preferred_username", userDetails.getEmail());
@@ -120,31 +129,38 @@ public class KeltaTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCo
                     ? "sso" : "internal";
             claims.put("auth_method", authMethod);
 
-            // For authorization_code flow via a connected app, include the app metadata
-            if (AuthorizationGrantType.AUTHORIZATION_CODE.equals(context.getAuthorizationGrantType())) {
-                enrichWithConnectedAppClaims(claims, context.getRegisteredClient().getClientId());
+            if (app != null) {
+                // Connected-app user-delegated token: surface app metadata so the
+                // gateway can apply connected-app rate limits / scope enforcement.
+                claims.put("connected_app_id", app.get("id"));
+                Object scopes = app.get("scopes");
+                if (scopes != null) {
+                    claims.put("app_scopes", scopes.toString());
+                }
+                claims.put("auth_method", "connected_app");
             }
         });
+
+        if (app != null) {
+            context.getClaims().id(jti);
+            String appId = String.valueOf(app.get("id"));
+            String tenantId = app.get("tenant_id") != null ? app.get("tenant_id").toString() : null;
+            Object scopes = app.get("scopes");
+            String scopesJson = scopes != null ? scopes.toString() : null;
+            var tokenSettings = context.getRegisteredClient().getTokenSettings();
+            java.time.Duration accessTtl = tokenSettings != null ? tokenSettings.getAccessTokenTimeToLive() : null;
+            // So an authorization_code token also appears in the app's token list /
+            // audit trail (the same promise client_credentials already keeps).
+            tokenRecorder.recordIssuedToken(appId, tenantId, scopesJson, jti, accessTtl, "authorization_code");
+        }
     }
 
-    /**
-     * Adds connected_app_id and app_scopes claims if the client_id belongs to a
-     * registered connected app. This enables the gateway to apply connected-app-level
-     * rate limits and scope enforcement even for user-delegated tokens.
-     */
-    private void enrichWithConnectedAppClaims(java.util.Map<String, Object> claims, String clientId) {
+    /** Returns the active connected app for a client_id (id, tenant_id, scopes), or null. */
+    private Map<String, Object> lookupConnectedApp(String clientId) {
         List<Map<String, Object>> results = jdbcTemplate.queryForList(
-                "SELECT id, scopes FROM connected_app WHERE client_id = ? AND active = true",
+                "SELECT id, tenant_id, scopes FROM connected_app WHERE client_id = ? AND active = true",
                 clientId
         );
-        if (!results.isEmpty()) {
-            Map<String, Object> app = results.get(0);
-            claims.put("connected_app_id", app.get("id"));
-            Object scopes = app.get("scopes");
-            if (scopes != null) {
-                claims.put("app_scopes", scopes.toString());
-            }
-            claims.put("auth_method", "connected_app");
-        }
+        return results.isEmpty() ? null : results.get(0);
     }
 }

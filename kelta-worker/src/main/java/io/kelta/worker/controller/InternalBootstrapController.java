@@ -328,6 +328,7 @@ public class InternalBootstrapController {
         response.put("registrationId", provider.get("registration_id"));
         response.put("idpEntityId", provider.get("idp_entity_id"));
         response.put("ssoUrl", provider.get("sso_url"));
+        response.put("sloUrl", provider.get("slo_url"));
         response.put("idpCertificate", provider.get("idp_certificate"));
         response.put("nameIdFormat", provider.get("name_id_format"));
         response.put("emailAttribute", provider.get("email_attribute"));

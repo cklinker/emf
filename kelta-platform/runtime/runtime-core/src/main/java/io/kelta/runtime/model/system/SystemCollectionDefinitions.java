@@ -894,6 +894,10 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("idp_certificate"))
             .addField(FieldDefinition.string("nameIdFormat", 200)
                 .withColumnName("name_id_format"))
+            // IdP SingleLogoutService URL (optional). When set, SLO is advertised in
+            // SP metadata + IdP-initiated LogoutRequests are honored.
+            .addField(FieldDefinition.string("sloUrl", 500)
+                .withColumnName("slo_url"))
             // Assertion attribute → user-field mappings.
             .addField(FieldDefinition.string("emailAttribute", 200)
                 .withColumnName("email_attribute"))

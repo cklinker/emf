@@ -161,7 +161,7 @@ public class WorkerClient {
 
     public record SamlProviderInfo(
             String id, String name, String registrationId,
-            String idpEntityId, String ssoUrl, String idpCertificate,
+            String idpEntityId, String ssoUrl, String sloUrl, String idpCertificate,
             String nameIdFormat, String emailAttribute, String profileAttribute,
             boolean active
     ) {}
@@ -308,6 +308,7 @@ public class WorkerClient {
                 node.path("registrationId").asText(null),
                 node.path("idpEntityId").asText(null),
                 node.path("ssoUrl").asText(null),
+                node.path("sloUrl").asText(null),
                 node.path("idpCertificate").asText(null),
                 node.path("nameIdFormat").asText(null),
                 node.path("emailAttribute").asText(null),

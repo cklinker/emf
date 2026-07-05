@@ -264,16 +264,21 @@ public class AuthorizationServerConfig {
             FederatedUserMapper federatedUserMapper,
             WorkerClient workerClient) throws Exception {
         http
-            .securityMatcher("/saml2/**", "/login/saml2/**")
+            .securityMatcher("/saml2/**", "/login/saml2/**", "/logout/saml2/**")
             .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
-            // The assertion-consumer POST comes cross-site from the IdP with no
-            // CSRF token; the SAML response signature is the integrity guarantee.
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/login/saml2/sso/**", "/saml2/**"))
+            // The assertion-consumer + SLO POSTs come cross-site from the IdP with no
+            // CSRF token; the SAML message signature is the integrity guarantee.
+            .csrf(csrf -> csrf.ignoringRequestMatchers(
+                    "/login/saml2/sso/**", "/saml2/**", "/logout/saml2/**"))
             .cors(Customizer.withDefaults())
             .saml2Login(saml2 -> saml2
                     .loginPage("/login")
                     .relyingPartyRegistrationRepository(relyingPartyRegistrationRepository)
                     .successHandler(new SamlFederatedLoginSuccessHandler(federatedUserMapper, workerClient)))
+            // Single Logout: handles IdP-initiated LogoutRequests (kills the session +
+            // returns a LogoutResponse) and SP-initiated LogoutResponses, on the SLO
+            // endpoints advertised by registrations that carry an IdP SLO URL.
+            .saml2Logout(Customizer.withDefaults())
             .saml2Metadata(Customizer.withDefaults());
 
         return http.build();

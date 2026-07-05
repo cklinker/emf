@@ -133,6 +133,7 @@ public class DynamicRelyingPartyRegistrationRepository implements RelyingPartyRe
             }
 
             X509Certificate idpCertificate = SamlCertificates.parseCertificate(provider.idpCertificate());
+            boolean hasSlo = provider.sloUrl() != null && !provider.sloUrl().isBlank();
 
             RelyingPartyRegistration.Builder builder = RelyingPartyRegistration
                     .withRegistrationId(registrationId)
@@ -141,18 +142,33 @@ public class DynamicRelyingPartyRegistrationRepository implements RelyingPartyRe
                     .entityId("{baseUrl}/saml2/service-provider-metadata/{registrationId}")
                     .assertionConsumerServiceLocation("{baseUrl}/login/saml2/sso/{registrationId}")
                     .signingX509Credentials(creds -> spCredentials.signing().ifPresent(creds::add))
-                    .assertingPartyMetadata(party -> party
-                            .entityId(provider.idpEntityId())
-                            .singleSignOnServiceLocation(provider.ssoUrl())
-                            .singleSignOnServiceBinding(Saml2MessageBinding.REDIRECT)
-                            // Sign AuthnRequests only when the platform SP keypair is
-                            // configured; otherwise send them unsigned.
-                            .wantAuthnRequestsSigned(spCredentials.hasSigning())
-                            .verificationX509Credentials(creds ->
-                                    creds.add(Saml2X509Credential.verification(idpCertificate))));
+                    .assertingPartyMetadata(party -> {
+                        party.entityId(provider.idpEntityId())
+                                .singleSignOnServiceLocation(provider.ssoUrl())
+                                .singleSignOnServiceBinding(Saml2MessageBinding.REDIRECT)
+                                // Sign AuthnRequests only when the platform SP keypair is
+                                // configured; otherwise send them unsigned.
+                                .wantAuthnRequestsSigned(spCredentials.hasSigning())
+                                .verificationX509Credentials(creds ->
+                                        creds.add(Saml2X509Credential.verification(idpCertificate)));
+                        // Advertise the IdP's SingleLogoutService so the SP can send
+                        // SP-initiated LogoutRequests and validate IdP LogoutResponses.
+                        if (hasSlo) {
+                            party.singleLogoutServiceLocation(provider.sloUrl())
+                                    .singleLogoutServiceBinding(Saml2MessageBinding.REDIRECT);
+                        }
+                    });
 
             if (provider.nameIdFormat() != null && !provider.nameIdFormat().isBlank()) {
                 builder.nameIdFormat(provider.nameIdFormat());
+            }
+
+            // SP-side SLO endpoint (where this SP receives IdP LogoutRequest/Response).
+            // Only set when the IdP advertises an SLO URL, so providers without SLO keep
+            // their exact prior metadata (no SLO element).
+            if (hasSlo) {
+                builder.singleLogoutServiceLocation("{baseUrl}/logout/saml2/slo/{registrationId}")
+                        .singleLogoutServiceBinding(Saml2MessageBinding.REDIRECT);
             }
 
             return builder.build();

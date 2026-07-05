@@ -3,6 +3,10 @@ package io.kelta.worker.controller;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.service.CerbosAuthorizationService;
+import io.kelta.worker.service.CerbosPermissionResolver;
+import io.kelta.worker.service.CollectionLifecycleManager;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,23 +18,45 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
- * Verifies that every 4xx response from the atomic-operations endpoint carries a populated
- * JSON:API error object — status, code, title, detail — never an empty {} placeholder.
+ * Verifies the atomic-operations endpoint's error envelope AND per-operation
+ * object-level authorization (the gateway skips its per-collection Cerbos check
+ * on this static route, so the controller enforces it).
  */
-@DisplayName("AtomicOperationsController error envelope")
+@DisplayName("AtomicOperationsController")
 class AtomicOperationsControllerTest {
 
     private AtomicOperationsController controller;
+    private QueryEngine queryEngine;
+    private CollectionLifecycleManager lifecycleManager;
+    private CerbosAuthorizationService authzService;
+    private CerbosPermissionResolver permissionResolver;
+    private HttpServletRequest request;
 
     @BeforeEach
     void setUp() {
-        QueryEngine queryEngine = mock(QueryEngine.class);
+        queryEngine = mock(QueryEngine.class);
         CollectionRegistry registry = mock(CollectionRegistry.class);
-        controller = new AtomicOperationsController(queryEngine, registry, 100);
+        lifecycleManager = mock(CollectionLifecycleManager.class);
+        authzService = mock(CerbosAuthorizationService.class);
+        permissionResolver = mock(CerbosPermissionResolver.class);
+        request = mock(HttpServletRequest.class);
+        controller = new AtomicOperationsController(queryEngine, registry, lifecycleManager,
+                authzService, permissionResolver, 100);
         TenantContext.set("tenant-1");
+
+        // Default: an authenticated caller with identity headers present.
+        when(permissionResolver.getEmail(request)).thenReturn("u@x.io");
+        when(permissionResolver.getProfileId(request)).thenReturn("profile-1");
+        when(permissionResolver.getTenantId(request)).thenReturn("tenant-1");
     }
 
     @AfterEach
@@ -42,7 +68,7 @@ class AtomicOperationsControllerTest {
     @DisplayName("missing atomic:operations key returns 400 with INVALID_PAYLOAD")
     @SuppressWarnings("unchecked")
     void missingOperationsKey() {
-        ResponseEntity<?> response = controller.executeOperations(Map.of());
+        ResponseEntity<?> response = controller.executeOperations(Map.of(), request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
@@ -59,7 +85,7 @@ class AtomicOperationsControllerTest {
     @SuppressWarnings("unchecked")
     void emptyOperationsArray() {
         ResponseEntity<?> response = controller.executeOperations(
-                Map.of("atomic:operations", List.of()));
+                Map.of("atomic:operations", List.of()), request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
@@ -75,7 +101,7 @@ class AtomicOperationsControllerTest {
     @SuppressWarnings("unchecked")
     void nonArrayOperationsValue() {
         ResponseEntity<?> response = controller.executeOperations(
-                Map.of("atomic:operations", "not-an-array"));
+                Map.of("atomic:operations", "not-an-array"), request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
@@ -84,5 +110,73 @@ class AtomicOperationsControllerTest {
         assertThat(err.get("status")).isEqualTo("400");
         assertThat(err.get("code")).isEqualTo("PARSE_ERROR");
         assertThat(err.get("detail")).asString().isNotEmpty();
+    }
+
+    // ---- Per-operation authorization ------------------------------------------------
+
+    private static Map<String, Object> addOp(String collection) {
+        return Map.of("op", "add", "data", Map.of(
+                "type", collection, "attributes", Map.of("name", "x")));
+    }
+
+    @Test
+    @DisplayName("returns 403 when the caller has no identity")
+    @SuppressWarnings("unchecked")
+    void deniesWithoutIdentity() {
+        when(permissionResolver.getProfileId(request)).thenReturn(null);
+
+        ResponseEntity<?> response = controller.executeOperations(
+                Map.of("atomic:operations", List.of(addOp("contacts"))), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        Map<String, Object> err = ((List<Map<String, Object>>) body.get("errors")).get(0);
+        assertThat(err.get("code")).isEqualTo("FORBIDDEN");
+        verify(queryEngine, never()).create(any(), any());
+    }
+
+    @Test
+    @DisplayName("returns 403 when Cerbos denies an operation's collection+action")
+    void deniesWhenCerbosDenies() {
+        when(lifecycleManager.getCollectionIdByName("contacts")).thenReturn("uuid-c");
+        when(authzService.checkCollectionAccess("u@x.io", "profile-1", "tenant-1", "uuid-c", "create"))
+                .thenReturn(false);
+
+        ResponseEntity<?> response = controller.executeOperations(
+                Map.of("atomic:operations", List.of(addOp("contacts"))), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(queryEngine, never()).create(any(), any());
+    }
+
+    @Test
+    @DisplayName("authorizes each operation before executing; passes on allow")
+    void allowsWhenCerbosAllows() {
+        when(lifecycleManager.getCollectionIdByName("contacts")).thenReturn("uuid-c");
+        when(authzService.checkCollectionAccess(anyString(), anyString(), anyString(), eq("uuid-c"), eq("create")))
+                .thenReturn(true);
+
+        ResponseEntity<?> response = controller.executeOperations(
+                Map.of("atomic:operations", List.of(addOp("contacts"))), request);
+
+        // Authorization passed (not 403). Execution itself fails on the mocked
+        // registry (unknown collection → 422), which is fine — we only assert authz ran.
+        assertThat(response.getStatusCode()).isNotEqualTo(HttpStatus.FORBIDDEN);
+        verify(authzService).checkCollectionAccess("u@x.io", "profile-1", "tenant-1", "uuid-c", "create");
+    }
+
+    @Test
+    @DisplayName("deduplicates the Cerbos check per (collection, action)")
+    void dedupesChecksPerCollectionAction() {
+        when(lifecycleManager.getCollectionIdByName("contacts")).thenReturn("uuid-c");
+        when(authzService.checkCollectionAccess(anyString(), anyString(), anyString(), eq("uuid-c"), eq("create")))
+                .thenReturn(true);
+
+        controller.executeOperations(
+                Map.of("atomic:operations", List.of(addOp("contacts"), addOp("contacts"), addOp("contacts"))),
+                request);
+
+        verify(authzService, org.mockito.Mockito.times(1))
+                .checkCollectionAccess(anyString(), anyString(), anyString(), eq("uuid-c"), eq("create"));
     }
 }

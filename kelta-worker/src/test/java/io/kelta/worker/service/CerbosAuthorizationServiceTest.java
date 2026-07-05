@@ -318,4 +318,35 @@ class CerbosAuthorizationServiceTest {
             verifyNoInteractions(cerbosClient);
         }
     }
+
+    @Nested
+    @DisplayName("Collection (object-level) access")
+    class CollectionAccess {
+
+        @Test
+        @DisplayName("allows when Cerbos allows the collection action")
+        void allowsWhenCerbosAllows() {
+            when(cerbosClient.check(any(Principal.class), any(Resource.class), eq("create")))
+                    .thenReturn(fieldCheckResult);
+            when(fieldCheckResult.isAllowed("create")).thenReturn(true);
+
+            boolean allowed = service.checkCollectionAccess(
+                    "user@test.com", "profile-1", "tenant-1", "uuid-c", "create");
+
+            assertThat(allowed).isTrue();
+        }
+
+        @Test
+        @DisplayName("denies when Cerbos denies the collection action")
+        void deniesWhenCerbosDenies() {
+            when(cerbosClient.check(any(Principal.class), any(Resource.class), eq("delete")))
+                    .thenReturn(fieldCheckResult);
+            when(fieldCheckResult.isAllowed("delete")).thenReturn(false);
+
+            boolean allowed = service.checkCollectionAccess(
+                    "user@test.com", "profile-1", "tenant-1", "uuid-c", "delete");
+
+            assertThat(allowed).isFalse();
+        }
+    }
 }

@@ -94,11 +94,14 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   So a new `/api/admin/...` endpoint is, by default, reachable by **any** authenticated user with
   API access. To put a *specific* permission on it, **enforce it inside the controller/service**
   (see "Worker-side system-permission check" below — inject `CerbosPermissionResolver` and
-  check `profile_system_permission`). **`POST /api/operations`** (atomic ops) is a static route
-  with **no** authorization of its own: it writes any collection through `QueryEngine`, so the
-  only server-side gate on identity-collection writes there is the `IdentityCollectionGuardHook`
-  (see "Delegated administration" below). A broader per-collection gate on `/api/operations` is
-  still open (tracked in `concerns.md`).
+  check `profile_system_permission`). **`POST /api/operations`** (atomic ops) is a static route, so
+  the gateway's per-collection Cerbos verb check doesn't run on it — instead
+  `AtomicOperationsController` mirrors that check server-side: per operation it maps the verb
+  (`add→create`, `update→edit`, `remove→delete`), resolves the collection UUID, and calls
+  `CerbosAuthorizationService.checkCollectionAccess` (object-level `collection` resource, **UUID**-keyed,
+  identical to the gateway), denying the whole batch (403, fail-closed) before executing if any op is
+  unauthorized. The `IdentityCollectionGuardHook` still guards identity-collection writes underneath
+  (see "Delegated administration" below).
 - **Delegated administration** (`/api/admin/delegated*`, security feature): full admins define
   `delegated-admin-scopes` (V157) so listed non-admins manage users within limits without
   `MANAGE_USERS`. `DelegatedAdminScopeController` (`MANAGE_DELEGATED_ADMINS`) owns scope CRUD;

@@ -39,18 +39,22 @@ Guardrails that MUST stay intact:
   count against platform quotas; ≤60s gateway slug-cache lag after sandbox create (masked by
   the CREATING status while cloning).
 
-**`POST /api/operations` (atomic ops) has no per-collection authorization (open).**
-`AtomicOperationsController` is a static gateway route (blanket `API_ACCESS` only) that writes any
-collection through `QueryEngine` with **no** object-permission check of its own — so any API user
-could batch-write collections the gateway's per-verb Cerbos check would otherwise deny on the
-normal dynamic route. Delegated administration (2026-07-05) closed this **for identity collections**
-(`users`/`user-permission-sets`/`group-memberships`/`delegated-admin-scopes`) via the
-`IdentityCollectionGuardHook` BeforeSaveHook, but **every other collection is still writable through
-`/api/operations` without a Cerbos object-permission gate.** A proper fix — mirroring the gateway's
-per-collection Cerbos verb check inside `AtomicOperationsController` (or a wildcard authorization
-hook that consults object permissions for all collections) — is a separate security task. Until
-then, treat `/api/operations` as authorized only at the `API_ACCESS` level for non-identity
-collections.
+**`POST /api/operations` (atomic ops) now enforces per-collection authorization (closed 2026-07-05).**
+`AtomicOperationsController` is a static gateway route (blanket `API_ACCESS` only), so the gateway's
+per-collection Cerbos verb check never ran on it — previously any API user could batch-write
+collections the normal dynamic route would deny. The controller now mirrors that gateway check:
+before executing, it maps each operation to a Cerbos action (`add→create`, `update→edit`,
+`remove→delete`), resolves the collection's UUID (`CollectionLifecycleManager.getCollectionIdByName`),
+and calls the new worker-side `CerbosAuthorizationService.checkCollectionAccess(...)` — the
+object-level (`collection` resource, keyed on **UUID**, same as the gateway) verb check. Any denied
+operation fails the **whole batch** with 403 before anything executes (atomic); checks are deduped
+per (collection, action). **Fail-closed**: a missing identity (no `X-User-Profile-Id`/`X-Cerbos-Scope`)
+or a Cerbos circuit-open/error denies. The `IdentityCollectionGuardHook` (identity collections) still
+runs underneath as defense-in-depth. **Pre-merge gate:** the harness Cerbos is allow-all, so real
+*deny* can only be verified on a live stack (same caveat as the object-policy fix) — unit tests cover
+allow/deny/dedup/no-identity with a mocked authz service. Guardrail: keep this check keyed on the
+collection **UUID** (`getCollectionIdByName`), not the name — the `collection` policy CEL is
+UUID-keyed (see architecture.md "Cerbos collectionId keying").
 
 **Delegated administration is a privilege-boundary surface (V157).** Guardrails that MUST stay
 intact: the `DelegatedAdminScopeValidationHook` rejection of privileged profiles/permsets at scope

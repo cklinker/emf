@@ -84,7 +84,7 @@ class EnvironmentPromotionRepositoryTest {
     @Test
     @DisplayName("createItem should insert promotion item")
     void createItemShouldInsert() {
-        String id = repository.createItem("promo-1", "COLLECTION", "col-1", "Accounts", "CREATE");
+        String id = repository.createItem("t1", "promo-1", "COLLECTION", "col-1", "Accounts", "CREATE");
 
         assertThat(id).isNotNull().hasSize(36);
         verify(jdbcTemplate).update(contains("INSERT INTO promotion_item"), any(Object[].class));

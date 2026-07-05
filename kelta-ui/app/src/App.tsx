@@ -149,6 +149,9 @@ const PackagesPage = React.lazy(() =>
 const MigrationsPage = React.lazy(() =>
   import('./pages/MigrationsPage').then((m) => ({ default: m.MigrationsPage }))
 )
+const EnvironmentsPage = React.lazy(() =>
+  import('./pages/EnvironmentsPage').then((m) => ({ default: m.EnvironmentsPage }))
+)
 const ResourceBrowserPage = React.lazy(() =>
   import('./pages/ResourceBrowserPage').then((m) => ({ default: m.ResourceBrowserPage }))
 )
@@ -752,6 +755,18 @@ function TenantRoutes(): React.ReactElement {
             <AdminPageRoute>
               <RequirePermission permission="CUSTOMIZE_APPLICATION">
                 <MigrationsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Environments route (sandboxes + metadata promotion) */}
+        <Route
+          path="environments"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_SANDBOXES">
+                <EnvironmentsPage />
               </RequirePermission>
             </AdminPageRoute>
           }

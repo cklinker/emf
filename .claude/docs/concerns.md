@@ -5,6 +5,40 @@ at the bottom so reviewers can see what's already been addressed.
 
 ## Security Risks
 
+**`TenantContext.runAsPlatform`/`callAsPlatform` is a silent-data-loss trap (2026-07-04).**
+The javadoc claims a `platform_bypass` RLS policy grants access under the `__platform__`
+sentinel — **that policy does not exist in any migration**. `TenantAwareDataSource` binds the
+sentinel as a literal tenant id, so `tenant_isolation` matches nothing and `admin_bypass`
+(empty-string) doesn't apply: every RLS-scoped read returns zero rows and writes are dropped.
+The sandbox/promotion services deliberately use explicit `callWithTenant(<uuid>, …)` per hop
+instead. Do not introduce new `runAsPlatform` callers until a real `platform_bypass` policy is
+migrated onto every RLS table.
+
+**Sandbox environments + metadata promotion are a destructive prod-config surface (V157).**
+Guardrails that MUST stay intact:
+- In-controller permission gates: `MANAGE_SANDBOXES` on `/api/environments/**` +
+  `/api/promotions/**`, `CUSTOMIZE_APPLICATION` on `/api/packages/**`. The gateway static
+  routes give these only blanket `API_ACCESS` — removing the controller checks exposes
+  whole-tenant config export and destructive promotion to every Standard User.
+- Approver ≠ creator + APPROVED-only execute (four-eyes on prod-config mutation).
+- Security types (`ROLE`/`POLICY`/`ROUTE_POLICY`/`FIELD_POLICY`) are excluded from promotion —
+  a compromised sandbox must not rewrite production authz.
+- Sandbox provisioning copies the parent's IP allowlist onto the sandbox tenant and replaces
+  the seeded admin's well-known default password with a one-time random secret — the
+  IP-allowlist filter is fail-open on missing config, so skipping the copy exposes a clone of
+  production config to any IP.
+- `RemotePromotionClient` is an SSRF-adjacent surface (`remote_base_url` is admin-supplied):
+  scheme allow-list http/https, no userinfo, redirects disabled, bounded timeouts/response,
+  PAT only from the credential vault. Private-range IPs are allowed **deliberately**
+  (in-cluster/homelab targets are the use case).
+- Accepted v1 limitations: per-item import (no global tx — DDL + NATS can't roll back;
+  re-runs converge via natural-key upsert); rollback re-imports the pre-promotion target
+  snapshot but does not undo deletions/creations; remote targets get no local snapshot or
+  rollback; large promotes emit one NATS config event per imported item (sequential — same
+  profile as bulk schema authoring); sandbox tenants run the full Svix/Superset hook chain and
+  count against platform quotas; ≤60s gateway slug-cache lag after sandbox create (masked by
+  the CREATING status while cloning).
+
 **Mass-email campaigns are a spam-capable, partly-public surface (V152).** Guardrails that
 MUST stay intact:
 - `CAMPAIGN_TRACKING_SECRET` **must be set to a strong per-deployment value.** It signs the HMAC

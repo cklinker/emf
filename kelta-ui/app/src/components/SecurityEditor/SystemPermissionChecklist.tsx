@@ -41,6 +41,11 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
         label: 'Customize Application',
         description: 'Modify application metadata, collections, and fields',
       },
+      {
+        name: 'MANAGE_SANDBOXES',
+        label: 'Manage Sandboxes',
+        description: 'Create sandbox environments and promote metadata to production',
+      },
     ],
   },
   {

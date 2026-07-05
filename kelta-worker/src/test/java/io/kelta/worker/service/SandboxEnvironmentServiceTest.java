@@ -2,11 +2,8 @@ package io.kelta.worker.service;
 
 import io.kelta.runtime.event.PlatformEventPublisher;
 import io.kelta.worker.repository.EnvironmentRepository;
-import io.kelta.worker.repository.PackageRepository;
 import org.junit.jupiter.api.*;
-import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.util.*;
 
@@ -19,24 +16,18 @@ import static org.mockito.Mockito.*;
 class SandboxEnvironmentServiceTest {
 
     private EnvironmentRepository environmentRepository;
-    private PackageRepository packageRepository;
-    private ObjectMapper objectMapper;
+    private PackageService packageService;
     private PlatformEventPublisher eventPublisher;
-    private JdbcTemplate jdbcTemplate;
     private SandboxEnvironmentService service;
 
     @BeforeEach
     void setUp() {
         environmentRepository = mock(EnvironmentRepository.class);
-        packageRepository = mock(PackageRepository.class);
-        objectMapper = JsonMapper.builder().build();
+        packageService = mock(PackageService.class);
         eventPublisher = mock(PlatformEventPublisher.class);
-        jdbcTemplate = mock(JdbcTemplate.class);
 
-        when(environmentRepository.getJdbcTemplate()).thenReturn(jdbcTemplate);
-
-        service = new SandboxEnvironmentService(environmentRepository, packageRepository,
-                objectMapper, eventPublisher);
+        service = new SandboxEnvironmentService(environmentRepository, packageService,
+                new ObjectMapper(), eventPublisher);
     }
 
     @Test
@@ -57,8 +48,8 @@ class SandboxEnvironmentServiceTest {
     @DisplayName("ensureProductionEnvironment should create when none exists")
     void ensureProductionShouldCreateWhenNone() {
         when(environmentRepository.findProductionByTenant("t1")).thenReturn(Optional.empty());
-        when(environmentRepository.create(eq("t1"), eq("Production"), any(), eq("PRODUCTION"), isNull(), isNull(), any()))
-                .thenReturn("prod-new");
+        when(environmentRepository.create(eq("t1"), eq("Production"), any(), eq("PRODUCTION"),
+                isNull(), isNull(), any())).thenReturn("prod-new");
 
         Map<String, Object> newProd = new HashMap<>();
         newProd.put("id", "prod-new");
@@ -68,52 +59,7 @@ class SandboxEnvironmentServiceTest {
         var result = service.ensureProductionEnvironment("t1", "admin");
 
         assertThat(result.get("id")).isEqualTo("prod-new");
-        verify(environmentRepository).create(eq("t1"), eq("Production"), any(), eq("PRODUCTION"), isNull(), isNull(), any());
-    }
-
-    @Test
-    @DisplayName("createSandbox should reject duplicate names")
-    void createSandboxShouldRejectDuplicateNames() {
-        when(environmentRepository.existsByTenantAndName("t1", "Dev")).thenReturn(true);
-
-        assertThatThrownBy(() -> service.createSandbox("t1", "Dev", null, null, null, "admin"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("already exists");
-    }
-
-    @Test
-    @DisplayName("createSandbox should create sandbox from production by default")
-    void createSandboxShouldCreateFromProduction() {
-        when(environmentRepository.existsByTenantAndName("t1", "Dev Sandbox")).thenReturn(false);
-
-        // Production environment setup
-        Map<String, Object> prodEnv = new HashMap<>();
-        prodEnv.put("id", "prod-1");
-        prodEnv.put("type", "PRODUCTION");
-        when(environmentRepository.findProductionByTenant("t1")).thenReturn(Optional.of(prodEnv));
-
-        when(environmentRepository.create(eq("t1"), eq("Dev Sandbox"), any(), eq("SANDBOX"), eq("prod-1"), any(), any()))
-                .thenReturn("sandbox-1");
-
-        Map<String, Object> sandboxEnv = new HashMap<>();
-        sandboxEnv.put("id", "sandbox-1");
-        sandboxEnv.put("type", "SANDBOX");
-        sandboxEnv.put("name", "Dev Sandbox");
-        when(environmentRepository.findByIdAndTenant("sandbox-1", "t1")).thenReturn(Optional.of(sandboxEnv));
-
-        // Mock snapshot creation queries
-        when(jdbcTemplate.queryForList(contains("FROM collection WHERE tenant_id"), eq("t1"))).thenReturn(List.of());
-        when(jdbcTemplate.queryForList(contains("FROM field f JOIN collection"), eq("t1"))).thenReturn(List.of());
-        when(jdbcTemplate.queryForList(contains("FROM role WHERE tenant_id"), eq("t1"))).thenReturn(List.of());
-        when(jdbcTemplate.queryForList(contains("FROM policy WHERE tenant_id"), eq("t1"))).thenReturn(List.of());
-        when(jdbcTemplate.queryForList(contains("FROM ui_page WHERE tenant_id"), eq("t1"))).thenReturn(List.of());
-        when(jdbcTemplate.queryForList(contains("FROM ui_menu WHERE tenant_id"), eq("t1"))).thenReturn(List.of());
-        when(environmentRepository.createSnapshot(any(), any(), any(), any(), anyInt(), any())).thenReturn("snap-1");
-
-        var result = service.createSandbox("t1", "Dev Sandbox", null, null, null, "admin");
-
-        assertThat(result.get("name")).isEqualTo("Dev Sandbox");
-        verify(environmentRepository).create(eq("t1"), eq("Dev Sandbox"), any(), eq("SANDBOX"), eq("prod-1"), any(), any());
+        verify(environmentRepository).updateStatus("prod-new", "t1", "ACTIVE");
     }
 
     @Test
@@ -167,5 +113,55 @@ class SandboxEnvironmentServiceTest {
         assertThatThrownBy(() -> service.updateEnvironment("prod-1", "t1", "Renamed", null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("production");
+    }
+
+    @Test
+    @DisplayName("createSnapshot stores the full export package as the snapshot document")
+    void createSnapshotStoresPackage() {
+        Map<String, Object> env = new HashMap<>();
+        env.put("id", "env-1");
+        env.put("type", "PRODUCTION");
+        when(environmentRepository.findByIdAndTenant("env-1", "t1")).thenReturn(Optional.of(env));
+
+        Map<String, Object> options = Map.of("name", "snap");
+        Map<String, Object> pkg = new LinkedHashMap<>();
+        pkg.put("formatVersion", 2);
+        pkg.put("items", List.of(Map.of("type", "COLLECTION", "data", Map.of("name", "orders"))));
+        when(packageService.exportAllOptions("t1", "snap", "snapshot")).thenReturn(options);
+        when(packageService.exportPackage("t1", options, false)).thenReturn(pkg);
+
+        when(environmentRepository.createSnapshot(eq("t1"), eq("env-1"), eq("snap"),
+                any(), eq(1), eq("admin"))).thenReturn("snap-1");
+        when(environmentRepository.findSnapshotById("snap-1", "t1"))
+                .thenReturn(Optional.of(Map.of("id", "snap-1", "item_count", 1)));
+
+        var result = service.createSnapshot("t1", "env-1", "snap", "admin");
+
+        assertThat(result.get("id")).isEqualTo("snap-1");
+        verify(environmentRepository).createSnapshot(eq("t1"), eq("env-1"), eq("snap"),
+                contains("\"formatVersion\":2"), eq(1), eq("admin"));
+    }
+
+    @Test
+    @DisplayName("snapshotPackage parses the stored package document")
+    void snapshotPackageParsesDocument() {
+        when(environmentRepository.findSnapshotById("snap-1", "t1")).thenReturn(Optional.of(Map.of(
+                "id", "snap-1",
+                "snapshot_data", "{\"formatVersion\":2,\"items\":[]}")));
+
+        var pkg = service.snapshotPackage("snap-1", "t1");
+
+        assertThat(pkg.get("formatVersion")).isEqualTo(2);
+        assertThat(pkg.get("items")).isEqualTo(List.of());
+    }
+
+    @Test
+    @DisplayName("snapshotPackage rejects an unknown snapshot")
+    void snapshotPackageRejectsUnknown() {
+        when(environmentRepository.findSnapshotById("snap-x", "t1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.snapshotPackage("snap-x", "t1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Snapshot not found");
     }
 }

@@ -215,6 +215,9 @@ public class RouteConfigService {
                 // ALM & governance
                 {"metadata", "/api/metadata/**", "metadata"},
                 {"config-health", "/api/config-health/**", "config-health"},
+                {"packages", "/api/packages/**", "packages"},
+                {"environments", "/api/environments/**", "environments"},
+                {"promotions", "/api/promotions/**", "promotions"},
                 // Developer tools & media
                 {"docs", "/api/docs/**", "docs"},
                 {"files", "/api/files/**", "files"},

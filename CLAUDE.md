@@ -142,7 +142,7 @@ visual system.
 | Frontend | React | 19.2 | `kelta-ui/app/package.json` |
 | Frontend build | Vite / Vitest | web 5.1/1.3, ui 7.2/4.0 | package.json (npm, Node 18 in CI) |
 | E2E | Playwright | 1.50 | `e2e-tests/package.json` |
-| Migrations | Flyway | head **V152**, next **V153** | `kelta-worker/.../db/migration/` |
+| Migrations | Flyway | head **V157**, next **V158** | `kelta-worker/.../db/migration/` |
 
 Check the relevant `pom.xml` / `package.json` for exact current versions before pinning.
 
@@ -205,6 +205,8 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.api-spec.changed.<tenantId>` | API spec changed |
 | `kelta.config.tenant.email.changed.<tenantId>` | Tenant SMTP config changed |
 | `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist (network access) changed |
+| `kelta.config.environment.changed.<tenantId>.<envId>` | Sandbox environment created/cloned/refreshed/archived |
+| `kelta.config.promotion.executed.<tenantId>.<promotionId>` | Metadata promotion executed/failed/rolled back |
 | `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime) |
 | `kelta.trigger.<tenantId>.<topic>` | External flow trigger — starts active `NATS_TRIGGERED` flows whose trigger-config `topic` matches (KELTA_TRIGGERS stream, queue-group consumed; body = arbitrary JSON, not a `PlatformEvent`) |
 
@@ -244,7 +246,7 @@ Java tests: surefire runs `*Test`/`*Tests`/`*Properties` in parallel; failsafe r
 ## Database Migrations
 
 - Location: `kelta-worker/src/main/resources/db/migration/`
-- Naming: `V<n>__<snake_description>.sql`. **Head is V152; next new migration is V153.**
+- Naming: `V<n>__<snake_description>.sql`. **Head is V157; next new migration is V158.**
   Check the directory for the true highest number before creating one — never reuse/skip.
 - Flyway runs at worker startup. Migrations execute under the platform sentinel tenant.
 

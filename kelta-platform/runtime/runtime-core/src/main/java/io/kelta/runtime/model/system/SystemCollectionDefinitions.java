@@ -187,6 +187,8 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("ip_allowlist_enabled"))
             .addField(FieldDefinition.json("ipAllowlistCidrs")
                 .withColumnName("ip_allowlist_cidrs"))
+            .addField(FieldDefinition.lookup("parentTenantId", "tenants", "Parent Tenant")
+                .withColumnName("parent_tenant_id"))
             .build();
     }
 

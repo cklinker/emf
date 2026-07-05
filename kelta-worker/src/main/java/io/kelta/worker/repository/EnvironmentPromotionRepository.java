@@ -24,23 +24,30 @@ public class EnvironmentPromotionRepository {
     }
 
     public String create(String tenantId, String sourceEnvId, String targetEnvId,
-                         String promotionType, String snapshotId, String promotedBy) {
+                         String promotionType, String conflictMode, String promotedBy) {
         String id = UUID.randomUUID().toString();
         Timestamp now = Timestamp.from(Instant.now());
         jdbcTemplate.update(
                 "INSERT INTO environment_promotion (id, tenant_id, source_env_id, target_env_id, " +
-                        "status, promotion_type, snapshot_id, promoted_by, created_at, updated_at) " +
+                        "status, promotion_type, conflict_mode, promoted_by, created_at, updated_at) " +
                         "VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?)",
-                id, tenantId, sourceEnvId, targetEnvId, promotionType, snapshotId, promotedBy, now, now
+                id, tenantId, sourceEnvId, targetEnvId, promotionType, conflictMode, promotedBy, now, now
         );
         return id;
+    }
+
+    public void setTargetSnapshot(String promotionId, String snapshotId) {
+        jdbcTemplate.update(
+                "UPDATE environment_promotion SET target_snapshot_id = ?, updated_at = NOW() WHERE id = ?",
+                snapshotId, promotionId
+        );
     }
 
     public Optional<Map<String, Object>> findByIdAndTenant(String promotionId, String tenantId) {
         var results = jdbcTemplate.queryForList(
                 "SELECT p.id, p.tenant_id, p.source_env_id, p.target_env_id, p.status, " +
-                        "p.promotion_type, p.snapshot_id, p.changes_summary, " +
-                        "p.items_promoted, p.items_skipped, p.items_failed, " +
+                        "p.promotion_type, p.conflict_mode, p.snapshot_id, p.target_snapshot_id, " +
+                        "p.changes_summary, p.items_promoted, p.items_skipped, p.items_failed, " +
                         "p.error_message, p.approved_by, p.approved_at, p.promoted_by, " +
                         "p.started_at, p.completed_at, p.created_at, p.updated_at, " +
                         "se.name as source_env_name, te.name as target_env_name " +
@@ -133,15 +140,25 @@ public class EnvironmentPromotionRepository {
 
     // --- Promotion item methods ---
 
-    public String createItem(String promotionId, String itemType, String itemId,
+    public String createItem(String tenantId, String promotionId, String itemType, String itemId,
                              String itemName, String action) {
         String id = UUID.randomUUID().toString();
         jdbcTemplate.update(
-                "INSERT INTO promotion_item (id, promotion_id, item_type, item_id, item_name, action, status) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, 'PENDING')",
-                id, promotionId, itemType, itemId, itemName, action
+                "INSERT INTO promotion_item (id, tenant_id, promotion_id, item_type, item_id, item_name, action, status) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')",
+                id, tenantId, promotionId, itemType, itemId, itemName, action
         );
         return id;
+    }
+
+    /** Updates a selective-promotion item's outcome by its natural key. */
+    public void updateItemStatusByKey(String promotionId, String itemType, String itemName,
+                                      String status, String errorMessage) {
+        jdbcTemplate.update(
+                "UPDATE promotion_item SET status = ?, error_message = ? " +
+                        "WHERE promotion_id = ? AND item_type = ? AND item_name = ?",
+                status, errorMessage, promotionId, itemType, itemName
+        );
     }
 
     public List<Map<String, Object>> findItemsByPromotion(String promotionId) {

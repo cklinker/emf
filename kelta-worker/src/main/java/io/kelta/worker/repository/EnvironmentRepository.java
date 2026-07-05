@@ -23,6 +23,11 @@ public class EnvironmentRepository {
         return jdbcTemplate;
     }
 
+    private static final String SELECT_COLUMNS =
+            "SELECT id, tenant_id, name, description, type, status, source_env_id, " +
+                    "sandbox_tenant_id, remote_base_url, remote_tenant_slug, credential_ref, " +
+                    "config, created_by, created_at, updated_at ";
+
     public String create(String tenantId, String name, String description, String type,
                          String sourceEnvId, String config, String createdBy) {
         String id = UUID.randomUUID().toString();
@@ -36,30 +41,62 @@ public class EnvironmentRepository {
         return id;
     }
 
+    /** Env row for a tenant-backed sandbox: points at the real sandbox tenant. */
+    public String createWithSandboxTenant(String tenantId, String name, String description, String type,
+                                          String sourceEnvId, String sandboxTenantId, String createdBy) {
+        String id = UUID.randomUUID().toString();
+        Timestamp now = Timestamp.from(Instant.now());
+        jdbcTemplate.update(
+                "INSERT INTO environment (id, tenant_id, name, description, type, status, " +
+                        "source_env_id, sandbox_tenant_id, created_by, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, ?, ?, 'CREATING', ?, ?, ?, ?, ?)",
+                id, tenantId, name, description, type, sourceEnvId, sandboxTenantId, createdBy, now, now
+        );
+        return id;
+    }
+
+    /** Env row describing a remote promotion target on another cluster. */
+    public String createRemote(String tenantId, String name, String description, String type,
+                               String remoteBaseUrl, String remoteTenantSlug, String credentialRef,
+                               String createdBy) {
+        String id = UUID.randomUUID().toString();
+        Timestamp now = Timestamp.from(Instant.now());
+        jdbcTemplate.update(
+                "INSERT INTO environment (id, tenant_id, name, description, type, status, " +
+                        "remote_base_url, remote_tenant_slug, credential_ref, created_by, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, ?, ?)",
+                id, tenantId, name, description, type, remoteBaseUrl, remoteTenantSlug,
+                credentialRef, createdBy, now, now
+        );
+        return id;
+    }
+
     public Optional<Map<String, Object>> findByIdAndTenant(String envId, String tenantId) {
         var results = jdbcTemplate.queryForList(
-                "SELECT id, tenant_id, name, description, type, status, source_env_id, " +
-                        "config, created_by, created_at, updated_at " +
-                        "FROM environment WHERE id = ? AND tenant_id = ?",
+                SELECT_COLUMNS + "FROM environment WHERE id = ? AND tenant_id = ?",
                 envId, tenantId
+        );
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
+
+    public Optional<Map<String, Object>> findBySandboxTenantId(String sandboxTenantId) {
+        var results = jdbcTemplate.queryForList(
+                SELECT_COLUMNS + "FROM environment WHERE sandbox_tenant_id = ?",
+                sandboxTenantId
         );
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
     public List<Map<String, Object>> findByTenant(String tenantId) {
         return jdbcTemplate.queryForList(
-                "SELECT id, tenant_id, name, description, type, status, source_env_id, " +
-                        "config, created_by, created_at, updated_at " +
-                        "FROM environment WHERE tenant_id = ? ORDER BY created_at DESC",
+                SELECT_COLUMNS + "FROM environment WHERE tenant_id = ? ORDER BY created_at DESC",
                 tenantId
         );
     }
 
     public List<Map<String, Object>> findByTenantAndType(String tenantId, String type) {
         return jdbcTemplate.queryForList(
-                "SELECT id, tenant_id, name, description, type, status, source_env_id, " +
-                        "config, created_by, created_at, updated_at " +
-                        "FROM environment WHERE tenant_id = ? AND type = ? ORDER BY created_at DESC",
+                SELECT_COLUMNS + "FROM environment WHERE tenant_id = ? AND type = ? ORDER BY created_at DESC",
                 tenantId, type
         );
     }
@@ -89,9 +126,8 @@ public class EnvironmentRepository {
 
     public Optional<Map<String, Object>> findProductionByTenant(String tenantId) {
         var results = jdbcTemplate.queryForList(
-                "SELECT id, tenant_id, name, description, type, status, source_env_id, " +
-                        "config, created_by, created_at, updated_at " +
-                        "FROM environment WHERE tenant_id = ? AND type = 'PRODUCTION' LIMIT 1",
+                SELECT_COLUMNS + "FROM environment WHERE tenant_id = ? AND type = 'PRODUCTION' " +
+                        "AND sandbox_tenant_id IS NULL AND remote_base_url IS NULL LIMIT 1",
                 tenantId
         );
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));

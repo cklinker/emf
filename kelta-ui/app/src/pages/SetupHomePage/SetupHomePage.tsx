@@ -24,6 +24,7 @@ import {
   FileText,
   Folder,
   Gauge,
+  GitBranch,
   History,
   IdCard,
   Bot,
@@ -382,6 +383,13 @@ const CATEGORIES: SetupCategory[] = [
         description: 'View database migration history',
         icon: ArrowUpFromLine,
         permission: 'CUSTOMIZE_APPLICATION',
+      },
+      {
+        name: 'Environments',
+        path: '/environments',
+        description: 'Manage sandboxes and promote metadata between environments',
+        icon: GitBranch,
+        permission: 'MANAGE_SANDBOXES',
       },
       {
         name: 'Governor Limits',

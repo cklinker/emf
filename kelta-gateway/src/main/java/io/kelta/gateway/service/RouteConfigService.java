@@ -193,6 +193,8 @@ public class RouteConfigService {
                 {"login-history", "/api/login-history/**", "login-history"},
                 {"security-audit-logs", "/api/security-audit-logs/**", "security-audit-logs"},
                 {"setup-audit-entries", "/api/setup-audit-entries/**", "setup-audit-entries"},
+                {"field-history", "/api/field-history/**", "field-history"},
+                {"collection-versions", "/api/collection-versions/**", "collection-versions"},
                 // Automation & integration
                 {"flows", "/api/flows/**", "flows"},
                 {"approval-processes", "/api/approval-processes/**", "approval-processes"},

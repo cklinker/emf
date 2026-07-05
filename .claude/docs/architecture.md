@@ -310,6 +310,19 @@ JSON:API path). Egress paths that do not pass the advice (data export,
 reports, dashboards, search index) are **not masked yet** — see
 `concerns.md`.
 
+**Field history** — value changes to fields with `trackHistory=true` are captured
+by `FieldHistoryHook` (worker `listener/`, wildcard `BeforeSaveHook`, order 900):
+`afterCreate`/`afterUpdate` diff old vs new, `beforeDelete` re-reads the record for
+final values, all written to `field_history` via `FieldHistoryRepository`. Reads go
+through the `field-history` read-only **system collection** (`/api/field-history`,
+gateway static route) — not a bespoke controller. Because a history row's
+`oldValue`/`newValue` carry the *referenced* collection field's value, the generic
+`CerbosFieldSecurityAdvice` (which keys off the row's own `field-history` type) can't
+protect them; `FieldHistorySecurityAdvice` (`@Order(20)`, runs after it) resolves each
+row's referenced collection+field and **drops FLS-denied rows / redacts MASKED old+new
+values** per requester, fail-closed on an unresolvable collection. The end-user record
+`ActivityTimeline` (`/app/o`) folds these rows into its feed.
+
 **Pagination contract** — every paginated REST endpoint uses JSON:API
 bracket syntax (`page[number]` / `page[size]`). Parsing lives in
 `runtime-core/.../query/Pagination.fromParams`, which clamps `page[size]`

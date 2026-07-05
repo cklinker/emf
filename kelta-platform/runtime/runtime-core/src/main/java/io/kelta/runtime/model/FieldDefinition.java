@@ -21,6 +21,7 @@ import java.util.Objects;
  * @param referenceConfig Configuration for foreign key relationships
  * @param fieldTypeConfig Type-specific configuration (e.g., auto-number prefix/padding, currency code)
  * @param columnName Physical database column name for system collections (null = use field name)
+ * @param trackHistory Whether value changes to this field are recorded in field_history (default: false)
  *
  * @since 1.0.0
  */
@@ -35,7 +36,8 @@ public record FieldDefinition(
     List<String> enumValues,
     ReferenceConfig referenceConfig,
     Map<String, Object> fieldTypeConfig,
-    String columnName
+    String columnName,
+    boolean trackHistory
 ) {
     /**
      * Compact constructor with validation and defensive copying.
@@ -54,8 +56,21 @@ public record FieldDefinition(
     }
 
     /**
-     * Backward-compatible constructor without columnName parameter.
-     * Delegates to the canonical constructor with columnName = null.
+     * Backward-compatible constructor without the trackHistory parameter.
+     * Delegates to the canonical constructor with trackHistory = false.
+     */
+    public FieldDefinition(
+            String name, FieldType type, boolean nullable, boolean immutable,
+            boolean unique, Object defaultValue, ValidationRules validationRules,
+            List<String> enumValues, ReferenceConfig referenceConfig,
+            Map<String, Object> fieldTypeConfig, String columnName) {
+        this(name, type, nullable, immutable, unique, defaultValue,
+             validationRules, enumValues, referenceConfig, fieldTypeConfig, columnName, false);
+    }
+
+    /**
+     * Backward-compatible constructor without columnName or trackHistory parameters.
+     * Delegates to the canonical constructor with columnName = null, trackHistory = false.
      */
     public FieldDefinition(
             String name, FieldType type, boolean nullable, boolean immutable,
@@ -63,7 +78,7 @@ public record FieldDefinition(
             List<String> enumValues, ReferenceConfig referenceConfig,
             Map<String, Object> fieldTypeConfig) {
         this(name, type, nullable, immutable, unique, defaultValue,
-             validationRules, enumValues, referenceConfig, fieldTypeConfig, null);
+             validationRules, enumValues, referenceConfig, fieldTypeConfig, null, false);
     }
 
     /**
@@ -218,7 +233,7 @@ public record FieldDefinition(
     public FieldDefinition withColumnName(String columnName) {
         return new FieldDefinition(name, type, nullable, immutable, unique,
                 defaultValue, validationRules, enumValues, referenceConfig,
-                fieldTypeConfig, columnName);
+                fieldTypeConfig, columnName, trackHistory);
     }
 
     /**
@@ -330,7 +345,7 @@ public record FieldDefinition(
     public FieldDefinition withNullable(boolean nullable) {
         return new FieldDefinition(name, type, nullable, immutable, unique,
                 defaultValue, validationRules, enumValues, referenceConfig,
-                fieldTypeConfig, columnName);
+                fieldTypeConfig, columnName, trackHistory);
     }
 
     /**
@@ -342,7 +357,7 @@ public record FieldDefinition(
     public FieldDefinition withUnique(boolean unique) {
         return new FieldDefinition(name, type, nullable, immutable, unique,
                 defaultValue, validationRules, enumValues, referenceConfig,
-                fieldTypeConfig, columnName);
+                fieldTypeConfig, columnName, trackHistory);
     }
 
     /**
@@ -354,7 +369,7 @@ public record FieldDefinition(
     public FieldDefinition withDefault(Object defaultValue) {
         return new FieldDefinition(name, type, nullable, immutable, unique,
                 defaultValue, validationRules, enumValues, referenceConfig,
-                fieldTypeConfig, columnName);
+                fieldTypeConfig, columnName, trackHistory);
     }
 
     /**
@@ -366,7 +381,7 @@ public record FieldDefinition(
     public FieldDefinition withValidation(ValidationRules validationRules) {
         return new FieldDefinition(name, type, nullable, immutable, unique,
                 defaultValue, validationRules, enumValues, referenceConfig,
-                fieldTypeConfig, columnName);
+                fieldTypeConfig, columnName, trackHistory);
     }
 
     /**
@@ -378,7 +393,7 @@ public record FieldDefinition(
     public FieldDefinition withImmutable(boolean immutable) {
         return new FieldDefinition(name, type, nullable, immutable, unique,
                 defaultValue, validationRules, enumValues, referenceConfig,
-                fieldTypeConfig, columnName);
+                fieldTypeConfig, columnName, trackHistory);
     }
 
     /**
@@ -390,7 +405,7 @@ public record FieldDefinition(
     public FieldDefinition withEnumValues(java.util.List<String> enumValues) {
         return new FieldDefinition(name, type, nullable, immutable, unique,
                 defaultValue, validationRules, enumValues, referenceConfig,
-                fieldTypeConfig, columnName);
+                fieldTypeConfig, columnName, trackHistory);
     }
 
     /**
@@ -402,6 +417,18 @@ public record FieldDefinition(
     public FieldDefinition withReferenceConfig(ReferenceConfig referenceConfig) {
         return new FieldDefinition(name, type, nullable, immutable, unique,
                 defaultValue, validationRules, enumValues, referenceConfig,
-                fieldTypeConfig, columnName);
+                fieldTypeConfig, columnName, trackHistory);
+    }
+
+    /**
+     * Returns a copy of this field with the trackHistory flag changed.
+     *
+     * @param trackHistory whether value changes are recorded in field_history
+     * @return a new field definition with the specified trackHistory flag
+     */
+    public FieldDefinition withTrackHistory(boolean trackHistory) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName, trackHistory);
     }
 }

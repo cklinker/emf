@@ -41,6 +41,7 @@ import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { DetailTabBar } from '@/pages/ResourceDetailPage/DetailTabBar'
 import { RecordShell } from '@/components/record/RecordShell'
 import { RecordDetailBody } from '@/components/record/RecordDetailBody'
+import { ActivityTimeline } from '@/components/ActivityTimeline/ActivityTimeline'
 import {
   RecordHeader,
   FieldSection,
@@ -838,6 +839,18 @@ export function ObjectDetailPage(): React.ReactElement {
             getUserDisplay={getUserDisplay}
             editable={permissions.canEdit}
             onRelatedChange={refetchRecord}
+          />
+        ) : undefined
+      }
+      belowTabs={
+        record && schema && recordId ? (
+          <ActivityTimeline
+            collectionId={schema.id}
+            collectionName={collectionName ?? ''}
+            recordId={recordId}
+            recordCreatedAt={(record.createdAt ?? record.created_at) as string | undefined}
+            recordUpdatedAt={(record.updatedAt ?? record.updated_at) as string | undefined}
+            apiClient={apiClient}
           />
         ) : undefined
       }

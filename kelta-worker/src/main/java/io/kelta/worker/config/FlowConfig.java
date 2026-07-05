@@ -608,6 +608,21 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.FieldHistoryHook fieldHistoryHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.repository.FieldHistoryRepository fieldHistoryRepository,
+            CollectionRegistry collectionRegistry,
+            CollectionLifecycleManager lifecycleManager,
+            QueryEngine queryEngine,
+            ObjectMapper objectMapper) {
+        io.kelta.worker.listener.FieldHistoryHook hook =
+                new io.kelta.worker.listener.FieldHistoryHook(fieldHistoryRepository, collectionRegistry,
+                        lifecycleManager, queryEngine, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public RecordTypeEnforcementHook recordTypeEnforcementHook(
             BeforeSaveHookRegistry hookRegistry,
             JdbcTemplate jdbcTemplate,

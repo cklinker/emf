@@ -70,7 +70,7 @@ public class CollectionLifecycleManager {
             SELECT name, type, required, unique_constraint, indexed, default_value,
                    constraints, field_type_config, reference_target, reference_collection_id,
                    relationship_type, relationship_name, cascade_delete, field_order, column_name,
-                   immutable, searchable
+                   immutable, searchable, track_history
             FROM field WHERE collection_id = ? AND active = true
             ORDER BY field_order
             """;
@@ -568,6 +568,7 @@ public class CollectionLifecycleManager {
             boolean required = Boolean.TRUE.equals(row.get("required"));
             boolean unique = Boolean.TRUE.equals(row.get("unique_constraint"));
             boolean immutable = Boolean.TRUE.equals(row.get("immutable"));
+            boolean trackHistory = Boolean.TRUE.equals(row.get("track_history"));
             String columnName = (String) row.get("column_name");
 
             // Parse reference config. `reference_target` (the denormalized target collection NAME)
@@ -630,7 +631,7 @@ public class CollectionLifecycleManager {
 
             FieldDefinition fieldDef = new FieldDefinition(
                     fieldName, fieldType, !required, immutable, unique,
-                    parsedDefaultValue, null, null, refConfig, parsedFieldTypeConfig, columnName);
+                    parsedDefaultValue, null, null, refConfig, parsedFieldTypeConfig, columnName, trackHistory);
             fields.add(fieldDef);
         }
 
@@ -877,5 +878,22 @@ public class CollectionLifecycleManager {
             log.warn("Failed to resolve collection ID for '{}': {}", collectionName, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Returns the collection name (API name) for a given collection ID,
+     * or {@code null} if not found.
+     *
+     * @param collectionId the collection ID
+     * @return the collection name, or null
+     */
+    public String getCollectionNameById(String collectionId) {
+        try {
+            return jdbcTemplate.queryForObject(
+                    SELECT_COLLECTION_NAME_BY_ID, String.class, collectionId);
+        } catch (Exception e) {
+            log.warn("Failed to resolve collection name for id '{}': {}", collectionId, e.getMessage());
+            return null;
+        }
     }
 }

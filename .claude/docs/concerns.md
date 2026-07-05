@@ -132,10 +132,14 @@ bypass the advice still emit **plaintext** to their (privileged-gated) callers:
 - Flows/scripts/webhooks/NATS consumers — system trust tier, same contract as FLS today.
 - Bulk ops / merge — same accepted trade-off as write-FLS above.
 Also: between storage-adapter decryption and the advice, plaintext exists in-process —
-never log field values on that path. `field_history` (V19) is **dormant** (no writer
-exists); if history tracking is ever implemented, its rows for masked/hidden fields must
-be filtered per requester or the old/new plaintext leaks through the generic JSON:API
-route.
+never log field values on that path. **`field_history` is now live** (writer:
+`FieldHistoryHook`, wildcard, captures create/update/delete diffs of `trackHistory` fields;
+read: `/api/field-history` system collection + gateway route). Its masked/hidden-field leak
+risk is closed by `FieldHistorySecurityAdvice`, which resolves each row's *referenced*
+collection+field and drops FLS-denied rows / redacts MASKED old+new values per requester
+(the generic `CerbosFieldSecurityAdvice` can't, since it keys off the row's own
+`field-history` type). Row-drop makes a page's returned count a lower bound — acceptable for
+an audit feed.
 
 ## Known Bugs
 

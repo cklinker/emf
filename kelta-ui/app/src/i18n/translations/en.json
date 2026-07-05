@@ -119,6 +119,8 @@
     "fieldType": "Field Type",
     "validation": "Validation",
     "versionHistory": "Version History",
+    "versionHistoryDescription": "Point-in-time snapshots of this collection's schema.",
+    "changeHistory": "Change History",
     "version": "Version",
     "currentVersion": "Current",
     "viewVersion": "View Version",
@@ -182,6 +184,8 @@
     "noChanges": "No field changes recorded yet."
   },
   "setupAudit": {
+    "title": "Schema Changes",
+    "description": "Administrative changes to this collection's structure — fields, validation rules, record types.",
     "action": "Action",
     "section": "Section",
     "entityType": "Entity Type",
@@ -1853,6 +1857,9 @@
     "sharedWith": "Shared with {{id}} ({{level}})",
     "flowRun": "Flow {{name}} {{status}}",
     "emailSent": "Email \"{{subject}}\" to {{recipient}} ({{status}})",
+    "fieldChanged": "{{field}} changed from {{from}} to {{to}}",
+    "fieldSet": "{{field}} set to {{value}}",
+    "fieldCleared": "{{field}} cleared (was {{value}})",
     "loading": "Loading activity..."
   },
   "recordActions": {

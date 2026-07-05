@@ -44,7 +44,6 @@ import type {
   RecordType,
   PicklistDependency,
   SetupAuditTrailEntry,
-  FieldHistoryEntry,
 } from '../../types/collections'
 import type { FieldType } from '../../types/collections'
 
@@ -167,9 +166,7 @@ export function CollectionDetailPage({
     | 'validationRules'
     | 'recordTypes'
     | 'picklistDependencies'
-    | 'fieldHistory'
-    | 'setupAudit'
-    | 'versions'
+    | 'changeHistory'
     | 'dataSource'
   >('fields')
 
@@ -229,7 +226,7 @@ export function CollectionDetailPage({
       apiClient.getList<CollectionVersion>(
         `/api/collection-versions?filter[collectionId][eq]=${collectionId}`
       ),
-    enabled: !!collectionId && activeTab === 'versions',
+    enabled: !!collectionId && activeTab === 'changeHistory',
   })
 
   // Fetch validation rules
@@ -294,31 +291,7 @@ export function CollectionDetailPage({
       apiClient.getPage<SetupAuditTrailEntry>(
         `/api/setup-audit-entries?filter[entityType][eq]=Collection&filter[entityId][eq]=${collectionId}&page[size]=50`
       ),
-    enabled: activeTab === 'setupAudit' && !!collectionId,
-  })
-
-  // Fetch field history for this collection (recent changes across all fields)
-  const { data: fieldHistoryPage, isLoading: isLoadingFieldHistory } = useQuery({
-    queryKey: ['field-history', collectionId],
-    queryFn: async () => {
-      // Fetch history for each tracked field
-      const trackedFields = collection?.fields?.filter((f) => f.trackHistory) ?? []
-      if (trackedFields.length === 0) return { content: [] as FieldHistoryEntry[] }
-      const results = await Promise.all(
-        trackedFields.map((field) =>
-          apiClient
-            .getList<FieldHistoryEntry>(
-              `/api/field-history?filter[collectionId][eq]=${collectionId}&filter[fieldName][eq]=${field.name}&page[size]=20`
-            )
-            .catch(() => [] as FieldHistoryEntry[])
-        )
-      )
-      // Merge and sort by changedAt descending
-      const allEntries = results.flatMap((r) => r)
-      allEntries.sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
-      return { content: allEntries.slice(0, 50) }
-    },
-    enabled: activeTab === 'fieldHistory' && !!collectionId,
+    enabled: activeTab === 'changeHistory' && !!collectionId,
   })
 
   // Fetch all collections for reference field dropdown
@@ -619,9 +592,7 @@ export function CollectionDetailPage({
         | 'validationRules'
         | 'recordTypes'
         | 'picklistDependencies'
-        | 'fieldHistory'
-        | 'setupAudit'
-        | 'versions'
+        | 'changeHistory'
         | 'dataSource'
     ) => {
       setActiveTab(tab)
@@ -1149,9 +1120,7 @@ export function CollectionDetailPage({
               label: t('picklistDependencies.title'),
               id: 'picklist-dependencies',
             },
-            { key: 'fieldHistory', label: t('collections.fieldHistory'), id: 'field-history' },
-            { key: 'setupAudit', label: t('collections.setupAudit'), id: 'setup-audit' },
-            { key: 'versions', label: t('collections.versionHistory'), id: 'versions' },
+            { key: 'changeHistory', label: t('collections.changeHistory'), id: 'change-history' },
             { key: 'dataSource', label: t('collections.dataSource'), id: 'data-source' },
           ] as const
         )
@@ -1867,169 +1836,26 @@ export function CollectionDetailPage({
         </section>
       )}
 
-      {/* Field History Panel */}
-      {activeTab === 'fieldHistory' && (
+      {/* Change History Panel: schema admin changes + version snapshots.
+          Record-level field-value history lives on the record (App UI timeline),
+          not here — this tab is about how the collection's schema evolved. */}
+      {activeTab === 'changeHistory' && (
         <section
-          id="field-history-panel"
+          id="change-history-panel"
           role="tabpanel"
-          aria-labelledby="field-history-tab"
+          aria-labelledby="change-history-tab"
           className="py-6"
-          data-testid="field-history-panel"
+          data-testid="change-history-panel"
         >
           <div className="flex justify-between items-center mb-4">
             <h2 className="m-0 text-lg font-semibold text-foreground">
-              {t('collections.fieldHistory')}
+              {t('collections.changeHistory')}
             </h2>
           </div>
-          <div className="p-6 text-muted-foreground">
-            <p className="m-0 mb-2">{t('fieldHistory.description')}</p>
-            <p className="m-0 mb-2 italic text-sm">{t('fieldHistory.trackedFieldsNote')}</p>
-            {sortedFields.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-semibold m-0 mb-1">
-                  {t('fieldHistory.trackedFields')}
-                </h3>
-                <ul className="list-disc pl-6 m-0">
-                  {sortedFields
-                    .filter((f: FieldDefinition) => f.trackHistory)
-                    .map((f: FieldDefinition) => (
-                      <li key={f.id} className="text-sm py-1">
-                        {f.displayName || f.name}
-                      </li>
-                    ))}
-                  {sortedFields.filter((f: FieldDefinition) => f.trackHistory).length === 0 && (
-                    <li className="text-muted-foreground/60 italic">
-                      {t('fieldHistory.noTrackedFields')}
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
 
-          {/* Recent Field Changes */}
-          {isLoadingFieldHistory ? (
-            <div className="flex justify-center items-center min-h-[200px]">
-              <LoadingSpinner size="medium" label={t('common.loading')} />
-            </div>
-          ) : fieldHistoryPage?.content && fieldHistoryPage.content.length > 0 ? (
-            <>
-              <h3 className="text-base font-semibold text-foreground my-6 mb-2">
-                {t('fieldHistory.recentChanges')}
-              </h3>
-              <div className="overflow-x-auto border border-border rounded-md bg-card">
-                <table
-                  className="w-full border-collapse text-sm"
-                  aria-label={t('fieldHistory.recentChanges')}
-                  data-testid="field-history-table"
-                >
-                  <thead className="bg-muted">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
-                      >
-                        {t('collections.fieldName')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
-                      >
-                        {t('fieldHistory.recordId')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
-                      >
-                        {t('fieldHistory.oldValue')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
-                      >
-                        {t('fieldHistory.newValue')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
-                      >
-                        {t('fieldHistory.changedBy')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
-                      >
-                        {t('fieldHistory.changedAt')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
-                      >
-                        {t('fieldHistory.source')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fieldHistoryPage.content.map((entry: FieldHistoryEntry) => (
-                      <tr key={entry.id}>
-                        <td className="p-4 text-foreground border-b border-border/50 font-medium font-mono">
-                          {getFieldName(entry.fieldName) || entry.fieldName}
-                        </td>
-                        <td className="p-4 border-b border-border/50">
-                          <code className="font-mono text-xs px-1.5 py-0.5 bg-muted rounded">
-                            {entry.recordId.substring(0, 8)}...
-                          </code>
-                        </td>
-                        <td className="p-4 text-foreground border-b border-border/50">
-                          {entry.oldValue != null ? String(entry.oldValue) : '-'}
-                        </td>
-                        <td className="p-4 text-foreground border-b border-border/50">
-                          {entry.newValue != null ? String(entry.newValue) : '-'}
-                        </td>
-                        <td className="p-4 text-foreground border-b border-border/50">
-                          {entry.changedBy || '-'}
-                        </td>
-                        <td className="p-4 text-foreground border-b border-border/50">
-                          {new Date(entry.changedAt).toLocaleString()}
-                        </td>
-                        <td className="p-4 border-b border-border/50">
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-emerald-800 bg-emerald-100 rounded uppercase tracking-wide dark:text-emerald-300 dark:bg-emerald-900">
-                            {entry.changeSource}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            sortedFields.some((f: FieldDefinition) => f.trackHistory) && (
-              <div
-                className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md"
-                data-testid="field-history-empty"
-              >
-                <p className="m-0 text-base">{t('fieldHistory.noChanges')}</p>
-              </div>
-            )
-          )}
-        </section>
-      )}
-
-      {/* Setup Audit Panel */}
-      {activeTab === 'setupAudit' && (
-        <section
-          id="setup-audit-panel"
-          role="tabpanel"
-          aria-labelledby="setup-audit-tab"
-          className="py-6"
-          data-testid="setup-audit-panel"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="m-0 text-lg font-semibold text-foreground">
-              {t('collections.setupAudit')}
-            </h2>
-          </div>
+          {/* Schema changes (setup audit trail) */}
+          <h3 className="text-base font-semibold text-foreground mb-1">{t('setupAudit.title')}</h3>
+          <p className="m-0 mb-4 text-sm text-muted-foreground">{t('setupAudit.description')}</p>
           {isLoadingAudit ? (
             <LoadingSpinner />
           ) : setupAuditPage?.content && setupAuditPage.content.length > 0 ? (
@@ -2093,23 +1919,14 @@ export function CollectionDetailPage({
               <p className="m-0 text-base">{t('setupAudit.empty')}</p>
             </div>
           )}
-        </section>
-      )}
 
-      {/* Version History Panel */}
-      {activeTab === 'versions' && (
-        <section
-          id="versions-panel"
-          role="tabpanel"
-          aria-labelledby="versions-tab"
-          className="py-6"
-          data-testid="versions-panel"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="m-0 text-lg font-semibold text-foreground">
-              {t('collections.versionHistory')}
-            </h2>
-          </div>
+          {/* Version snapshots */}
+          <h3 className="text-base font-semibold text-foreground mt-8 mb-1">
+            {t('collections.versionHistory')}
+          </h3>
+          <p className="m-0 mb-4 text-sm text-muted-foreground">
+            {t('collections.versionHistoryDescription')}
+          </p>
           {isLoadingVersions ? (
             <div className="flex justify-center items-center min-h-[200px]">
               <LoadingSpinner size="medium" label={t('common.loading')} />

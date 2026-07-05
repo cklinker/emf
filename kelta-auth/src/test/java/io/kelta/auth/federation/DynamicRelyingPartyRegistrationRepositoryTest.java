@@ -35,10 +35,15 @@ class DynamicRelyingPartyRegistrationRepositoryTest {
     }
 
     private static SamlProviderInfo provider(String idpCertPem) {
+        return provider(idpCertPem, null);
+    }
+
+    private static SamlProviderInfo provider(String idpCertPem, String sloUrl) {
         return new SamlProviderInfo(
                 "saml-1", "Acme IdP", "acme",
                 "https://idp.acme.example/entity",
                 "https://idp.acme.example/sso",
+                sloUrl,
                 idpCertPem,
                 "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
                 "email", null, true);
@@ -66,6 +71,34 @@ class DynamicRelyingPartyRegistrationRepositoryTest {
         assertThat(reg.getAssertingPartyMetadata().getVerificationX509Credentials()).isNotEmpty();
         assertThat(reg.getNameIdFormat())
                 .isEqualTo("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress");
+    }
+
+    @Test
+    @DisplayName("wires Single Logout (both sides) when the provider has an SLO URL")
+    void wiresSingleLogoutWhenSloUrlPresent() {
+        when(workerClient.findActiveSamlProviders("tenant-1"))
+                .thenReturn(List.of(provider(resource("/saml/idp.crt"), "https://idp.acme.example/slo")));
+
+        RelyingPartyRegistration reg = repoWithSpSigning().findByRegistrationId("tenant-1:saml-1");
+
+        // IdP side: the SLO endpoint the SP sends LogoutRequests to.
+        assertThat(reg.getAssertingPartyMetadata().getSingleLogoutServiceLocation())
+                .isEqualTo("https://idp.acme.example/slo");
+        // SP side: the endpoint this SP receives IdP LogoutRequest/Response on
+        // (advertised in metadata), resolved against the request base URL.
+        assertThat(reg.getSingleLogoutServiceLocation())
+                .isEqualTo("{baseUrl}/logout/saml2/slo/{registrationId}");
+    }
+
+    @Test
+    @DisplayName("omits Single Logout when the provider has no SLO URL")
+    void omitsSingleLogoutWhenNoSloUrl() {
+        when(workerClient.findActiveSamlProviders("tenant-1"))
+                .thenReturn(List.of(provider(resource("/saml/idp.crt"))));
+
+        RelyingPartyRegistration reg = repoWithSpSigning().findByRegistrationId("tenant-1:saml-1");
+
+        assertThat(reg.getAssertingPartyMetadata().getSingleLogoutServiceLocation()).isNull();
     }
 
     @Test

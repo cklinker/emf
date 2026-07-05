@@ -39,7 +39,7 @@ class FederatedUserMapperSamlTest {
 
     private SamlProviderInfo provider(String emailAttribute, String profileAttribute) {
         return new SamlProviderInfo("saml-1", "Acme IdP", "acme",
-                "https://idp.acme/entity", "https://idp.acme/sso", "cert",
+                "https://idp.acme/entity", "https://idp.acme/sso", null, "cert",
                 "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
                 emailAttribute, profileAttribute, true);
     }

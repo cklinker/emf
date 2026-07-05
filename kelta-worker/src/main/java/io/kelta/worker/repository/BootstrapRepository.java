@@ -66,13 +66,13 @@ public class BootstrapRepository {
             """;
 
     private static final String SELECT_ACTIVE_SAML_PROVIDERS_BY_TENANT = """
-            SELECT id, name, registration_id, idp_entity_id, sso_url, idp_certificate,
+            SELECT id, name, registration_id, idp_entity_id, sso_url, slo_url, idp_certificate,
                    name_id_format, email_attribute, profile_attribute, active
             FROM saml_provider WHERE tenant_id = ? AND active = true
             """;
 
     private static final String SELECT_SAML_PROVIDER_BY_ENTITY_ID_AND_TENANT = """
-            SELECT id, name, registration_id, idp_entity_id, sso_url, idp_certificate,
+            SELECT id, name, registration_id, idp_entity_id, sso_url, slo_url, idp_certificate,
                    name_id_format, email_attribute, profile_attribute, active
             FROM saml_provider WHERE idp_entity_id = ? AND tenant_id = ? AND active = true
             LIMIT 1

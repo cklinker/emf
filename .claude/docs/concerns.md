@@ -84,14 +84,20 @@ route.
 
 (No open bugs from the original audit. See Resolved → Bugs.)
 
-**Cerbos object/record policies are likely generated from collection UUIDs but checked
-against collection names (under investigation).** `profile_object_permission.collection_id`
-and `loadCollectionIdsForTenant` feed collection UUIDs into the collection/record policy
-CEL, while the gateway/worker advices pass the URL-path collection *name* — if confirmed,
-per-collection CRUD grants for non-admin profiles never match and only the unconditional
-`VIEW_ALL_DATA`/`MODIFY_ALL_DATA` rules take effect. The equivalent field-permission
-mismatch was real and is fixed (BootstrapRepository COALESCE-join translation, data-masking
-PR); a spawned task covers verifying + fixing the object/record side the same way.
+**FIXED (PR #1174) — record-policy `collectionId` was UUID-keyed but checked by name.**
+`CerbosPolicyGenerator.generateRecordPolicy` emitted `R.attr.collectionId == "<UUID>"` (from
+`profile_object_permission.collection_id` + `collection.id`, both UUIDs), but
+`CerbosRecordAuthorizationAdvice` sets `R.attr.collectionId` from the URL path **name**. With
+`permissions-enabled=true` (default) and real Cerbos policies, per-collection record allow rules
+never matched, so any profile lacking `VIEW_ALL_DATA` (e.g. the seeded **Standard User**) had
+**every record filtered out** of reads and denied on writes — except explicitly record-shared
+rows. The harness runs Cerbos in allow-all mode and e2e runs as admin, so neither caught it (same
+blind spot as the field-permission bug, per `feedback_db-constraint-test-gap`). Fix: the record
+policy CEL (and its custom-rule CEL) now key on the collection **name** via a `collectionIdToName`
+map; the **collection** policy stays UUID-keyed because the gateway's `checkObjectPermission`
+passes the UUID (`route.getId()`). See `architecture.md` → Cerbos `collectionId` keying.
+**Pre-merge gate: verify on a live stack** (`make up`, log in as a non-admin profile, toggle
+per-collection object permissions) — the allow-all harness Cerbos cannot exercise real deny.
 
 ## Tech Debt
 

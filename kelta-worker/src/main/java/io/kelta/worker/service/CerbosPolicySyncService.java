@@ -86,7 +86,22 @@ public class CerbosPolicySyncService {
                 log.info("No profiles found for tenant {} — skipping Cerbos policy sync", tenantId);
                 return;
             }
-            List<String> collectionIds = loadCollectionIdsForTenant(tenantId);
+            List<Map<String, Object>> activeCollections = bootstrapRepository.findActiveCollections();
+            List<String> collectionIds = activeCollections.stream()
+                    .map(row -> (String) row.get("id"))
+                    .filter(Objects::nonNull)
+                    .toList();
+            // id -> API name, so the record policy CEL can key on the collection name the
+            // worker record advice passes (the collection policy stays UUID-keyed for the
+            // gateway). See generateRecordPolicy.
+            Map<String, String> collectionIdToName = new LinkedHashMap<>();
+            for (Map<String, Object> row : activeCollections) {
+                String id = (String) row.get("id");
+                String name = (String) row.get("name");
+                if (id != null && name != null) {
+                    collectionIdToName.put(id, name);
+                }
+            }
             List<CerbosPolicyGenerator.CustomRule> customRules = loadCustomRulesForTenant(tenantId);
 
             // Generate policies
@@ -94,7 +109,8 @@ public class CerbosPolicySyncService {
             Map<String, Object> systemPolicy = policyGenerator.generateSystemFeaturePolicy(tenantId, profiles);
             Map<String, Object> collectionPolicy = policyGenerator.generateCollectionPolicy(tenantId, profiles, collectionIds);
             Map<String, Object> fieldPolicy = policyGenerator.generateFieldPolicy(tenantId, profiles);
-            Map<String, Object> recordPolicy = policyGenerator.generateRecordPolicy(tenantId, profiles, collectionIds, customRules);
+            Map<String, Object> recordPolicy = policyGenerator.generateRecordPolicy(
+                    tenantId, profiles, collectionIds, customRules, collectionIdToName);
 
             // Push to Cerbos Admin API
             pushPolicy(derivedRoles);
@@ -232,14 +248,6 @@ public class CerbosPolicySyncService {
                     .put(fieldId, visibility);
         }
         return perms;
-    }
-
-    private List<String> loadCollectionIdsForTenant(String tenantId) {
-        List<Map<String, Object>> collections = bootstrapRepository.findActiveCollections();
-        return collections.stream()
-                .map(row -> (String) row.get("id"))
-                .filter(Objects::nonNull)
-                .toList();
     }
 
     private List<CerbosPolicyGenerator.CustomRule> loadCustomRulesForTenant(String tenantId) {

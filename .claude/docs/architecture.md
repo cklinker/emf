@@ -75,6 +75,19 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
 - **Collection API routes** (`/{tenant}/{collection}`): the gateway `RouteAuthorizationFilter`
   (order 0) runs the per-resource Cerbos object check, and the worker
   `CerbosRecordAuthorizationAdvice` + FLS advices add record/field checks.
+  - **Cerbos `collectionId` keying (important).** The `collection` policy CEL (gateway) and
+    the `record`/`field` policies (worker advices) key `R.attr.collectionId` on **different
+    identifiers**, because their checkers pass different values. The gateway's
+    `RouteAuthorizationFilter.checkObjectPermission` passes `route.getId()` = the bootstrap
+    `collection.id` (a **UUID**), so `CerbosPolicyGenerator.generateCollectionPolicy` keys the
+    collection CEL on the UUID. The worker `CerbosRecordAuthorizationAdvice` and
+    `CerbosFieldSecurityAdvice` take `collectionId` from the **URL path segment** (the collection
+    **name**), and record-share widening joins by name — so `generateRecordPolicy` and
+    `generateFieldPolicy` key their CEL on the **name**. `generateRecordPolicy` therefore takes a
+    `collectionIdToName` map and translates the per-collection + custom-rule CEL literals to names
+    while still looking up object permissions by the stored UUID. Get this wrong in one direction
+    and per-collection allow rules silently never match: a UUID-keyed record CEL denies every
+    record to non-`VIEW_ALL_DATA` profiles (they'd see empty lists everywhere).
 - **Static routes** (`/api/admin/**`, `/api/me/**`, `/api/_search/**`, `/api/metrics/**`):
   `RouteAuthorizationFilter` **skips** ids starting `static-` — they get only the blanket
   `API_ACCESS` system-permission check. The worker advices **exclude** `/api/admin/`. So a new

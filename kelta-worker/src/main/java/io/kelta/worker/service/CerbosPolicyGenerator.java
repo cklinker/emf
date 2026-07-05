@@ -232,16 +232,30 @@ public class CerbosPolicyGenerator {
 
     /**
      * Generates the record resource policy for a tenant (base CRUD + custom ABAC rules).
+     *
+     * <p><strong>Record CEL keys on the collection NAME, not the UUID.</strong> The
+     * worker's {@code CerbosRecordAuthorizationAdvice} sets {@code R.attr.collectionId}
+     * from the request URL segment (the collection API name), and record-share widening
+     * joins by collection name too — so the per-collection record rules must match on the
+     * name. Object permissions are still <em>looked up</em> by the collection UUID (the id
+     * stored in {@code profile_object_permission}); only the emitted CEL literal is the
+     * name, resolved via {@code collectionIdToName}. This differs from
+     * {@link #generateCollectionPolicy}, whose CEL stays UUID-keyed because the gateway's
+     * route-level {@code checkObjectPermission} passes the collection UUID
+     * ({@code route.getId()} = bootstrap {@code collection.id}). A map miss falls back to
+     * the id (tolerant of any collection lacking a name entry).
      */
     public Map<String, Object> generateRecordPolicy(String tenantId,
                                                       List<ProfileData> profiles,
                                                       List<String> collectionIds,
-                                                      List<CustomRule> customRules) {
+                                                      List<CustomRule> customRules,
+                                                      Map<String, String> collectionIdToName) {
         // Start with same collection-level CRUD rules applied to records
         List<Map<String, Object>> rules = new ArrayList<>();
 
         // Per-collection CRUD (same as collection policy)
         for (String collectionId : collectionIds) {
+            String collectionRef = resolveCollectionRef(collectionIdToName, collectionId);
             for (String action : List.of("create", "read", "edit", "delete")) {
                 List<String> allowedRoles = new ArrayList<>();
                 for (ProfileData profile : profiles) {
@@ -256,7 +270,7 @@ public class CerbosPolicyGenerator {
                     rule.put("effect", "EFFECT_ALLOW");
                     rule.put("derivedRoles", allowedRoles);
                     Map<String, Object> condition = new LinkedHashMap<>();
-                    condition.put("match", Map.of("expr", "R.attr.collectionId == \"" + collectionId + "\""));
+                    condition.put("match", Map.of("expr", "R.attr.collectionId == \"" + collectionRef + "\""));
                     rule.put("condition", condition);
                     rules.add(rule);
                 }
@@ -301,7 +315,8 @@ public class CerbosPolicyGenerator {
                     ? "EFFECT_DENY" : "EFFECT_ALLOW");
             rule.put("derivedRoles", List.of("profile_" + customRule.profileId()));
 
-            String collExpr = "R.attr.collectionId == \"" + customRule.collectionId() + "\"";
+            String collExpr = "R.attr.collectionId == \""
+                    + resolveCollectionRef(collectionIdToName, customRule.collectionId()) + "\"";
             String celExpr = customRule.celExpression();
             String combinedExpr = celExpr != null && !celExpr.isBlank()
                     ? collExpr + " && " + celExpr
@@ -315,6 +330,17 @@ public class CerbosPolicyGenerator {
         }
 
         return buildResourcePolicy("record", tenantId, rules);
+    }
+
+    /**
+     * Resolves a collection UUID to the API name used in record CEL, falling back to the
+     * id itself when the map is null or has no entry (so an unmapped collection still emits
+     * a well-formed, if id-keyed, rule rather than a {@code null} literal).
+     */
+    private static String resolveCollectionRef(Map<String, String> collectionIdToName, String collectionId) {
+        return collectionIdToName != null
+                ? collectionIdToName.getOrDefault(collectionId, collectionId)
+                : collectionId;
     }
 
     private Map<String, Object> buildResourcePolicy(String resource, String tenantId,

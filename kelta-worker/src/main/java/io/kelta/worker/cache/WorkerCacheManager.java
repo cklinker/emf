@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -219,7 +220,13 @@ public class WorkerCacheManager {
      * @return the cached response if present, empty otherwise
      */
     public Optional<Map<String, Object>> getSystemCollectionResponse(String cacheKey) {
-        return Optional.ofNullable(systemCollectionCache.getIfPresent(cacheKey));
+        // Deep-copy on read: the cached response is shared across every requester,
+        // but per-request ControllerAdvices (field-level security stripping, data
+        // masking) mutate the response map in place. Handing out the canonical
+        // reference would let one user's redaction corrupt the copy served to
+        // everyone else on the same cached query. Each caller gets a private copy.
+        return Optional.ofNullable(systemCollectionCache.getIfPresent(cacheKey))
+                .map(WorkerCacheManager::deepCopyResponse);
     }
 
     /**
@@ -229,7 +236,47 @@ public class WorkerCacheManager {
      * @param response the JSON:API response to cache
      */
     public void putSystemCollectionResponse(String cacheKey, Map<String, Object> response) {
-        systemCollectionCache.put(cacheKey, response);
+        // Deep-copy on write too: the caller that populates the cache on a miss also
+        // returns the same object up the stack, where the advices mutate it — so the
+        // stored canonical copy must be independent of the object the first requester
+        // hands back.
+        systemCollectionCache.put(cacheKey, deepCopyResponse(response));
+    }
+
+    /**
+     * Recursively copies a JSON:API response tree (nested {@link Map}s / {@link List}s
+     * of JSON scalars) so the returned structure shares no mutable node with the input.
+     * Scalars (String/Number/Boolean) are immutable and returned as-is.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> deepCopyResponse(Map<String, Object> response) {
+        if (response == null) {
+            return null;
+        }
+        Map<String, Object> copy = new java.util.LinkedHashMap<>(response.size());
+        for (Map.Entry<String, Object> entry : response.entrySet()) {
+            copy.put(entry.getKey(), deepCopyValue(entry.getValue()));
+        }
+        return copy;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object deepCopyValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> copy = new java.util.LinkedHashMap<>(map.size());
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                copy.put(entry.getKey(), deepCopyValue(entry.getValue()));
+            }
+            return copy;
+        }
+        if (value instanceof List<?> list) {
+            List<Object> copy = new java.util.ArrayList<>(list.size());
+            for (Object item : list) {
+                copy.add(deepCopyValue(item));
+            }
+            return copy;
+        }
+        return value; // String / Number / Boolean / null — immutable
     }
 
     /**

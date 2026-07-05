@@ -22,6 +22,16 @@ public class RecordChangedPayload {
     private List<String> changedFields;
 
     /**
+     * True when the record's collection has masking-configured fields. Broadcast
+     * consumers that fan record data out to end users without per-user field
+     * security (e.g. the gateway realtime bridge) must omit {@code data} /
+     * {@code previousData} when set and let clients refetch through the
+     * masked JSON:API path. Defaults to false; absent on events from older
+     * pods (Jackson leaves it false).
+     */
+    private boolean containsMaskedFields;
+
+    /**
      * Default constructor for deserialization.
      */
     public RecordChangedPayload() {
@@ -89,6 +99,15 @@ public class RecordChangedPayload {
 
     public List<String> getChangedFields() { return changedFields; }
     public void setChangedFields(List<String> changedFields) { this.changedFields = changedFields; }
+
+    public boolean isContainsMaskedFields() { return containsMaskedFields; }
+    public void setContainsMaskedFields(boolean containsMaskedFields) { this.containsMaskedFields = containsMaskedFields; }
+
+    /** Fluent variant of {@link #setContainsMaskedFields} for inline publish sites. */
+    public RecordChangedPayload withContainsMaskedFields(boolean containsMaskedFields) {
+        this.containsMaskedFields = containsMaskedFields;
+        return this;
+    }
 
     @Override
     public boolean equals(Object o) {

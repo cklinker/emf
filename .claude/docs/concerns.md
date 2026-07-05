@@ -92,9 +92,46 @@ ever exposed to a lower-privilege role. It is deliberately **not** auto-invoked 
   `MANAGE_TENANTS` holder → allow), so it hardens access but is not a hard security
   boundary on its own — pair it with the network-level controls above.
 
+**Data masking v1 covers the JSON:API surface only (accepted, documented).** Masking
+(`fieldTypeConfig.masking` + `MASKED` visibility → `unmask` Cerbos deny) is enforced by
+`CerbosFieldSecurityAdvice` (strip→mask), the `MaskedFieldPredicateInterceptor`
+filter/sort guard, and realtime `data` suppression (`containsMaskedFields`). Paths that
+bypass the advice still emit **plaintext** to their (privileged-gated) callers:
+- Data export (`VIEW_ALL_DATA`-gated) and report execution/exports (`MANAGE_REPORTS`
+  follow-up above) — **top v2 priority**: apply `RecordMaskingService.maskRows` at their
+  serialization boundaries; block report groupBy on masked fields (group keys disclose
+  values).
+- Dashboards (`DashboardDataService`) — shared widget cache is not per-viewer; needs a
+  post-cache mask or cache-key redesign.
+- Full-text `search_index` (`display_value` + tsvector) and semantic embeddings — a
+  masked field that is `searchable`/embedded leaks via match-confirmation; v2 excludes
+  masking-configured fields at index/embed time + reindexes on mask-add.
+- Flows/scripts/webhooks/NATS consumers — system trust tier, same contract as FLS today.
+- Bulk ops / merge — same accepted trade-off as write-FLS above.
+Also: between storage-adapter decryption and the advice, plaintext exists in-process —
+never log field values on that path. `field_history` (V19) is **dormant** (no writer
+exists); if history tracking is ever implemented, its rows for masked/hidden fields must
+be filtered per requester or the old/new plaintext leaks through the generic JSON:API
+route.
+
 ## Known Bugs
 
 (No open bugs from the original audit. See Resolved → Bugs.)
+
+**FIXED (PR #1174) — record-policy `collectionId` was UUID-keyed but checked by name.**
+`CerbosPolicyGenerator.generateRecordPolicy` emitted `R.attr.collectionId == "<UUID>"` (from
+`profile_object_permission.collection_id` + `collection.id`, both UUIDs), but
+`CerbosRecordAuthorizationAdvice` sets `R.attr.collectionId` from the URL path **name**. With
+`permissions-enabled=true` (default) and real Cerbos policies, per-collection record allow rules
+never matched, so any profile lacking `VIEW_ALL_DATA` (e.g. the seeded **Standard User**) had
+**every record filtered out** of reads and denied on writes — except explicitly record-shared
+rows. The harness runs Cerbos in allow-all mode and e2e runs as admin, so neither caught it (same
+blind spot as the field-permission bug, per `feedback_db-constraint-test-gap`). Fix: the record
+policy CEL (and its custom-rule CEL) now key on the collection **name** via a `collectionIdToName`
+map; the **collection** policy stays UUID-keyed because the gateway's `checkObjectPermission`
+passes the UUID (`route.getId()`). See `architecture.md` → Cerbos `collectionId` keying.
+**Pre-merge gate: verify on a live stack** (`make up`, log in as a non-admin profile, toggle
+per-collection object permissions) — the allow-all harness Cerbos cannot exercise real deny.
 
 ## Tech Debt
 

@@ -283,6 +283,74 @@ class CerbosPolicyGeneratorTest {
                             && ((List<?>) rule.get("actions")).equals(List.of("write")));
             assertThat(hasWriteDeny).isTrue();
         }
+
+        @Test
+        @DisplayName("should create a default unmask allow rule for all users")
+        @SuppressWarnings("unchecked")
+        void createsDefaultUnmaskAllowRule() {
+            Map<String, Object> policy = generator.generateFieldPolicy(TENANT_ID, List.of());
+
+            Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
+            List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");
+
+            assertThat(rules).hasSizeGreaterThanOrEqualTo(3);
+            assertThat(rules.get(2).get("actions")).isEqualTo(List.of("unmask"));
+            assertThat(rules.get(2).get("effect")).isEqualTo("EFFECT_ALLOW");
+            assertThat(rules.get(2).get("roles")).isEqualTo(List.of("user"));
+        }
+
+        @Test
+        @DisplayName("should add a single unmask+write deny rule for MASKED fields")
+        @SuppressWarnings("unchecked")
+        void addsUnmaskWriteDenyForMaskedFields() {
+            ProfileData profileWithMaskedField = new ProfileData(
+                    "p1", "Profile 1",
+                    Map.of(), Map.of(),
+                    Map.of("col-1", Map.of("field-ssn", "MASKED"))
+            );
+
+            Map<String, Object> policy = generator.generateFieldPolicy(
+                    TENANT_ID, List.of(profileWithMaskedField));
+
+            Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
+            List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");
+
+            List<Map<String, Object>> denyRules = rules.stream()
+                    .filter(rule -> "EFFECT_DENY".equals(rule.get("effect")))
+                    .toList();
+            assertThat(denyRules).hasSize(1);
+
+            Map<String, Object> denyRule = denyRules.get(0);
+            assertThat(denyRule.get("actions")).isEqualTo(List.of("unmask", "write"));
+            assertThat(denyRule.get("derivedRoles")).isEqualTo(List.of("profile_p1"));
+
+            Map<String, Object> condition = (Map<String, Object>) denyRule.get("condition");
+            Map<String, Object> match = (Map<String, Object>) condition.get("match");
+            assertThat(match.get("expr")).isEqualTo(
+                    "R.attr.collectionId == \"col-1\" && R.attr.fieldId == \"field-ssn\"");
+        }
+
+        @Test
+        @DisplayName("MASKED must not deny read — the value renders redacted, not hidden")
+        @SuppressWarnings("unchecked")
+        void maskedDoesNotDenyRead() {
+            ProfileData profileWithMaskedField = new ProfileData(
+                    "p1", "Profile 1",
+                    Map.of(), Map.of(),
+                    Map.of("col-1", Map.of("field-ssn", "MASKED"))
+            );
+
+            Map<String, Object> policy = generator.generateFieldPolicy(
+                    TENANT_ID, List.of(profileWithMaskedField));
+
+            Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
+            List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");
+
+            boolean hasReadDeny = rules.stream().anyMatch(rule ->
+                    "EFFECT_DENY".equals(rule.get("effect"))
+                            && ((List<?>) rule.get("actions")).contains("read"));
+            assertThat(hasReadDeny).isFalse();
+        }
     }
 
     @Nested
@@ -299,7 +367,8 @@ class CerbosPolicyGeneratorTest {
                     "R.attr.status == \"locked\"", true);
 
             Map<String, Object> policy = generator.generateRecordPolicy(
-                    TENANT_ID, List.of(adminProfile()), List.of("col-1"), List.of(customRule));
+                    TENANT_ID, List.of(adminProfile()), List.of("col-1"), List.of(customRule),
+                    Map.of("col-1", "col-1"));
 
             Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
             List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");
@@ -318,6 +387,65 @@ class CerbosPolicyGeneratorTest {
         }
 
         @Test
+        @DisplayName("record CRUD CEL keys on the collection NAME, while collection policy stays UUID-keyed")
+        @SuppressWarnings("unchecked")
+        void recordCelUsesCollectionName() {
+            // A profile that can read collection UUID "col-uuid-1" (name "contacts").
+            ProfileData reader = new ProfileData(
+                    "reader-profile", "Reader",
+                    Map.of(),
+                    Map.of("col-uuid-1", Map.of("canRead", true)),
+                    Map.of());
+            List<String> collectionIds = List.of("col-uuid-1");
+            Map<String, String> idToName = Map.of("col-uuid-1", "contacts");
+
+            Map<String, Object> recordPolicy = generator.generateRecordPolicy(
+                    TENANT_ID, List.of(reader), collectionIds, List.of(), idToName);
+            Map<String, Object> collectionPolicy = generator.generateCollectionPolicy(
+                    TENANT_ID, List.of(reader), collectionIds);
+
+            // Record read rule matches on the NAME (what CerbosRecordAuthorizationAdvice passes).
+            assertThat(readRuleExpr(recordPolicy, "read"))
+                    .contains("R.attr.collectionId == \"contacts\"")
+                    .doesNotContain("col-uuid-1");
+            // Collection read rule still matches on the UUID (what the gateway passes).
+            assertThat(readRuleExpr(collectionPolicy, "read"))
+                    .contains("R.attr.collectionId == \"col-uuid-1\"")
+                    .doesNotContain("contacts");
+        }
+
+        @Test
+        @DisplayName("record CEL falls back to the id when no name mapping exists")
+        @SuppressWarnings("unchecked")
+        void recordCelFallsBackToId() {
+            ProfileData reader = new ProfileData(
+                    "reader-profile", "Reader",
+                    Map.of(), Map.of("col-uuid-9", Map.of("canRead", true)), Map.of());
+
+            Map<String, Object> policy = generator.generateRecordPolicy(
+                    TENANT_ID, List.of(reader), List.of("col-uuid-9"), List.of(), Map.of());
+
+            assertThat(readRuleExpr(policy, "read")).contains("R.attr.collectionId == \"col-uuid-9\"");
+        }
+
+        @SuppressWarnings("unchecked")
+        private String readRuleExpr(Map<String, Object> policy, String action) {
+            Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
+            List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");
+            return rules.stream()
+                    .filter(rule -> "EFFECT_ALLOW".equals(rule.get("effect")))
+                    .filter(rule -> ((List<String>) rule.get("actions")).contains(action))
+                    .filter(rule -> rule.get("condition") != null)
+                    .map(rule -> {
+                        Map<String, Object> condition = (Map<String, Object>) rule.get("condition");
+                        Map<String, Object> match = (Map<String, Object>) condition.get("match");
+                        return (String) match.get("expr");
+                    })
+                    .findFirst()
+                    .orElse("");
+        }
+
+        @Test
         @DisplayName("should skip disabled custom rules")
         @SuppressWarnings("unchecked")
         void skipsDisabledCustomRules() {
@@ -326,7 +454,7 @@ class CerbosPolicyGeneratorTest {
                     "delete", "EFFECT_DENY", "true", false);
 
             Map<String, Object> policy = generator.generateRecordPolicy(
-                    TENANT_ID, List.of(), List.of(), List.of(disabledRule));
+                    TENANT_ID, List.of(), List.of(), List.of(disabledRule), Map.of());
 
             Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
             List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");

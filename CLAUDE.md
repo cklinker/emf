@@ -163,6 +163,9 @@ Check the relevant `pom.xml` / `package.json` for exact current versions before 
   (`@ControllerAdvice`) — strips denied keys from JSON:API `attributes` **and to-one
   `relationships`**; preserves has-many and system audit fields. Write-side:
   `CerbosFieldWriteSecurityAdvice`. Add Cerbos policy rules for new field permissions.
+  **Data masking** rides the same advice (strip → mask): `MASKED` visibility denies the
+  `unmask` + `write` Cerbos actions; mask shape lives in `fieldTypeConfig.masking`;
+  masked records carry `meta.maskedFields`. See `architecture.md` → Data masking.
 - **Flow inputs:** read as `$.input.<key>` against the state envelope; manual/MCP/HTTP
   invocation double-wraps (`{ "input": { ... } }`). See `integrations.md` → Flows.
 - **Pagination:** HTTP page size clamps at `MAX_HTTP_PAGE_SIZE = 200`; internal at
@@ -207,7 +210,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist (network access) changed |
 | `kelta.config.environment.changed.<tenantId>.<envId>` | Sandbox environment created/cloned/refreshed/archived |
 | `kelta.config.promotion.executed.<tenantId>.<promotionId>` | Metadata promotion executed/failed/rolled back |
-| `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime) |
+| `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime). Payload `containsMaskedFields=true` ⇒ realtime bridge omits record data |
 | `kelta.trigger.<tenantId>.<topic>` | External flow trigger — starts active `NATS_TRIGGERED` flows whose trigger-config `topic` matches (KELTA_TRIGGERS stream, queue-group consumed; body = arbitrary JSON, not a `PlatformEvent`) |
 
 Envelope: `PlatformEvent<T>` (`eventId`, `eventType`, `tenantId`, `correlationId`, `userId`,

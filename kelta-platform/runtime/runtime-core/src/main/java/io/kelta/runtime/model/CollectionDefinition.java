@@ -167,13 +167,27 @@ public record CollectionDefinition(
     
     /**
      * Gets all field names in this collection.
-     * 
+     *
      * @return list of field names
      */
     public List<String> getFieldNames() {
         return fields.stream()
             .map(FieldDefinition::name)
             .toList();
+    }
+
+    /**
+     * Returns true when any field carries a data-masking policy
+     * ({@code fieldTypeConfig.masking}). Used to flag record-change events so
+     * broadcast consumers without per-user field security (e.g. the realtime
+     * bridge) suppress record data. Deliberately ignores whether the field's
+     * type is maskable — a misconfigured policy suppresses rather than leaks.
+     */
+    public boolean hasMaskingConfiguredFields() {
+        return fields.stream().anyMatch(f ->
+            f.fieldTypeConfig() != null
+                && f.fieldTypeConfig().get("masking") instanceof java.util.Map<?, ?> cfg
+                && !cfg.isEmpty());
     }
     
     /**

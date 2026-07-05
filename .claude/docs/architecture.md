@@ -75,6 +75,19 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
 - **Collection API routes** (`/{tenant}/{collection}`): the gateway `RouteAuthorizationFilter`
   (order 0) runs the per-resource Cerbos object check, and the worker
   `CerbosRecordAuthorizationAdvice` + FLS advices add record/field checks.
+  - **Cerbos `collectionId` keying (important).** The `collection` policy CEL (gateway) and
+    the `record`/`field` policies (worker advices) key `R.attr.collectionId` on **different
+    identifiers**, because their checkers pass different values. The gateway's
+    `RouteAuthorizationFilter.checkObjectPermission` passes `route.getId()` = the bootstrap
+    `collection.id` (a **UUID**), so `CerbosPolicyGenerator.generateCollectionPolicy` keys the
+    collection CEL on the UUID. The worker `CerbosRecordAuthorizationAdvice` and
+    `CerbosFieldSecurityAdvice` take `collectionId` from the **URL path segment** (the collection
+    **name**), and record-share widening joins by name — so `generateRecordPolicy` and
+    `generateFieldPolicy` key their CEL on the **name**. `generateRecordPolicy` therefore takes a
+    `collectionIdToName` map and translates the per-collection + custom-rule CEL literals to names
+    while still looking up object permissions by the stored UUID. Get this wrong in one direction
+    and per-collection allow rules silently never match: a UUID-keyed record CEL denies every
+    record to non-`VIEW_ALL_DATA` profiles (they'd see empty lists everywhere).
 - **Static routes** (`/api/admin/**`, `/api/me/**`, `/api/_search/**`, `/api/metrics/**`):
   `RouteAuthorizationFilter` **skips** ids starting `static-` — they get only the blanket
   `API_ACCESS` system-permission check. The worker advices **exclude** `/api/admin/`. So a new
@@ -248,6 +261,35 @@ not collection fields and are preserved. System audit fields (`createdAt`,
 `updatedAt`, `createdBy`, `updatedBy`) are never stripped; `meta` (pagination)
 is untouched. Metadata/admin paths (`/api/collections`, `/api/admin/**`, etc.)
 are skipped. Gated by `kelta.gateway.security.permissions-enabled`.
+
+**Data masking** — layered on the same advice, strictly **after** stripping (a
+HIDDEN field is never masked into existence). A field opts in via
+`fieldTypeConfig.masking` (`{type: FULL|LAST4|EMAIL|CUSTOM, maskChar?,
+customPattern?}`, string-typed `FieldType`s only — `FieldMaskingService`);
+per-profile exposure is the 4th `profile_field_permission.visibility` value
+**`MASKED`**, which `CerbosPolicyGenerator` compiles to an `EFFECT_DENY` on the
+new **`unmask`** action *and* `write` (so `CerbosFieldWriteSecurityAdvice`
+strips an echoed placeholder before it can overwrite the stored value — no new
+write-path code). The advice resolves the masked set via one extra batched,
+cached Cerbos check (`RecordMaskingService`) **only when the collection has
+masking config** (zero cost elsewhere), replaces attribute values with their
+redacted form, and stamps `meta.maskedFields` per record. The field-access
+cache key includes the action (`tenant:profile:collection:action`) — a cached
+`read` allow-list must never satisfy a `write`/`unmask` check.
+`BootstrapRepository.SELECT_PROFILE_FIELD_PERMISSIONS` COALESCE-joins
+field/collection to translate the UI's stored row UUIDs into the names the
+advices check against Cerbos; `FieldPermissionSyncHook` (on
+`profile-field-permissions`) triggers policy re-sync + multi-pod cache
+eviction via the existing `kelta.cerbos.policies.changed.<tenantId>` subject.
+Side channels: `MaskedFieldPredicateInterceptor` rejects list requests whose
+`filter[...]`/`sort` reference a field masked for the requester with one
+byte-identical 403 (`MASKED_FIELD_PREDICATE` — uniform so the error itself is
+no oracle), and record-change events from collections with masking config are
+flagged `containsMaskedFields`, which makes the gateway `RealtimeBridge` omit
+record `data` from WebSocket fan-out (clients refetch through the masked
+JSON:API path). Egress paths that do not pass the advice (data export,
+reports, dashboards, search index) are **not masked yet** — see
+`concerns.md`.
 
 **Pagination contract** — every paginated REST endpoint uses JSON:API
 bracket syntax (`page[number]` / `page[size]`). Parsing lives in

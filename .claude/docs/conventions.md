@@ -61,6 +61,20 @@ Where errors are constructed:
 - `io.kelta.jsonapi.JsonApiResponseBuilder.error(...)` — utility for one-off error documents in controllers; the 3-arg overload derives `code` from `title` so existing callers stay compliant
 - `io.kelta.jsonapi.JsonApiError` — POJO used by the handlers; `@JsonInclude(NON_NULL)` keeps absent fields out of the wire format
 
+#### Masked fields on read (data masking)
+
+A record whose fields were redacted for the caller carries a record-level
+`meta.maskedFields: ["ssn", …]` (sorted) in JSON:API responses. Clients MUST
+branch on `meta.maskedFields` to render lock state / disable editing — never
+sniff placeholder strings like `***`. Masked values are always JSON strings.
+
+`MASKED_FIELD_PREDICATE` — the 403 `code` returned when a list request's
+`filter[...]`/`sort` references a field masked for the requester
+(`MaskedFieldPredicateInterceptor`, kelta-worker). The body is deliberately
+**byte-identical for every rejection** (no `source`, no field name): a
+distinguishable error would itself be a value-probing oracle. Do not "improve"
+it with specifics.
+
 ### Javadoc
 - Required for public classes and methods
 - Include `@param`, `@returns`, `@throws`

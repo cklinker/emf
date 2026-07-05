@@ -75,7 +75,10 @@ public class CerbosAuthorizationService {
      */
     private record FieldAccessEntry(Set<String> asked, Set<String> allowed) {}
 
-    // Cache for field access: key = "tenantId:profileId:collectionId" → asked+allowed sets
+    // Cache for field access: key = "tenantId:profileId:collectionId:action" → asked+allowed
+    // sets. The action is part of the key: a cached "read" allow-list must never satisfy a
+    // "write" (or "unmask") check — READ_ONLY denies write but allows read, MASKED denies
+    // unmask but allows read.
     private final Cache<String, FieldAccessEntry> fieldAccessCache;
 
     // Metrics
@@ -205,8 +208,8 @@ public class CerbosAuthorizationService {
 
     /**
      * Batch-checks field access for multiple fields in a single Cerbos gRPC call.
-     * Results are cached per (tenant, profile, collection) since field permissions
-     * don't depend on record data.
+     * Results are cached per (tenant, profile, collection, action) since field
+     * permissions don't depend on record data.
      *
      * @return the list of fieldIds that are ALLOWED
      */
@@ -224,7 +227,7 @@ public class CerbosAuthorizationService {
         // for this (tenant, profile, collection) — otherwise a new field
         // (e.g. just-added rollup_summary) would be silently stripped because
         // "absent from allow-list" is indistinguishable from "denied".
-        String cacheKey = fieldCacheKey(tenantId, profileId, collectionId);
+        String cacheKey = fieldCacheKey(tenantId, profileId, collectionId, action);
         FieldAccessEntry cached = fieldAccessCache.getIfPresent(cacheKey);
         Set<String> requestedSet = Set.copyOf(fieldIds);
         if (cached != null && cached.asked().containsAll(requestedSet)) {
@@ -409,10 +412,17 @@ public class CerbosAuthorizationService {
         if (tenantId == null || collectionId == null) {
             return;
         }
-        String suffix = ":" + collectionId;
         String prefix = tenantId + ":";
         long evicted = fieldAccessCache.asMap().keySet().stream()
-                .filter(key -> key.startsWith(prefix) && key.endsWith(suffix))
+                .filter(key -> {
+                    if (!key.startsWith(prefix)) {
+                        return false;
+                    }
+                    // key = tenantId:profileId:collectionId:action — match the collection
+                    // segment positionally so every action's entry is evicted.
+                    String[] parts = key.split(":", -1);
+                    return parts.length >= 4 && parts[2].equals(collectionId);
+                })
                 .peek(fieldAccessCache::invalidate)
                 .count();
         if (evicted > 0) {
@@ -424,8 +434,9 @@ public class CerbosAuthorizationService {
 
     // ── Cache key builders ──────────────────────────────────────────────
 
-    private static String fieldCacheKey(String tenantId, String profileId, String collectionId) {
-        return tenantId + ":" + profileId + ":" + collectionId;
+    private static String fieldCacheKey(String tenantId, String profileId, String collectionId,
+                                        String action) {
+        return tenantId + ":" + profileId + ":" + collectionId + ":" + action;
     }
 
     // ── Circuit breaker helpers ──────────────────────────────────────────

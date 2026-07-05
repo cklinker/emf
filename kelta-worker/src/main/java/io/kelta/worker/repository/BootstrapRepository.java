@@ -114,9 +114,19 @@ public class BootstrapRepository {
             FROM profile_object_permission WHERE profile_id = ?
             """;
 
+    // Resolves collection/field UUIDs to API names: the UI stores row UUIDs (V100
+    // FKs to collection.id / field.id guarantee they are UUIDs), but Cerbos
+    // field-policy CEL is matched against the collection name (URL path segment) and
+    // field name (JSON:API attribute key) the worker advices pass. COALESCE is a
+    // defensive fallback only — under the FKs the joins always resolve.
     private static final String SELECT_PROFILE_FIELD_PERMISSIONS = """
-            SELECT collection_id, field_id, visibility
-            FROM profile_field_permission WHERE profile_id = ?
+            SELECT COALESCE(c.name, pfp.collection_id) AS collection_id,
+                   COALESCE(f.name, pfp.field_id) AS field_id,
+                   pfp.visibility
+            FROM profile_field_permission pfp
+            LEFT JOIN field f ON f.id = pfp.field_id
+            LEFT JOIN collection c ON c.id = pfp.collection_id
+            WHERE pfp.profile_id = ?
             """;
 
     private static final String SELECT_USER_GROUP_IDS = """

@@ -142,7 +142,7 @@ visual system.
 | Frontend | React | 19.2 | `kelta-ui/app/package.json` |
 | Frontend build | Vite / Vitest | web 5.1/1.3, ui 7.2/4.0 | package.json (npm, Node 18 in CI) |
 | E2E | Playwright | 1.50 | `e2e-tests/package.json` |
-| Migrations | Flyway | head **V152**, next **V153** | `kelta-worker/.../db/migration/` |
+| Migrations | Flyway | head **V156**, next **V157** | `kelta-worker/.../db/migration/` |
 
 Check the relevant `pom.xml` / `package.json` for exact current versions before pinning.
 
@@ -163,6 +163,9 @@ Check the relevant `pom.xml` / `package.json` for exact current versions before 
   (`@ControllerAdvice`) — strips denied keys from JSON:API `attributes` **and to-one
   `relationships`**; preserves has-many and system audit fields. Write-side:
   `CerbosFieldWriteSecurityAdvice`. Add Cerbos policy rules for new field permissions.
+  **Data masking** rides the same advice (strip → mask): `MASKED` visibility denies the
+  `unmask` + `write` Cerbos actions; mask shape lives in `fieldTypeConfig.masking`;
+  masked records carry `meta.maskedFields`. See `architecture.md` → Data masking.
 - **Flow inputs:** read as `$.input.<key>` against the state envelope; manual/MCP/HTTP
   invocation double-wraps (`{ "input": { ... } }`). See `integrations.md` → Flows.
 - **Pagination:** HTTP page size clamps at `MAX_HTTP_PAGE_SIZE = 200`; internal at
@@ -205,7 +208,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.api-spec.changed.<tenantId>` | API spec changed |
 | `kelta.config.tenant.email.changed.<tenantId>` | Tenant SMTP config changed |
 | `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist (network access) changed |
-| `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime) |
+| `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime). Payload `containsMaskedFields=true` ⇒ realtime bridge omits record data |
 | `kelta.trigger.<tenantId>.<topic>` | External flow trigger — starts active `NATS_TRIGGERED` flows whose trigger-config `topic` matches (KELTA_TRIGGERS stream, queue-group consumed; body = arbitrary JSON, not a `PlatformEvent`) |
 
 Envelope: `PlatformEvent<T>` (`eventId`, `eventType`, `tenantId`, `correlationId`, `userId`,
@@ -244,7 +247,7 @@ Java tests: surefire runs `*Test`/`*Tests`/`*Properties` in parallel; failsafe r
 ## Database Migrations
 
 - Location: `kelta-worker/src/main/resources/db/migration/`
-- Naming: `V<n>__<snake_description>.sql`. **Head is V152; next new migration is V153.**
+- Naming: `V<n>__<snake_description>.sql`. **Head is V156; next new migration is V157.**
   Check the directory for the true highest number before creating one — never reuse/skip.
 - Flyway runs at worker startup. Migrations execute under the platform sentinel tenant.
 

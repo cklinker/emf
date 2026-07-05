@@ -866,6 +866,182 @@ class DefaultQueryEngineTest {
     }
 
     @Nested
+    @DisplayName("Contains Masked Fields Flag Tests")
+    class ContainsMaskedFieldsFlagTests {
+
+        private RecordEventPublisher recordEventPublisher;
+        private DefaultQueryEngine engineWithPublisher;
+        private CollectionDefinition maskedCollection;
+
+        @BeforeEach
+        void setUp() {
+            recordEventPublisher = mock(RecordEventPublisher.class);
+            engineWithPublisher = new DefaultQueryEngine(
+                    storageAdapter, validationEngine, null, null, null, null, null,
+                    recordEventPublisher);
+
+            maskedCollection = new CollectionDefinitionBuilder()
+                .name("contacts")
+                .displayName("Contacts")
+                .addField(new FieldDefinitionBuilder()
+                    .name("name")
+                    .type(FieldType.STRING)
+                    .nullable(false)
+                    .build())
+                .addField(new FieldDefinitionBuilder()
+                    .name("ssn")
+                    .type(FieldType.STRING)
+                    .nullable(true)
+                    .fieldTypeConfig(Map.of("masking", Map.of("type", "FULL")))
+                    .build())
+                .build();
+        }
+
+        private RecordChangedPayload capturePublishedPayload() {
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<PlatformEvent<RecordChangedPayload>> eventCaptor =
+                    ArgumentCaptor.forClass(PlatformEvent.class);
+            verify(recordEventPublisher).publish(eventCaptor.capture());
+            return eventCaptor.getValue().getPayload();
+        }
+
+        @Test
+        @DisplayName("Should flag containsMaskedFields on CREATED event when a field has masking config")
+        void shouldFlagContainsMaskedFieldsOnCreate() {
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Jane");
+            inputData.put("ssn", "123-45-6789");
+
+            when(validationEngine.validate(eq(maskedCollection), any(), any()))
+                    .thenReturn(io.kelta.runtime.validation.ValidationResult.success());
+            when(storageAdapter.create(eq(maskedCollection), any()))
+                    .thenAnswer(invocation -> invocation.getArgument(1));
+
+            engineWithPublisher.create(maskedCollection, inputData);
+
+            RecordChangedPayload payload = capturePublishedPayload();
+            assertEquals(ChangeType.CREATED, payload.getChangeType());
+            assertTrue(payload.isContainsMaskedFields());
+        }
+
+        @Test
+        @DisplayName("Should not flag containsMaskedFields on CREATED event without masking config")
+        void shouldNotFlagContainsMaskedFieldsOnCreateWithoutMaskingConfig() {
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Test");
+            inputData.put("price", 10.0);
+
+            when(validationEngine.validate(eq(testCollection), any(), any()))
+                    .thenReturn(io.kelta.runtime.validation.ValidationResult.success());
+            when(storageAdapter.create(eq(testCollection), any()))
+                    .thenAnswer(invocation -> invocation.getArgument(1));
+
+            engineWithPublisher.create(testCollection, inputData);
+
+            RecordChangedPayload payload = capturePublishedPayload();
+            assertEquals(ChangeType.CREATED, payload.getChangeType());
+            assertFalse(payload.isContainsMaskedFields());
+        }
+
+        @Test
+        @DisplayName("Should flag containsMaskedFields on UPDATED event when a field has masking config")
+        void shouldFlagContainsMaskedFieldsOnUpdate() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Old Name");
+            existingRecord.put("ssn", "123-45-6789");
+
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("name", "New Name");
+
+            when(storageAdapter.getById(maskedCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(validationEngine.validate(eq(maskedCollection), any(), any(), eq(id)))
+                    .thenReturn(io.kelta.runtime.validation.ValidationResult.success());
+            when(storageAdapter.update(eq(maskedCollection), eq(id), any()))
+                    .thenAnswer(invocation -> {
+                        Map<String, Object> data = invocation.getArgument(2);
+                        Map<String, Object> result = new HashMap<>(existingRecord);
+                        result.putAll(data);
+                        return Optional.of(result);
+                    });
+
+            engineWithPublisher.update(maskedCollection, id, updateData);
+
+            RecordChangedPayload payload = capturePublishedPayload();
+            assertEquals(ChangeType.UPDATED, payload.getChangeType());
+            assertTrue(payload.isContainsMaskedFields());
+        }
+
+        @Test
+        @DisplayName("Should not flag containsMaskedFields on UPDATED event without masking config")
+        void shouldNotFlagContainsMaskedFieldsOnUpdateWithoutMaskingConfig() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Old Name");
+            existingRecord.put("price", 50.0);
+
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("name", "New Name");
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(validationEngine.validate(eq(testCollection), any(), any(), eq(id)))
+                    .thenReturn(io.kelta.runtime.validation.ValidationResult.success());
+            when(storageAdapter.update(eq(testCollection), eq(id), any()))
+                    .thenAnswer(invocation -> {
+                        Map<String, Object> data = invocation.getArgument(2);
+                        Map<String, Object> result = new HashMap<>(existingRecord);
+                        result.putAll(data);
+                        return Optional.of(result);
+                    });
+
+            engineWithPublisher.update(testCollection, id, updateData);
+
+            RecordChangedPayload payload = capturePublishedPayload();
+            assertEquals(ChangeType.UPDATED, payload.getChangeType());
+            assertFalse(payload.isContainsMaskedFields());
+        }
+
+        @Test
+        @DisplayName("Should flag containsMaskedFields on DELETED event when a field has masking config")
+        void shouldFlagContainsMaskedFieldsOnDelete() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Jane");
+            existingRecord.put("ssn", "123-45-6789");
+
+            when(storageAdapter.getById(maskedCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.delete(maskedCollection, id)).thenReturn(true);
+
+            engineWithPublisher.delete(maskedCollection, id);
+
+            RecordChangedPayload payload = capturePublishedPayload();
+            assertEquals(ChangeType.DELETED, payload.getChangeType());
+            assertTrue(payload.isContainsMaskedFields());
+        }
+
+        @Test
+        @DisplayName("Should not flag containsMaskedFields on DELETED event without masking config")
+        void shouldNotFlagContainsMaskedFieldsOnDeleteWithoutMaskingConfig() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Test Product");
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.delete(testCollection, id)).thenReturn(true);
+
+            engineWithPublisher.delete(testCollection, id);
+
+            RecordChangedPayload payload = capturePublishedPayload();
+            assertEquals(ChangeType.DELETED, payload.getChangeType());
+            assertFalse(payload.isContainsMaskedFields());
+        }
+    }
+
+    @Nested
     @DisplayName("BeforeSaveHook Integration Tests")
     class BeforeSaveHookTests {
 

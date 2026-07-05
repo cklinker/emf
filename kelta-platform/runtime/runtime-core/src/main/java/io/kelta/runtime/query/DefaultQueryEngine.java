@@ -314,7 +314,8 @@ public class DefaultQueryEngine implements QueryEngine {
         // Publish record change event
         publishRecordEvent(EventFactory.createRecordEvent("record.created",
                 extractTenantId(recordData), extractUserId(recordData),
-                RecordChangedPayload.created(definition.name(), id, created)));
+                RecordChangedPayload.created(definition.name(), id, created)
+                        .withContainsMaskedFields(definition.hasMaskingConfiguredFields())));
 
         return created;
     }
@@ -410,7 +411,8 @@ public class DefaultQueryEngine implements QueryEngine {
             publishRecordEvent(EventFactory.createRecordEvent("record.updated",
                     extractTenantId(mergedData), extractUserId(mergedData),
                     RecordChangedPayload.updated(definition.name(), id, mergedData,
-                            previousData, changedFields)));
+                            previousData, changedFields)
+                            .withContainsMaskedFields(definition.hasMaskingConfiguredFields())));
         });
 
         return updated;
@@ -444,7 +446,8 @@ public class DefaultQueryEngine implements QueryEngine {
             if (recordData != null) {
                 publishRecordEvent(EventFactory.createRecordEvent("record.deleted",
                         extractTenantId(recordData), extractUserId(recordData),
-                        RecordChangedPayload.deleted(definition.name(), id, recordData)));
+                        RecordChangedPayload.deleted(definition.name(), id, recordData)
+                                .withContainsMaskedFields(definition.hasMaskingConfiguredFields())));
             }
         }
 

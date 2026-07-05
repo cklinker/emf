@@ -594,13 +594,13 @@ describe('CollectionDetailPage', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('versions-tab')).toBeInTheDocument()
+        expect(screen.getByTestId('change-history-tab')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByTestId('versions-tab'))
+      await user.click(screen.getByTestId('change-history-tab'))
 
       await waitFor(() => {
-        expect(screen.getByTestId('versions-panel')).toBeInTheDocument()
+        expect(screen.getByTestId('change-history-panel')).toBeInTheDocument()
       })
     })
 
@@ -616,10 +616,10 @@ describe('CollectionDetailPage', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('versions-tab')).toBeInTheDocument()
+        expect(screen.getByTestId('change-history-tab')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByTestId('versions-tab'))
+      await user.click(screen.getByTestId('change-history-tab'))
 
       await waitFor(() => {
         expect(screen.getByTestId('versions-table')).toBeInTheDocument()
@@ -641,10 +641,10 @@ describe('CollectionDetailPage', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('versions-tab')).toBeInTheDocument()
+        expect(screen.getByTestId('change-history-tab')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByTestId('versions-tab'))
+      await user.click(screen.getByTestId('change-history-tab'))
 
       await waitFor(() => {
         expect(screen.getByTestId('view-version-button-0')).toBeInTheDocument()
@@ -665,10 +665,10 @@ describe('CollectionDetailPage', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('versions-tab')).toBeInTheDocument()
+        expect(screen.getByTestId('change-history-tab')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByTestId('versions-tab'))
+      await user.click(screen.getByTestId('change-history-tab'))
 
       await waitFor(() => {
         const currentVersionRow = screen.getByTestId('version-row-0')
@@ -900,7 +900,7 @@ describe('CollectionDetailPage', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('tablist')).toBeInTheDocument()
-        expect(screen.getAllByRole('tab')).toHaveLength(8)
+        expect(screen.getAllByRole('tab')).toHaveLength(6)
         expect(screen.getByRole('tabpanel')).toBeInTheDocument()
       })
     })

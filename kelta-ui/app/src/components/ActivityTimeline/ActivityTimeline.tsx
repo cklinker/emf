@@ -64,6 +64,7 @@ interface RecordShare {
 type TimelineEntryType =
   | 'CREATED'
   | 'UPDATED'
+  | 'FIELD_CHANGE'
   | 'NOTE'
   | 'ATTACHMENT'
   | 'APPROVAL_SUBMITTED'
@@ -116,6 +117,21 @@ interface ActivityEmailLog {
   status: string
   sentAt: string | null
   createdAt: string
+}
+
+/**
+ * A tracked field value change on this record (from the field-history system collection).
+ * {@code oldValue}/{@code newValue} arrive already redacted by the backend when the field is
+ * masked/FLS-restricted for the caller, so they can be rendered verbatim.
+ */
+interface ActivityFieldChange {
+  id: string
+  fieldName: string
+  oldValue: unknown
+  newValue: unknown
+  changedBy: string
+  changedAt: string
+  changeSource: string
 }
 
 /**
@@ -195,6 +211,7 @@ function getIconClasses(type: TimelineEntryType): string {
   const classMap: Record<TimelineEntryType, string> = {
     CREATED: 'bg-green-50 text-green-700 border-2 border-green-700',
     UPDATED: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
+    FIELD_CHANGE: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
     NOTE: 'bg-purple-50 text-purple-700 border-2 border-purple-700',
     ATTACHMENT: 'bg-teal-50 text-teal-700 border-2 border-teal-700',
     APPROVAL_SUBMITTED: 'bg-amber-50 text-amber-700 border-2 border-amber-700',
@@ -215,6 +232,7 @@ function getIconSymbol(type: TimelineEntryType): string {
   const symbolMap: Record<TimelineEntryType, string> = {
     CREATED: '+',
     UPDATED: '~',
+    FIELD_CHANGE: '~',
     NOTE: '✎',
     ATTACHMENT: '📎',
     APPROVAL_SUBMITTED: '!',
@@ -237,6 +255,18 @@ function approvalStatusToEntryType(status: string): TimelineEntryType {
   if (statusUpper === 'REJECTED') return 'APPROVAL_REJECTED'
   if (statusUpper === 'RECALLED') return 'APPROVAL_RECALLED'
   return 'APPROVAL_SUBMITTED'
+}
+
+/**
+ * Render a field-history value for the feed. Null/empty renders as an em dash; objects/arrays are
+ * JSON-stringified; everything else uses its string form. Long values are truncated.
+ */
+function formatFieldValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') {
+    return '—'
+  }
+  const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
+  return text.length > 80 ? `${text.slice(0, 80)}…` : text
 }
 
 /**
@@ -366,6 +396,23 @@ export function ActivityTimeline({
     enabled: !!recordId,
   })
 
+  // Fetch tracked field-value changes for this record. Values arrive already
+  // redacted by the backend guard when a field is masked/FLS-restricted.
+  const { data: fieldChanges } = useQuery({
+    queryKey: ['activity-field-history', collectionId, recordId],
+    queryFn: async () => {
+      try {
+        const result = await apiClient.getList<ActivityFieldChange>(
+          `/api/field-history?filter[collectionId][eq]=${collectionId}&filter[recordId][eq]=${recordId}&page[size]=50`
+        )
+        return result || []
+      } catch {
+        return []
+      }
+    },
+    enabled: !!collectionId && !!recordId,
+  })
+
   // Merge all data sources into a single timeline
   const entries: TimelineEntry[] = useMemo(() => {
     const allEntries: TimelineEntry[] = []
@@ -422,6 +469,38 @@ export function ActivityTimeline({
             timestamp: instance.completedAt,
           })
         }
+      }
+    }
+
+    // Tracked field-value changes
+    if (fieldChanges) {
+      for (const change of fieldChanges) {
+        const oldEmpty = change.oldValue === null || change.oldValue === undefined
+        const newEmpty = change.newValue === null || change.newValue === undefined
+        let description: string
+        if (oldEmpty && !newEmpty) {
+          description = t('activity.fieldSet', {
+            field: change.fieldName,
+            value: formatFieldValue(change.newValue),
+          })
+        } else if (!oldEmpty && newEmpty) {
+          description = t('activity.fieldCleared', {
+            field: change.fieldName,
+            value: formatFieldValue(change.oldValue),
+          })
+        } else {
+          description = t('activity.fieldChanged', {
+            field: change.fieldName,
+            from: formatFieldValue(change.oldValue),
+            to: formatFieldValue(change.newValue),
+          })
+        }
+        allEntries.push({
+          id: `field-change-${change.id}`,
+          type: 'FIELD_CHANGE',
+          description,
+          timestamp: change.changedAt,
+        })
       }
     }
 
@@ -510,6 +589,7 @@ export function ActivityTimeline({
     attachments,
     flowRuns,
     emailLogs,
+    fieldChanges,
     t,
   ])
 

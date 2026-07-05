@@ -37,16 +37,19 @@ class FieldHistoryScenarioTest extends ScenarioBase {
         String tenantId = auth.extractTenantId(token);
         String slug = tenants.slugForTenantId(tenantId);
 
-        String collectionId;
         String rowId = UUID.randomUUID().toString();
         String recordId = UUID.randomUUID().toString();
 
         try (Connection admin = openDbConnection()) {
-            collectionId = firstCollectionId(admin, tenantId);
-            assertThat(collectionId).as("ecommerce tenant has a seeded collection").isNotNull();
+            // A real (collection, field) pair: the read guard only surfaces history rows whose
+            // field still exists on the referenced collection, so a bogus field name is dropped.
+            CollectionField target = firstCollectionField(admin, tenantId);
+            assertThat(target).as("ecommerce tenant has a seeded collection field").isNotNull();
+            String collectionId = target.collectionId();
+            String fieldName = target.fieldName();
 
             try {
-                insertHistoryRow(admin, rowId, tenantId, collectionId, recordId);
+                insertHistoryRow(admin, rowId, tenantId, collectionId, recordId, fieldName);
 
                 // Route + system-collection read must return the seeded row through the gateway.
                 waitForStatus(gatewayClientWithToken(token),
@@ -67,7 +70,7 @@ class FieldHistoryScenarioTest extends ScenarioBase {
 
                 @SuppressWarnings("unchecked")
                 Map<String, Object> attrs = (Map<String, Object>) data.get(0).get("attributes");
-                assertThat(attrs.get("fieldName")).isEqualTo("status");
+                assertThat(attrs.get("fieldName")).isEqualTo(fieldName);
                 assertThat(attrs.get("recordId")).isEqualTo(recordId);
                 assertThat(attrs.get("changeSource")).isEqualTo("UI");
                 // old/new JSONB round-trips as parsed JSON values, not raw text.
@@ -79,30 +82,37 @@ class FieldHistoryScenarioTest extends ScenarioBase {
         }
     }
 
-    private String firstCollectionId(Connection conn, String tenantId) throws Exception {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id FROM collection WHERE tenant_id = ? ORDER BY id LIMIT 1")) {
+    private record CollectionField(String collectionId, String fieldName) {}
+
+    private CollectionField firstCollectionField(Connection conn, String tenantId) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT c.id AS cid, f.name AS fname
+                FROM collection c JOIN field f ON f.collection_id = c.id
+                WHERE c.tenant_id = ? AND f.active = true
+                ORDER BY c.id, f.field_order LIMIT 1
+                """)) {
             ps.setString(1, tenantId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getString("id") : null;
+                return rs.next() ? new CollectionField(rs.getString("cid"), rs.getString("fname")) : null;
             }
         }
     }
 
     private void insertHistoryRow(Connection conn, String id, String tenantId,
-                                  String collectionId, String recordId) throws Exception {
+                                  String collectionId, String recordId, String fieldName) throws Exception {
         try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT INTO field_history
                     (id, tenant_id, collection_id, record_id, field_name,
                      old_value, new_value, changed_by, change_source)
-                VALUES (?, ?, ?, ?, 'status', CAST(? AS jsonb), CAST(? AS jsonb), 'user-1', 'UI')
+                VALUES (?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), 'user-1', 'UI')
                 """)) {
             ps.setString(1, id);
             ps.setString(2, tenantId);
             ps.setString(3, collectionId);
             ps.setString(4, recordId);
-            ps.setString(5, "\"NEW\"");
-            ps.setString(6, "\"DONE\"");
+            ps.setString(5, fieldName);
+            ps.setString(6, "\"NEW\"");
+            ps.setString(7, "\"DONE\"");
             ps.executeUpdate();
         }
     }

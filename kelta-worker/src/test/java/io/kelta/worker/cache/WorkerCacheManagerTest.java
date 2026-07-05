@@ -3,8 +3,13 @@ package io.kelta.worker.cache;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -180,6 +185,87 @@ class WorkerCacheManagerTest {
         cacheManager.evictSystemCollection(null, "collections");
 
         assertThat(cacheManager.getSystemCollectionResponse("_:collections:list:q1")).isEmpty();
+    }
+
+    // ── System Collection Cache — deep-copy isolation ──────────────────────
+
+    @Nested
+    @DisplayName("System collection response cache deep-copies (per-request advice isolation)")
+    class SystemCollectionDeepCopy {
+
+        /**
+         * Builds a nested JSON:API-shaped response: {@code data} is a list of record maps,
+         * each with a mutable nested {@code attributes} map. This is the exact shape the
+         * per-request field-security / masking advices mutate in place.
+         */
+        private Map<String, Object> nestedResponse(String ssn) {
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("name", "John");
+            attributes.put("ssn", ssn);
+
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("type", "contacts");
+            record.put("id", "1");
+            record.put("attributes", attributes);
+
+            List<Object> data = new ArrayList<>();
+            data.add(record);
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("data", data);
+            return response;
+        }
+
+        @SuppressWarnings("unchecked")
+        private Map<String, Object> firstRecordAttributes(Map<String, Object> response) {
+            List<Object> data = (List<Object>) response.get("data");
+            Map<String, Object> record = (Map<String, Object>) data.get(0);
+            return (Map<String, Object>) record.get("attributes");
+        }
+
+        @Test
+        @DisplayName("Copy-on-put: mutating the source map after put does not corrupt the cached value")
+        void copyOnPut_sourceMutationDoesNotLeakIntoCache() {
+            Map<String, Object> source = nestedResponse("123-45-6789");
+            cacheManager.putSystemCollectionResponse("t1:contacts:id:1", source);
+
+            // Mutate the exact object we handed to put(), at the nested attributes level.
+            firstRecordAttributes(source).put("ssn", "MUTATED");
+            firstRecordAttributes(source).put("injected", "leak");
+
+            Optional<Map<String, Object>> cached =
+                    cacheManager.getSystemCollectionResponse("t1:contacts:id:1");
+            assertThat(cached).isPresent();
+            Map<String, Object> cachedAttrs = firstRecordAttributes(cached.get());
+            // The cached snapshot reflects the ORIGINAL values, not the post-put mutation.
+            assertThat(cachedAttrs.get("ssn")).isEqualTo("123-45-6789");
+            assertThat(cachedAttrs).doesNotContainKey("injected");
+        }
+
+        @Test
+        @DisplayName("Copy-on-get: mutating a returned map's nested attributes does not affect a later get")
+        void copyOnGet_returnedMutationDoesNotLeakIntoCache() {
+            cacheManager.putSystemCollectionResponse(
+                    "t1:contacts:id:1", nestedResponse("123-45-6789"));
+
+            // First reader mutates the returned response as the advice would (in-place redaction).
+            Map<String, Object> firstGet =
+                    cacheManager.getSystemCollectionResponse("t1:contacts:id:1").orElseThrow();
+            firstRecordAttributes(firstGet).put("ssn", "***-**-6789");
+            firstRecordAttributes(firstGet).remove("name");
+
+            // A second reader must see the pristine cached values — deep independence at the
+            // nested attributes level, not just the top map.
+            Map<String, Object> secondGet =
+                    cacheManager.getSystemCollectionResponse("t1:contacts:id:1").orElseThrow();
+            Map<String, Object> secondAttrs = firstRecordAttributes(secondGet);
+            assertThat(secondAttrs.get("ssn")).isEqualTo("123-45-6789");
+            assertThat(secondAttrs.get("name")).isEqualTo("John");
+
+            // And the two gets are distinct object graphs, not the same shared reference.
+            assertThat(secondGet).isNotSameAs(firstGet);
+            assertThat(firstRecordAttributes(secondGet)).isNotSameAs(firstRecordAttributes(firstGet));
+        }
     }
 
     // ── Metrics ──────────────────────────────────────────────────────────

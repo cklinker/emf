@@ -283,6 +283,74 @@ class CerbosPolicyGeneratorTest {
                             && ((List<?>) rule.get("actions")).equals(List.of("write")));
             assertThat(hasWriteDeny).isTrue();
         }
+
+        @Test
+        @DisplayName("should create a default unmask allow rule for all users")
+        @SuppressWarnings("unchecked")
+        void createsDefaultUnmaskAllowRule() {
+            Map<String, Object> policy = generator.generateFieldPolicy(TENANT_ID, List.of());
+
+            Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
+            List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");
+
+            assertThat(rules).hasSizeGreaterThanOrEqualTo(3);
+            assertThat(rules.get(2).get("actions")).isEqualTo(List.of("unmask"));
+            assertThat(rules.get(2).get("effect")).isEqualTo("EFFECT_ALLOW");
+            assertThat(rules.get(2).get("roles")).isEqualTo(List.of("user"));
+        }
+
+        @Test
+        @DisplayName("should add a single unmask+write deny rule for MASKED fields")
+        @SuppressWarnings("unchecked")
+        void addsUnmaskWriteDenyForMaskedFields() {
+            ProfileData profileWithMaskedField = new ProfileData(
+                    "p1", "Profile 1",
+                    Map.of(), Map.of(),
+                    Map.of("col-1", Map.of("field-ssn", "MASKED"))
+            );
+
+            Map<String, Object> policy = generator.generateFieldPolicy(
+                    TENANT_ID, List.of(profileWithMaskedField));
+
+            Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
+            List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");
+
+            List<Map<String, Object>> denyRules = rules.stream()
+                    .filter(rule -> "EFFECT_DENY".equals(rule.get("effect")))
+                    .toList();
+            assertThat(denyRules).hasSize(1);
+
+            Map<String, Object> denyRule = denyRules.get(0);
+            assertThat(denyRule.get("actions")).isEqualTo(List.of("unmask", "write"));
+            assertThat(denyRule.get("derivedRoles")).isEqualTo(List.of("profile_p1"));
+
+            Map<String, Object> condition = (Map<String, Object>) denyRule.get("condition");
+            Map<String, Object> match = (Map<String, Object>) condition.get("match");
+            assertThat(match.get("expr")).isEqualTo(
+                    "R.attr.collectionId == \"col-1\" && R.attr.fieldId == \"field-ssn\"");
+        }
+
+        @Test
+        @DisplayName("MASKED must not deny read — the value renders redacted, not hidden")
+        @SuppressWarnings("unchecked")
+        void maskedDoesNotDenyRead() {
+            ProfileData profileWithMaskedField = new ProfileData(
+                    "p1", "Profile 1",
+                    Map.of(), Map.of(),
+                    Map.of("col-1", Map.of("field-ssn", "MASKED"))
+            );
+
+            Map<String, Object> policy = generator.generateFieldPolicy(
+                    TENANT_ID, List.of(profileWithMaskedField));
+
+            Map<String, Object> resourcePolicy = (Map<String, Object>) policy.get("resourcePolicy");
+            List<Map<String, Object>> rules = (List<Map<String, Object>>) resourcePolicy.get("rules");
+
+            boolean hasReadDeny = rules.stream().anyMatch(rule ->
+                    "EFFECT_DENY".equals(rule.get("effect"))
+                            && ((List<?>) rule.get("actions")).contains("read"));
+            assertThat(hasReadDeny).isFalse();
+        }
     }
 
     @Nested

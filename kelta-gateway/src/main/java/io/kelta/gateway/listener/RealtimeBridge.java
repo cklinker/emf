@@ -50,6 +50,14 @@ public class RealtimeBridge {
             String changeType = (String) payload.get("changeType");
             Object data = payload.get("data");
 
+            // Collections with masking-configured fields: the bridge fans one event
+            // out to every tenant subscriber and cannot apply per-user field
+            // security, so record data is suppressed — clients refetch through the
+            // JSON:API path, where FLS + masking apply per user.
+            if (Boolean.TRUE.equals(payload.get("containsMaskedFields"))) {
+                data = null;
+            }
+
             if (tenantId == null || collectionName == null) {
                 return;
             }

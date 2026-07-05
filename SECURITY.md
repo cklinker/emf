@@ -18,6 +18,18 @@ Include:
 You should expect an acknowledgement within a few days. Triage, fix, and
 disclosure timelines are best-effort and depend on severity.
 
+## Data Masking Scope
+
+Field data masking (`MASKED` visibility + `fieldTypeConfig.masking`) is a
+**presentation-layer read control** on the JSON:API surface: values are
+redacted per user at response time, filter/sort probing is blocked, and
+realtime broadcasts suppress record data for masked collections. It is not
+full egress control — system-tier paths (flows, scripts, webhooks, exports,
+reports, search indexes) still see plaintext; see the data-masking entry in
+[`.claude/docs/concerns.md`](.claude/docs/concerns.md) for the current
+coverage matrix. Encrypt-at-rest (`ENCRYPTED` field type) and `HIDDEN`
+visibility remain the stronger controls where masking is insufficient.
+
 ## Known Issues
 
 A running list of known security risks, fragile areas, and tech debt is kept

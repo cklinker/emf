@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -251,6 +252,93 @@ class CollectionDefinitionTest {
             assertEquals(2, fieldNames.size());
             assertTrue(fieldNames.contains("name"));
             assertTrue(fieldNames.contains("price"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Masking Configuration Tests")
+    class MaskingConfigurationTests {
+
+        private CollectionDefinition collectionWithFields(FieldDefinition... fields) {
+            return new CollectionDefinition(
+                "test",
+                "Test",
+                "Description",
+                List.of(fields),
+                StorageConfig.physicalTable("tbl"),
+                ApiConfig.allEnabled("/api"),
+                AuthzConfig.disabled(),
+                1L,
+                NOW,
+                NOW
+            );
+        }
+
+        private FieldDefinition stringFieldWithConfig(String name, Map<String, Object> fieldTypeConfig) {
+            return new FieldDefinition(name, FieldType.STRING, true, false, false,
+                null, null, null, null, fieldTypeConfig);
+        }
+
+        @Test
+        @DisplayName("hasMaskingConfiguredFields() should return true when a field has a masking config")
+        void hasMaskingConfiguredFieldsShouldReturnTrueWhenFieldHasMaskingConfig() {
+            CollectionDefinition collection = collectionWithFields(
+                stringFieldWithConfig("ssn", Map.of("masking", Map.of("type", "FULL")))
+            );
+
+            assertTrue(collection.hasMaskingConfiguredFields());
+        }
+
+        @Test
+        @DisplayName("hasMaskingConfiguredFields() should return true when any field among many has masking")
+        void hasMaskingConfiguredFieldsShouldReturnTrueWhenAnyFieldHasMasking() {
+            CollectionDefinition collection = collectionWithFields(
+                FieldDefinition.string("name"),
+                stringFieldWithConfig("phone", Map.of("masking", Map.of("type", "LAST4", "maskChar", "*")))
+            );
+
+            assertTrue(collection.hasMaskingConfiguredFields());
+        }
+
+        @Test
+        @DisplayName("hasMaskingConfiguredFields() should return false when masking map is empty")
+        void hasMaskingConfiguredFieldsShouldReturnFalseWhenMaskingMapIsEmpty() {
+            CollectionDefinition collection = collectionWithFields(
+                stringFieldWithConfig("ssn", Map.of("masking", Map.of()))
+            );
+
+            assertFalse(collection.hasMaskingConfiguredFields());
+        }
+
+        @Test
+        @DisplayName("hasMaskingConfiguredFields() should return false when no field has a fieldTypeConfig")
+        void hasMaskingConfiguredFieldsShouldReturnFalseWhenNoFieldTypeConfig() {
+            CollectionDefinition collection = collectionWithFields(
+                FieldDefinition.string("name"),
+                FieldDefinition.doubleField("price")
+            );
+
+            assertFalse(collection.hasMaskingConfiguredFields());
+        }
+
+        @Test
+        @DisplayName("hasMaskingConfiguredFields() should return false when fieldTypeConfig lacks a masking key")
+        void hasMaskingConfiguredFieldsShouldReturnFalseWhenConfigLacksMaskingKey() {
+            CollectionDefinition collection = collectionWithFields(
+                stringFieldWithConfig("code", Map.of("prefix", "PRD-"))
+            );
+
+            assertFalse(collection.hasMaskingConfiguredFields());
+        }
+
+        @Test
+        @DisplayName("hasMaskingConfiguredFields() should return false when masking value is not a map")
+        void hasMaskingConfiguredFieldsShouldReturnFalseWhenMaskingValueIsNotAMap() {
+            CollectionDefinition collection = collectionWithFields(
+                stringFieldWithConfig("ssn", Map.of("masking", "FULL"))
+            );
+
+            assertFalse(collection.hasMaskingConfiguredFields());
         }
     }
 

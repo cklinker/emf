@@ -172,7 +172,14 @@ public class CerbosPolicyGenerator {
         defaultWriteRule.put("roles", List.of("user"));
         rules.add(defaultWriteRule);
 
-        // Deny rules for HIDDEN and READ_ONLY fields per profile
+        // Default: allow unmask — only fields a profile marks MASKED deny it below.
+        Map<String, Object> defaultUnmaskRule = new LinkedHashMap<>();
+        defaultUnmaskRule.put("actions", List.of("unmask"));
+        defaultUnmaskRule.put("effect", "EFFECT_ALLOW");
+        defaultUnmaskRule.put("roles", List.of("user"));
+        rules.add(defaultUnmaskRule);
+
+        // Deny rules for HIDDEN, READ_ONLY and MASKED fields per profile
         for (ProfileData profile : profiles) {
             for (Map.Entry<String, Map<String, String>> collEntry : profile.fieldPermissions().entrySet()) {
                 String collectionId = collEntry.getKey();
@@ -197,6 +204,18 @@ public class CerbosPolicyGenerator {
                         // Deny write only
                         Map<String, Object> rule = new LinkedHashMap<>();
                         rule.put("actions", List.of("write"));
+                        rule.put("effect", "EFFECT_DENY");
+                        rule.put("derivedRoles", List.of("profile_" + profile.id()));
+                        Map<String, Object> condition = new LinkedHashMap<>();
+                        condition.put("match", Map.of("expr", fieldExpr));
+                        rule.put("condition", condition);
+                        rules.add(rule);
+                    } else if ("MASKED".equals(visibility)) {
+                        // Read stays allowed (the value renders redacted); deny unmask
+                        // so the advice masks, and deny write so the write advice strips
+                        // an echoed placeholder before it can overwrite the stored value.
+                        Map<String, Object> rule = new LinkedHashMap<>();
+                        rule.put("actions", List.of("unmask", "write"));
                         rule.put("effect", "EFFECT_DENY");
                         rule.put("derivedRoles", List.of("profile_" + profile.id()));
                         Map<String, Object> condition = new LinkedHashMap<>();

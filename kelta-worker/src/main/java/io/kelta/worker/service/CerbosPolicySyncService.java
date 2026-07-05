@@ -65,7 +65,9 @@ public class CerbosPolicySyncService {
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
         this.cacheManager = cacheManager;
-        this.httpClient = HttpClient.newHttpClient();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(5))
+                .build();
         this.cerbosAdminUrl = "http://" + cerbosHost + ":" + cerbosHttpPort;
         this.cerbosAdminAuth = "Basic " + Base64.getEncoder()
                 .encodeToString((adminUsername + ":" + adminPassword).getBytes());
@@ -157,6 +159,7 @@ public class CerbosPolicySyncService {
                 .uri(URI.create(cerbosAdminUrl + "/admin/policy"))
                 .header("Content-Type", "application/json")
                 .header("Authorization", cerbosAdminAuth)
+                .timeout(java.time.Duration.ofSeconds(10))
                 .PUT(HttpRequest.BodyPublishers.ofString(json))
                 .build();
 

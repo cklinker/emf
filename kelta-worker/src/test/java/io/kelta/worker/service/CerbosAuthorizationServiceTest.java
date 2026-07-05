@@ -122,6 +122,80 @@ class CerbosAuthorizationServiceTest {
     }
 
     @Nested
+    @DisplayName("Per-action cache isolation")
+    class PerActionCacheIsolation {
+
+        @Test
+        @DisplayName("Should not serve a cached read result for a write check")
+        void readCacheDoesNotServeWrite() throws Exception {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check()).thenReturn(batchResult);
+            when(batchResult.find("field-1")).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+            when(fieldCheckResult.isAllowed("write")).thenReturn(false);
+
+            List<String> fields = List.of("field-1");
+
+            List<String> readResult = service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            List<String> writeResult = service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "write");
+
+            // READ_ONLY semantics: read allowed, write denied — a shared cache
+            // entry would have leaked the read allow-list into the write check.
+            assertThat(readResult).containsExactly("field-1");
+            assertThat(writeResult).isEmpty();
+            verify(cerbosClient, times(2)).batch(any());
+        }
+
+        @Test
+        @DisplayName("Should not serve a cached read result for an unmask check")
+        void readCacheDoesNotServeUnmask() throws Exception {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check()).thenReturn(batchResult);
+            when(batchResult.find("field-1")).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+            when(fieldCheckResult.isAllowed("unmask")).thenReturn(false);
+
+            List<String> fields = List.of("field-1");
+
+            List<String> readResult = service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            List<String> unmaskResult = service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "unmask");
+
+            // MASKED semantics: read allowed (value renders redacted), unmask denied.
+            assertThat(readResult).containsExactly("field-1");
+            assertThat(unmaskResult).isEmpty();
+            verify(cerbosClient, times(2)).batch(any());
+        }
+
+        @Test
+        @DisplayName("Should still cache repeat checks per action")
+        void cachesPerAction() throws Exception {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check()).thenReturn(batchResult);
+            when(batchResult.find("field-1")).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+            when(fieldCheckResult.isAllowed("unmask")).thenReturn(false);
+
+            List<String> fields = List.of("field-1");
+
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "unmask");
+            // Repeats — both must be cache hits.
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "unmask");
+
+            verify(cerbosClient, times(2)).batch(any());
+        }
+    }
+
+    @Nested
     @DisplayName("Cache eviction")
     class CacheEviction {
 
@@ -171,6 +245,63 @@ class CerbosAuthorizationServiceTest {
                     "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
 
             verify(cerbosClient, times(1)).batch(any());
+        }
+
+        @Test
+        @DisplayName("Should evict all actions' entries for a collection and re-check")
+        void evictsForCollectionAcrossActions() throws Exception {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check()).thenReturn(batchResult);
+            when(batchResult.find("field-1")).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+            when(fieldCheckResult.isAllowed("unmask")).thenReturn(true);
+
+            List<String> fields = List.of("field-1");
+
+            // Populate cache entries for two actions of the same collection
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "unmask");
+            verify(cerbosClient, times(2)).batch(any());
+
+            service.evictForCollection("tenant-1", "col-1");
+
+            // Both actions must re-query Cerbos
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "unmask");
+            verify(cerbosClient, times(4)).batch(any());
+        }
+
+        @Test
+        @DisplayName("Should not evict entries for other collections of the tenant")
+        void evictForCollectionLeavesOtherCollectionsAlone() throws Exception {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check()).thenReturn(batchResult);
+            when(batchResult.find("field-1")).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+
+            List<String> fields = List.of("field-1");
+
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-2", fields, "read");
+            verify(cerbosClient, times(2)).batch(any());
+
+            service.evictForCollection("tenant-1", "col-1");
+
+            // col-2 entry must survive the eviction — cache hit, no new Cerbos call.
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-2", fields, "read");
+            verify(cerbosClient, times(2)).batch(any());
+
+            // col-1 entry is gone — re-query.
+            service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            verify(cerbosClient, times(3)).batch(any());
         }
     }
 

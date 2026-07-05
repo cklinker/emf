@@ -171,6 +171,38 @@ class AddFieldToolTest {
     }
 
     @Test
+    void maskingAttachesFieldTypeConfigForStringField() {
+        stubCollectionLookup();
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "ssn",
+                        "type", "string",
+                        "maskingType", "last4"), null));
+
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("STRING")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.fieldTypeConfig.masking.type", equalTo("LAST4"))));
+    }
+
+    @Test
+    void maskingRejectedOnNonStringType() {
+        stubCollectionLookup();
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "amount",
+                        "type", "number",
+                        "maskingType", "FULL"), null));
+
+        assertThat(result.isError()).isEqualTo(Boolean.TRUE);
+    }
+
+    @Test
     void picklistRequiresSourceId() {
         stubCollectionLookup();
 

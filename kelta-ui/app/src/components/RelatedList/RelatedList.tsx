@@ -742,6 +742,15 @@ export function RelatedList({
                               tenantSlug={tenantSlug}
                               editable
                               editOn="pencil"
+                              masked={
+                                Array.isArray(
+                                  (record as { __maskedFields?: unknown }).__maskedFields
+                                ) &&
+                                (
+                                  (record as { __maskedFields?: string[] })
+                                    .__maskedFields as string[]
+                                ).includes(field.name)
+                              }
                               onCommit={(name, v) => commitEdit(record.id, name, v)}
                             />
                           ) : (

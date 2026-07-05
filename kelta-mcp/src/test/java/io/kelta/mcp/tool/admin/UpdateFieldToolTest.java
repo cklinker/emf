@@ -16,6 +16,7 @@ import java.util.Map;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.patch;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -55,6 +56,38 @@ class UpdateFieldToolTest {
         CallToolResult result = tool.toSpecification().callHandler().apply(
                 null, new CallToolRequest("update_field", Map.of("id", "f1"), null));
         assertThat(result.isError()).isEqualTo(Boolean.TRUE);
+    }
+
+    @Test
+    void setsMaskingConfig() {
+        wm.stubFor(patch(urlEqualTo("/api/fields/f1"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"data\":{}}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("update_field", Map.of(
+                        "id", "f1",
+                        "maskingType", "email"), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.patchRequestedFor(urlEqualTo("/api/fields/f1"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.fieldTypeConfig.masking.type", equalTo("EMAIL"))));
+    }
+
+    @Test
+    void clearsMaskingWithNone() {
+        wm.stubFor(patch(urlEqualTo("/api/fields/f1"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"data\":{}}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("update_field", Map.of(
+                        "id", "f1",
+                        "maskingType", "NONE"), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        // fieldTypeConfig present but empty (no masking key) → masking cleared.
+        wm.verify(WireMock.patchRequestedFor(urlEqualTo("/api/fields/f1"))
+                .withRequestBody(equalToJson(
+                        "{\"data\":{\"attributes\":{\"fieldTypeConfig\":{}}}}", true, true)));
     }
 
     @Test

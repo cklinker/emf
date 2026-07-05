@@ -82,6 +82,15 @@ export interface ObjectDataTableProps {
 }
 
 /**
+ * Fields the server masked for this viewer on a given row (`meta.maskedFields`,
+ * surfaced onto the flat record by flattenResource as `__maskedFields`).
+ */
+function maskedFieldsOf(record: CollectionRecord): Set<string> {
+  const raw = (record as { __maskedFields?: unknown }).__maskedFields
+  return new Set(Array.isArray(raw) ? (raw as string[]) : [])
+}
+
+/**
  * Renders a sort indicator icon based on the current sort state.
  */
 function SortIcon({ field, sort }: { field: string; sort?: SortState }) {
@@ -200,6 +209,7 @@ function DataRow({
                 tenantSlug={tenantSlug}
                 editable
                 editOn="pencil"
+                masked={maskedFieldsOf(record).has(field.name)}
                 onCommit={(fieldName, value) => onCellCommit!(record.id, fieldName, value)}
               />
             </TableCell>

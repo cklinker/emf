@@ -139,4 +139,18 @@ describe('InlineFieldValue', () => {
     })
     expect(screen.getByTestId('inline-field-stage')).toBeDefined()
   })
+
+  it('renders a locked read-only view when masked, even with edit permission', () => {
+    renderInline({
+      field: field({ name: 'ssn' }),
+      value: '***-**-6789',
+      editable: true,
+      masked: true,
+      onCommit: vi.fn(),
+    })
+    // No edit affordance; a masked-field marker is shown instead.
+    expect(screen.queryByTestId('inline-field-ssn')).toBeNull()
+    expect(screen.getByTestId('masked-field-ssn')).toBeDefined()
+    expect(screen.getByText('***-**-6789')).toBeDefined()
+  })
 })

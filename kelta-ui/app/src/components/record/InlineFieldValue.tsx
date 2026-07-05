@@ -5,7 +5,7 @@
  * inline editing is identical everywhere. See `.claude/docs/specs/unified-record/2-record-shell.md`.
  */
 import React, { useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import { getFieldControl } from '@/components/fieldControl'
@@ -31,6 +31,12 @@ export interface InlineFieldValueProps {
   editable?: boolean
   /** Placement-level read-only override. */
   readOnly?: boolean
+  /**
+   * The value is data-masked for the current user (server listed it in
+   * `meta.maskedFields`). Renders read-only with a lock affordance — editing a
+   * masked placeholder is pointless (the server write-denies it anyway).
+   */
+  masked?: boolean
   /** Placement-level required override (defaults to the schema field's `required`). */
   required?: boolean
   /** Persist a committed value. Rejects → the error is surfaced and edit mode stays open. */
@@ -60,7 +66,7 @@ function buildContext(props: InlineFieldValueProps): FieldControlContext {
 }
 
 export function InlineFieldValue(props: InlineFieldValueProps): React.ReactElement {
-  const { field, value, editable, readOnly, onCommit, className, editOn = 'click' } = props
+  const { field, value, editable, readOnly, masked, onCommit, className, editOn = 'click' } = props
   const control = getFieldControl(field.type)
   const ctx = buildContext(props)
 
@@ -77,11 +83,26 @@ export function InlineFieldValue(props: InlineFieldValueProps): React.ReactEleme
     !!onCommit &&
     control.editable &&
     !readOnly &&
+    !masked &&
     !INLINE_EXCLUDED.has(field.type) &&
     hasOptions
 
   const View = control.View
   const readView = <View type={field.type} value={value} ctx={ctx} truncate={false} />
+
+  // Masked value: read-only with a lock affordance, regardless of edit permission.
+  if (masked) {
+    return (
+      <div
+        className={cn('inline-flex items-center gap-1 text-muted-foreground', className)}
+        title="Masked — you don't have permission to view this value"
+        data-testid={`masked-field-${field.name}`}
+      >
+        <span className="min-w-0">{readView}</span>
+        <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
+      </div>
+    )
+  }
 
   if (!canInlineEdit) {
     return <div className={className}>{readView}</div>

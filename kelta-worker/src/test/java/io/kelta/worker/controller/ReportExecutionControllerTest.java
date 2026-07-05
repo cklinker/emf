@@ -4,9 +4,11 @@ import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.system.SystemCollectionDefinitions;
 import io.kelta.runtime.query.*;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.ReportExecutionService;
 import io.kelta.worker.service.ReportExecutionService.ColumnConfig;
 import io.kelta.worker.service.ReportExecutionService.ReportResult;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -24,13 +26,16 @@ class ReportExecutionControllerTest {
     private QueryEngine queryEngine;
     private CollectionRegistry collectionRegistry;
     private ReportExecutionController controller;
+    private HttpServletRequest request;
 
     @BeforeEach
     void setUp() {
         reportExecutionService = mock(ReportExecutionService.class);
         queryEngine = mock(QueryEngine.class);
         collectionRegistry = mock(CollectionRegistry.class);
-        controller = new ReportExecutionController(reportExecutionService, queryEngine, collectionRegistry);
+        request = mock(HttpServletRequest.class);
+        controller = new ReportExecutionController(reportExecutionService, queryEngine,
+                collectionRegistry, mock(CerbosPermissionResolver.class));
     }
 
     @SuppressWarnings("unchecked")
@@ -65,10 +70,10 @@ class ReportExecutionControllerTest {
         List<Map<String, Object>> data = List.of(Map.of("name", "Acme"));
         PaginationMetadata meta = new PaginationMetadata(1, 1, 200, 1);
         ReportResult result = new ReportResult(data, meta, columns, null, null);
-        when(reportExecutionService.execute(eq(reportConfig), eq(1), eq(200)))
+        when(reportExecutionService.execute(eq(reportConfig), eq(1), eq(200), any()))
             .thenReturn(result);
 
-        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-1", 1, 200);
+        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-1", 1, 200, request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         Map<String, Object> attrs = getAttributes(response.getBody());
@@ -91,7 +96,7 @@ class ReportExecutionControllerTest {
         when(queryEngine.getById(eq(reportsDef), eq("nonexistent")))
             .thenReturn(Optional.empty());
 
-        ResponseEntity<Map<String, Object>> response = controller.executeReport("nonexistent", 1, 200);
+        ResponseEntity<Map<String, Object>> response = controller.executeReport("nonexistent", 1, 200, request);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
@@ -109,10 +114,10 @@ class ReportExecutionControllerTest {
         when(queryEngine.getById(eq(reportsDef), eq("report-bad")))
             .thenReturn(Optional.of(reportConfig));
 
-        when(reportExecutionService.execute(any(), anyInt(), anyInt()))
+        when(reportExecutionService.execute(any(), anyInt(), anyInt(), any()))
             .thenThrow(new ReportExecutionService.ReportExecutionException("Collection not found"));
 
-        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-bad", 1, 200);
+        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-bad", 1, 200, request);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
@@ -121,7 +126,7 @@ class ReportExecutionControllerTest {
     void shouldReturn404WhenReportsCollectionNotInRegistry() {
         when(collectionRegistry.get("reports")).thenReturn(null);
 
-        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-1", 1, 200);
+        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-1", 1, 200, request);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
@@ -150,10 +155,10 @@ class ReportExecutionControllerTest {
         ReportResult result = new ReportResult(
             List.of(Map.of("status", "open"), Map.of("status", "closed")),
             meta, columns, groups, Map.of());
-        when(reportExecutionService.execute(eq(reportConfig), eq(1), eq(200)))
+        when(reportExecutionService.execute(eq(reportConfig), eq(1), eq(200), any()))
             .thenReturn(result);
 
-        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-grp", 1, 200);
+        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-grp", 1, 200, request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         Map<String, Object> attrs = getAttributes(response.getBody());

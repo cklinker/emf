@@ -97,6 +97,15 @@ export function flattenResource<T extends object = Record<string, unknown>>(
     }
   }
 
+  // Surface the resource-level data-masking marker (`meta.maskedFields`) onto
+  // the flat record so field renderers can show a masked/locked affordance
+  // without re-parsing the JSON:API envelope. The server already replaced the
+  // value with a masked placeholder; this is the UX hint that it did.
+  const meta = (resource as { meta?: { maskedFields?: unknown } }).meta
+  if (meta && Array.isArray(meta.maskedFields)) {
+    result.__maskedFields = meta.maskedFields
+  }
+
   return result as T
 }
 

@@ -306,9 +306,24 @@ byte-identical 403 (`MASKED_FIELD_PREDICATE` — uniform so the error itself is
 no oracle), and record-change events from collections with masking config are
 flagged `containsMaskedFields`, which makes the gateway `RealtimeBridge` omit
 record `data` from WebSocket fan-out (clients refetch through the masked
-JSON:API path). Egress paths that do not pass the advice (data export,
-reports, dashboards, search index) are **not masked yet** — see
-`concerns.md`.
+JSON:API path). **Non-advice egress** (PR 2) calls `RecordMaskingService.maskRows`
+at its own boundary keyed to the requesting user: `DataExportService` (CSV/JSON —
+the requester is threaded into the `@Async` job via `ExportPrincipal`) and
+`ReportExecutionService` (execute + CSV/PDF — requester resolved in
+`ReportExecutionController` via `CerbosPermissionResolver` into a
+`MaskingPrincipal`); reports additionally **reject** a filter/sort/group-by on a
+field masked for the executor (each leaks plaintext via predicate/ordering/group
+key). A `null`/system principal (scheduled report delivery, background export) is
+a documented **system-trust tier** that skips masking — same contract as flows
+and other non-request contexts. The **search index** excludes masking-configured
+fields at index time (field-config level, not per-viewer — the shared
+`search_content` tsvector + `display_value` have no requester identity;
+`SearchIndexService`), and `EmbeddingOnWriteHook` skips embedding a
+masking-configured source field (an embedded plaintext would be semantically
+searchable); `FieldConfigEventPublisher` rebuilds the collection index when a
+field's masking config toggles. Still deferred to v2: **dashboards** (shared
+Superset widget cache is not per-viewer) and the system-tier contexts above —
+see `concerns.md`.
 
 **Field history** — value changes to fields with `trackHistory=true` are captured
 by `FieldHistoryHook` (worker `listener/`, wildcard `BeforeSaveHook`, order 900):

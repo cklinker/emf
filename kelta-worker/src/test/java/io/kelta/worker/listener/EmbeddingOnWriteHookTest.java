@@ -61,7 +61,8 @@ class EmbeddingOnWriteHookTest {
 
     @BeforeEach
     void setUp() {
-        hook = new EmbeddingOnWriteHook(collectionRegistry, embeddingService);
+        hook = new EmbeddingOnWriteHook(collectionRegistry, embeddingService,
+                new io.kelta.worker.service.FieldMaskingService());
         lenient().when(embeddingService.dimensions()).thenReturn(DIM);
         lenient().when(embeddingService.providerId()).thenReturn("test");
         lenient().when(embeddingService.embed(anyString())).thenReturn(VEC);
@@ -80,6 +81,32 @@ class EmbeddingOnWriteHookTest {
         assertThat(result.getFieldUpdates())
                 .containsEntry("embedding", EmbeddingService.toVectorLiteral(VEC));
         verify(embeddingService).embed("hello world");
+    }
+
+    @Test
+    @DisplayName("create: masking-configured source field is not embedded")
+    void createSkipsMaskedSource() {
+        // Source "title" carries a masking config — embedding it would make the
+        // plaintext semantically searchable, bypassing masking.
+        Map<String, Object> vecConfig = new HashMap<>();
+        vecConfig.put("dimension", DIM);
+        vecConfig.put("embeddingSource", "title");
+        FieldDefinition maskedTitle = new io.kelta.runtime.model.FieldDefinitionBuilder()
+                .name("title").type(FieldType.STRING)
+                .fieldTypeConfig(Map.of("masking", Map.of("type", "FULL")))
+                .build();
+        CollectionDefinition def = new CollectionDefinitionBuilder().name("articles")
+                .addField(maskedTitle)
+                .addField(new FieldDefinition("embedding", FieldType.VECTOR,
+                        true, false, false, null, null, null, null, vecConfig, null))
+                .build();
+        when(collectionRegistry.get("articles")).thenReturn(def);
+
+        BeforeSaveResult result = hook.beforeCreate(
+                record(Map.of("title", "secret value")), "tenant-1");
+
+        assertThat(result.hasFieldUpdates()).isFalse();
+        verify(embeddingService, never()).embed(anyString());
     }
 
     @Test

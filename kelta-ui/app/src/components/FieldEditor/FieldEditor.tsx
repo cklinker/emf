@@ -200,6 +200,26 @@ export const FIELD_TYPES: FieldType[] = [
 ]
 
 /**
+ * Field types that support data masking. Masked values are strings, so only
+ * string-typed fields qualify — mirrors the backend
+ * {@code FieldMaskingService.MASKABLE_TYPES}. Numbers/dates/etc. use HIDDEN
+ * field permissions instead.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const MASKABLE_FIELD_TYPES: readonly FieldType[] = [
+  'string',
+  'rich_text',
+  'email',
+  'phone',
+  'url',
+  'encrypted',
+  'external_id',
+]
+
+/** Masking strategy options offered in the FieldEditor. `NONE` clears the config. */
+export type MaskingType = 'NONE' | 'FULL' | 'LAST4' | 'EMAIL' | 'CUSTOM'
+
+/**
  * Validation rule types available for each field type
  */
 // eslint-disable-next-line react-refresh/only-export-components
@@ -296,6 +316,9 @@ export const fieldEditorSchema = z
     rollupField: z.string().optional().or(z.literal('')),
     formulaExpression: z.string().optional().or(z.literal('')),
     formulaReturnType: z.enum(['TEXT', 'NUMBER', 'BOOLEAN']).optional(),
+    maskingType: z.enum(['NONE', 'FULL', 'LAST4', 'EMAIL', 'CUSTOM']).optional(),
+    maskingChar: z.string().max(1).optional().or(z.literal('')),
+    maskingCustomPattern: z.string().max(64).optional().or(z.literal('')),
     description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
     trackHistory: z.boolean(),
     searchable: z.boolean(),
@@ -488,6 +511,14 @@ export function FieldEditor({
       rollupField: (parsedConfig.aggregateField as string) ?? '',
       formulaExpression: (parsedConfig.expression as string) ?? '',
       formulaReturnType: (parsedConfig.returnType as FormulaReturnType) ?? undefined,
+      maskingType:
+        ((parsedConfig.masking as Record<string, unknown> | undefined)?.type as MaskingType) ??
+        'NONE',
+      maskingChar:
+        ((parsedConfig.masking as Record<string, unknown> | undefined)?.maskChar as string) ?? '',
+      maskingCustomPattern:
+        ((parsedConfig.masking as Record<string, unknown> | undefined)?.customPattern as string) ??
+        '',
       description: field?.description ?? '',
       trackHistory: field?.trackHistory ?? false,
       searchable: field?.searchable ?? false,
@@ -521,6 +552,8 @@ export function FieldEditor({
   const watchedType = watch('type')
   const watchedRollupChild = watch('rollupChildCollection')
   const watchedRollupFn = watch('rollupFunction')
+  const watchedMaskingType = watch('maskingType')
+  const isMaskable = MASKABLE_FIELD_TYPES.includes(watchedType)
 
   // Get available validation rules for current field type
   const availableValidationRules = useMemo(() => {
@@ -616,6 +649,14 @@ export function FieldEditor({
         rollupField: (parsedConfig.aggregateField as string) ?? '',
         formulaExpression: (parsedConfig.expression as string) ?? '',
         formulaReturnType: (parsedConfig.returnType as FormulaReturnType) ?? undefined,
+        maskingType:
+          ((parsedConfig.masking as Record<string, unknown> | undefined)?.type as MaskingType) ??
+          'NONE',
+        maskingChar:
+          ((parsedConfig.masking as Record<string, unknown> | undefined)?.maskChar as string) ?? '',
+        maskingCustomPattern:
+          ((parsedConfig.masking as Record<string, unknown> | undefined)
+            ?.customPattern as string) ?? '',
         description: field.description ?? '',
         trackHistory: field.trackHistory ?? false,
         searchable: field.searchable ?? false,
@@ -712,6 +753,20 @@ export function FieldEditor({
           expression: data.formulaExpression,
           returnType: data.formulaReturnType,
         }
+      }
+
+      // Data masking — string-typed fields only. `NONE` clears the config.
+      if (
+        MASKABLE_FIELD_TYPES.includes(data.type) &&
+        data.maskingType &&
+        data.maskingType !== 'NONE'
+      ) {
+        const masking: Record<string, unknown> = { type: data.maskingType }
+        if (data.maskingChar) masking.maskChar = data.maskingChar
+        if (data.maskingType === 'CUSTOM' && data.maskingCustomPattern) {
+          masking.customPattern = data.maskingCustomPattern
+        }
+        fieldTypeConfig = { ...(fieldTypeConfig ?? {}), masking }
       }
 
       const needsReferenceTarget =
@@ -1117,6 +1172,90 @@ export function FieldEditor({
             data-testid="field-currency-precision-input"
             {...register('currencyPrecision')}
           />
+        </div>
+      )}
+
+      {/* Data Masking Config (string-typed fields only) */}
+      {isMaskable && (
+        <div
+          className="flex flex-col gap-3 p-4 bg-secondary border border-border rounded-md"
+          data-testid="masking-config"
+        >
+          <h4 className="m-0 text-base font-medium text-foreground">
+            {t('fieldEditor.masking.title', 'Data Masking')}
+          </h4>
+          <p className="m-0 text-xs text-muted-foreground">
+            {t(
+              'fieldEditor.masking.help',
+              'Users whose profile lacks unmask rights see this field redacted (e.g. ***-**-6789). Note: analytics dashboards are not masked in this release.'
+            )}
+          </p>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="field-masking-type" className="text-sm font-medium text-foreground">
+              {t('fieldEditor.masking.strategy', 'Masking strategy')}
+            </label>
+            <select
+              id="field-masking-type"
+              className={inputClasses}
+              disabled={isSubmitting}
+              data-testid="field-masking-type-select"
+              {...register('maskingType')}
+            >
+              <option value="NONE">{t('fieldEditor.masking.none', 'None')}</option>
+              <option value="FULL">{t('fieldEditor.masking.full', 'Full (••••••)')}</option>
+              <option value="LAST4">{t('fieldEditor.masking.last4', 'Show last 4')}</option>
+              <option value="EMAIL">{t('fieldEditor.masking.email', 'Email (j•••@domain)')}</option>
+              <option value="CUSTOM">{t('fieldEditor.masking.custom', 'Custom pattern')}</option>
+            </select>
+          </div>
+          {watchedMaskingType && watchedMaskingType !== 'NONE' && (
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="field-masking-char"
+                className="flex items-center gap-1 text-sm font-medium text-foreground"
+              >
+                {t('fieldEditor.masking.maskChar', 'Mask character')}
+                <span className="text-xs font-normal text-muted-foreground ml-1">
+                  ({t('common.optional')})
+                </span>
+              </label>
+              <input
+                id="field-masking-char"
+                type="text"
+                className={inputClasses}
+                maxLength={1}
+                placeholder="•"
+                disabled={isSubmitting}
+                data-testid="field-masking-char-input"
+                {...register('maskingChar')}
+              />
+            </div>
+          )}
+          {watchedMaskingType === 'CUSTOM' && (
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="field-masking-pattern"
+                className="text-sm font-medium text-foreground"
+              >
+                {t('fieldEditor.masking.pattern', 'Custom pattern')}
+              </label>
+              <input
+                id="field-masking-pattern"
+                type="text"
+                className={inputClasses}
+                placeholder="###-##-####"
+                disabled={isSubmitting}
+                data-testid="field-masking-pattern-input"
+                {...register('maskingCustomPattern')}
+              />
+              <span className="text-xs text-muted-foreground">
+                {t(
+                  'fieldEditor.masking.patternHelp',
+                  '# reveals a character; any other character is shown literally, right-aligned.'
+                )}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

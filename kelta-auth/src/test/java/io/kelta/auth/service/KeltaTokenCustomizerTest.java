@@ -103,9 +103,10 @@ class KeltaTokenCustomizerTest {
         // Mock connected_app lookup
         Map<String, Object> appRow = new HashMap<>();
         appRow.put("id", "connected-app-1");
+        appRow.put("tenant_id", "tenant-1");
         appRow.put("scopes", "[\"api\",\"read:records\"]");
         when(jdbcTemplate.queryForList(
-                eq("SELECT id, scopes FROM connected_app WHERE client_id = ? AND active = true"),
+                eq("SELECT id, tenant_id, scopes FROM connected_app WHERE client_id = ? AND active = true"),
                 eq("third-party-app")
         )).thenReturn(List.of(appRow));
 
@@ -123,6 +124,11 @@ class KeltaTokenCustomizerTest {
         assertEquals("connected-app-1", claims.getClaim("connected_app_id"));
         assertEquals("[\"api\",\"read:records\"]", claims.getClaim("app_scopes"));
         assertEquals("connected_app", claims.getClaim("auth_method"));
+        assertNotNull(claims.getId(), "jti should be pinned for the recorded token");
+        // The authorization_code token is recorded in the app's token list too.
+        verify(tokenRecorder).recordIssuedToken(
+                eq("connected-app-1"), eq("tenant-1"), eq("[\"api\",\"read:records\"]"),
+                eq(claims.getId()), any(), eq("authorization_code"));
     }
 
     @Test
@@ -213,7 +219,7 @@ class KeltaTokenCustomizerTest {
 
         // No connected app for platform client
         when(jdbcTemplate.queryForList(
-                eq("SELECT id, scopes FROM connected_app WHERE client_id = ? AND active = true"),
+                eq("SELECT id, tenant_id, scopes FROM connected_app WHERE client_id = ? AND active = true"),
                 eq("kelta-platform")
         )).thenReturn(List.of());
 

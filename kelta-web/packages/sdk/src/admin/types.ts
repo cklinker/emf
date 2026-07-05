@@ -1855,6 +1855,9 @@ export interface ConnectedApp {
   ipRestrictions?: string;
   rateLimitPerHour: number;
   active: boolean;
+  grantTypes?: string[];
+  requirePkce?: boolean;
+  consentRequired?: boolean;
   lastUsedAt?: string;
   createdBy: string;
   createdAt: string;
@@ -1882,6 +1885,12 @@ export interface CreateConnectedAppRequest {
   ipRestrictions?: string;
   rateLimitPerHour?: number;
   active?: boolean;
+  /** JSON array string of enabled OAuth2 grants, e.g. `["client_credentials","authorization_code"]`. */
+  grantTypes?: string;
+  /** Require PKCE (public client, no secret) — authorization_code apps only. */
+  requirePkce?: boolean;
+  /** Prompt the user for consent on the authorization_code flow. */
+  consentRequired?: boolean;
 }
 
 // --- Bulk Jobs (Phase 5 Stream D) ---

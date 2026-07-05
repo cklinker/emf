@@ -330,7 +330,11 @@ public class AuthorizationServerConfig {
         paramsMapper.setObjectMapper(objectMapper);
         repository.setRegisteredClientParametersMapper(paramsMapper);
 
-        return repository;
+        // Wrap the JDBC store so connected-app clients resolve dynamically from the
+        // connected_app table (both client_credentials and authorization_code),
+        // taking effect without a kelta-auth restart. The JDBC store still holds
+        // the config-registered clients (platform UI, Superset, internal).
+        return new io.kelta.auth.service.ConnectedAppRegisteredClientRepository(repository, jdbcTemplate);
     }
 
     @Bean
@@ -422,7 +426,7 @@ public class AuthorizationServerConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         // DelegatingPasswordEncoder understands the {bcrypt} prefix used by
-        // connected-app client secrets (ConnectedAppClientSynchronizer stores
+        // connected-app client secrets (ConnectedAppRegisteredClientRepository builds
         // "{bcrypt}" + bcryptHash). encode() now emits a {bcrypt}-prefixed value.
         DelegatingPasswordEncoder encoder =
                 (DelegatingPasswordEncoder) PasswordEncoderFactories.createDelegatingPasswordEncoder();

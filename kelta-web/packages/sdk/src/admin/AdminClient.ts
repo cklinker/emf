@@ -593,11 +593,15 @@ export class AdminClient {
       },
 
       assignPermissionSet: async (id: string, permissionSetId: string): Promise<void> => {
-        await this.axios.post(`/api/admin/delegated/users/${id}/permission-sets/${permissionSetId}`);
+        await this.axios.post(
+          `/api/admin/delegated/users/${id}/permission-sets/${permissionSetId}`
+        );
       },
 
       removePermissionSet: async (id: string, permissionSetId: string): Promise<void> => {
-        await this.axios.delete(`/api/admin/delegated/users/${id}/permission-sets/${permissionSetId}`);
+        await this.axios.delete(
+          `/api/admin/delegated/users/${id}/permission-sets/${permissionSetId}`
+        );
       },
     },
   };

@@ -120,6 +120,61 @@ public class CerbosAuthorizationService {
         meterRegistry.gauge("cerbos.cache.size", fieldAccessCache, Cache::estimatedSize);
     }
 
+    /**
+     * Object-level (collection) permission check — the worker-side mirror of the
+     * gateway's {@code RouteAuthorizationFilter} per-collection verb check
+     * (`create`/`edit`/`delete`/`read` on the {@code collection} resource). The
+     * gateway applies this to every dynamic collection route but <b>not</b> to the
+     * static {@code /api/operations} route, so the atomic-operations controller
+     * calls this to enforce the same authorization on batched writes.
+     *
+     * <p><b>Keying:</b> the {@code collection} policy CEL is keyed on the bootstrap
+     * {@code collection.id} (a UUID) — the same identifier the gateway passes
+     * ({@code route.getId()}) — <i>not</i> the collection name the record/field
+     * policies use. Pass the collection's UUID here.
+     *
+     * <p>Fail-closed: a Cerbos circuit-open / timeout / error denies.
+     *
+     * @param collectionId the collection's UUID (bootstrap {@code collection.id})
+     * @param action       {@code create} | {@code edit} | {@code delete} | {@code read}
+     */
+    public boolean checkCollectionAccess(String email, String profileId, String tenantId,
+                                          String collectionId, String action) {
+        if (isCircuitOpen()) {
+            log.warn("Cerbos circuit open — denying collection check (fail-closed): user={} collection={} action={}",
+                    email, collectionId, action);
+            return false;
+        }
+
+        Future<Boolean> future = cerbosExecutor.submit(() -> {
+            Principal principal = buildPrincipal(email, profileId, tenantId);
+            Resource resource = Resource.newInstance("collection", collectionId)
+                    .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
+                    .withScope(tenantId);
+            CheckResult result = cerbosClient.check(principal, resource, action);
+            return result.isAllowed(action);
+        });
+
+        try {
+            boolean allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            recordSuccess();
+            log.debug("Cerbos collection check: user={} collection={} action={} allowed={}",
+                    email, collectionId, action, allowed);
+            return allowed;
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            recordFailure();
+            log.error("Cerbos collection check timed out (fail-closed): user={} collection={}", email, collectionId);
+            return false;
+        } catch (Exception e) {
+            future.cancel(true);
+            recordFailure();
+            log.error("Cerbos collection check failed (fail-closed): user={} collection={} error={}",
+                    email, collectionId, e.getMessage());
+            return false;
+        }
+    }
+
     public boolean checkRecordAccess(String email, String profileId, String tenantId,
                                       String collectionId, String recordId,
                                       Map<String, Object> recordAttributes, String action) {

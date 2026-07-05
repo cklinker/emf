@@ -68,6 +68,9 @@ public final class SystemCollectionDefinitions {
         definitions.add(userPermissionSets());
         definitions.add(groupPermissionSets());
 
+        // Delegated administration
+        definitions.add(delegatedAdminScopes());
+
         // UI & Layout
         definitions.add(pageLayouts());
         definitions.add(layoutSections());
@@ -1308,6 +1311,34 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("group_id"))
             .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
                 "Permission Set").withColumnName("permission_set_id"))
+            .build();
+    }
+
+    /**
+     * Delegated administration scopes: a full admin lists delegated users who may manage users
+     * whose profile is in {@code manageableProfileIds}, assign permission sets from
+     * {@code assignablePermissionSetIds}, and use the capability booleans. Read fresh per request
+     * by the worker's DelegatedAdminService (no cache, no NATS); CRUD via the dedicated
+     * MANAGE_DELEGATED_ADMINS-gated controller; DelegatedAdminScopeValidationHook rejects scopes
+     * that would delegate administration of privileged profiles.
+     */
+    public static CollectionDefinition delegatedAdminScopes() {
+        return systemBuilder("delegated-admin-scopes", "Delegated Admin Scopes",
+                "delegated_admin_scope")
+            .displayFieldName("name")
+            .addField(FieldDefinition.requiredString("name", 200))
+            .addField(FieldDefinition.string("description", 500))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .addField(FieldDefinition.json("delegatedUserIds").withColumnName("delegated_user_ids"))
+            .addField(FieldDefinition.json("manageableProfileIds").withColumnName("manageable_profile_ids"))
+            .addField(FieldDefinition.json("assignablePermissionSetIds")
+                .withColumnName("assignable_permission_set_ids"))
+            .addField(FieldDefinition.bool("canCreateUsers").withColumnName("can_create_users")
+                .withDefault(false))
+            .addField(FieldDefinition.bool("canDeactivateUsers").withColumnName("can_deactivate_users")
+                .withDefault(false))
+            .addField(FieldDefinition.bool("canResetPasswords").withColumnName("can_reset_passwords")
+                .withDefault(false))
             .build();
     }
 

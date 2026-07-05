@@ -5,6 +5,29 @@ at the bottom so reviewers can see what's already been addressed.
 
 ## Security Risks
 
+**`POST /api/operations` (atomic ops) has no per-collection authorization (open).**
+`AtomicOperationsController` is a static gateway route (blanket `API_ACCESS` only) that writes any
+collection through `QueryEngine` with **no** object-permission check of its own — so any API user
+could batch-write collections the gateway's per-verb Cerbos check would otherwise deny on the
+normal dynamic route. Delegated administration (2026-07-05) closed this **for identity collections**
+(`users`/`user-permission-sets`/`group-memberships`/`delegated-admin-scopes`) via the
+`IdentityCollectionGuardHook` BeforeSaveHook, but **every other collection is still writable through
+`/api/operations` without a Cerbos object-permission gate.** A proper fix — mirroring the gateway's
+per-collection Cerbos verb check inside `AtomicOperationsController` (or a wildcard authorization
+hook that consults object permissions for all collections) — is a separate security task. Until
+then, treat `/api/operations` as authorized only at the `API_ACCESS` level for non-identity
+collections.
+
+**Delegated administration is a privilege-boundary surface (V157).** Guardrails that MUST stay
+intact: the `DelegatedAdminScopeValidationHook` rejection of privileged profiles/permsets at scope
+save, the `DelegatedAdminService.effectiveScope` **request-time re-filter** (a profile granted a
+privileged permission after being scoped must silently drop out — do not "optimize" it into a cache
+that skips the re-check), the `DelegatedUserAdminController` field whitelist (email/managerId/mfa
+immutable, self-edit blocked), and the `IdentityCollectionGuardHook` default-deny for identified
+writes. `MANAGE_DELEGATED_ADMINS` rides the platform's "object perms == config perms" posture for
+the scope collection's own generic route, same as every other setup collection. Security feature →
+**not auto-merged**.
+
 **Mass-email campaigns are a spam-capable, partly-public surface (V152).** Guardrails that
 MUST stay intact:
 - `CAMPAIGN_TRACKING_SECRET` **must be set to a strong per-deployment value.** It signs the HMAC

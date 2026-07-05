@@ -1,0 +1,1 @@
+export { DelegatedAdminsPage } from './DelegatedAdminsPage'

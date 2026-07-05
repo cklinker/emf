@@ -1,11 +1,17 @@
-import React, { useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../../context/ApiContext'
-import type { CreatePlatformUserRequest } from '@kelta/sdk'
+import type {
+  CreatePlatformUserRequest,
+  DelegatedNamedRef,
+  DelegatedUpdateUserRequest,
+} from '@kelta/sdk'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useToast } from '../../components/Toast'
+import { useSystemPermissions } from '../../hooks/useSystemPermissions'
+import { useDelegatedAdmin } from '../../hooks/useDelegatedAdmin'
 import { cn } from '@/lib/utils'
 
 interface PlatformUser {
@@ -31,12 +37,14 @@ interface CreateUserFormData {
   firstName: string
   lastName: string
   username: string
+  profileId?: string
 }
 
 interface FormErrors {
   email?: string
   firstName?: string
   lastName?: string
+  profileId?: string
 }
 
 export interface UsersPageProps {
@@ -65,10 +73,13 @@ function UserForm({
   onSubmit,
   onCancel,
   isSubmitting,
+  profileOptions,
 }: {
   onSubmit: (data: CreateUserFormData) => void
   onCancel: () => void
   isSubmitting: boolean
+  /** When set (delegated scoped mode), a profile choice is required and limited to these. */
+  profileOptions?: DelegatedNamedRef[]
 }) {
   const { t } = useI18n()
   const [formData, setFormData] = useState<CreateUserFormData>({
@@ -76,6 +87,7 @@ function UserForm({
     firstName: '',
     lastName: '',
     username: '',
+    profileId: '',
   })
   const [errors, setErrors] = useState<FormErrors>({})
 
@@ -85,8 +97,9 @@ function UserForm({
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Invalid email'
     if (!formData.firstName.trim()) errs.firstName = 'First name is required'
     if (!formData.lastName.trim()) errs.lastName = 'Last name is required'
+    if (profileOptions && !formData.profileId) errs.profileId = 'Profile is required'
     return errs
-  }, [formData])
+  }, [formData, profileOptions])
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -182,6 +195,33 @@ function UserForm({
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
           </div>
+          {profileOptions && (
+            <div className="mb-4">
+              <label htmlFor="profileId" className="mb-1 block text-sm font-medium text-foreground">
+                {t('users.profile')} *
+              </label>
+              <select
+                id="profileId"
+                data-testid="create-profile-select"
+                value={formData.profileId}
+                onChange={(e) => setFormData({ ...formData, profileId: e.target.value })}
+                className={cn(
+                  'w-full rounded-md border border-border bg-background px-3 py-2 text-sm',
+                  errors.profileId && 'border-destructive'
+                )}
+              >
+                <option value="">{t('common.select')}</option>
+                {profileOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              {errors.profileId && (
+                <span className="mt-1 block text-xs text-destructive">{errors.profileId}</span>
+              )}
+            </div>
+          )}
           <div className="mt-6 flex justify-end gap-2">
             <button
               type="button"
@@ -204,14 +244,222 @@ function UserForm({
   )
 }
 
+/**
+ * Compact edit dialog for delegated (scoped) mode — whitelisted fields plus
+ * permission-set toggles limited to the caller's assignable set. Full admins
+ * keep the UserDetailPage instead.
+ */
+function DelegatedEditDialog({
+  user,
+  profileOptions,
+  permissionSetOptions,
+  onClose,
+  onSaved,
+}: {
+  user: PlatformUser
+  profileOptions: DelegatedNamedRef[]
+  permissionSetOptions: DelegatedNamedRef[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const { t } = useI18n()
+  const { keltaClient } = useApi()
+  const { showToast } = useToast()
+  const [form, setForm] = useState({
+    firstName: user.firstName ?? '',
+    lastName: user.lastName ?? '',
+    username: user.username ?? '',
+    profileId: user.profileId ?? '',
+  })
+  const [permissionSets, setPermissionSets] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
+
+  const { data: assignedIds, isLoading: assignmentsLoading } = useQuery({
+    queryKey: ['delegated-user-permsets', user.id],
+    queryFn: () => keltaClient.admin.delegated.users.listPermissionSets(user.id),
+  })
+
+  React.useEffect(() => {
+    if (assignedIds) setPermissionSets(new Set(assignedIds))
+  }, [assignedIds])
+
+  const togglePermissionSet = (id: string) => {
+    setPermissionSets((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const update: DelegatedUpdateUserRequest = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        username: form.username || undefined,
+      }
+      if (form.profileId && form.profileId !== user.profileId) {
+        update.profileId = form.profileId
+      }
+      await keltaClient.admin.delegated.users.update(user.id, update)
+
+      const before = new Set(assignedIds ?? [])
+      for (const id of permissionSets) {
+        if (!before.has(id))
+          await keltaClient.admin.delegated.users.assignPermissionSet(user.id, id)
+      }
+      for (const id of before) {
+        if (!permissionSets.has(id))
+          await keltaClient.admin.delegated.users.removePermissionSet(user.id, id)
+      }
+      showToast(t('users.updateSuccess'), 'success')
+      onSaved()
+    } catch (err) {
+      showToast((err as Error).message || t('errors.generic'), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose()
+      }}
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-[480px] rounded-lg bg-card p-6 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        data-testid="delegated-edit-dialog"
+      >
+        <h2 className="mb-1 text-xl font-semibold">{t('users.editUser')}</h2>
+        <p className="mb-4 text-sm text-muted-foreground">{user.email}</p>
+        <div className="mb-4">
+          <label
+            htmlFor="edit-firstName"
+            className="mb-1 block text-sm font-medium text-foreground"
+          >
+            {t('users.firstName')}
+          </label>
+          <input
+            id="edit-firstName"
+            type="text"
+            value={form.firstName}
+            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="edit-lastName" className="mb-1 block text-sm font-medium text-foreground">
+            {t('users.lastName')}
+          </label>
+          <input
+            id="edit-lastName"
+            type="text"
+            value={form.lastName}
+            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="edit-username" className="mb-1 block text-sm font-medium text-foreground">
+            {t('users.username')}
+          </label>
+          <input
+            id="edit-username"
+            type="text"
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="edit-profile" className="mb-1 block text-sm font-medium text-foreground">
+            {t('users.profile')}
+          </label>
+          <select
+            id="edit-profile"
+            data-testid="edit-profile-select"
+            value={form.profileId}
+            onChange={(e) => setForm({ ...form, profileId: e.target.value })}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          >
+            {profileOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {permissionSetOptions.length > 0 && (
+          <div className="mb-4">
+            <span className="mb-1 block text-sm font-medium text-foreground">
+              {t('users.permissionSets')}
+            </span>
+            {assignmentsLoading ? (
+              <span className="text-sm text-muted-foreground">{t('common.loading')}</span>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {permissionSetOptions.map((ps) => (
+                  <label
+                    key={ps.id}
+                    className="flex cursor-pointer items-center gap-1 rounded-full border border-border px-3 py-1 text-xs"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={permissionSets.has(ps.id)}
+                      onChange={() => togglePermissionSet(ps.id)}
+                    />
+                    {ps.name}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            className="cursor-pointer rounded-md border border-border bg-muted px-4 py-2 text-sm text-foreground"
+            onClick={onClose}
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleSave}
+            disabled={saving || assignmentsLoading}
+          >
+            {saving ? t('common.saving') : t('common.save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
   const { keltaClient } = useApi()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const { hasPermission } = useSystemPermissions()
+  const { summary, isDelegated } = useDelegatedAdmin()
+
+  // Delegated scoped mode: caller lacks MANAGE_USERS but is listed in an active
+  // delegated-admin scope. All data flows through /api/admin/delegated/* then.
+  const scoped = !hasPermission('MANAGE_USERS') && isDelegated
 
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editUser, setEditUser] = useState<PlatformUser | null>(null)
   const [filter, setFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(0)
@@ -224,14 +472,27 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
   }>({ open: false, userId: '', action: 'deactivate', userName: '' })
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['users', filter, statusFilter, page],
-    queryFn: () =>
-      keltaClient.admin.users.list(filter || undefined, statusFilter || undefined, page, 20),
+    queryKey: ['users', scoped, filter, statusFilter, page],
+    queryFn: async () => {
+      if (scoped) {
+        const list = (await keltaClient.admin.delegated.users.list(1, 200)) as PlatformUser[]
+        return { content: list, totalPages: 1 }
+      }
+      return keltaClient.admin.users.list(filter || undefined, statusFilter || undefined, page, 20)
+    },
   })
 
   const createMutation = useMutation({
     mutationFn: (formData: CreateUserFormData) =>
-      keltaClient.admin.users.create(formData as CreatePlatformUserRequest),
+      scoped
+        ? keltaClient.admin.delegated.users.create({
+            email: formData.email,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            username: formData.username || undefined,
+            profileId: formData.profileId ?? '',
+          })
+        : keltaClient.admin.users.create(formData as CreatePlatformUserRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       showToast(t('users.createSuccess'), 'success')
@@ -243,10 +504,15 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
   })
 
   const statusMutation = useMutation({
-    mutationFn: ({ userId, action }: { userId: string; action: 'deactivate' | 'activate' }) =>
-      action === 'activate'
+    mutationFn: ({ userId, action }: { userId: string; action: 'deactivate' | 'activate' }) => {
+      const status = action === 'activate' ? 'ACTIVE' : 'INACTIVE'
+      if (scoped) {
+        return keltaClient.admin.delegated.users.update(userId, { status })
+      }
+      return action === 'activate'
         ? keltaClient.admin.users.activate(userId)
-        : keltaClient.admin.users.deactivate(userId),
+        : keltaClient.admin.users.deactivate(userId)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       showToast(
@@ -281,8 +547,23 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
     })
   }, [confirmDialog, statusMutation])
 
-  const users = (data?.content ?? []) as PlatformUser[]
-  const totalPages = data?.totalPages ?? 0
+  // The delegated endpoint is already server-filtered by scope; search/status narrow client-side.
+  const users = useMemo(() => {
+    const rawUsers = (data?.content ?? []) as PlatformUser[]
+    if (!scoped) return rawUsers
+    const search = filter.trim().toLowerCase()
+    return rawUsers.filter((u) => {
+      if (statusFilter && u.status !== statusFilter) return false
+      if (!search) return true
+      return [u.email, u.firstName, u.lastName, u.username]
+        .filter(Boolean)
+        .some((v) => (v as string).toLowerCase().includes(search))
+    })
+  }, [scoped, data, filter, statusFilter])
+  const totalPages = scoped ? 1 : (data?.totalPages ?? 0)
+
+  const canCreate = !scoped || summary?.canCreateUsers === true
+  const canToggleStatus = !scoped || summary?.canDeactivateUsers === true
 
   if (error) {
     return (
@@ -303,13 +584,25 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
   return (
     <div className="mx-auto max-w-[1200px] p-6" data-testid={testId}>
       <header className="mb-6 flex items-center justify-between">
-        <h1 className="m-0 text-2xl font-semibold">{t('users.title')}</h1>
-        <button
-          className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => setIsFormOpen(true)}
-        >
-          {t('users.createUser')}
-        </button>
+        <div className="flex items-center gap-3">
+          <h1 className="m-0 text-2xl font-semibold">{t('users.title')}</h1>
+          {scoped && (
+            <span
+              data-testid="delegated-scope-badge"
+              className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+            >
+              {t('users.delegatedScope')}
+            </span>
+          )}
+        </div>
+        {canCreate && (
+          <button
+            className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => setIsFormOpen(true)}
+          >
+            {t('users.createUser')}
+          </button>
+        )}
       </header>
 
       <div className="mb-4 flex gap-4">
@@ -379,13 +672,17 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                     <td className="border-b border-border p-3">
                       <button
                         className="cursor-pointer border-none bg-transparent p-0 text-left font-medium text-primary hover:underline"
-                        onClick={() => navigate(`/${getTenantSlug()}/users/${user.id}`)}
+                        onClick={() =>
+                          scoped
+                            ? setEditUser(user)
+                            : navigate(`/${getTenantSlug()}/users/${user.id}`)
+                        }
                       >
                         {user.firstName} {user.lastName}
                       </button>
                     </td>
                     <td className="border-b border-border p-3">{user.email}</td>
-                    <td className="border-b border-border p-3">{user.username || '\u2014'}</td>
+                    <td className="border-b border-border p-3">{user.username || '—'}</td>
                     <td className="border-b border-border p-3">
                       <StatusBadge status={user.status} />
                     </td>
@@ -396,25 +693,30 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                       <div className="flex gap-2">
                         <button
                           className="cursor-pointer rounded border border-border bg-card px-2 py-1 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                          onClick={() => navigate(`/${getTenantSlug()}/users/${user.id}`)}
+                          onClick={() =>
+                            scoped
+                              ? setEditUser(user)
+                              : navigate(`/${getTenantSlug()}/users/${user.id}`)
+                          }
                         >
                           {t('common.edit')}
                         </button>
-                        {user.status === 'ACTIVE' ? (
-                          <button
-                            className="cursor-pointer rounded border-none bg-destructive px-2 py-1 text-xs text-destructive-foreground hover:bg-destructive/90"
-                            onClick={() => handleStatusAction(user, 'deactivate')}
-                          >
-                            {t('users.deactivate')}
-                          </button>
-                        ) : (
-                          <button
-                            className="cursor-pointer rounded border-none bg-emerald-500 px-2 py-1 text-xs text-white hover:bg-emerald-600"
-                            onClick={() => handleStatusAction(user, 'activate')}
-                          >
-                            {t('users.activate')}
-                          </button>
-                        )}
+                        {canToggleStatus &&
+                          (user.status === 'ACTIVE' ? (
+                            <button
+                              className="cursor-pointer rounded border-none bg-destructive px-2 py-1 text-xs text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => handleStatusAction(user, 'deactivate')}
+                            >
+                              {t('users.deactivate')}
+                            </button>
+                          ) : (
+                            <button
+                              className="cursor-pointer rounded border-none bg-emerald-500 px-2 py-1 text-xs text-white hover:bg-emerald-600"
+                              onClick={() => handleStatusAction(user, 'activate')}
+                            >
+                              {t('users.activate')}
+                            </button>
+                          ))}
                       </div>
                     </td>
                   </tr>
@@ -449,9 +751,23 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
 
       {isFormOpen && (
         <UserForm
-          onSubmit={(data) => createMutation.mutate(data)}
+          onSubmit={(formData) => createMutation.mutate(formData)}
           onCancel={() => setIsFormOpen(false)}
           isSubmitting={createMutation.isPending}
+          profileOptions={scoped ? (summary?.manageableProfiles ?? []) : undefined}
+        />
+      )}
+
+      {editUser && scoped && (
+        <DelegatedEditDialog
+          user={editUser}
+          profileOptions={summary?.manageableProfiles ?? []}
+          permissionSetOptions={summary?.assignablePermissionSets ?? []}
+          onClose={() => setEditUser(null)}
+          onSaved={() => {
+            setEditUser(null)
+            queryClient.invalidateQueries({ queryKey: ['users'] })
+          }}
         />
       )}
 

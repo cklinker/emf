@@ -1,6 +1,7 @@
 package io.kelta.auth.federation;
 
 import io.kelta.auth.model.KeltaUserDetails;
+import io.kelta.auth.model.SamlLogoutInfo;
 import io.kelta.auth.service.WorkerClient;
 import io.kelta.auth.service.WorkerClient.SamlProviderInfo;
 import jakarta.servlet.ServletException;
@@ -53,6 +54,16 @@ public class SamlFederatedLoginSuccessHandler implements AuthenticationSuccessHa
 
         String registrationId = principal.getRelyingPartyRegistrationId();
         log.info("SAML login success: registrationId={} nameId={}", registrationId, principal.getName());
+
+        // Preserve the SAML subject identity (NameID + SessionIndexes) in the HTTP
+        // session BEFORE we replace the Saml2Authentication with a platform token —
+        // an SP-initiated LogoutRequest (Single Logout) needs them, and the
+        // replacement below discards them. Non-SAML sessions never carry this.
+        if (registrationId != null) {
+            SamlLogoutInfo logoutInfo = new SamlLogoutInfo(
+                    registrationId, principal.getName(), principal.getSessionIndexes());
+            request.getSession(true).setAttribute(SamlLogoutInfo.SESSION_ATTRIBUTE, logoutInfo);
+        }
 
         // registrationId format: tenantId:providerId
         String[] parts = registrationId == null ? new String[0] : registrationId.split(":", 2);

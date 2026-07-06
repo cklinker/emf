@@ -3,6 +3,7 @@ package io.kelta.auth.aot;
 import io.kelta.auth.model.KeltaSession;
 import io.kelta.auth.model.KeltaUserDetails;
 import io.kelta.auth.model.KeltaUserDetailsMixin;
+import io.kelta.auth.model.SamlLogoutInfo;
 import io.kelta.auth.service.WorkerClient;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
@@ -52,6 +53,14 @@ public class AuthRuntimeHints implements RuntimeHintsRegistrar {
                 MemberCategory.DECLARED_FIELDS);
 
         hints.reflection().registerType(KeltaSession.Builder.class,
+                MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                MemberCategory.INVOKE_DECLARED_METHODS,
+                MemberCategory.DECLARED_FIELDS);
+
+        // SamlLogoutInfo is stored in the Redis-backed HTTP session (SP-initiated
+        // SAML Single Logout). JDK deserialization invokes the record's canonical
+        // constructor reflectively.
+        hints.reflection().registerType(SamlLogoutInfo.class,
                 MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
                 MemberCategory.INVOKE_DECLARED_METHODS,
                 MemberCategory.DECLARED_FIELDS);
@@ -260,6 +269,16 @@ public class AuthRuntimeHints implements RuntimeHintsRegistrar {
     private void registerSerialization(RuntimeHints hints) {
         // KeltaSession travels through Spring Session's Redis serializer.
         hints.serialization().registerType(KeltaSession.class);
+
+        // SP-initiated SAML Single Logout stores these in the Redis-backed HTTP
+        // session (JDK serialization): our capture of the SAML subject identity,
+        // and Spring Security's LogoutRequest saved by HttpSessionLogoutRequestRepository
+        // for the returning LogoutResponse's InResponseTo validation.
+        hints.serialization().registerType(SamlLogoutInfo.class);
+        hints.serialization().registerType(TypeReference.of(
+                "org.springframework.security.saml2.provider.service.authentication.logout.Saml2LogoutRequest"));
+        hints.serialization().registerType(TypeReference.of(
+                "org.springframework.security.saml2.provider.service.registration.Saml2MessageBinding"));
     }
 
     private void registerResources(RuntimeHints hints) {

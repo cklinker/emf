@@ -420,6 +420,42 @@ describe('AuthContext', () => {
       // Should have cleared storage
       expect(sessionStorageMock.removeItem).toHaveBeenCalled()
     })
+
+    it('should route logout through the SP-initiated SAML Single Logout initiator', async () => {
+      const payload = {
+        sub: 'user-123',
+        email: 'test@example.com',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      }
+      const mockToken = createMockJwt(payload)
+      mockSessionStorage['kelta_auth_tokens'] = JSON.stringify({
+        accessToken: mockToken,
+        idToken: mockToken,
+        expiresAt: Date.now() + 3600000,
+      })
+      mockSessionStorage['kelta_auth_provider_id'] = 'internal-1'
+
+      const user = userEvent.setup()
+      renderWithAuth()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated')
+      })
+
+      await user.click(screen.getByText('Logout'))
+
+      // Navigates to the SAML logout initiator (on the auth origin), passing the
+      // OIDC end-session URL as the post-logout target so a SAML session is logged
+      // out at the IdP first, then the OIDC session, then back to the app.
+      await waitFor(() => {
+        expect(mockLocationHref).toContain('https://auth.example.com/logout/saml2/initiate')
+      })
+      expect(mockLocationHref).toContain('post_logout_redirect_uri=')
+      const initiated = new URL(mockLocationHref)
+      const target = initiated.searchParams.get('post_logout_redirect_uri') ?? ''
+      expect(target).toContain('https://auth.example.com/logout')
+      expect(target).toContain('id_token_hint=')
+    })
   })
 
   describe('getAccessToken (Requirement 2.7)', () => {

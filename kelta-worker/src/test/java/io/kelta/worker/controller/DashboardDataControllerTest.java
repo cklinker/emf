@@ -4,9 +4,11 @@ import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.system.SystemCollectionDefinitions;
 import io.kelta.runtime.query.*;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.DashboardDataService;
 import io.kelta.worker.service.DashboardDataService.WidgetExecutionException;
 import io.kelta.worker.service.DashboardDataService.WidgetResult;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -23,6 +25,8 @@ class DashboardDataControllerTest {
     private DashboardDataService dashboardDataService;
     private QueryEngine queryEngine;
     private CollectionRegistry collectionRegistry;
+    private CerbosPermissionResolver permissionResolver;
+    private HttpServletRequest request;
     private DashboardDataController controller;
 
     @BeforeEach
@@ -30,7 +34,10 @@ class DashboardDataControllerTest {
         dashboardDataService = mock(DashboardDataService.class);
         queryEngine = mock(QueryEngine.class);
         collectionRegistry = mock(CollectionRegistry.class);
-        controller = new DashboardDataController(dashboardDataService, queryEngine, collectionRegistry);
+        permissionResolver = mock(CerbosPermissionResolver.class);
+        request = mock(HttpServletRequest.class);
+        controller = new DashboardDataController(
+            dashboardDataService, queryEngine, collectionRegistry, permissionResolver);
     }
 
     @SuppressWarnings("unchecked")
@@ -76,11 +83,11 @@ class DashboardDataControllerTest {
             Map.of("value", 42L), null, null));
         widgetResults.put("comp-2", new WidgetResult("chart",
             Map.of("series", List.of()), null, null));
-        when(dashboardDataService.executeDashboard(eq("dash-1"), eq(components), any()))
+        when(dashboardDataService.executeDashboard(eq("dash-1"), eq(components), any(), any()))
             .thenReturn(widgetResults);
 
         ResponseEntity<Map<String, Object>> response = controller.executeDashboard(
-            "dash-1", Map.of());
+            "dash-1", Map.of(), request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         Map<String, Object> attrs = getAttributes(response.getBody());
@@ -100,7 +107,7 @@ class DashboardDataControllerTest {
             .thenReturn(Optional.empty());
 
         ResponseEntity<Map<String, Object>> response = controller.executeDashboard(
-            "nonexistent", null);
+            "nonexistent", null, request);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
@@ -110,7 +117,7 @@ class DashboardDataControllerTest {
         when(collectionRegistry.get("dashboards")).thenReturn(null);
 
         ResponseEntity<Map<String, Object>> response = controller.executeDashboard(
-            "dash-1", null);
+            "dash-1", null, request);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
@@ -129,7 +136,7 @@ class DashboardDataControllerTest {
             .thenReturn(QueryResult.empty(new Pagination(1, 100)));
 
         ResponseEntity<Map<String, Object>> response = controller.executeDashboard(
-            "dash-2", null);
+            "dash-2", null, request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         Map<String, Object> attrs = getAttributes(response.getBody());
@@ -156,11 +163,11 @@ class DashboardDataControllerTest {
 
         Map<String, WidgetResult> widgetResults = Map.of(
             "comp-err", WidgetResult.error("Collection not found"));
-        when(dashboardDataService.executeDashboard(eq("dash-3"), eq(components), any()))
+        when(dashboardDataService.executeDashboard(eq("dash-3"), eq(components), any(), any()))
             .thenReturn(widgetResults);
 
         ResponseEntity<Map<String, Object>> response = controller.executeDashboard(
-            "dash-3", Map.of());
+            "dash-3", Map.of(), request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         Map<String, Object> meta = getMeta(response.getBody());
@@ -186,11 +193,11 @@ class DashboardDataControllerTest {
 
         WidgetResult widgetResult = new WidgetResult("metric",
             Map.of("value", 99L), null, null);
-        when(dashboardDataService.executeWidget(eq(component), any()))
+        when(dashboardDataService.executeWidget(eq(component), any(), any()))
             .thenReturn(widgetResult);
 
         ResponseEntity<Map<String, Object>> response = controller.executeComponent(
-            "dash-1", "comp-single", Map.of());
+            "dash-1", "comp-single", Map.of(), request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         Map<String, Object> attrs = getAttributes(response.getBody());
@@ -207,7 +214,7 @@ class DashboardDataControllerTest {
             .thenReturn(Optional.empty());
 
         ResponseEntity<Map<String, Object>> response = controller.executeComponent(
-            "dash-1", "nonexistent", null);
+            "dash-1", "nonexistent", null, request);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
@@ -224,7 +231,7 @@ class DashboardDataControllerTest {
             .thenReturn(Optional.of(component));
 
         ResponseEntity<Map<String, Object>> response = controller.executeComponent(
-            "dash-1", "comp-other", null);
+            "dash-1", "comp-other", null, request);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
@@ -241,11 +248,11 @@ class DashboardDataControllerTest {
         when(queryEngine.getById(eq(componentsDef), eq("comp-bad")))
             .thenReturn(Optional.of(component));
 
-        when(dashboardDataService.executeWidget(eq(component), any()))
+        when(dashboardDataService.executeWidget(eq(component), any(), any()))
             .thenThrow(new WidgetExecutionException("Invalid config"));
 
         ResponseEntity<Map<String, Object>> response = controller.executeComponent(
-            "dash-1", "comp-bad", Map.of());
+            "dash-1", "comp-bad", Map.of(), request);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
@@ -255,7 +262,7 @@ class DashboardDataControllerTest {
         when(collectionRegistry.get("dashboard-components")).thenReturn(null);
 
         ResponseEntity<Map<String, Object>> response = controller.executeComponent(
-            "dash-1", "comp-1", null);
+            "dash-1", "comp-1", null, request);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }

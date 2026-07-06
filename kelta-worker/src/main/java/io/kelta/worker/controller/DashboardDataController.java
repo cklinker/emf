@@ -4,8 +4,11 @@ import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.query.*;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.DashboardDataService;
 import io.kelta.worker.service.DashboardDataService.WidgetResult;
+import io.kelta.worker.service.ReportExecutionService.MaskingPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -30,13 +33,24 @@ public class DashboardDataController {
     private final DashboardDataService dashboardDataService;
     private final QueryEngine queryEngine;
     private final CollectionRegistry collectionRegistry;
+    private final CerbosPermissionResolver permissionResolver;
 
     public DashboardDataController(DashboardDataService dashboardDataService,
                                    QueryEngine queryEngine,
-                                   CollectionRegistry collectionRegistry) {
+                                   CollectionRegistry collectionRegistry,
+                                   CerbosPermissionResolver permissionResolver) {
         this.dashboardDataService = dashboardDataService;
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
+        this.permissionResolver = permissionResolver;
+    }
+
+    /** Builds the data-masking principal for the calling user from the gateway-forwarded identity headers. */
+    private MaskingPrincipal principalOf(HttpServletRequest request) {
+        return new MaskingPrincipal(
+            permissionResolver.getEmail(request),
+            permissionResolver.getProfileId(request),
+            permissionResolver.getTenantId(request));
     }
 
     /**
@@ -49,7 +63,8 @@ public class DashboardDataController {
     @PostMapping("/{dashboardId}/data")
     public ResponseEntity<Map<String, Object>> executeDashboard(
             @PathVariable String dashboardId,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request) {
 
         try {
             // Load dashboard record
@@ -72,7 +87,7 @@ public class DashboardDataController {
 
             Map<String, String> runtimeParams = body != null ? body : Map.of();
             Map<String, WidgetResult> results = dashboardDataService.executeDashboard(
-                dashboardId, components, runtimeParams);
+                dashboardId, components, runtimeParams, principalOf(request));
 
             // Build response
             Map<String, Object> widgetData = new LinkedHashMap<>();
@@ -124,7 +139,8 @@ public class DashboardDataController {
     public ResponseEntity<Map<String, Object>> executeComponent(
             @PathVariable String dashboardId,
             @PathVariable String componentId,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request) {
 
         try {
             // Load the specific component
@@ -134,7 +150,8 @@ public class DashboardDataController {
             }
 
             Map<String, String> runtimeParams = body != null ? body : Map.of();
-            WidgetResult result = dashboardDataService.executeWidget(component, runtimeParams);
+            WidgetResult result = dashboardDataService.executeWidget(
+                component, runtimeParams, principalOf(request));
 
             Map<String, Object> attributes = new LinkedHashMap<>();
             attributes.put("componentId", componentId);

@@ -38,10 +38,13 @@ public class DuplicateDetectionService {
 
     private final QueryEngine queryEngine;
     private final CollectionRegistry collectionRegistry;
+    private final RecordMaskingService recordMaskingService;
 
-    public DuplicateDetectionService(QueryEngine queryEngine, CollectionRegistry collectionRegistry) {
+    public DuplicateDetectionService(QueryEngine queryEngine, CollectionRegistry collectionRegistry,
+                                     RecordMaskingService recordMaskingService) {
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
+        this.recordMaskingService = recordMaskingService;
     }
 
     /** A set of records that share the same values on the match fields. */
@@ -58,10 +61,13 @@ public class DuplicateDetectionService {
      * @param collectionName the collection to scan
      * @param matchFields    the fields whose equal values define a duplicate (non-empty)
      * @param maxGroups      max groups to return (clamped 1..500)
+     * @param principal      the requester, for data-masking enforcement (null = system trust)
      * @return the duplicate groups (largest first) + scan stats
-     * @throws IllegalArgumentException if the collection is unknown or matchFields is empty
+     * @throws IllegalArgumentException if the collection is unknown, matchFields is empty, or a
+     *                                  match field is masked for the requester
      */
-    public Result findDuplicates(String collectionName, List<String> matchFields, int maxGroups) {
+    public Result findDuplicates(String collectionName, List<String> matchFields, int maxGroups,
+                                 ReportExecutionService.MaskingPrincipal principal) {
         if (matchFields == null || matchFields.isEmpty()) {
             throw new IllegalArgumentException("matchFields must be non-empty");
         }
@@ -69,6 +75,25 @@ public class DuplicateDetectionService {
         if (def == null) {
             throw new IllegalArgumentException("Collection not found: " + collectionName);
         }
+
+        // The returned group `values` ARE the match-field values, and grouping keys can't be
+        // masked without collapsing distinct values — so reject matching on a field masked for
+        // the requester (mirrors the report/dashboard group-by guard). Prevents both the value
+        // egress and the record-grouping inference. A null/system principal is not masked.
+        if (principal != null && principal.isPresent()) {
+            Map<String, FieldMaskingService.MaskingConfig> maskable = recordMaskingService.maskableConfigs(def);
+            if (!maskable.isEmpty()) {
+                java.util.Set<String> masked = recordMaskingService.maskedFieldsFor(
+                        principal.email(), principal.profileId(), principal.tenantId(),
+                        def.name(), maskable.keySet());
+                for (String field : matchFields) {
+                    if (masked.contains(field)) {
+                        throw new IllegalArgumentException("Cannot match on a masked field: " + field);
+                    }
+                }
+            }
+        }
+
         int clampedGroups = Math.min(Math.max(maxGroups, 1), 500);
 
         // Select the match fields + id. The QueryEngine validates the field names against the

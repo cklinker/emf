@@ -43,6 +43,7 @@ import io.kelta.auth.federation.DynamicRelyingPartyRegistrationRepository;
 import io.kelta.auth.federation.FederatedLoginSuccessHandler;
 import io.kelta.auth.federation.FederatedUserMapper;
 import io.kelta.auth.federation.SamlFederatedLoginSuccessHandler;
+import io.kelta.auth.federation.SamlLogoutSuccessHandler;
 import io.kelta.auth.federation.SamlSpCredentials;
 import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistrationRepository;
 import io.kelta.auth.model.KeltaUserDetails;
@@ -262,10 +263,16 @@ public class AuthorizationServerConfig {
             HttpSecurity http,
             RelyingPartyRegistrationRepository relyingPartyRegistrationRepository,
             FederatedUserMapper federatedUserMapper,
-            WorkerClient workerClient) throws Exception {
+            WorkerClient workerClient,
+            AuthProperties authProperties) throws Exception {
         http
             .securityMatcher("/saml2/**", "/login/saml2/**", "/logout/saml2/**")
-            .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+            .authorizeHttpRequests(authorize -> authorize
+                    // SP-initiated logout initiator: permitAll so an expired session
+                    // still completes logout (falls through to the OIDC end-session)
+                    // instead of bouncing to /login.
+                    .requestMatchers("/logout/saml2/initiate").permitAll()
+                    .anyRequest().authenticated())
             // The assertion-consumer + SLO POSTs come cross-site from the IdP with no
             // CSRF token; the SAML message signature is the integrity guarantee.
             .csrf(csrf -> csrf.ignoringRequestMatchers(
@@ -276,12 +283,33 @@ public class AuthorizationServerConfig {
                     .relyingPartyRegistrationRepository(relyingPartyRegistrationRepository)
                     .successHandler(new SamlFederatedLoginSuccessHandler(federatedUserMapper, workerClient)))
             // Single Logout: handles IdP-initiated LogoutRequests (kills the session +
-            // returns a LogoutResponse) and SP-initiated LogoutResponses, on the SLO
-            // endpoints advertised by registrations that carry an IdP SLO URL.
+            // returns a LogoutResponse) and, for SP-initiated logout (started by
+            // SamlLogoutController), validates the IdP's LogoutResponse. On completion
+            // the success handler redirects to the stashed post-logout target.
             .saml2Logout(Customizer.withDefaults())
+            .logout(logout -> logout.logoutSuccessHandler(new SamlLogoutSuccessHandler(authProperties)))
             .saml2Metadata(Customizer.withDefaults());
 
         return http.build();
+    }
+
+    /**
+     * Resolves signed SP-initiated SAML {@code LogoutRequest}s from the per-tenant
+     * relying-party registrations. Used by {@link io.kelta.auth.controller.SamlLogoutController}.
+     * Gated on {@code EncryptionService} so it appears/disappears with the SAML chain.
+     */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnBean(EncryptionService.class)
+    public org.springframework.security.saml2.provider.service.web.authentication.logout.Saml2LogoutRequestResolver
+            saml2LogoutRequestResolver(RelyingPartyRegistrationRepository relyingPartyRegistrationRepository) {
+        var resolver = new org.springframework.security.saml2.provider.service.web.authentication.logout
+                .OpenSaml5LogoutRequestResolver(relyingPartyRegistrationRepository);
+        // The initiator carries no inbound RelayState, so generate a per-request
+        // nonce: HttpSessionLogoutRequestRepository keys the saved LogoutRequest by
+        // RelayState and requires it non-empty, and the IdP echoes it on the
+        // returning LogoutResponse for InResponseTo correlation.
+        resolver.setRelayStateResolver(request -> java.util.UUID.randomUUID().toString());
+        return resolver;
     }
 
     /**

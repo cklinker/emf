@@ -546,10 +546,17 @@ export function AuthProvider({
       try {
         const discovery = await fetchDiscoveryDocument(internal.issuer)
         if (discovery.end_session_endpoint) {
-          const logoutUrl = new URL(discovery.end_session_endpoint)
-          logoutUrl.searchParams.set('id_token_hint', storedTokens.idToken)
-          logoutUrl.searchParams.set('post_logout_redirect_uri', logoutRedirectStr)
-          window.location.href = logoutUrl.toString()
+          const endSessionUrl = new URL(discovery.end_session_endpoint)
+          endSessionUrl.searchParams.set('id_token_hint', storedTokens.idToken)
+          endSessionUrl.searchParams.set('post_logout_redirect_uri', logoutRedirectStr)
+
+          // Route through the SP-initiated SAML Single Logout initiator so a user
+          // who signed in via SAML is also logged out at their IdP before the OIDC
+          // end-session. For non-SAML sessions the initiator is a safe passthrough
+          // that immediately redirects to the end-session URL.
+          const samlLogoutUrl = new URL('/logout/saml2/initiate', discovery.end_session_endpoint)
+          samlLogoutUrl.searchParams.set('post_logout_redirect_uri', endSessionUrl.toString())
+          window.location.href = samlLogoutUrl.toString()
           return
         }
       } catch (err) {

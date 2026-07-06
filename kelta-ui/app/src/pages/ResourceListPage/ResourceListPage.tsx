@@ -27,7 +27,7 @@ import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { useObjectPermissions } from '../../hooks/useObjectPermissions'
 import { ListShell } from '../../components/record/ListShell'
 import { ViewSelector } from '../../components/ViewSelector/ViewSelector'
-import { InlineEditCell } from '../../components/InlineEditCell/InlineEditCell'
+import { ObjectDataTable } from '../../components/ObjectDataTable/ObjectDataTable'
 import { SummaryStatsBar } from '../../components/SummaryStatsBar/SummaryStatsBar'
 import { cn } from '@/lib/utils'
 
@@ -396,7 +396,7 @@ export function ResourceListPage({
   const { collection: collectionName } = useParams<{ collection: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { t, formatDate } = useI18n()
+  const { t } = useI18n()
   const { apiClient } = useApi()
   const { showToast } = useToast()
   const { permissions: objectPermissions } = useObjectPermissions(collectionName)
@@ -532,12 +532,6 @@ export function ResourceListPage({
     return Math.ceil(resourcesData.total / pageSize)
   }, [resourcesData, pageSize])
 
-  // Check if all visible records are selected
-  const allSelected = useMemo(() => {
-    if (!resourcesData || resourcesData.data.length === 0) return false
-    return resourcesData.data.every((resource) => selectedIds.has(resource.id))
-  }, [resourcesData, selectedIds])
-
   // Handle sort change - Requirement 11.4 (column sorting)
   const handleSortChange = useCallback((field: string) => {
     setSort((prev) => {
@@ -631,27 +625,7 @@ export function ResourceListPage({
     [setVisibleColumns]
   )
 
-  // Selection handlers - Requirement 11.11
-  const handleSelectAll = useCallback(() => {
-    if (!resourcesData) return
-    if (allSelected) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(resourcesData.data.map((r) => r.id)))
-    }
-  }, [resourcesData, allSelected])
-
-  const handleSelectRow = useCallback((resourceId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(resourceId)) {
-        next.delete(resourceId)
-      } else {
-        next.add(resourceId)
-      }
-      return next
-    })
-  }, [])
+  // Row selection is handled by ObjectDataTable via onSelectionChange={setSelectedIds}.
 
   // Navigation handlers
   const handleCreate = useCallback(() => {
@@ -848,89 +822,26 @@ export function ResourceListPage({
   }, [])
 
   // Inline edit save callback (T11)
-  const handleInlineEditSaved = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
-  }, [queryClient, collectionName])
-
-  // Get sort indicator
-  const getSortIndicator = useCallback(
-    (field: string) => {
-      if (sort?.field !== field) return null
-      return sort.direction === 'asc' ? ' \u2191' : ' \u2193'
+  // Persist a single inline-edited cell via the JSON:API partial-PATCH path, then
+  // refetch the list (drives ObjectDataTable's opt-in inline edit — the shared
+  // control replaces the legacy InlineEditCell).
+  const handleCellCommit = useCallback(
+    async (recordId: string, fieldName: string, value: unknown) => {
+      await apiClient.patch(`/api/${collectionName}/${recordId}`, {
+        data: {
+          type: collectionName,
+          id: recordId,
+          attributes: { [fieldName]: value },
+        },
+      })
+      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
     },
-    [sort]
+    [apiClient, collectionName, queryClient]
   )
 
-  // Get aria-sort value
-  const getAriaSort = useCallback(
-    (field: string): 'ascending' | 'descending' | 'none' => {
-      if (sort?.field !== field) return 'none'
-      return sort.direction === 'asc' ? 'ascending' : 'descending'
-    },
-    [sort]
-  )
-
-  // Format cell value based on field type
-  const formatCellValue = useCallback(
-    (value: unknown, field: FieldDefinition): string => {
-      if (value === null || value === undefined) return '-'
-
-      switch (field.type) {
-        case 'boolean':
-          return value ? t('common.yes') : t('common.no')
-        case 'date':
-          return formatDate(new Date(value as string), {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-          })
-        case 'datetime':
-          return formatDate(new Date(value as string), {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        case 'json':
-          return typeof value === 'object' ? JSON.stringify(value) : String(value)
-        case 'currency':
-          return typeof value === 'number'
-            ? value.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })
-            : String(value)
-        case 'percent':
-          return typeof value === 'number' ? `${value.toFixed(2)}%` : String(value)
-        case 'encrypted':
-          return '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
-        case 'geolocation':
-          if (typeof value === 'object' && value !== null) {
-            const geo = value as Record<string, unknown>
-            return `${geo.latitude ?? '-'}, ${geo.longitude ?? '-'}`
-          }
-          return String(value)
-        case 'multi_picklist':
-          return Array.isArray(value) ? value.join(', ') : String(value)
-        case 'rich_text':
-          return String(value)
-            .replace(/<[^>]*>/g, '')
-            .substring(0, 100)
-        case 'master_detail': {
-          const strValue = String(value)
-          const fieldMap = lookupDisplayMap?.[field.name]
-          if (fieldMap && fieldMap[strValue]) {
-            return fieldMap[strValue]
-          }
-          return strValue
-        }
-        default:
-          return String(value)
-      }
-    },
-    [t, formatDate, lookupDisplayMap]
-  )
+  // Cell rendering + sort indicators are owned by the shared ObjectDataTable
+  // (FieldRenderer / InlineFieldValue), replacing the local formatCellValue and
+  // sort-indicator helpers.
 
   const resources = resourcesData?.data ?? []
   const totalCount = resourcesData?.total ?? 0
@@ -1352,193 +1263,30 @@ export function ResourceListPage({
               <p className="m-0 text-base">{t('common.noResults')}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto border border-border rounded-md bg-background">
-              <table
-                className="w-full border-collapse text-sm [&_thead]:bg-muted [&_th]:p-4 [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-b-2 [&_th]:border-border [&_th]:whitespace-nowrap [&_td]:p-4 [&_td]:text-foreground [&_td]:border-b [&_td]:border-border/50 [&_td]:max-w-[300px] [&_td]:overflow-hidden [&_td]:text-ellipsis [&_td]:whitespace-nowrap max-md:[&_th]:p-2 max-md:[&_td]:p-2"
-                role="grid"
-                aria-label={`${schema.displayName} records`}
-                data-testid="resources-table"
-              >
-                <thead>
-                  <tr role="row">
-                    {/* Select All Checkbox - Requirement 11.11 */}
-                    <th role="columnheader" className="!w-10 !text-center">
-                      <input
-                        type="checkbox"
-                        className="w-[18px] h-[18px] cursor-pointer"
-                        checked={allSelected}
-                        onChange={handleSelectAll}
-                        aria-label={allSelected ? t('common.deselectAll') : t('common.selectAll')}
-                        data-testid="select-all-checkbox"
-                      />
-                    </th>
-
-                    {/* ID Column */}
-                    {visibleColumns.has('id') && (
-                      <th
-                        role="columnheader"
-                        scope="col"
-                        className="cursor-pointer select-none transition-colors duration-150 hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:-outline-offset-2"
-                        onClick={() => handleSortChange('id')}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            handleSortChange('id')
-                          }
-                        }}
-                        tabIndex={0}
-                        aria-sort={getAriaSort('id')}
-                        data-testid="header-id"
-                      >
-                        ID
-                        <span className="ml-1 text-xs" aria-hidden="true">
-                          {getSortIndicator('id')}
-                        </span>
-                      </th>
-                    )}
-
-                    {/* Field Columns */}
-                    {visibleFields.map((field) => (
-                      <th
-                        key={field.name}
-                        role="columnheader"
-                        scope="col"
-                        className="cursor-pointer select-none transition-colors duration-150 hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:-outline-offset-2"
-                        onClick={() => handleSortChange(field.name)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            handleSortChange(field.name)
-                          }
-                        }}
-                        tabIndex={0}
-                        aria-sort={getAriaSort(field.name)}
-                        data-testid={`header-${field.name}`}
-                      >
-                        {field.displayName || field.name}
-                        <span className="ml-1 text-xs" aria-hidden="true">
-                          {getSortIndicator(field.name)}
-                        </span>
-                      </th>
-                    ))}
-
-                    {/* Actions Column */}
-                    <th role="columnheader" scope="col">
-                      {t('common.actions')}
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {resources.map((resource, index) => {
-                    const isSelected = selectedIds.has(resource.id)
-                    return (
-                      <tr
-                        key={resource.id}
-                        role="row"
-                        className={cn(
-                          'cursor-pointer transition-colors duration-150 hover:bg-muted focus-within:bg-accent',
-                          isSelected &&
-                            'bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900'
-                        )}
-                        onClick={() => handleView(resource)}
-                        data-testid={`resource-row-${index}`}
-                      >
-                        {/* Row Checkbox - Requirement 11.11 */}
-                        <td
-                          role="gridcell"
-                          className="!w-10 !text-center"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            className="w-[18px] h-[18px] cursor-pointer"
-                            checked={isSelected}
-                            onChange={() => handleSelectRow(resource.id)}
-                            aria-label={`Select row ${index + 1}`}
-                            data-testid={`row-checkbox-${index}`}
-                          />
-                        </td>
-
-                        {/* ID Cell */}
-                        {visibleColumns.has('id') && (
-                          <td role="gridcell" data-testid={`cell-id-${index}`}>
-                            {resource.id}
-                          </td>
-                        )}
-
-                        {/* Field Cells (T11: inline edit when enabled) */}
-                        {visibleFields.map((field) => (
-                          <td
-                            key={field.name}
-                            role="gridcell"
-                            data-testid={`cell-${field.name}-${index}`}
-                            onClick={inlineEditEnabled ? (e) => e.stopPropagation() : undefined}
-                          >
-                            {inlineEditEnabled ? (
-                              <InlineEditCell
-                                value={resource[field.name]}
-                                fieldName={field.name}
-                                fieldType={
-                                  field.type as
-                                    | 'string'
-                                    | 'number'
-                                    | 'boolean'
-                                    | 'date'
-                                    | 'datetime'
-                                    | 'json'
-                                    | 'reference'
-                                }
-                                recordId={resource.id}
-                                collectionName={collectionName!}
-                                displayValue={formatCellValue(resource[field.name], field)}
-                                enabled={true}
-                                apiClient={apiClient}
-                                onSaved={handleInlineEditSaved}
-                              />
-                            ) : (
-                              formatCellValue(resource[field.name], field)
-                            )}
-                          </td>
-                        ))}
-
-                        {/* Actions Cell */}
-                        <td role="gridcell" className="!w-[1%] !whitespace-nowrap">
-                          <div
-                            className="flex gap-2 max-md:flex-col max-md:gap-1"
-                            role="toolbar"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          >
-                            {objectPermissions.canEdit && (
-                              <button
-                                type="button"
-                                className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                                onClick={() => handleEdit(resource)}
-                                aria-label={`${t('common.edit')} ${resource.id}`}
-                                data-testid={`edit-button-${index}`}
-                              >
-                                {t('common.edit')}
-                              </button>
-                            )}
-                            {objectPermissions.canDelete && (
-                              <button
-                                type="button"
-                                className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                                onClick={() => handleDeleteClick(resource)}
-                                aria-label={`${t('common.delete')} ${resource.id}`}
-                                data-testid={`delete-button-${index}`}
-                              >
-                                {t('common.delete')}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            // Shared record grid (unified-record convergence): the admin resource
+            // browser now renders the same ObjectDataTable as the end-user list
+            // instead of a hand-built table. Admin chrome (filters, column selector,
+            // saved views, export, summary stats, pagination) stays in this page as
+            // ListShell slots; only the table body is shared. `onRowClick` routes to
+            // the admin `/resources/...` detail; inline edit is the opt-in shared
+            // control (InlineFieldValue) gated on the existing inline-edit toggle.
+            <div data-testid="resources-table">
+              <ObjectDataTable
+                records={resources}
+                fields={visibleFields}
+                sort={sort}
+                onSortChange={handleSortChange}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+                isLoading={false}
+                collectionName={collectionName || ''}
+                onRowClick={handleView}
+                onEdit={objectPermissions.canEdit ? handleEdit : undefined}
+                onDelete={objectPermissions.canDelete ? handleDeleteClick : undefined}
+                lookupDisplayMap={lookupDisplayMap}
+                editable={inlineEditEnabled && objectPermissions.canEdit}
+                onCellCommit={handleCellCommit}
+              />
             </div>
           )
         ) : undefined

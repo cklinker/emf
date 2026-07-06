@@ -65,6 +65,12 @@ export interface ObjectDataTableProps {
   isLoading?: boolean
   /** Collection name for building URLs */
   collectionName: string
+  /**
+   * Row activation (row click, "View" action, keyboard Enter). When omitted the
+   * table navigates to the end-user record route (`/{tenant}/app/o/{collection}/{id}`).
+   * The admin resource browser passes this to route to `/{tenant}/resources/...` instead.
+   */
+  onRowClick?: (record: CollectionRecord) => void
   /** Callback when edit is clicked on a row */
   onEdit?: (record: CollectionRecord) => void
   /** Callback when delete is clicked on a row */
@@ -276,6 +282,7 @@ export function ObjectDataTable({
   onSelectionChange,
   isLoading = false,
   collectionName,
+  onRowClick,
   onEdit,
   onDelete,
   lookupDisplayMap,
@@ -297,7 +304,11 @@ export function ObjectDataTable({
     rowCount: records.length,
     onRowActivate: (index) => {
       if (records[index]) {
-        navigate(`${basePath}/o/${collectionName}/${records[index].id}`)
+        if (onRowClick) {
+          onRowClick(records[index])
+        } else {
+          navigate(`${basePath}/o/${collectionName}/${records[index].id}`)
+        }
       }
     },
     onRowToggle: (index) => {
@@ -360,12 +371,16 @@ export function ObjectDataTable({
     [selectedIds, onSelectionChange]
   )
 
-  // Navigate to record detail
+  // Navigate to record detail (or defer to the caller's route)
   const handleRowClick = useCallback(
     (record: CollectionRecord) => {
-      navigate(`${basePath}/o/${collectionName}/${record.id}`)
+      if (onRowClick) {
+        onRowClick(record)
+      } else {
+        navigate(`${basePath}/o/${collectionName}/${record.id}`)
+      }
     },
-    [navigate, basePath, collectionName]
+    [onRowClick, navigate, basePath, collectionName]
   )
 
   // Get aria-sort value for a column

@@ -26,6 +26,7 @@ class DashboardDataServiceTest {
     private JdbcTemplate jdbcTemplate;
     private ObjectMapper objectMapper;
     private WorkerCacheManager cacheManager;
+    private RecordMaskingService recordMaskingService;
     private DashboardDataService service;
 
     @BeforeEach
@@ -36,12 +37,15 @@ class DashboardDataServiceTest {
         jdbcTemplate = mock(JdbcTemplate.class);
         objectMapper = new ObjectMapper();
         cacheManager = mock(WorkerCacheManager.class);
+        // Default mock: maskableConfigs() returns an empty map (Mockito ReturnsEmptyValues),
+        // so no collection has masking configured and the existing tests behave unchanged.
+        recordMaskingService = mock(RecordMaskingService.class);
 
         // Default: no cache hits
         when(cacheManager.getDashboardWidgetData(anyString())).thenReturn(Optional.empty());
 
         service = new DashboardDataService(queryEngine, collectionRegistry,
-            lifecycleManager, jdbcTemplate, objectMapper, cacheManager);
+            lifecycleManager, jdbcTemplate, objectMapper, cacheManager, recordMaskingService);
     }
 
     // =========================================================================
@@ -61,7 +65,7 @@ class DashboardDataServiceTest {
         Map<String, Object> component = buildComponent("comp-1", "metric",
             Map.of("collectionName", "accounts", "aggregateFunction", "COUNT"));
 
-        WidgetResult result = service.executeWidget(component, Map.of());
+        WidgetResult result = service.executeWidget(component, Map.of(), null);
 
         assertEquals("metric", result.type());
         assertNotNull(result.data());
@@ -84,7 +88,7 @@ class DashboardDataServiceTest {
                    "aggregateFunction", "SUM",
                    "aggregateField", "amount"));
 
-        WidgetResult result = service.executeWidget(component, Map.of());
+        WidgetResult result = service.executeWidget(component, Map.of(), null);
 
         assertEquals("metric", result.type());
         assertEquals(400.0, result.data().get("value"));
@@ -99,7 +103,7 @@ class DashboardDataServiceTest {
             Map.of("collectionName", "accounts", "aggregateFunction", "SUM"));
 
         assertThrows(WidgetExecutionException.class,
-            () -> service.executeWidget(component, Map.of()));
+            () -> service.executeWidget(component, Map.of(), null));
     }
 
     // =========================================================================
@@ -122,7 +126,7 @@ class DashboardDataServiceTest {
                    "groupByField", "status",
                    "aggregateFunction", "COUNT"));
 
-        WidgetResult result = service.executeWidget(component, Map.of());
+        WidgetResult result = service.executeWidget(component, Map.of(), null);
 
         assertEquals("chart", result.type());
         @SuppressWarnings("unchecked")
@@ -149,7 +153,7 @@ class DashboardDataServiceTest {
             Map.of("collectionName", "cases"));
 
         assertThrows(WidgetExecutionException.class,
-            () -> service.executeWidget(component, Map.of()));
+            () -> service.executeWidget(component, Map.of(), null));
     }
 
     @Test
@@ -170,7 +174,7 @@ class DashboardDataServiceTest {
                    "groupByField", "category",
                    "maxGroups", 5));
 
-        WidgetResult result = service.executeWidget(component, Map.of());
+        WidgetResult result = service.executeWidget(component, Map.of(), null);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> series =
@@ -197,7 +201,7 @@ class DashboardDataServiceTest {
             Map.of("collectionName", "contacts",
                    "fields", List.of("name", "email")));
 
-        WidgetResult result = service.executeWidget(component, Map.of("page", "1", "pageSize", "25"));
+        WidgetResult result = service.executeWidget(component, Map.of("page", "1", "pageSize", "25"), null);
 
         assertEquals("table", result.type());
         @SuppressWarnings("unchecked")
@@ -225,7 +229,7 @@ class DashboardDataServiceTest {
         Map<String, Object> component = buildComponent("comp-8", "recent",
             Map.of("collectionName", "activities", "limit", 10));
 
-        WidgetResult result = service.executeWidget(component, Map.of());
+        WidgetResult result = service.executeWidget(component, Map.of(), null);
 
         assertEquals("recent", result.type());
         @SuppressWarnings("unchecked")
@@ -247,7 +251,7 @@ class DashboardDataServiceTest {
         Map<String, Object> component = buildComponent("comp-9", "recent",
             Map.of("collectionName", "activities", "limit", 200));
 
-        service.executeWidget(component, Map.of());
+        service.executeWidget(component, Map.of(), null);
 
         // Verify the pagination used is clamped to 100
         verify(queryEngine).executeQuery(eq(collDef), argThat(req ->
@@ -308,7 +312,7 @@ class DashboardDataServiceTest {
         );
 
         Map<String, WidgetResult> results = service.executeDashboard(
-            "dash-1", components, Map.of());
+            "dash-1", components, Map.of(), null);
 
         assertEquals(2, results.size());
         assertNotNull(results.get("comp-a"));
@@ -327,7 +331,7 @@ class DashboardDataServiceTest {
                 Map.of("collectionName", "nonexistent", "aggregateFunction", "COUNT")));
 
         Map<String, WidgetResult> results = service.executeDashboard(
-            "dash-2", components, Map.of());
+            "dash-2", components, Map.of(), null);
 
         assertEquals(1, results.size());
         assertNotNull(results.get("comp-fail").error());
@@ -339,6 +343,10 @@ class DashboardDataServiceTest {
 
     @Test
     void shouldReturnCachedResultWhenPresent() {
+        // The collection is resolved before the cache read (so masking config can be
+        // checked), but a hit still short-circuits before any query. Cache entries only
+        // ever exist for non-masking collections, so serving one without a Cerbos check is safe.
+        when(collectionRegistry.get("accounts")).thenReturn(SystemCollectionDefinitions.dashboards());
         Map<String, Object> cachedData = Map.of(
             "type", "metric",
             "data", Map.of("value", 42L));
@@ -348,7 +356,7 @@ class DashboardDataServiceTest {
         Map<String, Object> component = buildComponent("comp-cached", "metric",
             Map.of("collectionName", "accounts", "aggregateFunction", "COUNT"));
 
-        WidgetResult result = service.executeWidget(component, Map.of());
+        WidgetResult result = service.executeWidget(component, Map.of(), null);
 
         assertEquals("metric", result.type());
         // Query engine should NOT be called
@@ -367,7 +375,7 @@ class DashboardDataServiceTest {
         Map<String, Object> component = buildComponent("comp-new", "metric",
             Map.of("collectionName", "accounts", "aggregateFunction", "COUNT"));
 
-        service.executeWidget(component, Map.of());
+        service.executeWidget(component, Map.of(), null);
 
         verify(cacheManager).putDashboardWidgetData(anyString(), any());
     }
@@ -385,7 +393,7 @@ class DashboardDataServiceTest {
             Map.of("collectionName", "accounts"));
 
         assertThrows(WidgetExecutionException.class,
-            () -> service.executeWidget(component, Map.of()));
+            () -> service.executeWidget(component, Map.of(), null));
     }
 
     @Test
@@ -396,7 +404,7 @@ class DashboardDataServiceTest {
         component.put("config", Map.of("collectionName", "accounts"));
 
         assertThrows(WidgetExecutionException.class,
-            () -> service.executeWidget(component, Map.of()));
+            () -> service.executeWidget(component, Map.of(), null));
     }
 
     // =========================================================================
@@ -520,6 +528,121 @@ class DashboardDataServiceTest {
         CollectionDefinition resolved = service.resolveTargetCollection(null,
             Map.of("collectionName", "nonexistent"));
         assertNull(resolved);
+    }
+
+    // =========================================================================
+    // Data-masking tests
+    // =========================================================================
+
+    private static final ReportExecutionService.MaskingPrincipal MASKED_VIEWER =
+        new ReportExecutionService.MaskingPrincipal("viewer@acme.example", "profile-1", "tenant-1");
+
+    /** Stubs the collection to have a masking-configured "ssn" field masked for the given principal. */
+    private CollectionDefinition withMaskedSsn(boolean maskedForViewer) {
+        CollectionDefinition collDef = SystemCollectionDefinitions.dashboards();
+        when(collectionRegistry.get("people")).thenReturn(collDef);
+        FieldMaskingService.MaskingConfig cfg = new FieldMaskingService.MaskingConfig(
+            FieldMaskingService.MaskType.FULL, '*', null);
+        when(recordMaskingService.maskableConfigs(collDef)).thenReturn(Map.of("ssn", cfg));
+        when(recordMaskingService.maskedFieldsFor(anyString(), anyString(), anyString(),
+            eq(collDef.name()), any())).thenReturn(maskedForViewer ? Set.of("ssn") : Set.of());
+        return collDef;
+    }
+
+    @Test
+    void shouldRejectFilterOnMaskedField() {
+        withMaskedSsn(true);
+        Map<String, Object> component = buildComponent("comp-mf", "table",
+            Map.of("collectionName", "people",
+                   "filters", List.of(Map.of("field", "ssn", "operator", "eq", "value", "123"))));
+
+        WidgetExecutionException ex = assertThrows(WidgetExecutionException.class,
+            () -> service.executeWidget(component, Map.of(), MASKED_VIEWER));
+        assertTrue(ex.getMessage().contains("ssn"));
+        verify(queryEngine, never()).executeQuery(any(), any());
+    }
+
+    @Test
+    void shouldRejectChartGroupByMaskedField() {
+        withMaskedSsn(true);
+        Map<String, Object> component = buildComponent("comp-mg", "chart",
+            Map.of("collectionName", "people", "groupByField", "ssn", "aggregateFunction", "COUNT"));
+
+        assertThrows(WidgetExecutionException.class,
+            () -> service.executeWidget(component, Map.of(), MASKED_VIEWER));
+    }
+
+    @Test
+    void shouldRejectSortOnMaskedField() {
+        withMaskedSsn(true);
+        Map<String, Object> component = buildComponent("comp-ms", "table",
+            Map.of("collectionName", "people",
+                   "sortBy", List.of(Map.of("field", "ssn", "direction", "ASC"))));
+
+        assertThrows(WidgetExecutionException.class,
+            () -> service.executeWidget(component, Map.of(), MASKED_VIEWER));
+    }
+
+    @Test
+    void shouldMaskTableRowsAndBypassCacheForMaskingConfiguredCollection() {
+        CollectionDefinition collDef = withMaskedSsn(true);
+        QueryResult queryResult = QueryResult.of(
+            List.of(new HashMap<>(Map.of("name", "Jane", "ssn", "123-45-6789"))),
+            1L, new Pagination(1, 25));
+        when(queryEngine.executeQuery(eq(collDef), any())).thenReturn(queryResult);
+
+        Map<String, Object> component = buildComponent("comp-mt", "table",
+            Map.of("collectionName", "people", "fields", List.of("name", "ssn")));
+
+        WidgetResult result = service.executeWidget(component, Map.of(), MASKED_VIEWER);
+
+        assertEquals("table", result.type());
+        // Row masking is delegated to the shared RecordMaskingService, keyed to the viewer.
+        verify(recordMaskingService).maskRows(eq(collDef), eq(queryResult.data()),
+            eq("viewer@acme.example"), eq("profile-1"), eq("tenant-1"));
+        // A masking-configured collection must never touch the shared (non-per-viewer) cache.
+        verify(cacheManager, never()).getDashboardWidgetData(anyString());
+        verify(cacheManager, never()).putDashboardWidgetData(anyString(), any());
+    }
+
+    @Test
+    void shouldNotMaskForNullSystemPrincipalButStillBypassCache() {
+        CollectionDefinition collDef = withMaskedSsn(true);
+        QueryResult queryResult = QueryResult.of(
+            List.of(new HashMap<>(Map.of("name", "Jane", "ssn", "123-45-6789"))),
+            1L, new Pagination(1, 25));
+        when(queryEngine.executeQuery(eq(collDef), any())).thenReturn(queryResult);
+
+        Map<String, Object> component = buildComponent("comp-sys", "table",
+            Map.of("collectionName", "people", "fields", List.of("name", "ssn")));
+
+        // Null principal = system trust tier — no masking, no Cerbos check.
+        service.executeWidget(component, Map.of(), null);
+
+        verify(recordMaskingService, never()).maskRows(any(), any(), any(), any(), any());
+        verify(recordMaskingService, never()).maskedFieldsFor(any(), any(), any(), any(), any());
+        // Still bypasses the shared cache (the collection is masking-configured).
+        verify(cacheManager, never()).getDashboardWidgetData(anyString());
+        verify(cacheManager, never()).putDashboardWidgetData(anyString(), any());
+    }
+
+    @Test
+    void shouldNotBypassCacheWhenViewerMayUnmaskButCollectionHasMaskConfig() {
+        // Even when THIS viewer can unmask (maskedFields empty), the collection is
+        // masking-configured, so the shared cache stays bypassed (it can't distinguish viewers).
+        CollectionDefinition collDef = withMaskedSsn(false);
+        QueryResult queryResult = QueryResult.of(
+            List.of(new HashMap<>(Map.of("name", "Jane", "ssn", "123-45-6789"))),
+            1L, new Pagination(1, 25));
+        when(queryEngine.executeQuery(eq(collDef), any())).thenReturn(queryResult);
+
+        Map<String, Object> component = buildComponent("comp-unmask", "table",
+            Map.of("collectionName", "people", "fields", List.of("name", "ssn")));
+
+        service.executeWidget(component, Map.of(), MASKED_VIEWER);
+
+        verify(cacheManager, never()).getDashboardWidgetData(anyString());
+        verify(cacheManager, never()).putDashboardWidgetData(anyString(), any());
     }
 
     // =========================================================================

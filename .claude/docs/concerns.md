@@ -132,9 +132,15 @@ ever exposed to a lower-privilege role. It is deliberately **not** auto-invoked 
   masking-configured fields are excluded at index/embed time (field-config level, since
   the shared index has no per-viewer identity), and the collection is reindexed when a
   field's masking config toggles (`FieldConfigEventPublisher` → `rebuildCollectionIndexAsync`).
+- Dashboards (`DashboardDataService`) — **now masked per-viewer**: the controller resolves a
+  `MaskingPrincipal` from the gateway identity headers (`CerbosPermissionResolver`, same as
+  reports). When the widget's target collection has any masking-configured field the shared
+  widget cache is **bypassed** (it isn't keyed on the viewer, so a can-unmask user would poison
+  it for a can't-unmask one), the table/recent row widgets `maskRows` keyed to the viewer, and
+  chart group-by / table sort / any filter on a field masked for the viewer is rejected
+  (`WidgetExecutionException`, mirroring reports). Collections with no masking config are
+  unchanged (shared cache, no Cerbos). A `null`/system principal is not masked (FLS trust tier).
 **Still v2 (emit plaintext / unmasked to their gated callers):**
-- Dashboards (`DashboardDataService`) — shared Superset widget cache is not per-viewer;
-  needs a post-cache mask or cache-key redesign.
 - Scheduled report delivery + background/system exports run with a `null` principal
   (system trust tier) and are **not** masked — same contract as flows below.
 - Flows/scripts/webhooks/NATS consumers — system trust tier, same contract as FLS today.

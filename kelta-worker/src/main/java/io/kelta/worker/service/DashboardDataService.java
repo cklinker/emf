@@ -45,19 +45,22 @@ public class DashboardDataService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final WorkerCacheManager cacheManager;
+    private final RecordMaskingService recordMaskingService;
 
     public DashboardDataService(QueryEngine queryEngine,
                                 CollectionRegistry collectionRegistry,
                                 CollectionLifecycleManager lifecycleManager,
                                 JdbcTemplate jdbcTemplate,
                                 ObjectMapper objectMapper,
-                                WorkerCacheManager cacheManager) {
+                                WorkerCacheManager cacheManager,
+                                RecordMaskingService recordMaskingService) {
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
         this.lifecycleManager = lifecycleManager;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.cacheManager = cacheManager;
+        this.recordMaskingService = recordMaskingService;
     }
 
     /**
@@ -65,12 +68,13 @@ public class DashboardDataService {
      */
     public Map<String, WidgetResult> executeDashboard(String dashboardId,
                                                       List<Map<String, Object>> components,
-                                                      Map<String, String> runtimeParams) {
+                                                      Map<String, String> runtimeParams,
+                                                      ReportExecutionService.MaskingPrincipal principal) {
         Map<String, WidgetResult> results = new LinkedHashMap<>();
         for (Map<String, Object> component : components) {
             String componentId = (String) component.get("id");
             try {
-                WidgetResult result = executeWidget(component, runtimeParams);
+                WidgetResult result = executeWidget(component, runtimeParams, principal);
                 results.put(componentId, result);
             } catch (WidgetExecutionException e) {
                 log.warn("Widget execution failed: componentId={}, error={}", componentId, e.getMessage());
@@ -87,22 +91,14 @@ public class DashboardDataService {
      * Executes a single widget/component and returns its data.
      */
     public WidgetResult executeWidget(Map<String, Object> component,
-                                      Map<String, String> runtimeParams) {
+                                      Map<String, String> runtimeParams,
+                                      ReportExecutionService.MaskingPrincipal principal) {
         String componentId = (String) component.get("id");
         String componentType = (String) component.get("componentType");
         String reportId = (String) component.get("reportId");
 
         if (componentType == null || componentType.isBlank()) {
             throw new WidgetExecutionException("Component has no componentType");
-        }
-
-        // Check cache
-        int refreshSeconds = getRefreshInterval(component);
-        String cacheKey = buildCacheKey(componentId, runtimeParams);
-        Optional<Map<String, Object>> cached = cacheManager.getDashboardWidgetData(cacheKey);
-        if (cached.isPresent()) {
-            log.debug("Cache hit for widget: componentId={}", componentId);
-            return WidgetResult.fromCachedMap(cached.get());
         }
 
         // Parse component config
@@ -117,6 +113,29 @@ public class DashboardDataService {
             throw new WidgetExecutionException("Cannot resolve target collection for component " + componentId);
         }
 
+        // Data masking: if the target collection has any masking-configured field, the
+        // widget output is per-viewer, so the shared widget cache MUST be bypassed (it is
+        // not keyed on the viewer — a user who can unmask would otherwise poison the cache
+        // for one who cannot). maskedFields is the subset denied to THIS viewer (empty when
+        // the viewer may unmask all, or for a null/system principal — the FLS trust tier).
+        Map<String, FieldMaskingService.MaskingConfig> maskable =
+            recordMaskingService.maskableConfigs(targetCollection);
+        boolean maskingConfigured = !maskable.isEmpty();
+        Set<String> maskedFields = (maskingConfigured && principal != null && principal.isPresent())
+            ? recordMaskingService.maskedFieldsFor(principal.email(), principal.profileId(),
+                principal.tenantId(), targetCollection.name(), maskable.keySet())
+            : Set.of();
+
+        // Shared cache is only safe for collections with no masking config.
+        String cacheKey = buildCacheKey(componentId, runtimeParams);
+        if (!maskingConfigured) {
+            Optional<Map<String, Object>> cached = cacheManager.getDashboardWidgetData(cacheKey);
+            if (cached.isPresent()) {
+                log.debug("Cache hit for widget: componentId={}", componentId);
+                return WidgetResult.fromCachedMap(cached.get());
+            }
+        }
+
         // Build time-range filters from runtime params
         List<FilterCondition> timeFilters = buildTimeFilters(runtimeParams, config);
 
@@ -127,21 +146,52 @@ public class DashboardDataService {
         List<FilterCondition> allFilters = new ArrayList<>(configFilters);
         allFilters.addAll(timeFilters);
 
+        // A masked field used as a filter would leak values by probing — reject it
+        // (the same guard reports apply). group-by / sort rejects live in the executors.
+        for (FilterCondition f : allFilters) {
+            rejectMaskedField(maskedFields, f.fieldName(), "filter on");
+        }
+
         WidgetResult result = switch (componentType.toLowerCase()) {
             case "metric" -> executeMetricWidget(targetCollection, config, allFilters);
-            case "chart" -> executeChartWidget(targetCollection, config, allFilters);
-            case "table" -> executeTableWidget(targetCollection, config, allFilters, runtimeParams);
-            case "recent" -> executeRecentWidget(targetCollection, config, allFilters);
+            case "chart" -> executeChartWidget(targetCollection, config, allFilters, maskedFields);
+            case "table" -> executeTableWidget(targetCollection, config, allFilters, runtimeParams,
+                maskedFields, principal);
+            case "recent" -> executeRecentWidget(targetCollection, config, allFilters, principal);
             default -> throw new WidgetExecutionException("Unsupported widget type: " + componentType);
         };
 
-        // Cache the result
-        cacheManager.putDashboardWidgetData(cacheKey, result.toMap());
+        // Only cache non-masked collections (see above).
+        if (!maskingConfigured) {
+            cacheManager.putDashboardWidgetData(cacheKey, result.toMap());
+        }
 
         log.info("Widget executed: componentId={}, type={}, collection={}",
             componentId, componentType, targetCollection.name());
 
         return result;
+    }
+
+    /** Rejects using a masked field as a predicate (filter / sort / group-by), mirroring reports. */
+    private void rejectMaskedField(Set<String> maskedFields, String field, String usage) {
+        if (field != null && maskedFields.contains(field)) {
+            throw new WidgetExecutionException("Cannot " + usage + " a masked field: " + field);
+        }
+    }
+
+    /**
+     * Masks masking-configured field values in raw record rows for the viewer.
+     * A {@code null}/system principal (the FLS trust tier) is not masked, matching
+     * reports. {@link RecordMaskingService#maskRows} short-circuits when the collection
+     * has no masking config or the viewer may unmask all.
+     */
+    private void maskRows(CollectionDefinition collection, List<Map<String, Object>> rows,
+                          ReportExecutionService.MaskingPrincipal principal) {
+        if (principal == null || !principal.isPresent()) {
+            return;
+        }
+        recordMaskingService.maskRows(collection, rows,
+            principal.email(), principal.profileId(), principal.tenantId());
     }
 
     // =========================================================================
@@ -194,11 +244,14 @@ public class DashboardDataService {
      */
     WidgetResult executeChartWidget(CollectionDefinition collection,
                                     Map<String, Object> config,
-                                    List<FilterCondition> filters) {
+                                    List<FilterCondition> filters,
+                                    Set<String> maskedFields) {
         String groupByField = getConfigString(config, "groupByField", null);
         if (groupByField == null || groupByField.isBlank()) {
             throw new WidgetExecutionException("groupByField is required for chart widgets");
         }
+        // Grouping by a masked field would surface its distinct values as chart labels.
+        rejectMaskedField(maskedFields, groupByField, "group by");
 
         String aggregateFunction = getConfigString(config, "aggregateFunction", "COUNT");
         String aggregateField = getConfigString(config, "aggregateField", null);
@@ -260,9 +313,16 @@ public class DashboardDataService {
     WidgetResult executeTableWidget(CollectionDefinition collection,
                                     Map<String, Object> config,
                                     List<FilterCondition> filters,
-                                    Map<String, String> runtimeParams) {
+                                    Map<String, String> runtimeParams,
+                                    Set<String> maskedFields,
+                                    ReportExecutionService.MaskingPrincipal principal) {
         List<String> fields = parseFieldList(config.get("fields"));
         List<SortField> sorting = parseSortFields(config.get("sortBy"));
+
+        // Sorting by a masked field leaks value ordering.
+        for (SortField s : sorting) {
+            rejectMaskedField(maskedFields, s.fieldName(), "sort on");
+        }
 
         int pageNumber = getIntParam(runtimeParams, "page", 1);
         int pageSize = Math.min(
@@ -272,6 +332,9 @@ public class DashboardDataService {
         QueryRequest request = new QueryRequest(
             new Pagination(pageNumber, pageSize), sorting, fields, filters);
         QueryResult queryResult = queryEngine.executeQuery(collection, request);
+
+        // Table returns raw record rows — mask masked-field values for this viewer.
+        maskRows(collection, queryResult.data(), principal);
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("records", queryResult.data());
@@ -292,7 +355,8 @@ public class DashboardDataService {
      */
     WidgetResult executeRecentWidget(CollectionDefinition collection,
                                      Map<String, Object> config,
-                                     List<FilterCondition> filters) {
+                                     List<FilterCondition> filters,
+                                     ReportExecutionService.MaskingPrincipal principal) {
         int limit = Math.min(
             getConfigInt(config, "limit", DEFAULT_RECENT_RECORDS),
             MAX_RECENT_RECORDS);
@@ -303,6 +367,9 @@ public class DashboardDataService {
         QueryRequest request = new QueryRequest(
             new Pagination(1, limit), sorting, fields, filters);
         QueryResult queryResult = queryEngine.executeQuery(collection, request);
+
+        // Recent returns raw record rows — mask masked-field values for this viewer.
+        maskRows(collection, queryResult.data(), principal);
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("records", queryResult.data());

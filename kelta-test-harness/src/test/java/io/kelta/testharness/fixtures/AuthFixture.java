@@ -50,23 +50,62 @@ public final class AuthFixture {
      * @return a valid RS256 JWT access token whose {@code tenant_id} claim
      *         matches the tenant identified by {@code tenantSlug}
      */
-    @SuppressWarnings("unchecked")
     public String loginAsAdmin(String tenantSlug) {
-        String username = adminUsernameForSlug(tenantSlug);
-        Map<String, Object> response = client.post()
-                .uri("/auth/direct-login")
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .body(Map.of(
-                        "username", username,
-                        "password", "password",
-                        "tenantSlug", tenantSlug))
-                .retrieve()
-                .body(Map.class);
+        // A tenant created at runtime (via TenantProvisioningHook) is loginnable only once
+        // kelta-auth's user lookup resolves the new tenant — the slug→tenant view can lag the
+        // worker's slug-map by a moment after creation. The default tenant (seeded before
+        // startup) resolves on the first try; a runtime tenant may 401 briefly, so retry.
+        AuthenticationException last = null;
+        for (int attempt = 0; attempt < MAX_LOGIN_ATTEMPTS; attempt++) {
+            try {
+                return attemptLogin(tenantSlug);
+            } catch (AuthenticationException e) {
+                last = e;
+                sleep(LOGIN_RETRY_MILLIS);
+            }
+        }
+        throw new RuntimeException("Direct login for tenant '" + tenantSlug + "' still failing after "
+                + MAX_LOGIN_ATTEMPTS + " attempts", last);
+    }
 
+    private static final int MAX_LOGIN_ATTEMPTS = 40;   // ~20s at 500ms
+    private static final long LOGIN_RETRY_MILLIS = 500;
+
+    /** Thrown when direct-login returns 401 for credentials that should be valid (propagation lag). */
+    private static final class AuthenticationException extends RuntimeException {
+        AuthenticationException(String message) { super(message); }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String attemptLogin(String tenantSlug) {
+        String username = adminUsernameForSlug(tenantSlug);
+        Map<String, Object> response;
+        try {
+            response = client.post()
+                    .uri("/auth/direct-login")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .body(Map.of(
+                            "username", username,
+                            "password", "password",
+                            "tenantSlug", tenantSlug))
+                    .retrieve()
+                    .body(Map.class);
+        } catch (org.springframework.web.client.HttpClientErrorException.Unauthorized e) {
+            throw new AuthenticationException("401 for " + username + " on tenant " + tenantSlug);
+        }
         if (response == null || !response.containsKey("access_token")) {
             throw new RuntimeException("Direct login did not return access_token. Response: " + response);
         }
         return (String) response.get("access_token");
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while retrying direct-login", ie);
+        }
     }
 
     /**

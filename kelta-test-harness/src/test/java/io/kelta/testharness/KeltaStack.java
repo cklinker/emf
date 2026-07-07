@@ -191,6 +191,10 @@ public final class KeltaStack {
             .withEnv("CORS_ALLOWED_ORIGIN_PATTERN",   "http://localhost:5173")
             .withEnv("TENANT_SLUG_REQUIRE_PREFIX",    "true")
             .withEnv("PERMISSIONS_ENABLED",           "false")
+            // The fixture provisions its tenant at runtime; refresh the gateway's slug→tenant
+            // cache fast (default 60s) so the new tenant resolves promptly instead of 404ing
+            // for up to a full refresh interval.
+            .withEnv("KELTA_GATEWAY_TENANT_SLUG_CACHE_REFRESH_MS", "2000")
             .withExposedPorts(8080)
             .waitingFor(Wait.forHttp("/actuator/health").withStartupTimeout(Duration.ofMinutes(2)));
 
@@ -294,7 +298,16 @@ public final class KeltaStack {
         // Phase 4: gateway (needs auth JWKS + worker routes)
         log.info("Phase 4: starting kelta-gateway...");
         GATEWAY.start();
-        log.info("kelta-gateway healthy — stack ready");
+        log.info("kelta-gateway healthy");
+
+        // Phase 5: seed the ecommerce fixture tenant via the admin API. The Flyway
+        // baseline seeds only the `default` tenant; the `threadline-clothing` tenant +
+        // its customers/orders/products collections used to come from Flyway V50, which
+        // the migration flatten removed. We recreate them at runtime through the gateway
+        // so scenarios that treat that tenant as a fixture keep passing.
+        log.info("Phase 5: seeding ecommerce fixture tenant...");
+        new io.kelta.testharness.fixtures.EcommerceSeedFixture().seedOnce();
+        log.info("ecommerce fixture seeded — stack ready");
     }
 
     public static void stop() {

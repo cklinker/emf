@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Regression guard for the write path Mockito worker tests can't reach: real inbound-FK
  * re-parenting and a real cascade-safe delete on Postgres. It merges two {@code customers} on the
- * V50-seeded {@code threadline-clothing} tenant, with a real {@code orders.customer} LOOKUP row
+ * fixture-seeded {@code threadline-clothing} tenant, with a real {@code orders.customer} LOOKUP row
  * pointing at the duplicate, and proves:
  * <ol>
  *   <li>the order's FK is re-pointed from the duplicate to the master (not left dangling, not
@@ -44,8 +44,9 @@ class RecordMergeScenarioTest extends ScenarioBase {
         waitForStatus(gatewayClientWithToken(token), "/" + slug + "/api/customers", HttpStatus.OK, 20);
 
         // Two duplicate customers: the master we keep and the duplicate we fold in. They share a
-        // name but need distinct emails — the seeded `customers.email` field is uniquely constrained
-        // (the merge takes record ids directly, so an exact match-field value isn't required here).
+        // name but need distinct emails — the fixture-seeded `customers.email` field is uniquely
+        // constrained (the merge takes record ids directly, so an exact match-field value isn't
+        // required here).
         String suffix = Long.toHexString(System.nanoTime());
         String masterId = createCustomer(token, slug, "dupe-master-" + suffix + "@example.com", "Dupe", "Master");
         String dupId = createCustomer(token, slug, "dupe-dup-" + suffix + "@example.com", "Dupe", "Duplicate");

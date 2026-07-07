@@ -8,15 +8,17 @@ import java.util.Map;
 /**
  * Resolves tenant slugs and manages tenant-scoped test state.
  *
- * <p>Flyway migration V9 seeds a {@code default} tenant and V50 seeds a
- * {@code threadline-clothing} tenant — both are ACTIVE at harness startup.
+ * <p>The Flyway baseline seeds the {@code default} tenant. The
+ * {@code threadline-clothing} tenant is provisioned at harness startup by
+ * {@link EcommerceSeedFixture} through the admin API (replacing the old Flyway V50
+ * demo seed) — both are ACTIVE by the time scenarios run.
  */
 public final class TenantFixture {
 
-    /** Seeded by V9 — no collections, used for isolation tests. */
+    /** Seeded by the Flyway baseline — no user collections, used for isolation tests. */
     public static final String DEFAULT_SLUG = "default";
 
-    /** Seeded by V50 — has products, customers, orders etc. */
+    /** Provisioned at startup by {@link EcommerceSeedFixture} — has customers, orders, products. */
     public static final String ECOMMERCE_SLUG = "threadline-clothing";
 
     private final RestClient workerClient;

@@ -28,6 +28,9 @@ public class KeltaUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String emailOrUsername) throws UsernameNotFoundException {
         String tenantId = resolveTenantFromRequest();
+        // [AUTH-DIAG] temporary — diagnosing runtime-provisioned-tenant login 401 in the harness.
+        // Remove before merge.
+        log.info("[AUTH-DIAG] loadUserByUsername user='{}' resolvedTenantId='{}'", emailOrUsername, tenantId);
 
         // Tenant context is required. The platform_user table has row-level security on
         // the public schema scoped by tenant_id; cross-tenant lookups are unsafe because
@@ -61,6 +64,24 @@ public class KeltaUserDetailsService implements UserDetailsService {
         );
 
         if (users.isEmpty()) {
+            // [AUTH-DIAG] temporary — pinpoint the harness runtime-tenant 401. Remove before merge.
+            // rowsVisibleByEmailAnyTenant=0 → the row is RLS-hidden (check appTenantCtx);
+            // >=1 → the resolved tenantId != the user's tenant_id (slug-resolution mismatch).
+            try {
+                Integer anyByEmail = jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM platform_user WHERE email = ? OR username = ?",
+                        Integer.class, emailOrUsername, emailOrUsername);
+                String rlsCtx = jdbcTemplate.queryForObject(
+                        "SELECT current_setting('app.current_tenant_id', true)", String.class);
+                String actualTenants = String.join(",", jdbcTemplate.query(
+                        "SELECT tenant_id::text FROM platform_user WHERE email = ? OR username = ?",
+                        (rs, n) -> rs.getString(1), emailOrUsername, emailOrUsername));
+                log.warn("[AUTH-DIAG] no user match: user='{}' resolvedTenantId='{}' "
+                                + "rowsVisibleByEmailAnyTenant={} userTenantIds=[{}] appTenantCtx='{}'",
+                        emailOrUsername, tenantId, anyByEmail, actualTenants, rlsCtx);
+            } catch (Exception diag) {
+                log.warn("[AUTH-DIAG] diagnostic query failed: {}", diag.getMessage());
+            }
             throw new UsernameNotFoundException("User not found: " + emailOrUsername);
         }
 

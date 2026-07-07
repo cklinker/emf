@@ -175,6 +175,8 @@ public final class KeltaStack {
             .withEnv("CORS_ALLOWED_ORIGINS",      "http://localhost:5173")
             .withEnv("DIRECT_LOGIN_ENABLED",      "true")
             .withExposedPorts(8080)
+            .withLogConsumer(new org.testcontainers.containers.output.Slf4jLogConsumer(
+                    org.slf4j.LoggerFactory.getLogger("kelta-auth-container")))
             .waitingFor(Wait.forHttp("/actuator/health").withStartupTimeout(Duration.ofMinutes(2)));
 
     public static final GenericContainer<?> GATEWAY = serviceContainer("kelta-gateway")

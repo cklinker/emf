@@ -308,22 +308,26 @@ public final class EcommerceSeedFixture {
     }
 
     private void waitForStatus(RestClient client, String uri, HttpStatusCode expected, int maxAttempts) {
+        HttpStatusCode lastStatus = null;
+        String lastBody = null;
         for (int i = 0; i < maxAttempts; i++) {
             try {
-                HttpStatusCode status = client.get().uri(uri).retrieve()
-                        .onStatus(s -> true, (req, resp) -> { })
-                        .toBodilessEntity()
-                        .getStatusCode();
-                if (status.equals(expected)) {
+                org.springframework.http.ResponseEntity<String> resp = client.get().uri(uri).retrieve()
+                        .onStatus(s -> true, (req, r) -> { })
+                        .toEntity(String.class);
+                lastStatus = resp.getStatusCode();
+                lastBody = resp.getBody();
+                if (lastStatus.equals(expected)) {
                     return;
                 }
-            } catch (RuntimeException ignored) {
-                // not ready yet
+            } catch (RuntimeException ex) {
+                lastBody = ex.getMessage();
             }
             sleep();
         }
-        throw new AssertionError("URL " + uri + " did not return " + expected
-                + " after " + maxAttempts + " attempts");
+        String body = lastBody == null ? "" : lastBody.substring(0, Math.min(300, lastBody.length()));
+        throw new AssertionError("URL " + uri + " did not return " + expected + " after " + maxAttempts
+                + " attempts (lastStatus=" + lastStatus + ", body=" + body + ")");
     }
 
     private void sleep() {

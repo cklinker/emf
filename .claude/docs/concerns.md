@@ -191,22 +191,13 @@ Staged cleanup:
 - **PR1 (shipped #1186): permission sets fully removed** — the six V98-dropped permission-set tables
   were still registered as system collections and queried by delegated admin. Migration V160 dropped
   the `delegated_admin_scope.assignable_permission_set_ids` column.
-- **PR2 (this change): package export/import + config-health.** `PackageService`/`PackageRepository`/
+- **PR2 (this change, #1187): package export/import + config-health.** `PackageService`/`PackageRepository`/
   `PackageImportService` were still exporting/importing `role`/`policy`/`route_policy`/`field_policy`
   (dropped V47) — package export threw on those item types; `OverpermissiveProfileRule` selected `FROM
   system_permission` (dropped V47) — the config-health scan failed. Removed the authz export/import
   path (methods, repo queries, natural-key remap machinery) and fixed the rule to read
   `profile_system_permission`.
-- **PR3 (pending): orphan tables + dead endpoint.** Drop `user_group_member` (V12, superseded by
-  `group_membership` V45; 1 stale row) and `flow_execution_dedup` (V71, unused). Delete
-  `WorkflowMigrationController`/`WorkflowMigrationRepository` (queries `workflow_rule`/`workflow_action`,
-  dropped V72 — the "deliberately-retained" note below is wrong: it's dead-broken, not harmless).
-- **PR1 (shipped #1186): permission sets fully removed** (six V98-dropped tables still registered as
-  system collections + queried by delegated admin). Migration V160 dropped the
-  `delegated_admin_scope.assignable_permission_set_ids` column.
-- **PR2 (shipped #1187): package export/import + config-health** stopped querying V47-dropped
-  `role`/`policy`/`route_policy`/`field_policy`/`system_permission`.
-- **PR3 (this change): orphan tables + dead endpoint.** Dropped `user_group_member` (V12 flat join,
+- **PR3 (shipped #1188): orphan tables + dead endpoint.** Dropped `user_group_member` (V12 flat join,
   superseded by `group_membership` V45; the one stale row is discarded legacy data) and
   `flow_execution_dedup` (V71, unused) via `V161__drop_orphan_tables.sql`. Deleted
   `WorkflowMigrationController`/`WorkflowMigrationRepository` — they queried `workflow_rule`/

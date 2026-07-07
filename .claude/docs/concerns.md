@@ -201,6 +201,16 @@ Staged cleanup:
   `group_membership` V45; 1 stale row) and `flow_execution_dedup` (V71, unused). Delete
   `WorkflowMigrationController`/`WorkflowMigrationRepository` (queries `workflow_rule`/`workflow_action`,
   dropped V72 — the "deliberately-retained" note below is wrong: it's dead-broken, not harmless).
+- **PR1 (shipped #1186): permission sets fully removed** (six V98-dropped tables still registered as
+  system collections + queried by delegated admin). Migration V160 dropped the
+  `delegated_admin_scope.assignable_permission_set_ids` column.
+- **PR2 (shipped #1187): package export/import + config-health** stopped querying V47-dropped
+  `role`/`policy`/`route_policy`/`field_policy`/`system_permission`.
+- **PR3 (this change): orphan tables + dead endpoint.** Dropped `user_group_member` (V12 flat join,
+  superseded by `group_membership` V45; the one stale row is discarded legacy data) and
+  `flow_execution_dedup` (V71, unused) via `V161__drop_orphan_tables.sql`. Deleted
+  `WorkflowMigrationController`/`WorkflowMigrationRepository` — they queried `workflow_rule`/
+  `workflow_action` (dropped V72), so the endpoint was dead-broken, not "harmless" as previously noted.
 - **PR4 (pending): Flyway history flatten** to a clean V1 baseline; rehearse the no-op on a
   `192.168.0.5` clone before rollout.
 
@@ -220,9 +230,6 @@ for removal ("inline the current value"). Findings:
   verified first — a scoped follow-up, not a mechanical inline.
 
 **Deliberately-retained code (audit judged deletion riskier than the cleanliness gain):**
-- `WorkflowMigrationController` (`/api/admin/migrate-workflow-rules`) — one-time workflows→flows
-  migration tool; no UI caller, but removing it deletes a migration path with unclear per-tenant
-  need. Harmless as-is.
 - Email-template dual lookup (`findTemplateByKey` vs `findTemplateByName`, see below) — both axes
   are live on the transactional-email path (password reset/invite); consolidating risks that path
   for a cosmetic gain.

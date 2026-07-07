@@ -9,8 +9,11 @@ import java.util.Map;
 /**
  * Mints JWTs against the in-harness kelta-auth instance via the direct-login endpoint.
  *
- * <p>The default Flyway seeds create {@code admin@kelta.local / password} for every
- * ACTIVE tenant. Use {@link #loginAsAdmin()} to authenticate and retrieve an access token.
+ * <p>The {@code default} tenant is seeded by the Flyway baseline with
+ * {@code admin@kelta.local / password}. Every other tenant is provisioned at runtime
+ * by the worker's {@code TenantProvisioningHook}, which seeds its admin as
+ * {@code <slug>-admin@kelta.local} (username {@code <slug>-admin}, password
+ * {@code password}). {@link #loginAsAdmin(String)} picks the right identity per slug.
  */
 public final class AuthFixture {
 
@@ -23,19 +26,24 @@ public final class AuthFixture {
     }
 
     /**
-     * Logs in as the seeded {@code admin@kelta.local} user in the {@code default}
-     * tenant. The {@code admin@kelta.local} account is seeded per-tenant by V102,
-     * so the caller must specify which tenant the token should be scoped to —
+     * Logs in as the {@code admin@kelta.local} user in the {@code default} tenant.
      * kelta-auth refuses to authenticate without a tenant context because the
-     * platform_user table is RLS-scoped.
+     * platform_user table is RLS-scoped, so a tenant slug is always required.
      */
     public String loginAsAdmin() {
         return loginAsAdmin(TenantFixture.DEFAULT_SLUG);
     }
 
     /**
-     * Logs in as {@code admin@kelta.local} in the specified tenant and returns
-     * the raw access token string.
+     * Logs in as the admin user of the specified tenant and returns the raw access
+     * token string. The admin identity depends on how the tenant was created:
+     * <ul>
+     *   <li>{@code default} — {@code admin@kelta.local} (Flyway baseline seed)</li>
+     *   <li>any other slug — {@code <slug>-admin@kelta.local}, seeded by the worker's
+     *       {@code TenantProvisioningHook} when the tenant was created via the admin API
+     *       (e.g. the {@code threadline-clothing} fixture tenant)</li>
+     * </ul>
+     * Both share the password {@code password}.
      *
      * @param tenantSlug the slug of the tenant to scope the login to (e.g.
      *                   {@code "default"} or {@code "threadline-clothing"})
@@ -44,11 +52,12 @@ public final class AuthFixture {
      */
     @SuppressWarnings("unchecked")
     public String loginAsAdmin(String tenantSlug) {
+        String username = adminUsernameForSlug(tenantSlug);
         Map<String, Object> response = client.post()
                 .uri("/auth/direct-login")
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                 .body(Map.of(
-                        "username", "admin@kelta.local",
+                        "username", username,
                         "password", "password",
                         "tenantSlug", tenantSlug))
                 .retrieve()
@@ -58,6 +67,18 @@ public final class AuthFixture {
             throw new RuntimeException("Direct login did not return access_token. Response: " + response);
         }
         return (String) response.get("access_token");
+    }
+
+    /**
+     * The admin email for a tenant. The Flyway baseline seeds {@code admin@kelta.local}
+     * for the {@code default} tenant; every runtime-provisioned tenant gets
+     * {@code <slug>-admin@kelta.local} from {@code TenantProvisioningHook}. Direct-login
+     * accepts email or username, so the email form is used uniformly.
+     */
+    private static String adminUsernameForSlug(String tenantSlug) {
+        return TenantFixture.DEFAULT_SLUG.equals(tenantSlug)
+                ? "admin@kelta.local"
+                : tenantSlug + "-admin@kelta.local";
     }
 
     /**

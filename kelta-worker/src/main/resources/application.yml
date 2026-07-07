@@ -29,6 +29,13 @@ spring:
     # email_template intentionally stores ${variable} as data for runtime
     # substitution, which would otherwise trip placeholder validation.
     placeholder-replacement: false
+    # V1..V161 were flattened into V1__baseline.sql (superseded scripts live in
+    # db/migration-archive/, off the classpath). Databases already migrated past
+    # the baseline still have V2..V161 in their history with no matching files;
+    # tolerate those "missing" entries so validate() passes. A one-time
+    # `flyway repair` realigns the V1 checksum on those DBs — see
+    # db/migration/README.md. Fresh installs just run V1__baseline.
+    ignore-migration-patterns: "*:missing"
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}

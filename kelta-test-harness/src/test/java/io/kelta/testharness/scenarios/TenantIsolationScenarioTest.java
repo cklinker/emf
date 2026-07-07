@@ -22,12 +22,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * belonging to a different tenant must be rejected (401/403), and requests to an
  * entirely unknown slug must return 404.
  *
- * <p>Seeded tenants (Flyway):
+ * <p>Fixture tenants:
  * <ul>
- *   <li>V9  — {@code default} (id: 00000000-0000-0000-0000-000000000001)</li>
- *   <li>V50 — {@code threadline-clothing} (9 collections)</li>
+ *   <li>{@code default} (id: 00000000-0000-0000-0000-000000000001) — Flyway baseline</li>
+ *   <li>{@code threadline-clothing} — provisioned at startup by {@code EcommerceSeedFixture}
+ *       via the admin API, with customers/orders/products collections</li>
  * </ul>
- * V102 seeds {@code admin@kelta.local / password} for every ACTIVE tenant.
+ * Each tenant has an admin account (password {@code password}); see {@code AuthFixture}.
  */
 @DisplayName("Tenant Isolation Scenario")
 class TenantIsolationScenarioTest extends ScenarioBase {

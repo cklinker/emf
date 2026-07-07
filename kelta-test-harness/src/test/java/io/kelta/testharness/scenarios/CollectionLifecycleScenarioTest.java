@@ -20,16 +20,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * pod rebuilds its RouteRegistry. This scenario confirms the full path:
  * Postgres → worker startup → NATS event → gateway RouteRegistry → routable endpoint.
  *
- * <p>The {@code threadline-clothing} tenant is seeded by Flyway V50 with nine
- * collections (products, customers, orders, etc.). We use those seeded collections
- * rather than creating new ones to keep the test read-only and idempotent.
+ * <p>The {@code threadline-clothing} tenant is provisioned at startup by
+ * {@code EcommerceSeedFixture} with customers, orders, and products collections. We use
+ * those seeded collections rather than creating new ones to keep the test read-only.
  */
 @DisplayName("Collection Lifecycle Scenario")
 class CollectionLifecycleScenarioTest extends ScenarioBase {
 
     /**
      * After gateway startup the route registry must already contain the collections
-     * seeded by Flyway V50 for the {@code threadline-clothing} tenant.
+     * seeded by {@code EcommerceSeedFixture} for the {@code threadline-clothing} tenant.
      *
      * <p>We poll /actuator/health first (already done by KeltaStack startup), then
      * verify that the gateway accepts a request to a seeded collection endpoint.
@@ -109,12 +109,12 @@ class CollectionLifecycleScenarioTest extends ScenarioBase {
     }
 
     /**
-     * Verifies that the ecommerce tenant ({@code threadline-clothing}) has the V50-seeded
-     * collections available via the gateway.
+     * Verifies that the ecommerce tenant ({@code threadline-clothing}) has its
+     * fixture-seeded collections available via the gateway.
      *
-     * <p>If the auth token resolves to the ecommerce tenant, we confirm the full
-     * product catalogue slug is reachable. This validates NATS route propagation
-     * for a tenant with a non-trivial collection set.
+     * <p>If the auth token resolves to the ecommerce tenant, we confirm the seeded
+     * collection slugs are reachable. This validates NATS route propagation for a
+     * tenant with a non-trivial collection set.
      */
     @Test
     @DisplayName("ecommerce tenant collections are routable when seeded")
@@ -130,9 +130,9 @@ class CollectionLifecycleScenarioTest extends ScenarioBase {
         // Both tenants are seeded — at least one must exist
         String activeSlug = (ecommerceId != null) ? TenantFixture.ECOMMERCE_SLUG : slug;
 
-        // For the ecommerce tenant, check collections are routed (V50 seeds products etc.)
-        // We need a token for the right tenant; if our token's tenant happens to be
-        // ecommerce we can check directly, otherwise verify via worker's collections endpoint.
+        // For the ecommerce tenant, check collections are routed (the fixture seeds
+        // customers/orders/products). We need a token for the right tenant; if our token's
+        // tenant happens to be ecommerce we check directly, otherwise verify via slug-map.
         if (TenantFixture.ECOMMERCE_SLUG.equals(slug)) {
             @SuppressWarnings("unchecked")
             Map<String, Object> body = gatewayClientWithToken(token)
@@ -143,7 +143,7 @@ class CollectionLifecycleScenarioTest extends ScenarioBase {
 
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> data = (List<Map<String, Object>>) body.get("data");
-            // V50 seeds at least products + customers + orders (9 total)
+            // The fixture seeds customers + orders + products (plus system collections).
             assertThat(data.size()).isGreaterThanOrEqualTo(3);
         } else {
             // Confirm ecommerce tenant is registered in the slug-map (worker awareness)

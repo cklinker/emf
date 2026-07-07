@@ -294,7 +294,16 @@ public final class KeltaStack {
         // Phase 4: gateway (needs auth JWKS + worker routes)
         log.info("Phase 4: starting kelta-gateway...");
         GATEWAY.start();
-        log.info("kelta-gateway healthy — stack ready");
+        log.info("kelta-gateway healthy");
+
+        // Phase 5: seed the ecommerce fixture tenant via the admin API. The Flyway
+        // baseline seeds only the `default` tenant; the `threadline-clothing` tenant +
+        // its customers/orders/products collections used to come from Flyway V50, which
+        // the migration flatten removed. We recreate them at runtime through the gateway
+        // so scenarios that treat that tenant as a fixture keep passing.
+        log.info("Phase 5: seeding ecommerce fixture tenant...");
+        new io.kelta.testharness.fixtures.EcommerceSeedFixture().seedOnce();
+        log.info("ecommerce fixture seeded — stack ready");
     }
 
     public static void stop() {

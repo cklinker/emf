@@ -10,6 +10,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -73,6 +77,7 @@ public final class EcommerceSeedFixture {
         log.info("Seeding ecommerce fixture tenant '{}' via admin API", TenantFixture.ECOMMERCE_SLUG);
         createTenant();
         waitForTenantActive();
+        clearAdminForcePasswordChange();
 
         String token = auth.loginAsAdmin(TenantFixture.ECOMMERCE_SLUG);
         RestClient client = gatewayClient(token);
@@ -139,6 +144,29 @@ public final class EcommerceSeedFixture {
                     "Failed to create ecommerce fixture tenant: HTTP " + response.getStatusCode());
         }
         log.info("Created ecommerce fixture tenant record (HTTP {})", response.getStatusCode());
+    }
+
+    /**
+     * Clears {@code force_change_on_login} on the provisioned tenant admin's credential.
+     * {@code TenantProvisioningHook} seeds every runtime-provisioned admin with
+     * {@code force_change_on_login = TRUE} (they must rotate the well-known password), which
+     * makes {@code KeltaUserDetails.isCredentialsNonExpired()} return false — so direct-login
+     * for the admin fails with "credentials have expired". The harness uses the admin directly,
+     * so clear the flag (the default tenant's baseline admin already has it false).
+     */
+    private void clearAdminForcePasswordChange() {
+        String adminEmail = TenantFixture.ECOMMERCE_SLUG + "-admin@kelta.local";
+        String sql = "UPDATE user_credential SET force_change_on_login = false "
+                + "WHERE user_id IN (SELECT id FROM platform_user WHERE email = ?)";
+        try (Connection conn = DriverManager.getConnection(
+                        KeltaStack.dbJdbcUrl(), KeltaStack.dbUsername(), KeltaStack.dbPassword());
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, adminEmail);
+            int updated = ps.executeUpdate();
+            log.info("Cleared force_change_on_login for '{}' ({} credential row(s))", adminEmail, updated);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to clear force_change_on_login for " + adminEmail, e);
+        }
     }
 
     /**

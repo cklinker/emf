@@ -21,7 +21,6 @@ interface ScopeForm {
   active: boolean
   delegatedUserIds: string[]
   manageableProfileIds: string[]
-  assignablePermissionSetIds: string[]
   canCreateUsers: boolean
   canDeactivateUsers: boolean
   canResetPasswords: boolean
@@ -33,7 +32,6 @@ const EMPTY_FORM: ScopeForm = {
   active: true,
   delegatedUserIds: [],
   manageableProfileIds: [],
-  assignablePermissionSetIds: [],
   canCreateUsers: false,
   canDeactivateUsers: false,
   canResetPasswords: false,
@@ -93,7 +91,6 @@ function ScopeEditor({
   initial,
   userOptions,
   profileOptions,
-  permissionSetOptions,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -101,7 +98,6 @@ function ScopeEditor({
   initial: ScopeForm
   userOptions: Option[]
   profileOptions: Option[]
-  permissionSetOptions: Option[]
   onSubmit: (form: ScopeForm) => void
   onCancel: () => void
   isSubmitting: boolean
@@ -184,13 +180,6 @@ function ScopeEditor({
         <p className="-mt-2 mb-4 text-xs text-muted-foreground">
           {t('delegatedAdmins.privilegedProfileHint')}
         </p>
-        <MultiSelect
-          label={t('delegatedAdmins.assignablePermissionSets')}
-          options={permissionSetOptions}
-          selected={form.assignablePermissionSetIds}
-          onChange={(ids) => setForm({ ...form, assignablePermissionSetIds: ids })}
-          testId="picker-permsets"
-        />
 
         <div className="mb-4 flex flex-col gap-2">
           <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -275,22 +264,6 @@ export function DelegatedAdminsPage({
     queryFn: () => keltaClient.admin.profiles.list(),
   })
 
-  const { data: permissionSets } = useQuery({
-    queryKey: ['delegated-admin-scopes', 'permission-sets'],
-    queryFn: async () => {
-      const response = await keltaClient
-        .getAxiosInstance()
-        .get('/api/permission-sets?page[size]=200')
-      const payload = response.data as {
-        data?: Array<{ id: string; attributes?: { name?: string } }>
-      }
-      return (payload.data ?? []).map((r) => ({
-        id: r.id,
-        label: r.attributes?.name ?? r.id,
-      }))
-    },
-  })
-
   const userOptions: Option[] = useMemo(
     () =>
       (users?.content ?? []).map((u) => ({
@@ -303,7 +276,6 @@ export function DelegatedAdminsPage({
     () => (profiles ?? []).map((p) => ({ id: p.id, label: p.name })),
     [profiles]
   )
-  const permissionSetOptions: Option[] = permissionSets ?? []
 
   const saveMutation = useMutation({
     mutationFn: ({ id, form }: { id?: string; form: ScopeForm }) => {
@@ -313,7 +285,6 @@ export function DelegatedAdminsPage({
         active: form.active,
         delegatedUserIds: form.delegatedUserIds,
         manageableProfileIds: form.manageableProfileIds,
-        assignablePermissionSetIds: form.assignablePermissionSetIds,
         canCreateUsers: form.canCreateUsers,
         canDeactivateUsers: form.canDeactivateUsers,
         canResetPasswords: form.canResetPasswords,
@@ -353,7 +324,6 @@ export function DelegatedAdminsPage({
         active: scope.active,
         delegatedUserIds: scope.delegatedUserIds ?? [],
         manageableProfileIds: scope.manageableProfileIds ?? [],
-        assignablePermissionSetIds: scope.assignablePermissionSetIds ?? [],
         canCreateUsers: scope.canCreateUsers,
         canDeactivateUsers: scope.canDeactivateUsers,
         canResetPasswords: scope.canResetPasswords,
@@ -446,7 +416,6 @@ export function DelegatedAdminsPage({
           initial={editing.form}
           userOptions={userOptions}
           profileOptions={profileOptions}
-          permissionSetOptions={permissionSetOptions}
           onSubmit={(form) => saveMutation.mutate({ id: editing.id, form })}
           onCancel={() => setEditing(null)}
           isSubmitting={saveMutation.isPending}

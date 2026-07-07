@@ -49,7 +49,6 @@ class DelegatedAdminServiceTest {
      * it: JSONB array columns normalized to their JSON string form. */
     private static Map<String, Object> scopeRow(String delegatedUserIdsJson,
                                                 String manageableProfileIdsJson,
-                                                String assignablePermissionSetIdsJson,
                                                 boolean canCreate,
                                                 boolean canDeactivate,
                                                 boolean canReset) {
@@ -58,7 +57,6 @@ class DelegatedAdminServiceTest {
         row.put("name", "Scope");
         row.put("delegated_user_ids", delegatedUserIdsJson);
         row.put("manageable_profile_ids", manageableProfileIdsJson);
-        row.put("assignable_permission_set_ids", assignablePermissionSetIdsJson);
         row.put("can_create_users", canCreate);
         row.put("can_deactivate_users", canDeactivate);
         row.put("can_reset_passwords", canReset);
@@ -88,25 +86,23 @@ class DelegatedAdminServiceTest {
     void callerNotInAnyScopeIsNone() {
         stubCallerResolvesTo(CALLER_ID);
         when(scopeRepository.findActiveScopes(TENANT)).thenReturn(List.of(
-                scopeRow("[\"someone-else\"]", "[\"p1\"]", "[\"ps1\"]", true, true, true)));
+                scopeRow("[\"someone-else\"]", "[\"p1\"]", true, true, true)));
 
         EffectiveDelegatedScope scope = service.effectiveScope(CALLER_EMAIL, TENANT);
 
         assertThat(scope).isSameAs(EffectiveDelegatedScope.NONE);
         // Not delegated → the privileged re-filter never runs.
         verify(scopeRepository, never()).findPrivilegedProfileIds(anyCollection());
-        verify(scopeRepository, never()).findPrivilegedPermissionSetIds(anyCollection());
     }
 
     @Test
-    @DisplayName("union across two scopes ORs capabilities and unions profile/permset sets")
+    @DisplayName("union across two scopes ORs capabilities and unions profile sets")
     void unionAcrossTwoScopes() {
         stubCallerResolvesTo(CALLER_ID);
         when(scopeRepository.findActiveScopes(TENANT)).thenReturn(List.of(
-                scopeRow("[\"user-1\"]", "[\"p1\"]", "[\"ps1\"]", true, false, false),
-                scopeRow("[\"user-1\",\"user-9\"]", "[\"p2\"]", "[\"ps2\"]", false, true, false)));
+                scopeRow("[\"user-1\"]", "[\"p1\"]", true, false, false),
+                scopeRow("[\"user-1\",\"user-9\"]", "[\"p2\"]", false, true, false)));
         when(scopeRepository.findPrivilegedProfileIds(Set.of("p1", "p2"))).thenReturn(Set.of());
-        when(scopeRepository.findPrivilegedPermissionSetIds(Set.of("ps1", "ps2"))).thenReturn(Set.of());
 
         EffectiveDelegatedScope scope = service.effectiveScope(CALLER_EMAIL, TENANT);
 
@@ -115,27 +111,22 @@ class DelegatedAdminServiceTest {
         assertThat(scope.canDeactivateUsers()).isTrue();
         assertThat(scope.canResetPasswords()).isFalse();
         assertThat(scope.manageableProfileIds()).containsExactlyInAnyOrder("p1", "p2");
-        assertThat(scope.assignablePermissionSetIds()).containsExactlyInAnyOrder("ps1", "ps2");
         assertThat(scope.canManageProfile("p1")).isTrue();
-        assertThat(scope.canAssignPermissionSet("ps2")).isTrue();
     }
 
     @Test
-    @DisplayName("runtime re-filter drops now-privileged profiles and permission sets")
+    @DisplayName("runtime re-filter drops now-privileged profiles")
     void runtimeReFilterDropsPrivilegedEntries() {
         stubCallerResolvesTo(CALLER_ID);
         when(scopeRepository.findActiveScopes(TENANT)).thenReturn(List.of(
-                scopeRow("[\"user-1\"]", "[\"p1\",\"p2\"]", "[\"ps1\",\"ps2\"]", true, false, true)));
+                scopeRow("[\"user-1\"]", "[\"p1\",\"p2\"]", true, false, true)));
         when(scopeRepository.findPrivilegedProfileIds(Set.of("p1", "p2"))).thenReturn(Set.of("p2"));
-        when(scopeRepository.findPrivilegedPermissionSetIds(Set.of("ps1", "ps2"))).thenReturn(Set.of("ps1"));
 
         EffectiveDelegatedScope scope = service.effectiveScope(CALLER_EMAIL, TENANT);
 
         assertThat(scope.delegated()).isTrue();
         assertThat(scope.manageableProfileIds()).containsExactly("p1");
-        assertThat(scope.assignablePermissionSetIds()).containsExactly("ps2");
         assertThat(scope.canManageProfile("p2")).isFalse();
-        assertThat(scope.canAssignPermissionSet("ps1")).isFalse();
     }
 
     @Test
@@ -159,11 +150,10 @@ class DelegatedAdminServiceTest {
     @DisplayName("scope rows carrying JSONB columns as JSON strings resolve membership")
     void jsonbColumnsAsJsonStrings() {
         stubCallerResolvesTo(CALLER_ID);
-        Map<String, Object> row = scopeRow("[\"user-1\"]", "[\"p1\"]", "[\"ps1\"]", false, false, true);
+        Map<String, Object> row = scopeRow("[\"user-1\"]", "[\"p1\"]", false, false, true);
         assertThat(row.get("delegated_user_ids")).isInstanceOf(String.class);
         when(scopeRepository.findActiveScopes(TENANT)).thenReturn(List.of(row));
         when(scopeRepository.findPrivilegedProfileIds(Set.of("p1"))).thenReturn(Set.of());
-        when(scopeRepository.findPrivilegedPermissionSetIds(Set.of("ps1"))).thenReturn(Set.of());
 
         EffectiveDelegatedScope scope = service.effectiveScope(CALLER_EMAIL, TENANT);
 
@@ -171,7 +161,6 @@ class DelegatedAdminServiceTest {
         assertThat(scope.canResetPasswords()).isTrue();
         assertThat(scope.canCreateUsers()).isFalse();
         assertThat(scope.manageableProfileIds()).containsExactly("p1");
-        assertThat(scope.assignablePermissionSetIds()).containsExactly("ps1");
     }
 
     @Test

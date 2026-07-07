@@ -74,8 +74,7 @@ public class SystemCollectionResponseCacheFilter implements GlobalFilter, Ordere
             "page-layouts", "layout-sections", "layout-fields",
             "layout-related-lists", "layout-assignments",
             "list-views",
-            "profiles",
-            "permission-sets"
+            "profiles"
     );
 
     /**

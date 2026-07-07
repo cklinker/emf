@@ -431,7 +431,6 @@ export interface DelegatedAdminSummary {
   canDeactivateUsers: boolean;
   canResetPasswords: boolean;
   manageableProfiles: DelegatedNamedRef[];
-  assignablePermissionSets: DelegatedNamedRef[];
 }
 
 /**
@@ -444,7 +443,6 @@ export interface DelegatedAdminScope {
   active: boolean;
   delegatedUserIds: string[];
   manageableProfileIds: string[];
-  assignablePermissionSetIds: string[];
   canCreateUsers: boolean;
   canDeactivateUsers: boolean;
   canResetPasswords: boolean;
@@ -461,7 +459,6 @@ export interface SaveDelegatedAdminScopeRequest {
   active?: boolean;
   delegatedUserIds?: string[];
   manageableProfileIds?: string[];
-  assignablePermissionSetIds?: string[];
   canCreateUsers?: boolean;
   canDeactivateUsers?: boolean;
   canResetPasswords?: boolean;

@@ -46,7 +46,6 @@ public final class SystemCollectionDefinitions {
         definitions.add(tenants());
         definitions.add(users());
         definitions.add(profiles());
-        definitions.add(permissionSets());
         definitions.add(collections());
         definitions.add(fields());
 
@@ -58,15 +57,6 @@ public final class SystemCollectionDefinitions {
         definitions.add(profileSystemPermissions());
         definitions.add(profileObjectPermissions());
         definitions.add(profileFieldPermissions());
-
-        // Permission tables (permission-set-based)
-        definitions.add(permsetSystemPermissions());
-        definitions.add(permsetObjectPermissions());
-        definitions.add(permsetFieldPermissions());
-
-        // Permission assignments
-        definitions.add(userPermissionSets());
-        definitions.add(groupPermissionSets());
 
         // Delegated administration
         definitions.add(delegatedAdminScopes());
@@ -223,15 +213,6 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition profiles() {
         return systemBuilder("profiles", "Profiles", "profile")
-            .displayFieldName("name")
-            .addField(FieldDefinition.requiredString("name", 255))
-            .addField(FieldDefinition.text("description"))
-            .addField(FieldDefinition.bool("isSystem").withColumnName("is_system").withDefault(false))
-            .build();
-    }
-
-    public static CollectionDefinition permissionSets() {
-        return systemBuilder("permission-sets", "Permission Sets", "permission_set")
             .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 255))
             .addField(FieldDefinition.text("description"))
@@ -1247,84 +1228,10 @@ public final class SystemCollectionDefinitions {
             .build();
     }
 
-    public static CollectionDefinition permsetSystemPermissions() {
-        return systemBuilder("permset-system-permissions", "Permission Set System Permissions",
-                "permset_system_permission")
-            .tenantScoped(true)
-            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
-                "Permission Set").withColumnName("permission_set_id"))
-            .addField(FieldDefinition.requiredString("permissionName", 100)
-                .withColumnName("permission_name"))
-            .addField(FieldDefinition.bool("granted").withDefault(false)
-                .withNullable(false))
-            .build();
-    }
-
-    public static CollectionDefinition permsetObjectPermissions() {
-        return systemBuilder("permset-object-permissions", "Permission Set Object Permissions",
-                "permset_object_permission")
-            .tenantScoped(true)
-            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
-                "Permission Set").withColumnName("permission_set_id"))
-            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
-                .withColumnName("collection_id"))
-            .addField(FieldDefinition.bool("canCreate").withColumnName("can_create")
-                .withDefault(false).withNullable(false))
-            .addField(FieldDefinition.bool("canRead").withColumnName("can_read")
-                .withDefault(false).withNullable(false))
-            .addField(FieldDefinition.bool("canEdit").withColumnName("can_edit")
-                .withDefault(false).withNullable(false))
-            .addField(FieldDefinition.bool("canDelete").withColumnName("can_delete")
-                .withDefault(false).withNullable(false))
-            .build();
-    }
-
-    public static CollectionDefinition permsetFieldPermissions() {
-        return systemBuilder("permset-field-permissions", "Permission Set Field Permissions",
-                "permset_field_permission")
-            .tenantScoped(true)
-            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
-                "Permission Set").withColumnName("permission_set_id"))
-            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
-                .withColumnName("collection_id"))
-            .addField(FieldDefinition.masterDetail("fieldId", "fields", "Field")
-                .withColumnName("field_id"))
-            .addField(FieldDefinition.requiredString("visibility", 20)
-                .withDefault("VISIBLE"))
-            .build();
-    }
-
-    // =========================================================================
-    // Permission Assignment Collections
-    // =========================================================================
-
-    public static CollectionDefinition userPermissionSets() {
-        return systemBuilder("user-permission-sets", "User Permission Sets",
-                "user_permission_set")
-            .tenantScoped(false)
-            .addField(FieldDefinition.masterDetail("userId", "users", "User")
-                .withColumnName("user_id"))
-            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
-                "Permission Set").withColumnName("permission_set_id"))
-            .build();
-    }
-
-    public static CollectionDefinition groupPermissionSets() {
-        return systemBuilder("group-permission-sets", "Group Permission Sets",
-                "group_permission_set")
-            .tenantScoped(true)
-            .addField(FieldDefinition.masterDetail("groupId", "user-groups", "Group")
-                .withColumnName("group_id"))
-            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
-                "Permission Set").withColumnName("permission_set_id"))
-            .build();
-    }
-
     /**
      * Delegated administration scopes: a full admin lists delegated users who may manage users
-     * whose profile is in {@code manageableProfileIds}, assign permission sets from
-     * {@code assignablePermissionSetIds}, and use the capability booleans. Read fresh per request
-     * by the worker's DelegatedAdminService (no cache, no NATS); CRUD via the dedicated
+     * whose profile is in {@code manageableProfileIds}, plus the capability booleans. Read fresh
+     * per request by the worker's DelegatedAdminService (no cache, no NATS); CRUD via the dedicated
      * MANAGE_DELEGATED_ADMINS-gated controller; DelegatedAdminScopeValidationHook rejects scopes
      * that would delegate administration of privileged profiles.
      */
@@ -1337,8 +1244,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.bool("active").withDefault(true))
             .addField(FieldDefinition.json("delegatedUserIds").withColumnName("delegated_user_ids"))
             .addField(FieldDefinition.json("manageableProfileIds").withColumnName("manageable_profile_ids"))
-            .addField(FieldDefinition.json("assignablePermissionSetIds")
-                .withColumnName("assignable_permission_set_ids"))
             .addField(FieldDefinition.bool("canCreateUsers").withColumnName("can_create_users")
                 .withDefault(false))
             .addField(FieldDefinition.bool("canDeactivateUsers").withColumnName("can_deactivate_users")

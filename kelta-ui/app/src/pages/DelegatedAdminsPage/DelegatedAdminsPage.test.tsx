@@ -15,7 +15,6 @@ const scopesUpdate = vi.fn()
 const scopesDelete = vi.fn()
 const usersList = vi.fn()
 const profilesList = vi.fn()
-const axiosGet = vi.fn()
 
 vi.mock('../../context/ApiContext', () => ({
   useApi: () => ({
@@ -30,7 +29,6 @@ vi.mock('../../context/ApiContext', () => ({
         users: { list: usersList },
         profiles: { list: profilesList },
       },
-      getAxiosInstance: () => ({ get: axiosGet }),
     },
   }),
 }))
@@ -44,7 +42,6 @@ const SCOPE: DelegatedAdminScope = {
   active: true,
   delegatedUserIds: ['u1'],
   manageableProfileIds: ['p1'],
-  assignablePermissionSetIds: [],
   canCreateUsers: true,
   canDeactivateUsers: false,
   canResetPasswords: false,
@@ -72,7 +69,6 @@ describe('DelegatedAdminsPage', () => {
       { id: 'p1', name: 'Standard User' },
       { id: 'p2', name: 'Manager' },
     ])
-    axiosGet.mockReset().mockResolvedValue({ data: { data: [] } })
   })
 
   it('shows the empty state when there are no scopes', async () => {

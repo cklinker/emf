@@ -37,7 +37,7 @@ public class RecordTypeEnforcementHook implements BeforeSaveHook {
             "approval-processes", "approval-steps", "approval-instances",
             "approval-step-instances", "flows", "flow-versions",
             "workflow-rules", "email-templates", "scheduled-jobs",
-            "connected-apps", "oidc-providers", "permission-sets",
+            "connected-apps", "oidc-providers",
             "profile-system-permissions", "profile-object-permissions",
             "profile-field-permissions", "global-picklists", "picklist-values",
             "picklist-dependencies", "scripts", "script-triggers",

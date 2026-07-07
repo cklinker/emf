@@ -34,7 +34,6 @@ const DELEGATED_SUMMARY: DelegatedAdminSummary = {
   canDeactivateUsers: false,
   canResetPasswords: false,
   manageableProfiles: [{ id: 'p1', name: 'Standard User' }],
-  assignablePermissionSets: [],
 }
 
 describe('useDelegatedAdmin', () => {

@@ -584,25 +584,6 @@ export class AdminClient {
         const response = await this.axios.post(`/api/admin/delegated/users/${id}/reset-password`);
         return response.data as { status: string; userId: string };
       },
-
-      listPermissionSets: async (id: string): Promise<string[]> => {
-        const response = await this.axios.get<{ assignedPermissionSetIds?: string[] }>(
-          `/api/admin/delegated/users/${id}/permission-sets`
-        );
-        return response.data?.assignedPermissionSetIds ?? [];
-      },
-
-      assignPermissionSet: async (id: string, permissionSetId: string): Promise<void> => {
-        await this.axios.post(
-          `/api/admin/delegated/users/${id}/permission-sets/${permissionSetId}`
-        );
-      },
-
-      removePermissionSet: async (id: string, permissionSetId: string): Promise<void> => {
-        await this.axios.delete(
-          `/api/admin/delegated/users/${id}/permission-sets/${permissionSetId}`
-        );
-      },
     },
   };
 

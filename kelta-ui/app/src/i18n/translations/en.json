@@ -1056,7 +1056,6 @@
     "activateConfirm": "Are you sure you want to activate {{name}}?",
     "noLoginHistory": "No login history available",
     "profile": "Profile",
-    "permissionSets": "Permission Sets",
     "editUser": "Edit User",
     "delegatedScope": "Delegated scope"
   },
@@ -1070,7 +1069,6 @@
     "active": "Active",
     "delegatedUsers": "Delegated Users",
     "manageableProfiles": "Manageable Profiles",
-    "assignablePermissionSets": "Assignable Permission Sets",
     "canCreateUsers": "Can create users",
     "canDeactivateUsers": "Can activate/deactivate users",
     "canResetPasswords": "Can reset passwords",

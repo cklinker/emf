@@ -178,6 +178,28 @@ per-collection object permissions) — the allow-all harness Cerbos cannot exerc
 
 ## Tech Debt
 
+**DB-design audit — incomplete legacy removals (2026-07-06).** A schema audit (all 159 migrations +
+code cross-referenced against the live `192.168.0.5/emf_control_plane` DB: 117 public tables, 55 empty)
+found the platform's move to profiles+Cerbos left dead references to tables dropped years earlier.
+Staged cleanup:
+- **PR1 (done, this change): permission sets fully removed.** V98 dropped the six permission-set tables;
+  the runtime still registered them as system collections and delegated-admin still queried
+  `permset_system_permission`/`permission_set` (broken on a real DB). Removed the 6
+  `SystemCollectionDefinitions`, the delegated-admin `assignablePermissionSetIds` path (repo/hook/service/
+  controller + SDK + UI), and stale name-lists in `AuditBeforeSaveHook`/`ApprovalRecordLockHook`/
+  `RecordTypeEnforcementHook`/gateway `SystemCollectionResponseCacheFilter`. Migration V160 drops the
+  `delegated_admin_scope.assignable_permission_set_ids` column.
+- **PR2 (pending): package export/import + config-health.** `PackageService`/`PackageRepository`/
+  `PackageImportService` still `SELECT/INSERT/UPDATE role`/`policy`/`route_policy`/`field_policy` (dropped
+  V47) — package export throws on those item types. `OverpermissiveProfileRule` selects `FROM
+  system_permission` (dropped V47) — config-health scan fails. Rewrite to `profile_system_permission`.
+- **PR3 (pending): orphan tables + dead endpoint.** Drop `user_group_member` (V12, superseded by
+  `group_membership` V45; 1 stale row) and `flow_execution_dedup` (V71, unused). Delete
+  `WorkflowMigrationController`/`WorkflowMigrationRepository` (queries `workflow_rule`/`workflow_action`,
+  dropped V72 — see the "deliberately-retained" note below, which is wrong: it's dead-broken, not harmless).
+- **PR4 (pending): Flyway history flatten** to a clean V1 baseline (post-cleanup schema + curated bootstrap
+  seed), archiving V1→head; rehearse the no-op on a `192.168.0.5` clone before rollout.
+
 **Feature-flag audit outcomes (2026-07-02).** The audit reviewed every `@ConditionalOnProperty`
 for removal ("inline the current value"). Findings:
 - **Removed**: frontend `RENDER_TREE_V2` (was hardcoded `true`; legacy per-type renderer deleted — #1137).

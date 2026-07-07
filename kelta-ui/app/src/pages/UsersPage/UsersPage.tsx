@@ -245,20 +245,18 @@ function UserForm({
 }
 
 /**
- * Compact edit dialog for delegated (scoped) mode — whitelisted fields plus
- * permission-set toggles limited to the caller's assignable set. Full admins
- * keep the UserDetailPage instead.
+ * Compact edit dialog for delegated (scoped) mode — whitelisted fields limited
+ * to the caller's manageable profiles. Full admins keep the UserDetailPage
+ * instead.
  */
 function DelegatedEditDialog({
   user,
   profileOptions,
-  permissionSetOptions,
   onClose,
   onSaved,
 }: {
   user: PlatformUser
   profileOptions: DelegatedNamedRef[]
-  permissionSetOptions: DelegatedNamedRef[]
   onClose: () => void
   onSaved: () => void
 }) {
@@ -271,26 +269,7 @@ function DelegatedEditDialog({
     username: user.username ?? '',
     profileId: user.profileId ?? '',
   })
-  const [permissionSets, setPermissionSets] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
-
-  const { data: assignedIds, isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['delegated-user-permsets', user.id],
-    queryFn: () => keltaClient.admin.delegated.users.listPermissionSets(user.id),
-  })
-
-  React.useEffect(() => {
-    if (assignedIds) setPermissionSets(new Set(assignedIds))
-  }, [assignedIds])
-
-  const togglePermissionSet = (id: string) => {
-    setPermissionSets((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -304,16 +283,6 @@ function DelegatedEditDialog({
         update.profileId = form.profileId
       }
       await keltaClient.admin.delegated.users.update(user.id, update)
-
-      const before = new Set(assignedIds ?? [])
-      for (const id of permissionSets) {
-        if (!before.has(id))
-          await keltaClient.admin.delegated.users.assignPermissionSet(user.id, id)
-      }
-      for (const id of before) {
-        if (!permissionSets.has(id))
-          await keltaClient.admin.delegated.users.removePermissionSet(user.id, id)
-      }
       showToast(t('users.updateSuccess'), 'success')
       onSaved()
     } catch (err) {
@@ -397,32 +366,6 @@ function DelegatedEditDialog({
             ))}
           </select>
         </div>
-        {permissionSetOptions.length > 0 && (
-          <div className="mb-4">
-            <span className="mb-1 block text-sm font-medium text-foreground">
-              {t('users.permissionSets')}
-            </span>
-            {assignmentsLoading ? (
-              <span className="text-sm text-muted-foreground">{t('common.loading')}</span>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {permissionSetOptions.map((ps) => (
-                  <label
-                    key={ps.id}
-                    className="flex cursor-pointer items-center gap-1 rounded-full border border-border px-3 py-1 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={permissionSets.has(ps.id)}
-                      onChange={() => togglePermissionSet(ps.id)}
-                    />
-                    {ps.name}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
@@ -435,7 +378,7 @@ function DelegatedEditDialog({
             type="button"
             className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
             onClick={handleSave}
-            disabled={saving || assignmentsLoading}
+            disabled={saving}
           >
             {saving ? t('common.saving') : t('common.save')}
           </button>
@@ -771,7 +714,6 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
         <DelegatedEditDialog
           user={editUser}
           profileOptions={summary?.manageableProfiles ?? []}
-          permissionSetOptions={summary?.assignablePermissionSets ?? []}
           onClose={() => setEditUser(null)}
           onSaved={() => {
             setEditUser(null)

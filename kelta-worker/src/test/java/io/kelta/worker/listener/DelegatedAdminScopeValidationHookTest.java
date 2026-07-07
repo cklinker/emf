@@ -55,12 +55,9 @@ class DelegatedAdminScopeValidationHookTest {
         Map<String, Object> record = new HashMap<>();
         record.put("delegatedUserIds", List.of("u1", "u2", "u1")); // duplicate deduped
         record.put("manageableProfileIds", List.of("p1"));
-        record.put("assignablePermissionSetIds", List.of("ps1"));
         when(scopeRepository.findExistingUserIds(Set.of("u1", "u2"), TENANT)).thenReturn(Set.of("u1", "u2"));
         when(scopeRepository.findExistingProfileIds(Set.of("p1"), TENANT)).thenReturn(Set.of("p1"));
-        when(scopeRepository.findExistingPermissionSetIds(Set.of("ps1"), TENANT)).thenReturn(Set.of("ps1"));
         when(scopeRepository.findPrivilegedProfileIds(Set.of("p1"))).thenReturn(Set.of());
-        when(scopeRepository.findPrivilegedPermissionSetIds(Set.of("ps1"))).thenReturn(Set.of());
 
         BeforeSaveResult result = hook.beforeCreate(record, TENANT);
 
@@ -68,7 +65,6 @@ class DelegatedAdminScopeValidationHookTest {
         assertThat(record.get("delegatedUserIds")).isInstanceOf(List.class);
         assertThat(idList(record, "delegatedUserIds")).containsExactlyInAnyOrder("u1", "u2");
         assertThat(idList(record, "manageableProfileIds")).containsExactly("p1");
-        assertThat(idList(record, "assignablePermissionSetIds")).containsExactly("ps1");
     }
 
     @Test
@@ -85,22 +81,6 @@ class DelegatedAdminScopeValidationHookTest {
 
         assertError(result, "manageableProfileIds");
         assertThat(result.getErrors().get(0).message()).contains("p-admin");
-    }
-
-    @Test
-    @DisplayName("privileged permission set in assignablePermissionSetIds is rejected on that field")
-    void privilegedPermissionSetRejected() {
-        Map<String, Object> record = new HashMap<>();
-        record.put("assignablePermissionSetIds", List.of("ps1", "ps-admin"));
-        when(scopeRepository.findExistingPermissionSetIds(Set.of("ps1", "ps-admin"), TENANT))
-                .thenReturn(Set.of("ps1", "ps-admin"));
-        when(scopeRepository.findPrivilegedPermissionSetIds(Set.of("ps1", "ps-admin")))
-                .thenReturn(Set.of("ps-admin"));
-
-        BeforeSaveResult result = hook.beforeCreate(record, TENANT);
-
-        assertError(result, "assignablePermissionSetIds");
-        assertThat(result.getErrors().get(0).message()).contains("ps-admin");
     }
 
     @Test

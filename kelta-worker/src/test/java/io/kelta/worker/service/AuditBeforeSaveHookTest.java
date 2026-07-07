@@ -114,17 +114,6 @@ class AuditBeforeSaveHookTest {
     }
 
     @Test
-    @DisplayName("Should map permission set collections")
-    void shouldMapPermissionSetCollections() {
-        hook.afterCreate("permission-sets",
-                Map.of("name", "Sales Admin", "id", "ps-1", "createdBy", "u1"), "t1");
-
-        verify(auditService).log(eq("t1"), eq("u1"), eq("CREATED"), eq("Permission Sets"),
-                eq("permission-set"), eq("ps-1"), eq("Sales Admin"),
-                isNull(), any());
-    }
-
-    @Test
     @DisplayName("Should map users collection")
     void shouldMapUsersCollection() {
         hook.afterUpdate("users", "u2",
@@ -162,9 +151,7 @@ class AuditBeforeSaveHookTest {
         assertEquals("system-permissions",
                 AuditBeforeSaveHook.resolveEntityType("profile-system-permissions"));
         assertEquals("object-permissions",
-                AuditBeforeSaveHook.resolveEntityType("permset-object-permissions"));
-        assertEquals("permission-sets",
-                AuditBeforeSaveHook.resolveEntityType("user-permission-sets"));
+                AuditBeforeSaveHook.resolveEntityType("profile-object-permissions"));
     }
 
     @Test

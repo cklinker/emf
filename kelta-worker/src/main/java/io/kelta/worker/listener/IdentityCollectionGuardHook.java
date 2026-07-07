@@ -15,8 +15,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Last-line write guard for identity collections ({@code users}, {@code user-permission-sets},
- * {@code group-memberships}, {@code delegated-admin-scopes}).
+ * Last-line write guard for identity collections ({@code users}, {@code group-memberships},
+ * {@code delegated-admin-scopes}).
  *
  * <p>Every QueryEngine write path fires before-save hooks — the dynamic collection router, the
  * JSON:API atomic-operations batch endpoint, CSV import, and the delegated admin controller. The
@@ -40,7 +40,7 @@ public class IdentityCollectionGuardHook implements BeforeSaveHook {
     private static final Logger log = LoggerFactory.getLogger(IdentityCollectionGuardHook.class);
 
     static final Set<String> GUARDED = Set.of(
-            "users", "user-permission-sets", "group-memberships", "delegated-admin-scopes");
+            "users", "group-memberships", "delegated-admin-scopes");
 
     private static final String PROFILE_ID_HEADER = "X-User-Profile-Id";
 

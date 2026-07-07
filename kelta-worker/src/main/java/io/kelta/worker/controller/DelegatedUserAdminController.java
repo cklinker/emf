@@ -111,8 +111,6 @@ public class DelegatedUserAdminController {
         body.put("canResetPasswords", scope.canResetPasswords());
         body.put("manageableProfiles", named(scope.manageableProfileIds(),
                 scopeRepository.findProfileNames(scope.manageableProfileIds(), tenantId)));
-        body.put("assignablePermissionSets", named(scope.assignablePermissionSetIds(),
-                scopeRepository.findPermissionSetNames(scope.assignablePermissionSetIds(), tenantId)));
         return ResponseEntity.ok(body);
     }
 
@@ -234,64 +232,6 @@ public class DelegatedUserAdminController {
         return ResponseEntity.ok(Map.of("status", "reset_initiated", "userId", id));
     }
 
-    // ----------------------------------------------------- permission sets
-
-    /**
-     * The target user's current assignments, filtered to the caller's assignable set — a
-     * delegated admin sees only the permission sets they could themselves toggle.
-     */
-    @GetMapping("/users/{id}/permission-sets")
-    public ResponseEntity<Map<String, Object>> listPermissionSets(HttpServletRequest request,
-                                                                  @PathVariable String id) {
-        Caller caller = requireDelegated(request);
-        requireManageableTarget(caller, id);
-        QueryResult result = queryEngine.executeQuery(userPermissionSetsDefinition(), new QueryRequest(
-                new Pagination(1, MAX_PAGE), List.of(), List.of(),
-                List.of(FilterCondition.eq("userId", id))));
-        List<String> assigned = result.data().stream()
-                .map(row -> str(row.get("permissionSetId")))
-                .filter(psId -> psId != null && caller.scope.canAssignPermissionSet(psId))
-                .toList();
-        return ResponseEntity.ok(Map.of("assignedPermissionSetIds", assigned));
-    }
-
-    @PostMapping("/users/{id}/permission-sets/{permissionSetId}")
-    public ResponseEntity<Map<String, Object>> assignPermissionSet(HttpServletRequest request,
-                                                                   @PathVariable String id,
-                                                                   @PathVariable String permissionSetId) {
-        Caller caller = requireDelegated(request);
-        requireManageableTarget(caller, id);
-        requireAssignablePermissionSet(caller, permissionSetId);
-        if (findAssignment(id, permissionSetId).isPresent()) {
-            return ResponseEntity.ok(Map.of("status", "exists"));
-        }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("userId", id);
-        data.put("permissionSetId", permissionSetId);
-        DelegatedWriteContext.callAuthorized(
-                () -> queryEngine.create(userPermissionSetsDefinition(), data));
-        audit(caller, id, "permission set " + permissionSetId + " assigned");
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("status", "assigned"));
-    }
-
-    @DeleteMapping("/users/{id}/permission-sets/{permissionSetId}")
-    public ResponseEntity<Map<String, Object>> removePermissionSet(HttpServletRequest request,
-                                                                   @PathVariable String id,
-                                                                   @PathVariable String permissionSetId) {
-        Caller caller = requireDelegated(request);
-        requireManageableTarget(caller, id);
-        requireAssignablePermissionSet(caller, permissionSetId);
-        var assignment = findAssignment(id, permissionSetId);
-        if (assignment.isEmpty()) {
-            return ResponseEntity.ok(Map.of("status", "absent"));
-        }
-        String assignmentId = String.valueOf(assignment.get().get("id"));
-        DelegatedWriteContext.callAuthorized(
-                () -> queryEngine.delete(userPermissionSetsDefinition(), assignmentId));
-        audit(caller, id, "permission set " + permissionSetId + " removed");
-        return ResponseEntity.ok(Map.of("status", "removed"));
-    }
-
     // ------------------------------------------------------------- Helpers
 
     private record Caller(String email, String userId, String tenantId, EffectiveDelegatedScope scope) {
@@ -337,21 +277,6 @@ public class DelegatedUserAdminController {
         }
     }
 
-    private void requireAssignablePermissionSet(Caller caller, String permissionSetId) {
-        if (!caller.scope.canAssignPermissionSet(permissionSetId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Permission set is not in the delegated scope");
-        }
-    }
-
-    private java.util.Optional<Map<String, Object>> findAssignment(String userId, String permissionSetId) {
-        QueryResult result = queryEngine.executeQuery(userPermissionSetsDefinition(), new QueryRequest(
-                new Pagination(1, 1), List.of(), List.of(),
-                List.of(FilterCondition.eq("userId", userId),
-                        FilterCondition.eq("permissionSetId", permissionSetId))));
-        return result.data().stream().findFirst();
-    }
-
     private void rejectUnknownFields(Map<String, Object> attrs, Set<String> allowed) {
         for (String key : attrs.keySet()) {
             if (!allowed.contains(key)) {
@@ -378,10 +303,6 @@ public class DelegatedUserAdminController {
 
     private CollectionDefinition usersDefinition() {
         return requireDefinition("users");
-    }
-
-    private CollectionDefinition userPermissionSetsDefinition() {
-        return requireDefinition("user-permission-sets");
     }
 
     private CollectionDefinition requireDefinition(String name) {

@@ -104,13 +104,13 @@ class IdentityCollectionGuardHookTest {
         }
 
         @Test
-        @DisplayName("MODIFY_ALL_DATA admits writes to user-permission-sets")
+        @DisplayName("MODIFY_ALL_DATA admits writes to group-memberships")
         void modifyAllDataIsAdmitted() {
             bindRequestWithProfile("profile-1");
             stubPermissions(Map.of("permission_name", "MODIFY_ALL_DATA", "granted", true));
 
             BeforeSaveResult result = hook.beforeUpdate(
-                    "user-permission-sets", "ups-1", Map.of(), Map.of(), "tenant-1");
+                    "group-memberships", "gm-1", Map.of(), Map.of(), "tenant-1");
 
             assertThat(result.isSuccess()).isTrue();
         }
@@ -142,7 +142,7 @@ class IdentityCollectionGuardHookTest {
                     Map.of("permission_name", "API_ACCESS", "granted", true),
                     Map.of("permission_name", "MANAGE_USERS", "granted", false));
 
-            for (String collection : List.of("users", "user-permission-sets", "group-memberships")) {
+            for (String collection : List.of("users", "group-memberships")) {
                 assertBlocked(hook.beforeCreate(collection, Map.of(), "tenant-1"), collection);
                 assertBlocked(hook.beforeUpdate(collection, "rec-1", Map.of(), Map.of(), "tenant-1"),
                         collection);

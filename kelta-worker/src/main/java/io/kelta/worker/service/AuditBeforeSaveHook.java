@@ -41,16 +41,8 @@ public class AuditBeforeSaveHook implements BeforeSaveHook {
             Map.entry("profile-object-permissions", "Profiles"),
             Map.entry("profile-field-permissions", "Profiles"),
 
-            // Permission Sets
-            Map.entry("permission-sets", "Permission Sets"),
-            Map.entry("permset-system-permissions", "Permission Sets"),
-            Map.entry("permset-object-permissions", "Permission Sets"),
-            Map.entry("permset-field-permissions", "Permission Sets"),
-
             // Users
             Map.entry("users", "Users"),
-            Map.entry("user-permission-sets", "Users"),
-            Map.entry("group-permission-sets", "Users"),
             Map.entry("groups", "Users"),
 
             // OIDC
@@ -76,9 +68,7 @@ public class AuditBeforeSaveHook implements BeforeSaveHook {
      * than the collection name itself (for more readable audit entries).
      */
     private static final Set<String> JUNCTION_COLLECTIONS = Set.of(
-            "profile-system-permissions", "profile-object-permissions", "profile-field-permissions",
-            "permset-system-permissions", "permset-object-permissions", "permset-field-permissions",
-            "user-permission-sets", "group-permission-sets"
+            "profile-system-permissions", "profile-object-permissions", "profile-field-permissions"
     );
 
     private final SetupAuditService auditService;

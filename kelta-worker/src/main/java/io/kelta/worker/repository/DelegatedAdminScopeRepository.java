@@ -33,15 +33,13 @@ public class DelegatedAdminScopeRepository {
     public List<Map<String, Object>> findActiveScopes(String tenantId) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT id, name, delegated_user_ids, manageable_profile_ids, "
-                        + "assignable_permission_set_ids, can_create_users, can_deactivate_users, "
-                        + "can_reset_passwords "
+                        + "can_create_users, can_deactivate_users, can_reset_passwords "
                         + "FROM delegated_admin_scope WHERE tenant_id = ? AND active = true",
                 tenantId);
         return rows.stream().map(row -> {
             Map<String, Object> normalized = new LinkedHashMap<>(row);
             normalized.computeIfPresent("delegated_user_ids", (k, v) -> v.toString());
             normalized.computeIfPresent("manageable_profile_ids", (k, v) -> v.toString());
-            normalized.computeIfPresent("assignable_permission_set_ids", (k, v) -> v.toString());
             return normalized;
         }).toList();
     }
@@ -61,20 +59,6 @@ public class DelegatedAdminScopeRepository {
         return Set.copyOf(jdbcTemplate.queryForList(sql, String.class, args));
     }
 
-    /**
-     * Of the given permission-set ids, the ones that currently grant any privileged permission.
-     */
-    public Set<String> findPrivilegedPermissionSetIds(Collection<String> permissionSetIds) {
-        if (permissionSetIds == null || permissionSetIds.isEmpty()) {
-            return Set.of();
-        }
-        String sql = "SELECT DISTINCT permission_set_id FROM permset_system_permission "
-                + "WHERE granted = true AND permission_set_id IN (" + placeholders(permissionSetIds.size()) + ") "
-                + "AND permission_name IN (" + placeholders(PrivilegedPermissions.SET.size()) + ")";
-        Object[] args = concat(permissionSetIds, PrivilegedPermissions.SET);
-        return Set.copyOf(jdbcTemplate.queryForList(sql, String.class, args));
-    }
-
     /** Of the given user ids, the ones that exist in the tenant. */
     public Set<String> findExistingUserIds(Collection<String> userIds, String tenantId) {
         return findExistingIds("platform_user", userIds, tenantId);
@@ -85,19 +69,9 @@ public class DelegatedAdminScopeRepository {
         return findExistingIds("profile", profileIds, tenantId);
     }
 
-    /** Of the given permission-set ids, the ones that exist in the tenant. */
-    public Set<String> findExistingPermissionSetIds(Collection<String> permissionSetIds, String tenantId) {
-        return findExistingIds("permission_set", permissionSetIds, tenantId);
-    }
-
     /** id → name for the given profile ids within the tenant. */
     public Map<String, String> findProfileNames(Collection<String> profileIds, String tenantId) {
         return findNames("profile", profileIds, tenantId);
-    }
-
-    /** id → name for the given permission-set ids within the tenant. */
-    public Map<String, String> findPermissionSetNames(Collection<String> permissionSetIds, String tenantId) {
-        return findNames("permission_set", permissionSetIds, tenantId);
     }
 
     private Map<String, String> findNames(String table, Collection<String> ids, String tenantId) {

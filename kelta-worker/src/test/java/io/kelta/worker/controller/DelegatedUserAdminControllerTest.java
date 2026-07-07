@@ -66,8 +66,6 @@ class DelegatedUserAdminControllerTest {
     @Mock private HttpServletRequest request;
 
     private final CollectionDefinition usersDef = SystemCollectionDefinitions.users();
-    private final CollectionDefinition userPermissionSetsDef =
-            SystemCollectionDefinitions.userPermissionSets();
 
     private DelegatedUserAdminController controller;
 
@@ -77,7 +75,6 @@ class DelegatedUserAdminControllerTest {
                 queryEngine, collectionRegistry, permissionResolver, userInviteService, jdbcTemplate);
         TenantContext.set(TENANT);
         lenient().when(collectionRegistry.get("users")).thenReturn(usersDef);
-        lenient().when(collectionRegistry.get("user-permission-sets")).thenReturn(userPermissionSetsDef);
     }
 
     @AfterEach
@@ -89,7 +86,7 @@ class DelegatedUserAdminControllerTest {
 
     private static EffectiveDelegatedScope fullScope() {
         return new EffectiveDelegatedScope(true, true, true, true,
-                Set.of("profile-a", "profile-b"), Set.of("ps-1", "ps-2"));
+                Set.of("profile-a", "profile-b"));
     }
 
     private void stubCaller(EffectiveDelegatedScope scope) {
@@ -127,7 +124,6 @@ class DelegatedUserAdminControllerTest {
             when(delegatedAdminService.effectiveScope(CALLER_EMAIL, TENANT))
                     .thenReturn(EffectiveDelegatedScope.NONE);
             when(scopeRepository.findProfileNames(Set.of(), TENANT)).thenReturn(Map.of());
-            when(scopeRepository.findPermissionSetNames(Set.of(), TENANT)).thenReturn(Map.of());
 
             ResponseEntity<Map<String, Object>> response = controller.me(request);
 
@@ -137,21 +133,18 @@ class DelegatedUserAdminControllerTest {
                     .containsEntry("canCreateUsers", false)
                     .containsEntry("canDeactivateUsers", false)
                     .containsEntry("canResetPasswords", false)
-                    .containsEntry("manageableProfiles", List.of())
-                    .containsEntry("assignablePermissionSets", List.of());
+                    .containsEntry("manageableProfiles", List.of());
         }
 
         @Test
-        @DisplayName("returns capabilities plus named profiles and permission sets")
+        @DisplayName("returns capabilities plus named profiles")
         void delegatedScopeReturnsCapabilitiesAndNames() {
             EffectiveDelegatedScope scope = new EffectiveDelegatedScope(true, true, false, true,
-                    Set.of("profile-a", "profile-b"), Set.of("ps-1"));
+                    Set.of("profile-a", "profile-b"));
             when(permissionResolver.getEmail(request)).thenReturn(CALLER_EMAIL);
             when(delegatedAdminService.effectiveScope(CALLER_EMAIL, TENANT)).thenReturn(scope);
             when(scopeRepository.findProfileNames(Set.of("profile-a", "profile-b"), TENANT))
                     .thenReturn(Map.of("profile-a", "Sales", "profile-b", "Support"));
-            when(scopeRepository.findPermissionSetNames(Set.of("ps-1"), TENANT))
-                    .thenReturn(Map.of("ps-1", "Exporter"));
 
             ResponseEntity<Map<String, Object>> response = controller.me(request);
 
@@ -165,8 +158,6 @@ class DelegatedUserAdminControllerTest {
             assertThat(body.get("manageableProfiles")).isEqualTo(List.of(
                     Map.of("id", "profile-a", "name", "Sales"),
                     Map.of("id", "profile-b", "name", "Support")));
-            assertThat(body.get("assignablePermissionSets")).isEqualTo(List.of(
-                    Map.of("id", "ps-1", "name", "Exporter")));
         }
     }
 
@@ -190,7 +181,7 @@ class DelegatedUserAdminControllerTest {
         @Test
         @DisplayName("empty manageable set short-circuits to an empty collection without querying")
         void emptyManageableProfilesReturnsEmptyCollection() {
-            stubCaller(new EffectiveDelegatedScope(true, false, false, false, Set.of(), Set.of()));
+            stubCaller(new EffectiveDelegatedScope(true, false, false, false, Set.of()));
 
             ResponseEntity<Map<String, Object>> response = controller.listUsers(request, 50, 1);
 
@@ -233,7 +224,7 @@ class DelegatedUserAdminControllerTest {
         @DisplayName("403 when the scope does not allow creating users")
         void rejectsWithoutCanCreateUsers() {
             stubCaller(new EffectiveDelegatedScope(true, false, true, true,
-                    Set.of("profile-a"), Set.of()));
+                    Set.of("profile-a")));
 
             assertThatThrownBy(() -> controller.createUser(request,
                     Map.of("email", "new@t.io", "profileId", "profile-a")))
@@ -368,7 +359,7 @@ class DelegatedUserAdminControllerTest {
         @DisplayName("403 when changing status without canDeactivateUsers")
         void rejectsStatusChangeWithoutCapability() {
             stubCaller(new EffectiveDelegatedScope(true, true, false, true,
-                    Set.of("profile-a"), Set.of()));
+                    Set.of("profile-a")));
             stubTarget("user-2", "profile-a");
 
             assertThatThrownBy(() -> controller.updateUser(request, "user-2",
@@ -468,7 +459,7 @@ class DelegatedUserAdminControllerTest {
         @DisplayName("403 when the scope does not allow password resets")
         void rejectsWithoutCanResetPasswords() {
             stubCaller(new EffectiveDelegatedScope(true, true, true, false,
-                    Set.of("profile-a"), Set.of()));
+                    Set.of("profile-a")));
 
             assertThatThrownBy(() -> controller.resetPassword(request, "user-2"))
                     .isInstanceOf(ResponseStatusException.class)
@@ -492,108 +483,6 @@ class DelegatedUserAdminControllerTest {
                     .containsEntry("status", "reset_initiated")
                     .containsEntry("userId", "user-2");
             verify(jdbcTemplate).update(contains("force_change_on_login = true"), any(), eq("user-2"));
-        }
-    }
-
-    // --------------------- POST /users/{id}/permission-sets/{permissionSetId}
-
-    @Nested
-    @DisplayName("POST /users/{id}/permission-sets/{permissionSetId}")
-    class AssignPermissionSet {
-
-        @Test
-        @DisplayName("403 when the permission set is not in the assignable set")
-        void rejectsOutOfScopePermissionSet() {
-            stubCaller(fullScope());
-            stubTarget("user-2", "profile-a");
-
-            assertThatThrownBy(() -> controller.assignPermissionSet(request, "user-2", "ps-x"))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasFieldOrPropertyWithValue("statusCode", HttpStatus.FORBIDDEN);
-            verify(queryEngine, never()).create(any(), any());
-        }
-
-        @Test
-        @DisplayName("returns 200 exists when the assignment is already present, without creating")
-        void existingAssignmentReturnsExists() {
-            stubCaller(fullScope());
-            stubTarget("user-2", "profile-a");
-            when(queryEngine.executeQuery(eq(userPermissionSetsDef), any(QueryRequest.class)))
-                    .thenReturn(QueryResult.of(List.of(Map.of(
-                            "id", "assign-1", "userId", "user-2", "permissionSetId", "ps-1")),
-                            1, new Pagination(1, 1)));
-
-            ResponseEntity<Map<String, Object>> response =
-                    controller.assignPermissionSet(request, "user-2", "ps-1");
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).containsEntry("status", "exists");
-            verify(queryEngine, never()).create(any(), any());
-        }
-
-        @Test
-        @DisplayName("creates the assignment on user-permission-sets and returns 201")
-        @SuppressWarnings("unchecked")
-        void createsAssignment() {
-            stubCaller(fullScope());
-            stubTarget("user-2", "profile-a");
-            when(queryEngine.executeQuery(eq(userPermissionSetsDef), any(QueryRequest.class)))
-                    .thenReturn(QueryResult.empty(new Pagination(1, 1)));
-            when(queryEngine.create(eq(userPermissionSetsDef), any()))
-                    .thenReturn(Map.of("id", "assign-9"));
-
-            ResponseEntity<Map<String, Object>> response =
-                    controller.assignPermissionSet(request, "user-2", "ps-1");
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-            assertThat(response.getBody()).containsEntry("status", "assigned");
-            ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
-            verify(queryEngine).create(eq(userPermissionSetsDef), dataCaptor.capture());
-            assertThat(dataCaptor.getValue())
-                    .containsEntry("userId", "user-2")
-                    .containsEntry("permissionSetId", "ps-1");
-        }
-    }
-
-    // ------------------- DELETE /users/{id}/permission-sets/{permissionSetId}
-
-    @Nested
-    @DisplayName("DELETE /users/{id}/permission-sets/{permissionSetId}")
-    class RemovePermissionSet {
-
-        @Test
-        @DisplayName("returns absent when no assignment exists, without deleting")
-        void absentAssignmentReturnsAbsent() {
-            stubCaller(fullScope());
-            stubTarget("user-2", "profile-a");
-            when(queryEngine.executeQuery(eq(userPermissionSetsDef), any(QueryRequest.class)))
-                    .thenReturn(QueryResult.empty(new Pagination(1, 1)));
-
-            ResponseEntity<Map<String, Object>> response =
-                    controller.removePermissionSet(request, "user-2", "ps-1");
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).containsEntry("status", "absent");
-            verify(queryEngine, never()).delete(any(), any());
-        }
-
-        @Test
-        @DisplayName("deletes the existing assignment row by id")
-        void deletesExistingAssignment() {
-            stubCaller(fullScope());
-            stubTarget("user-2", "profile-a");
-            when(queryEngine.executeQuery(eq(userPermissionSetsDef), any(QueryRequest.class)))
-                    .thenReturn(QueryResult.of(List.of(Map.of(
-                            "id", "assign-1", "userId", "user-2", "permissionSetId", "ps-1")),
-                            1, new Pagination(1, 1)));
-            when(queryEngine.delete(eq(userPermissionSetsDef), eq("assign-1"))).thenReturn(true);
-
-            ResponseEntity<Map<String, Object>> response =
-                    controller.removePermissionSet(request, "user-2", "ps-1");
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).containsEntry("status", "removed");
-            verify(queryEngine).delete(eq(userPermissionSetsDef), eq("assign-1"));
         }
     }
 }

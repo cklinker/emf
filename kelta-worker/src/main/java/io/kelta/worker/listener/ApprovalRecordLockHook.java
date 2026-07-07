@@ -36,7 +36,7 @@ public class ApprovalRecordLockHook implements BeforeSaveHook {
             "approval-step-instances", "validation-rules", "flows",
             "flow-versions", "workflow-rules", "email-templates",
             "scheduled-jobs", "connected-apps", "oidc-providers",
-            "permission-sets", "profile-system-permissions",
+            "profile-system-permissions",
             "profile-object-permissions", "profile-field-permissions",
             "ui-pages", "ui-components", "dashboards", "dashboard-components"
     );

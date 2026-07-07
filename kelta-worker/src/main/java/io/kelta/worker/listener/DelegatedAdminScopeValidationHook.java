@@ -15,10 +15,9 @@ import java.util.Set;
 /**
  * Validates {@code delegated-admin-scopes} writes — the "no delegating admin-of-admins" gate.
  *
- * <p>Rejects a scope whose {@code manageableProfileIds} contains a profile — or whose
- * {@code assignablePermissionSetIds} contains a permission set — that grants any privileged
- * permission ({@code PrivilegedPermissions.SET}); validates that every referenced user, profile,
- * and permission set exists in the tenant; and enforces shape (arrays of non-blank id strings,
+ * <p>Rejects a scope whose {@code manageableProfileIds} contains a profile that grants any
+ * privileged permission ({@code PrivilegedPermissions.SET}); validates that every referenced user
+ * and profile exists in the tenant; and enforces shape (arrays of non-blank id strings,
  * deduplicated, size-capped). {@code DelegatedAdminService} re-checks the privileged filter at
  * request time, so this hook is the first of two gates, not the only one.
  */
@@ -29,7 +28,6 @@ public class DelegatedAdminScopeValidationHook implements BeforeSaveHook {
     static final String COLLECTION = "delegated-admin-scopes";
     static final int MAX_USERS = 500;
     static final int MAX_PROFILES = 100;
-    static final int MAX_PERMSETS = 100;
     private static final int MAX_ID_LENGTH = 64;
 
     private final DelegatedAdminScopeRepository scopeRepository;
@@ -89,28 +87,6 @@ public class DelegatedAdminScopeValidationHook implements BeforeSaveHook {
                         "Profiles granting administrative permissions cannot be delegated: " + privileged);
             }
             record.put("manageableProfileIds", List.copyOf(profiles.ids));
-        }
-
-        // assignablePermissionSetIds
-        if (record.containsKey("assignablePermissionSetIds")) {
-            ParseResult permsets = parseIds(record.get("assignablePermissionSetIds"), MAX_PERMSETS);
-            if (permsets.error != null) {
-                return BeforeSaveResult.error("assignablePermissionSetIds", permsets.error);
-            }
-            Set<String> missing = missing(permsets.ids,
-                    scopeRepository.findExistingPermissionSetIds(permsets.ids, tenantId));
-            if (!missing.isEmpty()) {
-                return BeforeSaveResult.error("assignablePermissionSetIds",
-                        "Unknown permission set(s): " + missing);
-            }
-            Set<String> privileged = scopeRepository.findPrivilegedPermissionSetIds(permsets.ids);
-            if (!privileged.isEmpty()) {
-                log.warn("Rejected delegated-admin scope in tenant {}: privileged permission sets {}",
-                        tenantId, privileged);
-                return BeforeSaveResult.error("assignablePermissionSetIds",
-                        "Permission sets granting administrative permissions cannot be delegated: " + privileged);
-            }
-            record.put("assignablePermissionSetIds", List.copyOf(permsets.ids));
         }
 
         return BeforeSaveResult.ok();

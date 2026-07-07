@@ -17,7 +17,6 @@ const NONE: DelegatedAdminSummary = {
   canDeactivateUsers: false,
   canResetPasswords: false,
   manageableProfiles: [],
-  assignablePermissionSets: [],
 }
 
 /**

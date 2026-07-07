@@ -35,9 +35,6 @@ const adminUsersList = vi.fn()
 const delegatedUsersList = vi.fn()
 const delegatedUsersCreate = vi.fn()
 const delegatedUsersUpdate = vi.fn()
-const delegatedUsersListPermissionSets = vi.fn()
-const delegatedUsersAssignPermissionSet = vi.fn()
-const delegatedUsersRemovePermissionSet = vi.fn()
 
 vi.mock('../../context/ApiContext', () => ({
   useApi: () => ({
@@ -49,9 +46,6 @@ vi.mock('../../context/ApiContext', () => ({
             list: delegatedUsersList,
             create: delegatedUsersCreate,
             update: delegatedUsersUpdate,
-            listPermissionSets: delegatedUsersListPermissionSets,
-            assignPermissionSet: delegatedUsersAssignPermissionSet,
-            removePermissionSet: delegatedUsersRemovePermissionSet,
           },
         },
       },
@@ -65,7 +59,6 @@ const SCOPED_SUMMARY: DelegatedAdminSummary = {
   canDeactivateUsers: false,
   canResetPasswords: false,
   manageableProfiles: [{ id: 'p1', name: 'Standard User' }],
-  assignablePermissionSets: [],
 }
 
 const NONE_SUMMARY: DelegatedAdminSummary = {
@@ -74,7 +67,6 @@ const NONE_SUMMARY: DelegatedAdminSummary = {
   canDeactivateUsers: false,
   canResetPasswords: false,
   manageableProfiles: [],
-  assignablePermissionSets: [],
 }
 
 const DELEGATED_USER = {
@@ -127,7 +119,6 @@ describe('UsersPage', () => {
     adminUsersList.mockReset().mockResolvedValue({ content: [], totalPages: 0 })
     delegatedUsersList.mockReset().mockResolvedValue([])
     delegatedUsersCreate.mockReset().mockResolvedValue(DELEGATED_USER)
-    delegatedUsersListPermissionSets.mockReset().mockResolvedValue([])
   })
 
   describe('delegated (scoped) mode', () => {

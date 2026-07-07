@@ -15,8 +15,8 @@ import java.util.Set;
 
 /**
  * Resolves a caller's <em>effective</em> delegated-administration scope: the union of all active
- * scopes listing the caller, minus any manageable profile or assignable permission set that
- * <em>currently</em> grants a privileged permission ({@link PrivilegedPermissions}).
+ * scopes listing the caller, minus any manageable profile that <em>currently</em> grants a
+ * privileged permission ({@link PrivilegedPermissions}).
  *
  * <p>The runtime re-filter is deliberate defense in depth: {@code DelegatedAdminScopeValidationHook}
  * already rejects privileged entries at scope-save time, but a profile can be granted
@@ -38,18 +38,13 @@ public class DelegatedAdminService {
                                           boolean canCreateUsers,
                                           boolean canDeactivateUsers,
                                           boolean canResetPasswords,
-                                          Set<String> manageableProfileIds,
-                                          Set<String> assignablePermissionSetIds) {
+                                          Set<String> manageableProfileIds) {
 
         public static final EffectiveDelegatedScope NONE =
-                new EffectiveDelegatedScope(false, false, false, false, Set.of(), Set.of());
+                new EffectiveDelegatedScope(false, false, false, false, Set.of());
 
         public boolean canManageProfile(String profileId) {
             return profileId != null && manageableProfileIds.contains(profileId);
-        }
-
-        public boolean canAssignPermissionSet(String permissionSetId) {
-            return permissionSetId != null && assignablePermissionSetIds.contains(permissionSetId);
         }
     }
 
@@ -95,7 +90,6 @@ public class DelegatedAdminService {
         boolean canDeactivate = false;
         boolean canReset = false;
         Set<String> profiles = new HashSet<>();
-        Set<String> permsets = new HashSet<>();
 
         for (Map<String, Object> scope : scopes) {
             Set<String> members = parseIdArray(scope.get("delegated_user_ids"));
@@ -107,27 +101,21 @@ public class DelegatedAdminService {
             canDeactivate |= Boolean.TRUE.equals(scope.get("can_deactivate_users"));
             canReset |= Boolean.TRUE.equals(scope.get("can_reset_passwords"));
             profiles.addAll(parseIdArray(scope.get("manageable_profile_ids")));
-            permsets.addAll(parseIdArray(scope.get("assignable_permission_set_ids")));
         }
 
         if (!delegated) {
             return EffectiveDelegatedScope.NONE;
         }
 
-        // Fail-closed runtime re-filter: drop entries that have become privileged since save.
+        // Fail-closed runtime re-filter: drop profiles that have become privileged since save.
         Set<String> privilegedProfiles = scopeRepository.findPrivilegedProfileIds(profiles);
         if (!privilegedProfiles.isEmpty()) {
             log.warn("Delegated scope for user {} drops now-privileged profiles {}", userId, privilegedProfiles);
             profiles.removeAll(privilegedProfiles);
         }
-        Set<String> privilegedPermsets = scopeRepository.findPrivilegedPermissionSetIds(permsets);
-        if (!privilegedPermsets.isEmpty()) {
-            log.warn("Delegated scope for user {} drops now-privileged permission sets {}", userId, privilegedPermsets);
-            permsets.removeAll(privilegedPermsets);
-        }
 
         return new EffectiveDelegatedScope(true, canCreate, canDeactivate, canReset,
-                Set.copyOf(profiles), Set.copyOf(permsets));
+                Set.copyOf(profiles));
     }
 
     /**

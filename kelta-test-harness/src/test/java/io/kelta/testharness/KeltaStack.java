@@ -191,6 +191,10 @@ public final class KeltaStack {
             .withEnv("CORS_ALLOWED_ORIGIN_PATTERN",   "http://localhost:5173")
             .withEnv("TENANT_SLUG_REQUIRE_PREFIX",    "true")
             .withEnv("PERMISSIONS_ENABLED",           "false")
+            // The fixture provisions its tenant at runtime; refresh the gateway's slug→tenant
+            // cache fast (default 60s) so the new tenant resolves promptly instead of 404ing
+            // for up to a full refresh interval.
+            .withEnv("KELTA_GATEWAY_TENANT_SLUG_CACHE_REFRESH_MS", "2000")
             .withExposedPorts(8080)
             .waitingFor(Wait.forHttp("/actuator/health").withStartupTimeout(Duration.ofMinutes(2)));
 

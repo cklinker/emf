@@ -144,9 +144,15 @@ ever exposed to a lower-privilege role. It is deliberately **not** auto-invoked 
 - Scheduled report delivery + background/system exports run with a `null` principal
   (system trust tier) and are **not** masked — same contract as flows below.
 - Flows/scripts/webhooks/NATS consumers — system trust tier, same contract as FLS today.
-- Bulk ops / merge — same accepted trade-off as write-FLS above.
+- Bulk ops / merge — write-side, same accepted trade-off as write-FLS above (their result
+  payloads are status/id/counts only, not field values, so no read egress). **Duplicate
+  detection is closed (2026-07-05)**: `POST /{collection}/duplicates` returns the match-field
+  `values` verbatim, so a match on a field masked for the requester is rejected 400
+  (`DuplicateDetectionService` via `MaskingPrincipal` + `RecordMaskingService`) — a grouping key
+  can't be masked without collapsing distinct values, so reject (mirrors group-by).
 - Re-embedding pre-existing vectors when a field *gains* masking (new writes skip embed;
-  old embeddings are left stale — full re-embed automation is v2).
+  old embeddings are left stale — full re-embed automation is v2). NOTE: `EmbeddingOnWriteHook`
+  should be re-verified to actually skip a masking-configured source on write before relying on it.
 Also: between storage-adapter decryption and the advice, plaintext exists in-process —
 never log field values on that path. **`field_history` is now live** (writer:
 `FieldHistoryHook`, wildcard, captures create/update/delete diffs of `trackHistory` fields;

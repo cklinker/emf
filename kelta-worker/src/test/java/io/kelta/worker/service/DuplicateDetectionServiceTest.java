@@ -27,14 +27,20 @@ class DuplicateDetectionServiceTest {
 
     private QueryEngine queryEngine;
     private CollectionRegistry collectionRegistry;
+    private RecordMaskingService recordMaskingService;
     private DuplicateDetectionService service;
 
     @BeforeEach
     void setUp() {
         queryEngine = mock(QueryEngine.class);
         collectionRegistry = mock(CollectionRegistry.class);
-        service = new DuplicateDetectionService(queryEngine, collectionRegistry);
+        // Default mock: maskableConfigs() returns an empty map, so no field is maskable.
+        recordMaskingService = mock(RecordMaskingService.class);
+        service = new DuplicateDetectionService(queryEngine, collectionRegistry, recordMaskingService);
     }
+
+    private static final ReportExecutionService.MaskingPrincipal MASKED_VIEWER =
+        new ReportExecutionService.MaskingPrincipal("viewer@acme.example", "profile-1", "tenant-1");
 
     private CollectionDefinition contactsDef() {
         return CollectionDefinition.builder()
@@ -61,7 +67,7 @@ class DuplicateDetectionServiceTest {
                 Map.of("id", "5", "email", "b@x.com"),
                 Map.of("id", "6", "email", "unique@x.com")));
 
-        Result result = service.findDuplicates("contacts", List.of("email"), 100);
+        Result result = service.findDuplicates("contacts", List.of("email"), 100, null);
 
         assertThat(result.scanned()).isEqualTo(6);
         assertThat(result.truncated()).isFalse();
@@ -84,7 +90,7 @@ class DuplicateDetectionServiceTest {
         nullRow2.put("email", null);
         stubQuery(List.of(nullRow1, nullRow2, Map.of("id", "3", "email", "")));
 
-        Result result = service.findDuplicates("contacts", List.of("email"), 100);
+        Result result = service.findDuplicates("contacts", List.of("email"), 100, null);
 
         assertThat(result.groups()).isEmpty();
     }
@@ -92,12 +98,45 @@ class DuplicateDetectionServiceTest {
     @Test
     @DisplayName("rejects empty matchFields and unknown collection")
     void validation() {
-        assertThatThrownBy(() -> service.findDuplicates("contacts", List.of(), 100))
+        assertThatThrownBy(() -> service.findDuplicates("contacts", List.of(), 100, null))
                 .isInstanceOf(IllegalArgumentException.class);
 
         when(collectionRegistry.get("missing")).thenReturn(null);
-        assertThatThrownBy(() -> service.findDuplicates("missing", List.of("email"), 100))
+        assertThatThrownBy(() -> service.findDuplicates("missing", List.of("email"), 100, null))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("rejects matching on a field masked for the requester (before any scan)")
+    void rejectsMaskedMatchField() {
+        when(collectionRegistry.get("contacts")).thenReturn(contactsDef());
+        var cfg = new FieldMaskingService.MaskingConfig(FieldMaskingService.MaskType.FULL, '*', null);
+        when(recordMaskingService.maskableConfigs(any())).thenReturn(Map.of("email", cfg));
+        when(recordMaskingService.maskedFieldsFor(eq("viewer@acme.example"), eq("profile-1"),
+                eq("tenant-1"), eq("contacts"), any())).thenReturn(java.util.Set.of("email"));
+
+        assertThatThrownBy(() -> service.findDuplicates("contacts", List.of("email"), 100, MASKED_VIEWER))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("masked");
+        // The leak is prevented before the record scan runs.
+        verify(queryEngine, never()).executeQuery(any(), any());
+    }
+
+    @Test
+    @DisplayName("allows matching on a maskable field the requester may unmask")
+    void allowsUnmaskableMatchField() {
+        stubQuery(List.of(
+                Map.of("id", "1", "email", "a@x.com"),
+                Map.of("id", "2", "email", "a@x.com")));
+        var cfg = new FieldMaskingService.MaskingConfig(FieldMaskingService.MaskType.FULL, '*', null);
+        when(recordMaskingService.maskableConfigs(any())).thenReturn(Map.of("email", cfg));
+        // Viewer may unmask email → not in the masked set → detection proceeds.
+        when(recordMaskingService.maskedFieldsFor(any(), any(), any(), eq("contacts"), any()))
+                .thenReturn(java.util.Set.of());
+
+        Result result = service.findDuplicates("contacts", List.of("email"), 100, MASKED_VIEWER);
+
+        assertThat(result.groups()).hasSize(1);
     }
 
     @Test
@@ -105,7 +144,7 @@ class DuplicateDetectionServiceTest {
     void queryShape() {
         stubQuery(List.of(Map.of("id", "1", "email", "a@x.com")));
 
-        service.findDuplicates("contacts", List.of("email"), 100);
+        service.findDuplicates("contacts", List.of("email"), 100, null);
 
         verify(queryEngine).executeQuery(any(CollectionDefinition.class), org.mockito.ArgumentMatchers.argThat(req ->
                 req.fields().contains("email") && req.fields().contains("id")

@@ -5,6 +5,7 @@ import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.DuplicateDetectionService;
 import io.kelta.worker.service.DuplicateDetectionService.Result;
+import io.kelta.worker.service.ReportExecutionService.MaskingPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,7 +62,8 @@ public class DuplicateDetectionController {
         int limit = body.get("limit") instanceof Number n ? n.intValue() : 100;
 
         try {
-            Result result = detectionService.findDuplicates(collectionName, matchFields, limit);
+            Result result = detectionService.findDuplicates(collectionName, matchFields, limit,
+                    principalOf(request));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("collectionName", collectionName);
             out.put("matchFields", matchFields);
@@ -79,6 +81,14 @@ public class DuplicateDetectionController {
             // Unknown collection or an invalid match field → 400 (client error).
             return ResponseEntity.badRequest().body(error(e.getMessage()));
         }
+    }
+
+    /** Builds the data-masking principal for the calling user from the gateway-forwarded identity headers. */
+    private MaskingPrincipal principalOf(HttpServletRequest request) {
+        return new MaskingPrincipal(
+            permissionResolver.getEmail(request),
+            permissionResolver.getProfileId(request),
+            permissionResolver.getTenantId(request));
     }
 
     private void requirePermission(HttpServletRequest request) {

@@ -37,9 +37,9 @@ public class PackageService {
                 "SELECT id FROM collection WHERE tenant_id = ? AND system_collection = false",
                 String.class, tenantId));
         // role/policy/route_policy/field_policy were dropped in V47 (legacy
-        // security tables) — the real per-tenant authz is profiles +
-        // permission-sets, seeded fresh in a sandbox by TenantProvisioningHook.
-        // Never query the dead tables and never clone/promote authz types.
+        // security tables) — per-tenant authz is now profiles + Cerbos, seeded
+        // fresh in a sandbox by TenantProvisioningHook. Authz types are never
+        // exported, cloned, or promoted.
         options.put("uiPageIds", repository.findAllIds("ui_page", tenantId));
         options.put("uiMenuIds", repository.findAllIds("ui_menu", tenantId));
         options.put("flowIds", repository.findAllIds("flow", tenantId));
@@ -61,8 +61,6 @@ public class PackageService {
         String description = (String) options.getOrDefault("description", "");
 
         List<String> collectionIds = getStringList(options, "collectionIds");
-        List<String> roleIds = getStringList(options, "roleIds");
-        List<String> policyIds = getStringList(options, "policyIds");
         List<String> uiPageIds = getStringList(options, "uiPageIds");
         List<String> uiMenuIds = getStringList(options, "uiMenuIds");
         List<String> flowIds = getStringList(options, "flowIds");
@@ -131,25 +129,8 @@ public class PackageService {
             items.add(buildItem("FLOW", flow));
         }
 
-        // Export roles
-        var roles = repository.findRolesByIds(tenantId, roleIds);
-        for (var role : roles) {
-            items.add(buildItem("ROLE", role));
-        }
-
-        // Export policies and their route/field policies
-        var policies = repository.findPoliciesByIds(tenantId, policyIds);
-        for (var policy : policies) {
-            items.add(buildItem("POLICY", policy));
-        }
-        var routePolicies = repository.findRoutePoliciesByPolicyIds(tenantId, policyIds);
-        for (var rp : routePolicies) {
-            items.add(buildItem("ROUTE_POLICY", rp));
-        }
-        var fieldPolicies = repository.findFieldPoliciesByPolicyIds(tenantId, policyIds);
-        for (var fp : fieldPolicies) {
-            items.add(buildItem("FIELD_POLICY", fp));
-        }
+        // Legacy authz (role/policy/route_policy/field_policy) is intentionally
+        // never exported — those tables were dropped in V47; authz is profiles + Cerbos.
 
         // Export UI pages
         var pages = repository.findUiPagesByIds(tenantId, uiPageIds);
@@ -371,8 +352,6 @@ public class PackageService {
         return switch (type) {
             case "COLLECTION" -> "collection";
             case "FIELD" -> "collection";
-            case "ROLE" -> "role";
-            case "POLICY", "ROUTE_POLICY", "FIELD_POLICY" -> "policy";
             case "UI_PAGE" -> "page";
             case "UI_MENU", "UI_MENU_ITEM" -> "menu";
             case "FLOW" -> "flow";

@@ -188,12 +188,16 @@ per-collection object permissions) — the allow-all harness Cerbos cannot exerc
 cross-referenced against the live `192.168.0.5/emf_control_plane` DB: 117 public tables, 55 empty)
 found dead references to tables dropped years earlier when the platform moved to profiles + Cerbos.
 Staged cleanup:
-- **PR1 (shipped #1186): permission sets fully removed** (six V98-dropped tables still registered as
-  system collections + queried by delegated admin). Migration V160 dropped the
-  `delegated_admin_scope.assignable_permission_set_ids` column.
-- **PR2 (shipped #1187): package export/import + config-health** stopped querying V47-dropped
-  `role`/`policy`/`route_policy`/`field_policy`/`system_permission`.
-- **PR3 (this change): orphan tables + dead endpoint.** Dropped `user_group_member` (V12 flat join,
+- **PR1 (shipped #1186): permission sets fully removed** — the six V98-dropped permission-set tables
+  were still registered as system collections and queried by delegated admin. Migration V160 dropped
+  the `delegated_admin_scope.assignable_permission_set_ids` column.
+- **PR2 (this change, #1187): package export/import + config-health.** `PackageService`/`PackageRepository`/
+  `PackageImportService` were still exporting/importing `role`/`policy`/`route_policy`/`field_policy`
+  (dropped V47) — package export threw on those item types; `OverpermissiveProfileRule` selected `FROM
+  system_permission` (dropped V47) — the config-health scan failed. Removed the authz export/import
+  path (methods, repo queries, natural-key remap machinery) and fixed the rule to read
+  `profile_system_permission`.
+- **PR3 (shipped #1188): orphan tables + dead endpoint.** Dropped `user_group_member` (V12 flat join,
   superseded by `group_membership` V45; the one stale row is discarded legacy data) and
   `flow_execution_dedup` (V71, unused) via `V161__drop_orphan_tables.sql`. Deleted
   `WorkflowMigrationController`/`WorkflowMigrationRepository` — they queried `workflow_rule`/

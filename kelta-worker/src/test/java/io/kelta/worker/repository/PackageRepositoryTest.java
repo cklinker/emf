@@ -71,16 +71,6 @@ class PackageRepositoryTest {
     }
 
     @Test
-    @DisplayName("Should find roles by IDs")
-    void shouldFindRolesByIds() {
-        when(jdbcTemplate.queryForList(contains("role"), any(Object[].class)))
-                .thenReturn(List.of(Map.of("id", "role-1", "name", "admin")));
-
-        var result = repository.findRolesByIds("t1", List.of("role-1"));
-        assertThat(result).hasSize(1);
-    }
-
-    @Test
     @DisplayName("Should expose JdbcTemplate")
     void shouldExposeJdbcTemplate() {
         assertThat(repository.getJdbcTemplate()).isSameAs(jdbcTemplate);

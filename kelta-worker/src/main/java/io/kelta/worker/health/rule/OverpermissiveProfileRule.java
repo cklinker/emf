@@ -21,11 +21,11 @@ import java.util.Map;
 public class OverpermissiveProfileRule implements HealthRule {
 
     private static final String SQL = """
-            SELECT p.id, p.name, sp.permission_key
-            FROM system_permission sp
-            JOIN profile p ON sp.profile_id = p.id
-            WHERE p.tenant_id = ? AND sp.granted = true
-              AND sp.permission_key IN ('VIEW_ALL_DATA', 'MODIFY_ALL_DATA')
+            SELECT p.id, p.name, psp.permission_name AS permission_key
+            FROM profile_system_permission psp
+            JOIN profile p ON psp.profile_id = p.id
+            WHERE p.tenant_id = ? AND psp.granted = true
+              AND psp.permission_name IN ('VIEW_ALL_DATA', 'MODIFY_ALL_DATA')
             """;
 
     @Override

@@ -104,6 +104,8 @@ public final class AuthFixture {
     }
 
     private static String padBase64(String base64url) {
-        return base64url + "==".substring(base64url.length() % 4 == 0 ? 2 : base64url.length() % 4);
+        int rem = base64url.length() % 4;
+        // rem==2 → "==", rem==3 → "=", rem==0 → "" (already a multiple of 4).
+        return rem == 0 ? base64url : base64url + "====".substring(rem);
     }
 }

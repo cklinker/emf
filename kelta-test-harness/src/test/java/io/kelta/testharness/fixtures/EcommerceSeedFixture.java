@@ -98,9 +98,9 @@ public final class EcommerceSeedFixture {
         addStringField(client, base, ordersId, "name", false);
         addStringField(client, base, ordersId, "status", false);
         addStringField(client, base, ordersId, "order_date", false);
-        addStringField(client, base, ordersId, "subtotal", false);
-        addStringField(client, base, ordersId, "tax_amount", false);
-        addStringField(client, base, ordersId, "total_amount", false);
+        addDoubleField(client, base, ordersId, "subtotal");
+        addDoubleField(client, base, ordersId, "tax_amount");
+        addDoubleField(client, base, ordersId, "total_amount");
         addLookupField(client, base, ordersId, "customer", customersId);
 
         // products — a second collection with ≥2 fields (field-masking scenario needs ≥2 fields).
@@ -261,6 +261,17 @@ public final class EcommerceSeedFixture {
                 "type", "fields",
                 "attributes", attributes));
 
+        createField(client, base, fieldName, body);
+    }
+
+    /** A DOUBLE (floating-point) field — e.g. the order money columns the merge scenario writes. */
+    private void addDoubleField(RestClient client, String base, String collectionId, String fieldName) {
+        Map<String, Object> body = Map.of("data", Map.of(
+                "type", "fields",
+                "attributes", Map.of(
+                        "collectionId", collectionId,
+                        "name", fieldName,
+                        "type", "DOUBLE")));
         createField(client, base, fieldName, body);
     }
 

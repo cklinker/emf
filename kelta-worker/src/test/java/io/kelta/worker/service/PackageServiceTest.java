@@ -86,37 +86,6 @@ class PackageServiceTest {
         }
 
         @Test
-        @DisplayName("Should export roles and policies")
-        void shouldExportRolesAndPolicies() {
-            Map<String, Object> options = new LinkedHashMap<>();
-            options.put("name", "role-pkg");
-            options.put("version", "1.0.0");
-            options.put("roleIds", List.of("role-1"));
-            options.put("policyIds", List.of("pol-1"));
-
-            Map<String, Object> role = new LinkedHashMap<>();
-            role.put("id", "role-1");
-            role.put("name", "admin");
-            role.put("tenant_id", "t1");
-            when(repository.findRolesByIds("t1", List.of("role-1"))).thenReturn(List.of(role));
-
-            Map<String, Object> policy = new LinkedHashMap<>();
-            policy.put("id", "pol-1");
-            policy.put("name", "read-all");
-            policy.put("tenant_id", "t1");
-            when(repository.findPoliciesByIds("t1", List.of("pol-1"))).thenReturn(List.of(policy));
-            when(repository.save(any(), any(), any(), any(), any(), any(), any())).thenReturn("hist-1");
-
-            var result = service.exportPackage("t1", options);
-
-            @SuppressWarnings("unchecked")
-            var items = (List<Map<String, Object>>) result.get("items");
-            assertThat(items).hasSize(2);
-            assertThat(items.stream().map(i -> i.get("type")).toList())
-                    .containsExactly("ROLE", "POLICY");
-        }
-
-        @Test
         @DisplayName("Should record export in history")
         void shouldRecordExportHistory() {
             Map<String, Object> options = new LinkedHashMap<>();
@@ -159,10 +128,10 @@ class PackageServiceTest {
         void shouldIdentifyConflicts() {
             Map<String, Object> pkg = new LinkedHashMap<>();
             pkg.put("items", List.of(
-                    Map.of("type", "ROLE", "data", Map.of("id", "role-1", "name", "admin"))));
+                    Map.of("type", "COLLECTION", "data", Map.of("id", "col-1", "name", "accounts"))));
             when(importService.importPackage(eq("t1"), eq(pkg), any()))
                     .thenReturn(report(new PackageImportService.ItemResult(
-                            "ROLE", "admin", "SKIPPED", null)));
+                            "COLLECTION", "accounts", "SKIPPED", null)));
 
             var result = service.previewImport("t1", pkg);
 
@@ -233,7 +202,7 @@ class PackageServiceTest {
             pkg.put("items", List.of());
             when(importService.importPackage(eq("t1"), eq(pkg), any()))
                     .thenReturn(report(new PackageImportService.ItemResult(
-                            "ROLE", "viewer", "CREATED", null)));
+                            "COLLECTION", "contacts", "CREATED", null)));
 
             service.importPackage("t1", pkg, false);
 

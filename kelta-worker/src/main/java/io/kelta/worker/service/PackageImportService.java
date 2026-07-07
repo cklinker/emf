@@ -23,8 +23,8 @@ import java.util.*;
  * {@link QueryEngine#update} against their system collections — the same path
  * the admin API and MCP tools use — so quota hooks, physical-table DDL, and the
  * {@code kelta.config.*} NATS broadcasts all fire (the
- * {@code ExternalEntityMaterializer} pattern). Only the pre-metadata-engine
- * authz tables (role/policy/route_policy/field_policy) stay on raw SQL.
+ * {@code ExternalEntityMaterializer} pattern). Legacy authz tables
+ * (role/policy/route_policy/field_policy) were dropped in V47 and are never imported.
  *
  * <p>Cross-tenant references are resolved by <b>natural key</b> (names), never
  * by source UUID: a field's {@code reference_collection_id} is re-pointed at
@@ -44,9 +44,9 @@ public class PackageImportService {
 
     /**
      * Import order: referenced types strictly before referencing types.
-     * The legacy authz types (ROLE/POLICY/ROUTE_POLICY/FIELD_POLICY) are omitted
-     * — those tables were dropped in V47; per-tenant authz is profiles +
-     * permission-sets, which a sandbox seeds itself via TenantProvisioningHook.
+     * Legacy authz types (ROLE/POLICY/ROUTE_POLICY/FIELD_POLICY) are not imported
+     * — those tables were dropped in V47; per-tenant authz is profiles + Cerbos,
+     * which a sandbox seeds itself via TenantProvisioningHook.
      */
     private static final List<String> TYPE_ORDER = List.of(
             "COLLECTION", "FIELD", "GLOBAL_PICKLIST", "PICKLIST_VALUE",
@@ -120,7 +120,6 @@ public class PackageImportService {
         }
 
         // In-package id→natural-key maps drive the raw authz-table remaps
-        ctx.indexPackageIds(items);
 
         List<ItemResult> results = new ArrayList<>();
         for (String type : TYPE_ORDER) {
@@ -178,10 +177,6 @@ public class PackageImportService {
             case "LAYOUT_SECTION" -> importLayoutSection(ctx, naturalKey, data);
             case "LAYOUT_FIELD" -> importLayoutField(ctx, naturalKey, data);
             case "FLOW" -> importFlow(ctx, naturalKey, data);
-            case "ROLE" -> importRole(ctx, naturalKey, data);
-            case "POLICY" -> importPolicy(ctx, naturalKey, data);
-            case "ROUTE_POLICY" -> importRoutePolicy(ctx, naturalKey, data);
-            case "FIELD_POLICY" -> importFieldPolicy(ctx, naturalKey, data);
             case "UI_PAGE" -> importUiPage(ctx, naturalKey, data);
             case "UI_MENU" -> importSimpleByName(ctx, "UI_MENU", naturalKey, data, ctx.menuIdByName);
             case "UI_MENU_ITEM" -> importUiMenuItem(ctx, naturalKey, data);
@@ -206,8 +201,6 @@ public class PackageImportService {
                     + ":" + data.get("section_sort_order") + ":" + data.get("field_name");
             case "UI_PAGE" -> String.valueOf(data.getOrDefault("path", data.get("name")));
             case "UI_MENU_ITEM" -> data.get("menu_name") + ":" + data.get("label");
-            case "ROUTE_POLICY" -> data.get("collection_id") + ":" + data.get("operation");
-            case "FIELD_POLICY" -> data.get("field_id") + ":" + data.get("operation");
             default -> String.valueOf(data.get("name"));
         };
     }
@@ -398,106 +391,6 @@ public class PackageImportService {
         return new ItemResult(type, key, "CREATED", null);
     }
 
-    // ------------------------------------------------------------------
-    // Raw-SQL importers (pre-metadata-engine authz tables)
-    // ------------------------------------------------------------------
-
-    private ItemResult importRole(ImportContext ctx, String key, Map<String, Object> data) {
-        String existingId = ctx.roleIdByName.get(key);
-        if (existingId != null && ctx.options.conflictMode() == ConflictMode.SKIP) {
-            return new ItemResult("ROLE", key, "SKIPPED", null);
-        }
-        if (ctx.options.dryRun()) {
-            if (existingId == null) ctx.roleIdByName.put(key, "dry-run:" + UUID.randomUUID());
-            return new ItemResult("ROLE", key, existingId != null ? "UPDATED" : "CREATED", null);
-        }
-        if (existingId != null) {
-            repository.getJdbcTemplate().update(
-                    "UPDATE role SET description = ? WHERE id = ?",
-                    data.get("description"), existingId);
-            return new ItemResult("ROLE", key, "UPDATED", null);
-        }
-        String id = UUID.randomUUID().toString();
-        repository.getJdbcTemplate().update(
-                "INSERT INTO role (id, tenant_id, name, description, created_at) VALUES (?, ?, ?, ?, ?)",
-                id, ctx.tenantId, data.get("name"), data.get("description"), now());
-        ctx.roleIdByName.put(key, id);
-        return new ItemResult("ROLE", key, "CREATED", null);
-    }
-
-    private ItemResult importPolicy(ImportContext ctx, String key, Map<String, Object> data) {
-        String rulesJson = jsonString(data.get("rules"));
-        String existingId = ctx.policyIdByName.get(key);
-        if (existingId != null && ctx.options.conflictMode() == ConflictMode.SKIP) {
-            return new ItemResult("POLICY", key, "SKIPPED", null);
-        }
-        if (ctx.options.dryRun()) {
-            if (existingId == null) ctx.policyIdByName.put(key, "dry-run:" + UUID.randomUUID());
-            return new ItemResult("POLICY", key, existingId != null ? "UPDATED" : "CREATED", null);
-        }
-        if (existingId != null) {
-            repository.getJdbcTemplate().update(
-                    "UPDATE policy SET description = ?, rules = ?::jsonb WHERE id = ?",
-                    data.get("description"), rulesJson, existingId);
-            return new ItemResult("POLICY", key, "UPDATED", null);
-        }
-        String id = UUID.randomUUID().toString();
-        repository.getJdbcTemplate().update(
-                "INSERT INTO policy (id, tenant_id, name, description, rules, created_at) " +
-                        "VALUES (?, ?, ?, ?, ?::jsonb, ?)",
-                id, ctx.tenantId, data.get("name"), data.get("description"), rulesJson, now());
-        ctx.policyIdByName.put(key, id);
-        return new ItemResult("POLICY", key, "CREATED", null);
-    }
-
-    private ItemResult importRoutePolicy(ImportContext ctx, String key, Map<String, Object> data) {
-        String collectionName = ctx.packageCollectionName((String) data.get("collection_id"));
-        String policyName = ctx.packagePolicyName((String) data.get("policy_id"));
-        String collectionId = ctx.requireCollection(collectionName);
-        String policyId = ctx.requirePolicy(policyName);
-        String readableKey = collectionName + ":" + data.get("operation");
-
-        if (ctx.options.dryRun()) {
-            return new ItemResult("ROUTE_POLICY", readableKey, "CREATED", null);
-        }
-        int updatedRows = repository.getJdbcTemplate().update(
-                "UPDATE route_policy SET policy_id = ? WHERE collection_id = ? AND operation = ?",
-                policyId, collectionId, data.get("operation"));
-        if (updatedRows > 0) {
-            return new ItemResult("ROUTE_POLICY", readableKey, "UPDATED", null);
-        }
-        repository.getJdbcTemplate().update(
-                "INSERT INTO route_policy (id, collection_id, operation, policy_id, created_at) " +
-                        "VALUES (?, ?, ?, ?, ?)",
-                UUID.randomUUID().toString(), collectionId, data.get("operation"), policyId, now());
-        return new ItemResult("ROUTE_POLICY", readableKey, "CREATED", null);
-    }
-
-    private ItemResult importFieldPolicy(ImportContext ctx, String key, Map<String, Object> data) {
-        String fieldKey = ctx.packageFieldKey((String) data.get("field_id"));
-        String policyName = ctx.packagePolicyName((String) data.get("policy_id"));
-        String fieldId = ctx.fieldIdByKey().get(fieldKey);
-        if (fieldId == null) {
-            throw new IllegalStateException("Field-policy target field not found: " + fieldKey);
-        }
-        String policyId = ctx.requirePolicy(policyName);
-        String readableKey = fieldKey + ":" + data.get("operation");
-
-        if (ctx.options.dryRun()) {
-            return new ItemResult("FIELD_POLICY", readableKey, "CREATED", null);
-        }
-        int updatedRows = repository.getJdbcTemplate().update(
-                "UPDATE field_policy SET policy_id = ? WHERE field_id = ? AND operation = ?",
-                policyId, fieldId, data.get("operation"));
-        if (updatedRows > 0) {
-            return new ItemResult("FIELD_POLICY", readableKey, "UPDATED", null);
-        }
-        repository.getJdbcTemplate().update(
-                "INSERT INTO field_policy (id, field_id, operation, policy_id, created_at) " +
-                        "VALUES (?, ?, ?, ?, ?)",
-                UUID.randomUUID().toString(), fieldId, data.get("operation"), policyId, now());
-        return new ItemResult("FIELD_POLICY", readableKey, "CREATED", null);
-    }
 
     // ------------------------------------------------------------------
     // Row → system-collection field mapping
@@ -565,24 +458,6 @@ public class PackageImportService {
         return value;
     }
 
-    private String jsonString(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof String s) {
-            return s;
-        }
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to serialize JSON value", e);
-        }
-    }
-
-    private static Timestamp now() {
-        return Timestamp.from(Instant.now());
-    }
-
     // ------------------------------------------------------------------
     // Import context: target-tenant natural-key registries
     // ------------------------------------------------------------------
@@ -600,16 +475,9 @@ public class PackageImportService {
         final Map<String, String> sectionIdByKey = new HashMap<>();
         final Map<String, String> layoutFieldIdByKey = new HashMap<>();
         final Map<String, String> flowIdByName = new HashMap<>();
-        final Map<String, String> roleIdByName = new HashMap<>();
-        final Map<String, String> policyIdByName = new HashMap<>();
         final Map<String, String> uiPageIdByPath = new HashMap<>();
         final Map<String, String> menuIdByName = new HashMap<>();
         final Map<String, String> menuItemIdByKey = new HashMap<>();
-
-        // Source-package id → natural key (raw authz-table remap)
-        private final Map<String, String> pkgCollectionNameById = new HashMap<>();
-        private final Map<String, String> pkgPolicyNameById = new HashMap<>();
-        private final Map<String, String> pkgFieldKeyById = new HashMap<>();
 
         private String defaultUserId;
 
@@ -617,24 +485,6 @@ public class PackageImportService {
             this.tenantId = tenantId;
             this.options = options;
             seed();
-        }
-
-        @SuppressWarnings("unchecked")
-        void indexPackageIds(List<Map<String, Object>> items) {
-            for (var item : items) {
-                Map<String, Object> data = (Map<String, Object>) item.get("data");
-                String id = data.get("id") != null ? String.valueOf(data.get("id")) : null;
-                if (id == null) {
-                    continue;
-                }
-                switch ((String) item.get("type")) {
-                    case "COLLECTION" -> pkgCollectionNameById.put(id, (String) data.get("name"));
-                    case "POLICY" -> pkgPolicyNameById.put(id, (String) data.get("name"));
-                    case "FIELD" -> pkgFieldKeyById.put(id,
-                            data.get("collection_name") + "." + data.get("name"));
-                    default -> { }
-                }
-            }
         }
 
         void seed() {
@@ -711,41 +561,6 @@ public class PackageImportService {
                 throw new IllegalStateException("Collection not found in target: " + name);
             }
             return id;
-        }
-
-        String requirePolicy(String name) {
-            String id = policyIdByName.get(name);
-            if (id == null) {
-                throw new IllegalStateException("Policy not found in target: " + name);
-            }
-            return id;
-        }
-
-        String packageCollectionName(String sourceId) {
-            String name = pkgCollectionNameById.get(sourceId);
-            if (name == null) {
-                throw new IllegalStateException(
-                        "Route policy references a collection not present in the package: " + sourceId);
-            }
-            return name;
-        }
-
-        String packagePolicyName(String sourceId) {
-            String name = pkgPolicyNameById.get(sourceId);
-            if (name == null) {
-                throw new IllegalStateException(
-                        "Policy reference not present in the package: " + sourceId);
-            }
-            return name;
-        }
-
-        String packageFieldKey(String sourceId) {
-            String fieldKey = pkgFieldKeyById.get(sourceId);
-            if (fieldKey == null) {
-                throw new IllegalStateException(
-                        "Field policy references a field not present in the package: " + sourceId);
-            }
-            return fieldKey;
         }
 
         String resolveDefaultUserId() {

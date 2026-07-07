@@ -83,56 +83,6 @@ public class PackageRepository {
         );
     }
 
-    public List<Map<String, Object>> findRolesByIds(String tenantId, List<String> ids) {
-        if (ids.isEmpty()) return List.of();
-        String placeholders = String.join(",", ids.stream().map(i -> "?").toList());
-        Object[] params = new Object[ids.size() + 1];
-        params[0] = tenantId;
-        for (int i = 0; i < ids.size(); i++) params[i + 1] = ids.get(i);
-        return jdbcTemplate.queryForList(
-                "SELECT * FROM role WHERE tenant_id = ? AND id IN (" + placeholders + ")",
-                params
-        );
-    }
-
-    public List<Map<String, Object>> findPoliciesByIds(String tenantId, List<String> ids) {
-        if (ids.isEmpty()) return List.of();
-        String placeholders = String.join(",", ids.stream().map(i -> "?").toList());
-        Object[] params = new Object[ids.size() + 1];
-        params[0] = tenantId;
-        for (int i = 0; i < ids.size(); i++) params[i + 1] = ids.get(i);
-        return jdbcTemplate.queryForList(
-                "SELECT * FROM policy WHERE tenant_id = ? AND id IN (" + placeholders + ")",
-                params
-        );
-    }
-
-    public List<Map<String, Object>> findRoutePoliciesByPolicyIds(String tenantId, List<String> policyIds) {
-        if (policyIds.isEmpty()) return List.of();
-        String placeholders = String.join(",", policyIds.stream().map(i -> "?").toList());
-        Object[] params = new Object[policyIds.size() + 1];
-        params[0] = tenantId;
-        for (int i = 0; i < policyIds.size(); i++) params[i + 1] = policyIds.get(i);
-        return jdbcTemplate.queryForList(
-                "SELECT rp.* FROM route_policy rp JOIN collection c ON rp.collection_id = c.id " +
-                        "WHERE c.tenant_id = ? AND rp.policy_id IN (" + placeholders + ")",
-                params
-        );
-    }
-
-    public List<Map<String, Object>> findFieldPoliciesByPolicyIds(String tenantId, List<String> policyIds) {
-        if (policyIds.isEmpty()) return List.of();
-        String placeholders = String.join(",", policyIds.stream().map(i -> "?").toList());
-        Object[] params = new Object[policyIds.size() + 1];
-        params[0] = tenantId;
-        for (int i = 0; i < policyIds.size(); i++) params[i + 1] = policyIds.get(i);
-        return jdbcTemplate.queryForList(
-                "SELECT fp.* FROM field_policy fp JOIN field f ON fp.field_id = f.id " +
-                        "JOIN collection c ON f.collection_id = c.id " +
-                        "WHERE c.tenant_id = ? AND fp.policy_id IN (" + placeholders + ")",
-                params
-        );
-    }
 
     public List<Map<String, Object>> findUiPagesByIds(String tenantId, List<String> ids) {
         if (ids.isEmpty()) return List.of();
@@ -178,30 +128,6 @@ public class PackageRepository {
         for (int i = 0; i < names.size(); i++) params[i + 1] = names.get(i);
         return jdbcTemplate.queryForList(
                 "SELECT * FROM collection WHERE tenant_id = ? AND name IN (" + placeholders + ")",
-                params
-        );
-    }
-
-    public List<Map<String, Object>> findRolesByNames(String tenantId, List<String> names) {
-        if (names.isEmpty()) return List.of();
-        String placeholders = String.join(",", names.stream().map(i -> "?").toList());
-        Object[] params = new Object[names.size() + 1];
-        params[0] = tenantId;
-        for (int i = 0; i < names.size(); i++) params[i + 1] = names.get(i);
-        return jdbcTemplate.queryForList(
-                "SELECT * FROM role WHERE tenant_id = ? AND name IN (" + placeholders + ")",
-                params
-        );
-    }
-
-    public List<Map<String, Object>> findPoliciesByNames(String tenantId, List<String> names) {
-        if (names.isEmpty()) return List.of();
-        String placeholders = String.join(",", names.stream().map(i -> "?").toList());
-        Object[] params = new Object[names.size() + 1];
-        params[0] = tenantId;
-        for (int i = 0; i < names.size(); i++) params[i + 1] = names.get(i);
-        return jdbcTemplate.queryForList(
-                "SELECT * FROM policy WHERE tenant_id = ? AND name IN (" + placeholders + ")",
                 params
         );
     }

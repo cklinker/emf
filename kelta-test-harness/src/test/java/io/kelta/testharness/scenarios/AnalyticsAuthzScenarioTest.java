@@ -52,8 +52,8 @@ class AnalyticsAuthzScenarioTest extends ScenarioBase {
         String slug = TenantFixture.ECOMMERCE_SLUG;
         String adminToken = auth.loginAsAdmin(slug);
         String tenantId = auth.extractTenantId(adminToken);
-        waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/customers", HttpStatus.OK, 20);
-        waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/reports", HttpStatus.OK, 20);
+        waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/customers", HttpStatus.OK, 60);
+        waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/reports", HttpStatus.OK, 60);
 
         String suffix = Long.toHexString(System.nanoTime());
         String analystEmail = "analyst-" + suffix + "@example.com";

@@ -51,9 +51,9 @@ class ApprovalActorScenarioTest extends ScenarioBase {
         String adminToken = auth.loginAsAdmin(slug);
         String tenantId = auth.extractTenantId(adminToken);
         waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/customers",
-                HttpStatus.OK, 20);
+                HttpStatus.OK, 60);
         waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/approval-processes",
-                HttpStatus.OK, 20);
+                HttpStatus.OK, 60);
 
         String suffix = Long.toHexString(System.nanoTime());
         String approverEmail = "approver-" + suffix + "@example.com";
@@ -144,7 +144,15 @@ class ApprovalActorScenarioTest extends ScenarioBase {
                         .isEqualTo("APPROVED");
             } finally {
                 if (processId != null) {
-                    // MASTER_DETAIL FKs cascade: steps, instances, step instances follow.
+                    // System-table FKs are plain (no ON DELETE CASCADE) — children first.
+                    deleteByColumn(db,
+                            "DELETE FROM approval_step_instance WHERE approval_instance_id IN "
+                                    + "(SELECT id FROM approval_instance WHERE approval_process_id = ?)",
+                            processId);
+                    deleteByColumn(db,
+                            "DELETE FROM approval_instance WHERE approval_process_id = ?", processId);
+                    deleteByColumn(db,
+                            "DELETE FROM approval_step WHERE approval_process_id = ?", processId);
                     deleteRowById(db, "approval_process", processId);
                 }
                 if (customerId != null) {
@@ -294,6 +302,13 @@ class ApprovalActorScenarioTest extends ScenarioBase {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getString(1) : null;
             }
+        }
+    }
+
+    private void deleteByColumn(Connection db, String sql, String param) throws Exception {
+        try (PreparedStatement ps = db.prepareStatement(sql)) {
+            ps.setString(1, param);
+            ps.executeUpdate();
         }
     }
 

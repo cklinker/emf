@@ -14,6 +14,7 @@ import { AddFieldsProposalCard } from './AddFieldsProposalCard'
 import { UpdateFieldProposalCard } from './UpdateFieldProposalCard'
 import { RemoveFieldProposalCard } from './RemoveFieldProposalCard'
 import { PicklistProposalCard } from './PicklistProposalCard'
+import { UiPageProposalCard } from './UiPageProposalCard'
 import { ToolCallIndicator } from './ToolCallIndicator'
 import { TokenUsageBadge } from './TokenUsageBadge'
 import type { AiProposal, ChatMessage as ChatMessageType, ToolCallState } from './types'
@@ -281,6 +282,8 @@ export function AiChatPanel({
         return <RemoveFieldProposalCard key={proposal.id} {...props} />
       case 'picklist':
         return <PicklistProposalCard key={proposal.id} {...props} />
+      case 'ui_page':
+        return <UiPageProposalCard key={proposal.id} {...props} />
       default:
         return null
     }

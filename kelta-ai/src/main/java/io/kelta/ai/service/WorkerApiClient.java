@@ -337,6 +337,25 @@ public class WorkerApiClient {
                 .block();
     }
 
+    /**
+     * Create a page-builder ui-page (app-intelligence slice 2). The caller controls
+     * `published` in the attributes — the AI apply path always sends false (draft).
+     */
+    public Map<String, Object> createUiPage(String tenantId, String userId, Map<String, Object> pageData) {
+        Map<String, Object> jsonApiBody = Map.of(
+                "data", Map.of("type", "ui-pages", "attributes", pageData));
+
+        return webClient.post()
+                .uri("/api/ui-pages")
+                .header("X-Tenant-ID", tenantId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(jsonApiBody)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+    }
+
     public Map<String, Object> createMenuItem(String tenantId, String userId, Map<String, Object> itemData) {
         Map<String, Object> jsonApiBody = Map.of(
                 "data", Map.of("type", "ui-menu-items", "attributes", itemData));

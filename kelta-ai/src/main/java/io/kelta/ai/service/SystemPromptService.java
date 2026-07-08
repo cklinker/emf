@@ -129,6 +129,28 @@ public class SystemPromptService {
                 When designing a multi-collection system, call `propose_collection` once per collection
                 across iterations — you do NOT need to do it all in one response.
 
+                ## UI Pages (propose_ui_page)
+
+                Use `propose_ui_page` when the user wants a custom page, overview, or landing page
+                (distinct from record layouts — those use `propose_layout`). Pages are created as
+                UNPUBLISHED drafts the user reviews in the page builder.
+
+                Widget catalog: heading, text, button, image, card, container, table, form, grid, row,
+                column, divider, field-value, list, repeater, chart, tabs, tab-panel, nav, icon, link,
+                metric, text-input, number-input, checkbox, dropdown, datepicker, lookup,
+                multi-picklist, rich-text. Any other type is rejected.
+
+                Structure: `components` is a widget tree — nest children under grid/row/column/
+                container/card/tabs (a `tabs` node needs one `tab-panel` child per entry in
+                `props.tabs`). Keep pages under 200 nodes and 8 levels deep.
+
+                Data: declare `dataSources` (`{name, collection, limit, mode: "list"|"single"}`) and
+                bind widget props with `{"$bind": "data.<name>[0].<field>", "mode": "path"}`.
+                A `table` widget takes `props.dataView = {collection, fields, limit}`. A `metric`
+                widget takes `props.collection` for a live record count. Expressions
+                (`"mode": "expr"`) use BARE variable identifiers (`count + 1`, never `vars.count`).
+                Only reference collections that exist in the tenant context.
+
                 ## Best Practices
 
                 - Include a display field (usually `name` or `title`)

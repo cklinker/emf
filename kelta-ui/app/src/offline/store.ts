@@ -7,7 +7,7 @@
  * `IndexedDbOfflineStore` is the thin production implementation.
  */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { OutboxOp, ReplicaRecord } from './types'
+import type { FailedOp, OutboxOp, ReplicaRecord } from './types'
 
 export interface OfflineStore {
   /** Last sync watermark for a collection, or null if never synced. */
@@ -24,6 +24,11 @@ export interface OfflineStore {
   enqueue(op: OutboxOp): Promise<void>
   listOutbox(): Promise<OutboxOp[]>
   removeOutbox(opId: string): Promise<void>
+
+  /** Failed replays retained for user review (Phase 4 slice 1), oldest first. */
+  addFailed(op: FailedOp): Promise<void>
+  listFailed(): Promise<FailedOp[]>
+  removeFailed(opId: string): Promise<void>
 
   /** Cached page render contract for a custom-page slug (cold-offline page loads). */
   getPageContract(slug: string): Promise<unknown | undefined>
@@ -42,6 +47,7 @@ export class InMemoryOfflineStore implements OfflineStore {
   private cursors = new Map<string, string>()
   private records = new Map<string, Map<string, ReplicaRecord>>()
   private outbox = new Map<string, OutboxOp>()
+  private failed = new Map<string, FailedOp>()
   private pageContracts = new Map<string, unknown>()
 
   private bucket(collection: string): Map<string, ReplicaRecord> {
@@ -89,6 +95,20 @@ export class InMemoryOfflineStore implements OfflineStore {
 
   async removeOutbox(opId: string): Promise<void> {
     this.outbox.delete(opId)
+  }
+
+  async addFailed(op: FailedOp): Promise<void> {
+    this.failed.set(op.id, op)
+  }
+
+  async listFailed(): Promise<FailedOp[]> {
+    return [...this.failed.values()].sort((a, b) =>
+      a.failedAt < b.failedAt ? -1 : a.failedAt > b.failedAt ? 1 : 0
+    )
+  }
+
+  async removeFailed(opId: string): Promise<void> {
+    this.failed.delete(opId)
   }
 
   async getPageContract(slug: string): Promise<unknown | undefined> {
@@ -142,10 +162,15 @@ interface OfflineDbSchema extends DBSchema {
     key: string
     value: PageContractRow
   }
+  failed: {
+    key: string
+    value: FailedOp
+  }
 }
 
-// v1: records/cursors/outbox · v2: + pages (custom-page render contracts).
-const DB_VERSION = 2
+// v1: records/cursors/outbox · v2: + pages (custom-page render contracts) ·
+// v3: + failed (rejected replays retained for review — Phase 4 slice 1).
+const DB_VERSION = 3
 
 export class IndexedDbOfflineStore implements OfflineStore {
   private dbPromise: Promise<IDBPDatabase<OfflineDbSchema>>
@@ -168,6 +193,9 @@ export class IndexedDbOfflineStore implements OfflineStore {
         }
         if (oldVersion < 2) {
           db.createObjectStore('pages', { keyPath: 'slug' })
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('failed', { keyPath: 'id' })
         }
       },
     })
@@ -219,6 +247,19 @@ export class IndexedDbOfflineStore implements OfflineStore {
 
   async removeOutbox(opId: string): Promise<void> {
     await (await this.dbPromise).delete('outbox', opId)
+  }
+
+  async addFailed(op: FailedOp): Promise<void> {
+    await (await this.dbPromise).put('failed', op)
+  }
+
+  async listFailed(): Promise<FailedOp[]> {
+    const rows = await (await this.dbPromise).getAll('failed')
+    return rows.sort((a, b) => (a.failedAt < b.failedAt ? -1 : a.failedAt > b.failedAt ? 1 : 0))
+  }
+
+  async removeFailed(opId: string): Promise<void> {
+    await (await this.dbPromise).delete('failed', opId)
   }
 
   async getPageContract(slug: string): Promise<unknown | undefined> {

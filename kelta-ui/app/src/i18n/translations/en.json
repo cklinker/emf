@@ -2091,9 +2091,9 @@
     "groupsPageOnly": "Groups reflect this page only"
   },
   "massEdit": {
-    "success": "Updated {success} of {total} records",
-    "partial": "Updated {success} of {total} records — {failed} failed. Check the Bulk Jobs page for details.",
-    "terminal": "Bulk update {status} — check the Bulk Jobs page for details",
+    "success": "Updated {{success}} of {{total}} records",
+    "partial": "Updated {{success}} of {{total}} records — {{failed}} failed. Check the Bulk Jobs page for details.",
+    "terminal": "Bulk update {{status}} — check the Bulk Jobs page for details",
     "stillRunning": "Bulk update is still running — check the Bulk Jobs page for its result",
     "viewJobs": "View jobs"
   },
@@ -2110,6 +2110,16 @@
     "noLaneField": "Kanban needs a picklist field to define lanes.",
     "noDateField": "Calendar needs a date or datetime field.",
     "moveFailed": "Move failed — the record changed or the value was rejected",
-    "showingFirst": "Showing the first {count} of {total} records in this range"
+    "showingFirst": "Showing the first {{count}} of {{total}} records in this range"
+  },
+  "offline": {
+    "offline": "You're offline — showing saved data; changes sync when you reconnect.",
+    "offlineQueued": "You're offline — {{count}} change(s) queued; they sync when you reconnect.",
+    "failedBanner": "{{count}} change(s) failed to sync",
+    "details": "Details",
+    "hideDetails": "Hide",
+    "pendingSync": "pending sync",
+    "retry": "Retry",
+    "discard": "Discard"
   }
 }

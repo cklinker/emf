@@ -41,6 +41,20 @@ export interface OutboxOp {
 }
 
 /**
+ * An outbox op the server rejected on replay (409 conflict or other 4xx),
+ * retained for user review instead of being silently dropped (Phase 4 slice 1).
+ * 5xx/network failures are never retained — they stay queued and retry.
+ */
+export interface FailedOp extends OutboxOp {
+  /** HTTP status the replay failed with, when known. */
+  status?: number
+  /** Human-readable server error. */
+  error: string
+  /** ISO-8601 time of the failed replay. */
+  failedAt: string
+}
+
+/**
  * How to resolve a record that was edited both locally (pending outbox) and
  * on the server (pulled) since the last sync.
  */

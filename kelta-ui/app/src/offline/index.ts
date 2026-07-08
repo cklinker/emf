@@ -7,9 +7,17 @@
  *   // read cached rows offline: store.getAll(collection)
  *   // on reconnect (useOnlineStatus → true): engine.sync([collection])
  */
-export type { ChangesFeed, ConflictPolicy, OutboxOp, ReplicaRecord, SyncResult } from './types'
+export type {
+  ChangesFeed,
+  ConflictPolicy,
+  FailedOp,
+  OutboxOp,
+  ReplicaRecord,
+  SyncResult,
+} from './types'
 export { resolveConflict } from './conflict'
 export { InMemoryOfflineStore, IndexedDbOfflineStore, type OfflineStore } from './store'
 export { SyncEngine, type SyncApi, type SyncEngineOptions } from './syncEngine'
 export { useOnlineStatus } from './useOnlineStatus'
 export { OfflineProvider, useOffline, type OfflineContextValue } from './OfflineProvider'
+export { useOfflineOutbox, type UseOfflineOutboxReturn } from './useOfflineOutbox'

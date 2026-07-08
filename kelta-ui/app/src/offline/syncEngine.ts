@@ -12,7 +12,14 @@
  */
 import { resolveConflict } from './conflict'
 import type { OfflineStore } from './store'
-import type { ChangesFeed, ConflictPolicy, OutboxOp, ReplicaRecord, SyncResult } from './types'
+import type {
+  ChangesFeed,
+  ConflictPolicy,
+  FailedOp,
+  OutboxOp,
+  ReplicaRecord,
+  SyncResult,
+} from './types'
 
 /** Minimal subset of `ApiClient` the engine needs (structurally compatible). */
 export interface SyncApi {
@@ -50,6 +57,8 @@ export class SyncEngine {
 
   private readonly store: OfflineStore
   private readonly api: SyncApi
+  /** Outbox-change listeners (Phase 4 slice 1) — notified after queue/push/retry/discard. */
+  private readonly listeners = new Set<() => void>()
 
   constructor(store: OfflineStore, api: SyncApi, opts: SyncEngineOptions = {}) {
     this.store = store
@@ -58,6 +67,64 @@ export class SyncEngine {
     this.pageSize = opts.pageSize ?? 200
     this.idGen = opts.idGen ?? (() => globalThis.crypto.randomUUID())
     this.now = opts.now ?? (() => new Date().toISOString())
+  }
+
+  /**
+   * Subscribe to outbox/failed changes (queue, push, retry, discard). Returns an
+   * unsubscribe function. Listeners fire after the store write completes.
+   */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) listener()
+  }
+
+  /** Failed replays retained for review, oldest first. */
+  listFailed(): Promise<FailedOp[]> {
+    return this.store.listFailed()
+  }
+
+  /**
+   * Move a failed op back into the outbox (fresh queuedAt → FIFO tail). The caller
+   * pushes when online; the op keeps its id so a repeat failure replaces its entry.
+   */
+  async retryFailed(opId: string): Promise<OutboxOp | null> {
+    const failed = await this.store.listFailed()
+    const target = failed.find((f) => f.id === opId)
+    if (!target) return null
+    const requeued: OutboxOp = {
+      id: target.id,
+      collection: target.collection,
+      op: target.op,
+      recordId: target.recordId,
+      tempId: target.tempId,
+      payload: target.payload,
+      queuedAt: this.now(),
+    }
+    await this.store.removeFailed(opId)
+    await this.store.enqueue(requeued)
+    this.notify()
+    return requeued
+  }
+
+  /** Drop a retained failed op permanently. */
+  async discardFailed(opId: string): Promise<void> {
+    await this.store.removeFailed(opId)
+    this.notify()
+  }
+
+  /** Retain a rejected replay for user review instead of dropping it silently. */
+  private async retainFailure(op: OutboxOp, error: unknown, status: number | undefined) {
+    const failedOp: FailedOp = {
+      ...op,
+      status,
+      error: error instanceof Error ? error.message : String(error),
+      failedAt: this.now(),
+    }
+    await this.store.addFailed(failedOp)
   }
 
   /** Full pass: push local changes, then pull each collection. */
@@ -113,6 +180,7 @@ export class SyncEngine {
     }
 
     await this.store.enqueue(entry)
+    this.notify()
     return entry
   }
 
@@ -146,14 +214,18 @@ export class SyncEngine {
       } catch (error) {
         const status = statusOf(error)
         if (status === 409) {
-          // Server rejected on a version/uniqueness conflict — drop the op and
-          // let the subsequent pull bring authoritative server state down.
+          // Server rejected on a version/uniqueness conflict — drop the op (the
+          // subsequent pull brings authoritative state) but RETAIN it for review
+          // (Phase 4 slice 1: no more silent drops).
           conflicts++
           await this.store.removeOutbox(op.id)
+          await this.retainFailure(op, error, status)
         } else if (status !== undefined && status >= 400 && status < 500) {
-          // Permanently bad op (validation/authz) — drop so it can't wedge the queue.
+          // Permanently bad op (validation/authz) — remove so it can't wedge the
+          // queue, retained for review/retry.
           failed++
           await this.store.removeOutbox(op.id)
+          await this.retainFailure(op, error, status)
         } else {
           // Network or 5xx — keep queued and stop, so order is preserved on retry.
           failed++
@@ -162,6 +234,7 @@ export class SyncEngine {
       }
     }
 
+    this.notify()
     return { pushed, failed, conflicts }
   }
 

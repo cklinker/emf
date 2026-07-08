@@ -2057,5 +2057,8 @@
     "range30d": "Last 30 days",
     "range90d": "Last 90 days",
     "range1y": "Last year"
+  },
+  "savedViews": {
+    "sharedReadOnly": "Shared views are managed in Setup → List Views"
   }
 }

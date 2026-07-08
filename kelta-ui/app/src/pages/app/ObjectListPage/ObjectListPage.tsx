@@ -54,6 +54,12 @@ import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagin
 import { ListViewToolbar } from '@/components/ListViewToolbar'
 import { CsvImportDialog } from '@/components/CsvImportDialog/CsvImportDialog'
 import { FilterBar } from '@/components/FilterBar'
+import { ViewSelector } from '@/components/ViewSelector/ViewSelector'
+import { useSavedViews, type SavedView } from '@/hooks/useSavedViews'
+import { useSharedListViews } from '@/hooks/useSharedListViews'
+import { isSharedViewId, orderFieldsByView } from './listViewMapping'
+import { toast } from 'sonner'
+import { useI18n } from '@/context/I18nContext'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
@@ -97,6 +103,7 @@ export function ObjectListPage(): React.ReactElement {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const collectionStore = useCollectionStore()
+  const { t } = useI18n()
   const basePath = `/${tenantSlug}/app`
 
   // Parse list state from URL params (deep linking support)
@@ -131,13 +138,30 @@ export function ObjectListPage(): React.ReactElement {
   } = useCollectionPermissions(collectionName)
 
   // Determine visible fields (first 6 fields by default, excluding system and hidden fields)
+  // Saved views: personal (localStorage, the admin ResourceListPage mechanism) + shared
+  // (admin-authored PUBLIC `list-views` rows, read-only with a `shared:` id prefix).
+  const savedViews = useSavedViews(collectionName || '')
+  const { sharedViews } = useSharedListViews(collectionName, schema?.id)
+  const allViews = useMemo(
+    () => [...sharedViews, ...savedViews.views],
+    [sharedViews, savedViews.views]
+  )
+  const [activeViewId, setActiveViewId] = useState<string | null>(null)
+  const activeView = useMemo(
+    () => allViews.find((v) => v.id === activeViewId) ?? null,
+    [allViews, activeViewId]
+  )
+
   const visibleFields = useMemo(() => {
     if (!fields.length) return []
-    return fields
+    const accessible = fields
       .filter((f) => !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name))
       .filter((f) => isFieldVisible(f.name))
-      .slice(0, 6)
-  }, [fields, isFieldVisible])
+    // An active view's column list drives the column set (view order wins);
+    // otherwise the default first-6 rule applies.
+    const fromView = activeView ? orderFieldsByView(accessible, activeView.visibleColumns) : null
+    return fromView ?? accessible.slice(0, 6)
+  }, [fields, isFieldVisible, activeView])
 
   // Identify reference fields in visible columns that need included resources
   const referenceFields = useMemo(
@@ -252,6 +276,97 @@ export function ObjectListPage(): React.ReactElement {
     },
     [setSearchParams]
   )
+
+  /** Applies a saved view onto the URL state (deep links keep working); null clears it. */
+  const applyView = useCallback(
+    (view: SavedView | null) => {
+      setActiveViewId(view?.id ?? null)
+      if (view) {
+        updateParams({
+          filter: view.filters.length > 0 ? JSON.stringify(view.filters) : undefined,
+          sort: view.sortField
+            ? `${view.sortDirection === 'desc' ? '-' : ''}${view.sortField}`
+            : undefined,
+          pageSize: String(view.pageSize),
+          page: undefined,
+        })
+      } else {
+        updateParams({ filter: undefined, sort: undefined, pageSize: undefined, page: undefined })
+      }
+    },
+    [updateParams]
+  )
+
+  const handleSelectView = useCallback(
+    (viewId: string | null) => {
+      applyView(viewId ? (allViews.find((v) => v.id === viewId) ?? null) : null)
+    },
+    [applyView, allViews]
+  )
+
+  const handleSaveView = useCallback(
+    (name: string) => {
+      savedViews.saveView(name, {
+        filters,
+        sortField: sort?.field ?? null,
+        sortDirection: sort?.direction ?? 'asc',
+        visibleColumns: visibleFields.map((f) => f.name),
+        pageSize,
+        isDefault: false,
+      })
+    },
+    [savedViews, filters, sort, visibleFields, pageSize]
+  )
+
+  const rejectSharedViewEdit = useCallback(() => {
+    toast.error(t('savedViews.sharedReadOnly', 'Shared views are managed in Setup → List Views'))
+  }, [t])
+
+  const handleDeleteView = useCallback(
+    (viewId: string) => {
+      if (isSharedViewId(viewId)) return rejectSharedViewEdit()
+      if (activeViewId === viewId) setActiveViewId(null)
+      savedViews.deleteView(viewId)
+    },
+    [savedViews, activeViewId, rejectSharedViewEdit]
+  )
+
+  const handleRenameView = useCallback(
+    (viewId: string, newName: string) => {
+      if (isSharedViewId(viewId)) return rejectSharedViewEdit()
+      savedViews.renameView(viewId, newName)
+    },
+    [savedViews, rejectSharedViewEdit]
+  )
+
+  const handleSetDefaultView = useCallback(
+    (viewId: string) => {
+      if (isSharedViewId(viewId)) return rejectSharedViewEdit()
+      savedViews.setDefaultView(viewId)
+    },
+    [savedViews, rejectSharedViewEdit]
+  )
+
+  // Auto-apply the default view on a clean first visit — explicit URL state always wins.
+  const appliedDefaultRef = useRef(false)
+  useEffect(() => {
+    if (appliedDefaultRef.current) return
+    const urlHasState = ['page', 'pageSize', 'sort', 'filter'].some((k) => searchParams.has(k))
+    if (urlHasState) {
+      appliedDefaultRef.current = true
+      return
+    }
+    const personalDefault = savedViews.views.find((v) => v.isDefault)
+    const sharedDefault = sharedViews.find((v) => v.isDefault)
+    const def = personalDefault ?? sharedDefault
+    if (def) {
+      appliedDefaultRef.current = true
+      // Deferred so the apply (setState + URL write) never runs synchronously inside
+      // the effect — avoids a cascading render on first mount.
+      const timer = setTimeout(() => applyView(def), 0)
+      return () => clearTimeout(timer)
+    }
+  }, [savedViews.views, sharedViews, searchParams, applyView])
 
   // Sort handler: cycle through asc → desc → none
   const handleSortChange = useCallback(
@@ -422,26 +537,39 @@ export function ObjectListPage(): React.ReactElement {
         </Breadcrumb>
       }
       toolbar={
-        <ListViewToolbar
-          collectionLabel={collectionLabel}
-          selectedCount={selectedIds.size}
-          totalCount={total}
-          onNew={handleNew}
-          onBulkDelete={handleBulkDeleteClick}
-          onExportCsv={handleExportCsv}
-          onExportJson={handleExportJson}
-          onImportCsv={permissions.canCreate ? () => setShowImportDialog(true) : undefined}
-          onClearSelection={handleClearSelection}
-          canCreate={permissions.canCreate}
-          canDelete={permissions.canDelete}
-          quickActionsSlot={
-            <QuickActionsMenu
-              collectionName={collectionName || ''}
-              context="list"
-              executionContext={quickActionContext}
+        <div className="flex flex-col gap-2">
+          <ListViewToolbar
+            collectionLabel={collectionLabel}
+            selectedCount={selectedIds.size}
+            totalCount={total}
+            onNew={handleNew}
+            onBulkDelete={handleBulkDeleteClick}
+            onExportCsv={handleExportCsv}
+            onExportJson={handleExportJson}
+            onImportCsv={permissions.canCreate ? () => setShowImportDialog(true) : undefined}
+            onClearSelection={handleClearSelection}
+            canCreate={permissions.canCreate}
+            canDelete={permissions.canDelete}
+            quickActionsSlot={
+              <QuickActionsMenu
+                collectionName={collectionName || ''}
+                context="list"
+                executionContext={quickActionContext}
+              />
+            }
+          />
+          <div className="flex items-center">
+            <ViewSelector
+              views={allViews}
+              activeView={activeView}
+              onSelectView={handleSelectView}
+              onSaveView={handleSaveView}
+              onDeleteView={handleDeleteView}
+              onRenameView={handleRenameView}
+              onSetDefault={handleSetDefaultView}
             />
-          }
-        />
+          </div>
+        </div>
       }
       filters={
         <>

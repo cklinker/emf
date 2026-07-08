@@ -102,6 +102,13 @@ user can list every approval (including `comments`). This predates the approvals
 exposure). Deferred fix: a row-level read policy (submitter/assignee/admin) needs a design
 pass — likely a read-side hook or Cerbos record policy on these collections. Revisit before
 approvals carry sensitive comments in anger.
+**Realtime socket has no per-subscriber FLS (accepted, 2026-07-08).**
+`RealtimeBridge` fans each `kelta.record.changed` event to every tenant subscriber —
+collection name, record id, and (for non-masking collections) the record `data` — with no
+per-subscriber field-level check. The frontend mitigates via the invalidation-only rule
+(see conventions.md): pushed `data` is never rendered or cached. Residual exposure: a
+subscriber learns change activity (ids + non-masked data on the wire) for collections they
+subscribe to. Per-subscriber filtering server-side is v2.
 
 **Record merge write path — field-level write-FLS not applied (accepted trade-off).**
 `RecordMergeController` (`POST /api/collections/{name}/merge`) applies the master's

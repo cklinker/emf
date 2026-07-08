@@ -100,6 +100,13 @@ either. Grant `VIEW_ANALYTICS` to end-user profiles; reserve `MANAGE_REPORTS` fo
 (`?page/pageSize/sort/filter=<JSON FilterCondition[]>`). Build deep links ONLY through its
 `buildListUrl(tenantSlug, collection, filters, sort?)` — the canonical drill-through helper
 (dashboard chart segments, saved views); never hand-assemble the `filter` param.
+### Realtime events are invalidation-only
+
+`/ws/realtime` pushes record `data` to every tenant subscriber with NO per-subscriber
+FLS/Cerbos check (masking-configured collections already suppress `data`). Frontend
+consumers therefore NEVER write pushed `data` into caches — on `record.changed`, invalidate
+the matching React Query keys (`src/realtime/invalidation.ts` is the canonical mapping) and
+let the refetch go through the authorized JSON:API path where per-viewer authz applies.
 
 ## REST API: pagination
 

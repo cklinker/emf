@@ -452,7 +452,9 @@
         "pathFormat": "Path must start with /",
         "titleRequired": "Page title is required",
         "titleTooLong": "Page title must be 100 characters or less"
-      }
+      },
+      "undo": "Undo (Cmd/Ctrl+Z)",
+      "redo": "Redo (Shift+Cmd/Ctrl+Z)"
     },
     "menus": {
       "title": "Menu Builder",

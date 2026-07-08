@@ -626,8 +626,9 @@ public class FlowConfig {
     @Bean
     public ApprovalProcessConfigHook approvalProcessConfigHook(
             BeforeSaveHookRegistry hookRegistry,
-            PlatformEventPublisher eventPublisher) {
-        ApprovalProcessConfigHook hook = new ApprovalProcessConfigHook(eventPublisher);
+            PlatformEventPublisher eventPublisher,
+            JdbcTemplate jdbcTemplate) {
+        ApprovalProcessConfigHook hook = new ApprovalProcessConfigHook(eventPublisher, jdbcTemplate);
         hookRegistry.register(hook);
         return hook;
     }

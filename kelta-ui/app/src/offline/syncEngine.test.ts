@@ -192,7 +192,7 @@ describe('SyncEngine.push', () => {
     expect(await store.listOutbox()).toHaveLength(0)
   })
 
-  it('drops an op the server rejects with 409 and counts it as a conflict', async () => {
+  it('drops a 409 op from the queue but RETAINS it as a failed op (slice 1)', async () => {
     api.put.mockRejectedValueOnce(new ApiStatusError(409))
     const engine = engineFor(store, api)
     await engine.queue('orders', 'update', { recordId: 'o1', payload: { v: 2 } })
@@ -201,9 +201,12 @@ describe('SyncEngine.push', () => {
 
     expect(r).toMatchObject({ pushed: 0, conflicts: 1 })
     expect(await store.listOutbox()).toHaveLength(0)
+    const failed = await store.listFailed()
+    expect(failed).toHaveLength(1)
+    expect(failed[0]).toMatchObject({ op: 'update', recordId: 'o1', status: 409 })
   })
 
-  it('drops a permanently bad op (4xx) so it cannot wedge the queue', async () => {
+  it('retains a permanently bad op (4xx) with its server error instead of dropping silently', async () => {
     api.put.mockRejectedValueOnce(new ApiStatusError(422))
     const engine = engineFor(store, api)
     await engine.queue('orders', 'update', { recordId: 'o1', payload: { v: 2 } })
@@ -212,9 +215,12 @@ describe('SyncEngine.push', () => {
 
     expect(r).toMatchObject({ pushed: 0, failed: 1 })
     expect(await store.listOutbox()).toHaveLength(0)
+    const failed = await store.listFailed()
+    expect(failed).toHaveLength(1)
+    expect(failed[0]).toMatchObject({ status: 422, error: 'status 422' })
   })
 
-  it('keeps the queue intact and stops on a network/5xx error to preserve order', async () => {
+  it('keeps the queue intact (and retains nothing) on a network/5xx error', async () => {
     api.put.mockRejectedValueOnce(new ApiStatusError(0))
     const engine = engineFor(store, api)
     await engine.queue('orders', 'update', { recordId: 'o1', payload: { v: 2 } })
@@ -225,6 +231,63 @@ describe('SyncEngine.push', () => {
     expect(r.failed).toBe(1)
     expect(api.del).not.toHaveBeenCalled() // stopped before the second op
     expect(await store.listOutbox()).toHaveLength(2)
+    expect(await store.listFailed()).toHaveLength(0)
+  })
+
+  it('retryFailed re-queues the op and a subsequent push replays it', async () => {
+    api.put.mockRejectedValueOnce(new ApiStatusError(422))
+    const engine = engineFor(store, api)
+    await engine.queue('orders', 'update', { recordId: 'o1', payload: { v: 2 } })
+    await engine.push()
+    const failed = await store.listFailed()
+    expect(failed).toHaveLength(1)
+
+    const requeued = await engine.retryFailed(failed[0].id)
+    expect(requeued).toMatchObject({ op: 'update', recordId: 'o1' })
+    expect(await store.listFailed()).toHaveLength(0)
+    expect(await store.listOutbox()).toHaveLength(1)
+
+    const r = await engine.push()
+    expect(r.pushed).toBe(1)
+    expect(await store.listOutbox()).toHaveLength(0)
+  })
+
+  it('retryFailed returns null for an unknown id', async () => {
+    const engine = engineFor(store, api)
+    expect(await engine.retryFailed('nope')).toBeNull()
+  })
+
+  it('discardFailed drops the retained op permanently', async () => {
+    api.put.mockRejectedValueOnce(new ApiStatusError(422))
+    const engine = engineFor(store, api)
+    await engine.queue('orders', 'update', { recordId: 'o1', payload: { v: 2 } })
+    await engine.push()
+    const failed = await store.listFailed()
+
+    await engine.discardFailed(failed[0].id)
+    expect(await store.listFailed()).toHaveLength(0)
+    expect(await store.listOutbox()).toHaveLength(0)
+  })
+
+  it('notifies onChange subscribers on queue, push, retry, and discard', async () => {
+    api.put.mockRejectedValueOnce(new ApiStatusError(422))
+    const engine = engineFor(store, api)
+    const listener = vi.fn()
+    const unsubscribe = engine.onChange(listener)
+
+    await engine.queue('orders', 'update', { recordId: 'o1', payload: { v: 2 } })
+    expect(listener).toHaveBeenCalledTimes(1)
+    await engine.push() // fails with 422 → retained
+    expect(listener).toHaveBeenCalledTimes(2)
+    const failed = await store.listFailed()
+    await engine.retryFailed(failed[0].id)
+    expect(listener).toHaveBeenCalledTimes(3)
+    await engine.push()
+    expect(listener).toHaveBeenCalledTimes(4)
+
+    unsubscribe()
+    await engine.queue('orders', 'delete', { recordId: 'o9' })
+    expect(listener).toHaveBeenCalledTimes(4)
   })
 })
 

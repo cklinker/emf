@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openDB } from 'idb'
 import { IndexedDbOfflineStore, InMemoryOfflineStore, type OfflineStore } from './store'
-import type { OutboxOp } from './types'
+import type { FailedOp, OutboxOp } from './types'
 
 function op(id: string, queuedAt: string, collection = 'orders'): OutboxOp {
   return { id, collection, op: 'update', recordId: id, payload: { id }, queuedAt }
@@ -62,6 +62,24 @@ describe.each(factories)('%s (OfflineStore contract)', (_name, make) => {
     expect((await store.listOutbox()).map((o) => o.id)).toEqual(['b', 'c'])
   })
 
+  it('retains, lists (oldest first), and removes failed ops', async () => {
+    const failedOp = (id: string, failedAt: string): FailedOp => ({
+      ...op(id, failedAt),
+      status: 422,
+      error: 'validation failed',
+      failedAt,
+    })
+    await store.addFailed(failedOp('f2', '2026-07-08T02:00:00Z'))
+    await store.addFailed(failedOp('f1', '2026-07-08T01:00:00Z'))
+
+    const listed = await store.listFailed()
+    expect(listed.map((f) => f.id)).toEqual(['f1', 'f2'])
+    expect(listed[0]).toMatchObject({ status: 422, error: 'validation failed' })
+
+    await store.removeFailed('f1')
+    expect((await store.listFailed()).map((f) => f.id)).toEqual(['f2'])
+  })
+
   it('returns undefined for an uncached page contract and round-trips one by slug', async () => {
     expect(await store.getPageContract('dashboard')).toBeUndefined()
 
@@ -76,8 +94,8 @@ describe.each(factories)('%s (OfflineStore contract)', (_name, make) => {
   })
 })
 
-describe('IndexedDbOfflineStore v1 → v2 upgrade', () => {
-  it('keeps existing v1 records/cursors and adds the pages store', async () => {
+describe('IndexedDbOfflineStore v1 → v3 upgrade', () => {
+  it('keeps existing v1 records/cursors and adds the pages + failed stores', async () => {
     const dbName = `test-db-upgrade-${++dbCounter}`
 
     // Simulate a live v1 replica (records/cursors/outbox only — no `pages` store).
@@ -94,7 +112,7 @@ describe('IndexedDbOfflineStore v1 → v2 upgrade', () => {
     await v1.put('cursors', { collection: 'orders', cursor: '2026-06-21T00:00:00Z' })
     v1.close()
 
-    // Reopening through the store runs the v1→v2 upgrade path.
+    // Reopening through the store runs the incremental v1→v3 upgrade path.
     const store = new IndexedDbOfflineStore(dbName)
     expect(await store.get('orders', 'o1')).toMatchObject({ id: 'o1', total: 10 })
     expect(await store.getCursor('orders')).toBe('2026-06-21T00:00:00Z')
@@ -104,5 +122,14 @@ describe('IndexedDbOfflineStore v1 → v2 upgrade', () => {
     expect(await store.getPageContract('home')).toMatchObject({ slug: 'home' })
     await store.putRecords('orders', [{ id: 'o2', total: 20 }])
     expect((await store.getAll('orders')).map((r) => r.id).sort()).toEqual(['o1', 'o2'])
+
+    // The new failed store (v3) works too.
+    await store.addFailed({
+      ...op('f1', '2026-07-08T01:00:00Z'),
+      status: 409,
+      error: 'conflict',
+      failedAt: '2026-07-08T01:01:00Z',
+    })
+    expect((await store.listFailed()).map((f) => f.id)).toEqual(['f1'])
   })
 })

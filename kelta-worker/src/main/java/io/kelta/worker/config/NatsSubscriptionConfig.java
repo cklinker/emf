@@ -15,6 +15,7 @@ import io.kelta.worker.listener.RecordWebhookPublisher;
 import io.kelta.worker.listener.SvixWebhookPublisher;
 import io.kelta.worker.listener.MenuCacheInvalidationListener;
 import io.kelta.worker.listener.SystemFeatureCacheInvalidationListener;
+import io.kelta.worker.listener.SystemCollectionCacheInvalidationListener;
 import io.kelta.worker.listener.TranslationCacheInvalidationListener;
 import io.kelta.worker.listener.TenantEmailCacheInvalidationListener;
 import io.kelta.worker.module.ModuleEventListener;
@@ -52,6 +53,7 @@ public class NatsSubscriptionConfig {
     private final LayoutCacheInvalidationListener layoutCacheInvalidationListener;
     private final MenuCacheInvalidationListener menuCacheInvalidationListener;
     private final TranslationCacheInvalidationListener translationCacheInvalidationListener;
+    private final SystemCollectionCacheInvalidationListener systemCollectionCacheInvalidationListener;
 
     @Autowired(required = false)
     private CredentialCacheInvalidationListener credentialCacheInvalidationListener;
@@ -79,7 +81,8 @@ public class NatsSubscriptionConfig {
                                    SystemFeatureCacheInvalidationListener systemFeatureCacheInvalidationListener,
                                    LayoutCacheInvalidationListener layoutCacheInvalidationListener,
                                    MenuCacheInvalidationListener menuCacheInvalidationListener,
-                                   TranslationCacheInvalidationListener translationCacheInvalidationListener) {
+                                   TranslationCacheInvalidationListener translationCacheInvalidationListener,
+                                   SystemCollectionCacheInvalidationListener systemCollectionCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.flowEventListener = flowEventListener;
         this.natsTriggerFlowListener = natsTriggerFlowListener;
@@ -92,6 +95,7 @@ public class NatsSubscriptionConfig {
         this.layoutCacheInvalidationListener = layoutCacheInvalidationListener;
         this.menuCacheInvalidationListener = menuCacheInvalidationListener;
         this.translationCacheInvalidationListener = translationCacheInvalidationListener;
+        this.systemCollectionCacheInvalidationListener = systemCollectionCacheInvalidationListener;
     }
 
     @PostConstruct
@@ -165,6 +169,15 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.broadcast(
                 "worker-layout-cache", "kelta.config.layout.changed.*",
                 layoutCacheInvalidationListener::handleLayoutChanged));
+
+        // System-collection response cache invalidation — every pod evicts its
+        // cached JSON:API responses for a system collection when one of its rows
+        // changes anywhere in the fleet. Without this, DynamicCollectionRouter's
+        // same-pod eviction left the other replicas serving stale field/collection
+        // config until the 10-minute TTL.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-system-collection-cache", "kelta.record.changed.>",
+                systemCollectionCacheInvalidationListener::handleRecordChanged));
 
         // Menu/app config invalidation (apps/nav v2) — every pod evicts its cached
         // ui-menus / ui-menu-items responses when navigation config changes anywhere.

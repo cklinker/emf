@@ -68,6 +68,15 @@ export function mapSharedListView(row: ListViewRow, collectionName: string): Sav
     filters: asFilterConditions(row.filters).map((f, i) => ({ ...f, id: f.id ?? `s${i + 1}` })),
     sortField: row.sortField ?? null,
     sortDirection: row.sortDirection?.toUpperCase() === 'DESC' ? 'desc' : 'asc',
+    sorts: row.sortField
+      ? [
+          {
+            field: row.sortField,
+            direction:
+              row.sortDirection?.toUpperCase() === 'DESC' ? ('desc' as const) : ('asc' as const),
+          },
+        ]
+      : undefined,
     visibleColumns: asStringArray(row.columns),
     pageSize,
     isDefault: row.isDefault === true,

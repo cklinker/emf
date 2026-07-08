@@ -82,7 +82,8 @@ interface FetchRecordsParams {
   collectionName: string
   page: number
   pageSize: number
-  sort?: SortState
+  /** Single sort or an ordered multi-sort list (serialized as `sort=a,-b`). */
+  sort?: SortState | SortState[]
   filters?: FilterCondition[]
   include?: string
 }
@@ -132,15 +133,20 @@ function queryReplica(rows: ReplicaRecord[], params: FetchRecordsParams): Pagina
   if (filters && filters.length > 0) {
     result = result.filter((row) => filters.every((f) => matchesFilter(row[f.field], f)))
   }
-  if (sort) {
-    const dir = sort.direction === 'desc' ? -1 : 1
+  const sortLevels = sort ? (Array.isArray(sort) ? sort : [sort]) : []
+  if (sortLevels.length > 0) {
     result = [...result].sort((a, b) => {
-      const av = a[sort.field]
-      const bv = b[sort.field]
-      if (av == null && bv == null) return 0
-      if (av == null) return -dir
-      if (bv == null) return dir
-      return av < bv ? -dir : av > bv ? dir : 0
+      for (const level of sortLevels) {
+        const dir = level.direction === 'desc' ? -1 : 1
+        const av = a[level.field]
+        const bv = b[level.field]
+        if (av == null && bv == null) continue
+        if (av == null) return -dir
+        if (bv == null) return dir
+        if (av < bv) return -dir
+        if (av > bv) return dir
+      }
+      return 0
     })
   }
 
@@ -164,8 +170,9 @@ async function fetchRecords(
   queryParams.set('page[size]', String(pageSize))
 
   if (sort) {
-    const sortValue = sort.direction === 'desc' ? `-${sort.field}` : sort.field
-    queryParams.set('sort', sortValue)
+    const list = Array.isArray(sort) ? sort : [sort]
+    const sortValue = list.map((s) => (s.direction === 'desc' ? `-${s.field}` : s.field)).join(',')
+    if (sortValue) queryParams.set('sort', sortValue)
   }
 
   if (filters && filters.length > 0) {
@@ -191,8 +198,8 @@ export interface UseCollectionRecordsOptions {
   page?: number
   /** Page size */
   pageSize?: number
-  /** Sort state */
-  sort?: SortState
+  /** Sort state — single or an ordered multi-sort list (`sort=a,-b` server grammar) */
+  sort?: SortState | SortState[]
   /** Active filters */
   filters?: FilterCondition[]
   /** Whether the query is enabled */

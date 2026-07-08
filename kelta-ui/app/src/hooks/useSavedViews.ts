@@ -28,6 +28,14 @@ export interface FilterCondition {
 /**
  * A saved list view configuration for a collection.
  */
+export type SavedViewType = 'table' | 'kanban' | 'calendar' | 'gallery'
+export type SavedViewDensity = 'compact' | 'normal' | 'comfortable'
+
+export interface SavedViewSort {
+  field: string
+  direction: 'asc' | 'desc'
+}
+
 export interface SavedView {
   id: string
   name: string
@@ -39,6 +47,28 @@ export interface SavedView {
   pageSize: number
   isDefault: boolean
   createdAt: string
+  // ---- v2 (app-data-entry slice 2) — all optional; absent reads as today's behavior.
+  /** Ordered multi-sort; supersedes sortField/sortDirection when present. */
+  sorts?: SavedViewSort[]
+  /** Renderer for this view; absent = 'table'. */
+  viewType?: SavedViewType
+  /** Row density; absent = 'normal'. */
+  density?: SavedViewDensity
+  /** This-page grouping field (table view; slice 3 consumes). */
+  groupBy?: string | null
+  /** Per-view-type config (kanban lanes, calendar date field, gallery card). */
+  typeConfig?: {
+    kanban?: { laneField: string; cardFields?: string[] }
+    calendar?: { dateField: string; endDateField?: string }
+    gallery?: { imageField?: string; titleField?: string; cardFields?: string[] }
+  }
+}
+
+/** Effective ordered sorts for a view (v2 `sorts` wins; v1 fields as fallback). */
+export function viewSorts(view: SavedView): SavedViewSort[] {
+  if (view.sorts && view.sorts.length > 0) return view.sorts
+  if (view.sortField) return [{ field: view.sortField, direction: view.sortDirection }]
+  return []
 }
 
 export interface UseSavedViewsReturn {
@@ -149,6 +179,11 @@ export function useSavedViews(collectionName: string): UseSavedViewsReturn {
           visibleColumns: config.visibleColumns,
           pageSize: config.pageSize,
           isDefault: config.isDefault,
+          sorts: config.sorts,
+          viewType: config.viewType,
+          density: config.density,
+          groupBy: config.groupBy,
+          typeConfig: config.typeConfig,
           createdAt: existingIndex >= 0 ? prev[existingIndex].createdAt : new Date().toISOString(),
         }
 

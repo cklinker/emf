@@ -1,10 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { buildListUrl, parseFilters, parseListViewParams } from './listUrlState'
+import {
+  buildListUrl,
+  buildSortParam,
+  parseFilters,
+  parseListViewParams,
+  parseSortParam,
+} from './listUrlState'
 
 describe('listUrlState', () => {
   it('parses defaults from empty params', () => {
     const state = parseListViewParams(new URLSearchParams())
-    expect(state).toEqual({ page: 1, pageSize: 25, sort: undefined, filters: [] })
+    expect(state).toEqual({
+      page: 1,
+      pageSize: 25,
+      sort: undefined,
+      sorts: [],
+      filters: [],
+      viewId: null,
+    })
   })
 
   it('parses page, pageSize, sort direction, and filters', () => {
@@ -47,5 +60,30 @@ describe('listUrlState', () => {
     expect(buildListUrl('acme', 'orders', [])).toBe('/acme/app/o/orders')
     const url = buildListUrl('acme', 'orders', [], { field: 'total', direction: 'desc' })
     expect(url).toBe('/acme/app/o/orders?sort=-total')
+  })
+})
+
+describe('multi-sort grammar (app-data-entry slice 2)', () => {
+  it('parses the comma grammar into ordered levels', () => {
+    expect(parseSortParam('stage,-amount, name')).toEqual([
+      { field: 'stage', direction: 'asc' },
+      { field: 'amount', direction: 'desc' },
+      { field: 'name', direction: 'asc' },
+    ])
+    expect(parseSortParam(null)).toEqual([])
+    expect(parseSortParam('-')).toEqual([])
+  })
+
+  it('round-trips through buildSortParam', () => {
+    const sorts = parseSortParam('a,-b')
+    expect(buildSortParam(sorts)).toBe('a,-b')
+    expect(buildSortParam([])).toBeUndefined()
+  })
+
+  it('parseListViewParams exposes sorts, first-level sort, and the view id', () => {
+    const state = parseListViewParams(new URLSearchParams('sort=a,-b&view=v42'))
+    expect(state.sorts).toHaveLength(2)
+    expect(state.sort).toEqual({ field: 'a', direction: 'asc' })
+    expect(state.viewId).toBe('v42')
   })
 })

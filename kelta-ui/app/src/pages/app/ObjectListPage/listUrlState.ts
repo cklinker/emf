@@ -38,31 +38,50 @@ export function parseFilters(filterParam: string | null): FilterCondition[] {
  * Parse list view state from URL search params.
  * Returns page, pageSize, sort, and filters with sensible defaults.
  */
+/** Parses the comma sort grammar (`a,-b`) into ordered SortState entries. */
+export function parseSortParam(sortParam: string | null): SortState[] {
+  if (!sortParam) return []
+  return sortParam
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .map((part) =>
+      part.startsWith('-')
+        ? { field: part.slice(1), direction: 'desc' as const }
+        : { field: part, direction: 'asc' as const }
+    )
+    .filter((s) => s.field.length > 0)
+}
+
+/** Serializes ordered SortState entries back to the comma grammar; undefined when empty. */
+export function buildSortParam(sorts: SortState[]): string | undefined {
+  if (sorts.length === 0) return undefined
+  return sorts.map((s) => (s.direction === 'desc' ? `-${s.field}` : s.field)).join(',')
+}
+
 export function parseListViewParams(searchParams: URLSearchParams): {
   page: number
   pageSize: number
+  /** First sort level — kept for single-sort consumers. */
   sort: SortState | undefined
+  /** Full ordered sort list (server grammar `sort=a,-b` — multi-sort verified server-side). */
+  sorts: SortState[]
   filters: FilterCondition[]
+  /** Saved-view deep link (`view=<id>`). */
+  viewId: string | null
 } {
   const pageParam = parseInt(searchParams.get('page') || '1', 10)
   const pageSizeParam = parseInt(searchParams.get('pageSize') || '25', 10)
-  const sortParam = searchParams.get('sort')
+  const sorts = parseSortParam(searchParams.get('sort'))
   const filterParam = searchParams.get('filter')
-
-  let sort: SortState | undefined
-  if (sortParam) {
-    if (sortParam.startsWith('-')) {
-      sort = { field: sortParam.slice(1), direction: 'desc' }
-    } else {
-      sort = { field: sortParam, direction: 'asc' }
-    }
-  }
 
   return {
     page: isNaN(pageParam) || pageParam < 1 ? 1 : pageParam,
     pageSize: [10, 25, 50, 100].includes(pageSizeParam) ? pageSizeParam : 25,
-    sort,
+    sort: sorts[0],
+    sorts,
     filters: parseFilters(filterParam),
+    viewId: searchParams.get('view'),
   }
 }
 

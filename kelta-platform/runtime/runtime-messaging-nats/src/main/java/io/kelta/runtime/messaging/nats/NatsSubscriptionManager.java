@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
@@ -51,6 +52,8 @@ import java.util.concurrent.atomic.AtomicLong;
 public class NatsSubscriptionManager implements DisposableBean {
 
     private static final Logger log = LoggerFactory.getLogger(NatsSubscriptionManager.class);
+
+    static final long RETRY_SECONDS = 5;
 
     private final NatsConnectionManager connectionManager;
     private final ObjectMapper objectMapper;
@@ -95,22 +98,67 @@ public class NatsSubscriptionManager implements DisposableBean {
         subscriptions.add(subscription);
     }
 
+    /**
+     * Starts all registered subscriptions. Ordered after
+     * {@link JetStreamInitializer#initializeStreams()} so the streams exist before
+     * the first subscribe attempt. Any subscription that still fails to start
+     * (NATS not yet reachable, stream owned by a peer service not yet up) is
+     * retried every {@link #RETRY_SECONDS}s until it attaches — a pod must never
+     * run deaf until restart because of an unlucky startup race.
+     */
     @EventListener(ApplicationReadyEvent.class)
+    @Order(10)
     public void startSubscriptions() {
+        List<EventSubscription> failed = new ArrayList<>();
         for (EventSubscription sub : subscriptions) {
-            try {
-                switch (sub.deliveryMode()) {
-                    case QUEUE_GROUP -> startPullConsumer(sub);
-                    case BROADCAST -> startPushConsumer(sub);
-                }
-            } catch (Exception e) {
-                log.error("Failed to start subscription '{}' on {}: {}",
-                        sub.name(), sub.subject(), e.getMessage(), e);
+            if (!tryStartSubscription(sub, true)) {
+                failed.add(sub);
             }
         }
+        if (!failed.isEmpty()) {
+            log.warn("{} NATS subscription(s) failed to start — retrying every {}s until attached",
+                    failed.size(), RETRY_SECONDS);
+            lagPoller.schedule(() -> retryPending(failed), RETRY_SECONDS, TimeUnit.SECONDS);
+        }
         // Schedule consumer-lag polling after all subscriptions are registered.
-        if (meterRegistry != null && !subsByName.isEmpty()) {
+        if (meterRegistry != null && !subscriptions.isEmpty()) {
             lagPoller.scheduleAtFixedRate(this::pollLagOnce, 30, 30, TimeUnit.SECONDS);
+        }
+    }
+
+    boolean tryStartSubscription(EventSubscription sub, boolean firstAttempt) {
+        try {
+            switch (sub.deliveryMode()) {
+                case QUEUE_GROUP -> startPullConsumer(sub);
+                case BROADCAST -> startPushConsumer(sub);
+            }
+            return true;
+        } catch (Exception e) {
+            if (firstAttempt) {
+                log.error("Failed to start subscription '{}' on {}: {}",
+                        sub.name(), sub.subject(), e.getMessage(), e);
+            } else {
+                log.warn("Retry failed for subscription '{}' on {}: {}",
+                        sub.name(), sub.subject(), e.getMessage());
+            }
+            return false;
+        }
+    }
+
+    void retryPending(List<EventSubscription> pending) {
+        if (!running) {
+            return;
+        }
+        List<EventSubscription> still = new ArrayList<>();
+        for (EventSubscription sub : pending) {
+            if (tryStartSubscription(sub, false)) {
+                log.info("Subscription '{}' attached on retry", sub.name());
+            } else {
+                still.add(sub);
+            }
+        }
+        if (!still.isEmpty() && running) {
+            lagPoller.schedule(() -> retryPending(still), RETRY_SECONDS, TimeUnit.SECONDS);
         }
     }
 

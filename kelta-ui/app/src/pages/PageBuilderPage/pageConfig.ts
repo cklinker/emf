@@ -16,6 +16,14 @@ export interface PageVariable {
   name: string
   type: 'string' | 'number' | 'boolean' | 'json'
   default?: unknown
+  /**
+   * Variable kind (app-platform slice 2). Absent = 'static' (today's behavior).
+   * A 'computed' variable derives its value from `expression` over the live binding
+   * scope; it has no stored state and rejects `setVar`.
+   */
+  kind?: 'static' | 'computed'
+  /** Formula expression for `kind: 'computed'` (evaluated via the 2d expr path). */
+  expression?: string
 }
 
 /**

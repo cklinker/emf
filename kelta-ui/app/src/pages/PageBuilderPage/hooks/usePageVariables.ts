@@ -4,6 +4,7 @@
  * resulting `vars` map feeds `scope.vars` for binding resolution.
  */
 import { useCallback, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import type { PageVariable } from '../pageConfig'
 
 export interface UsePageVariablesReturn {
@@ -37,11 +38,15 @@ function coerceDefault(variable: PageVariable): unknown {
   }
 }
 
-/** Build the initial `vars` map from the declared variables (last duplicate name wins). */
+/**
+ * Build the initial `vars` map from the declared variables (last duplicate name wins).
+ * Computed variables (slice 2) carry no state — they derive per render — so they are
+ * excluded from seeding.
+ */
 function seedVars(variables: PageVariable[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const v of variables) {
-    if (v && typeof v.name === 'string' && v.name.length > 0) {
+    if (v && typeof v.name === 'string' && v.name.length > 0 && v.kind !== 'computed') {
       out[v.name] = coerceDefault(v)
     }
   }
@@ -51,7 +56,7 @@ function seedVars(variables: PageVariable[]): Record<string, unknown> {
 export function usePageVariables(variables: PageVariable[]): UsePageVariablesReturn {
   // A stable signature of the declared variable set; re-seed only when it actually changes.
   const seedKey = useMemo(
-    () => JSON.stringify(variables.map((v) => [v.name, v.type, v.default])),
+    () => JSON.stringify(variables.map((v) => [v.name, v.type, v.default, v.kind])),
     [variables]
   )
   // Lazy initializer so the first render seeds without a manual-memo dependency the compiler rejects.
@@ -66,9 +71,23 @@ export function usePageVariables(variables: PageVariable[]): UsePageVariablesRet
     setState({ key: seedKey, vars: seedVars(variables) })
   }
 
-  const setVar = useCallback((name: string, value: unknown) => {
-    setState((prev) => ({ key: prev.key, vars: { ...prev.vars, [name]: value } }))
-  }, [])
+  // Computed variables are read-only — `setVar` (incl. the 2e action) rejects them here,
+  // the single guard site.
+  const computedNames = useMemo(
+    () => new Set(variables.filter((v) => v.kind === 'computed').map((v) => v.name)),
+    [variables]
+  )
+
+  const setVar = useCallback(
+    (name: string, value: unknown) => {
+      if (computedNames.has(name)) {
+        toast.error(`"${name}" is a computed variable and cannot be set`)
+        return
+      }
+      setState((prev) => ({ key: prev.key, vars: { ...prev.vars, [name]: value } }))
+    },
+    [computedNames]
+  )
 
   const reset = useCallback(
     () => setState((prev) => ({ key: prev.key, vars: seedVars(variables) })),

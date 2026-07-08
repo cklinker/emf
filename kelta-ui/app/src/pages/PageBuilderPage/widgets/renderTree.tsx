@@ -6,6 +6,7 @@
 /* eslint-disable react-refresh/only-export-components -- shared render path exports both RenderTree and renderNode */
 import React from 'react'
 import { resolveBindings, type BindingScope } from '../model/bindingScope'
+import { isHiddenValue } from '../model/visibility'
 import { widgetRegistry } from './registry'
 import type { RenderNode } from './types'
 
@@ -20,6 +21,17 @@ function NodeRenderer({ node, scope, mode, tenantSlug }: NodeRendererProps): Rea
   const descriptor = widgetRegistry.get(node.type)
   // Resolved-node invariant: props handed to Render are always already resolved.
   const resolvedNode: RenderNode = { ...node, props: resolveBindings(node.props ?? {}, scope) }
+  // Conditional visibility (app-platform slice 1): at runtime a node whose `visible`
+  // prop is present AND resolves hidden skips its whole subtree. The editor never
+  // hides (SelectableNode ghosts/badges instead); absent prop = today's behavior.
+  if (
+    mode === 'runtime' &&
+    node.props &&
+    'visible' in node.props &&
+    isHiddenValue(resolvedNode.props.visible)
+  ) {
+    return <></>
+  }
   const Render = descriptor.Render
   const renderChild = (child: RenderNode, childScope?: BindingScope): React.ReactNode => (
     <NodeRenderer

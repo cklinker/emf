@@ -10,10 +10,11 @@
 import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../../../context/I18nContext'
 import { componentRegistry } from '@/services/componentRegistry'
+import { visibilityKind } from '../model/visibility'
 import type { PageComponent, ResponsiveSpan } from '../model/pageModel'
 import { widgetRegistry } from '../widgets/registry'
 import { renderNode } from '../widgets/renderTree'
@@ -58,6 +59,12 @@ export function SelectableNode({
   const isPlugin =
     !widgetRegistry.list().some((w) => w.type === node.type) &&
     componentRegistry.hasPageComponent(node.type)
+  // Conditional visibility (app-platform slice 1): editor chrome from the RAW prop —
+  // a literal false ghosts the node; a binding badges it (the editor scope can't
+  // evaluate it). The node stays selectable/deletable either way.
+  const nodeVisibility = visibilityKind(
+    (node.props as Record<string, unknown> | undefined)?.visible
+  )
 
   // The grid width is measured at pointer-down (inside the hook), not during render — no ref read here.
   const { handleProps } = useSpanResize({
@@ -84,7 +91,8 @@ export function SelectableNode({
         'group relative rounded border border-border bg-muted/40 p-2 transition-[border-color,box-shadow]',
         inGrid && spanToClasses(node.span),
         isSelected && 'border-primary ring-2 ring-primary/20',
-        isPlugin && 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40'
+        isPlugin && 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40',
+        nodeVisibility === 'literal-hidden' && 'opacity-50'
       )}
       // Selecting a node: clicking anywhere on the node chrome selects it (and stops the canvas
       // deselect). Keyboard select uses the drag-handle button + Enter via dnd-kit a11y.
@@ -115,6 +123,17 @@ export function SelectableNode({
                 data-testid={`custom-badge-${node.id}`}
               >
                 Custom
+              </span>
+            )}
+            {nodeVisibility !== 'default' && (
+              <span
+                className="ml-1 inline-flex items-center gap-0.5 rounded bg-muted px-1 py-[2px] text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                data-testid={`visibility-badge-${node.id}`}
+              >
+                <EyeOff className="h-2.5 w-2.5" aria-hidden />
+                {nodeVisibility === 'bound'
+                  ? t('builder.inspector.visibilityConditional')
+                  : t('builder.inspector.visibilityHidden')}
               </span>
             )}
           </span>

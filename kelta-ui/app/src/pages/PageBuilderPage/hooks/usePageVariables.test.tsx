@@ -1,8 +1,10 @@
 /** usePageVariables: seeds vars from typed defaults, setVar updates one, reset restores. */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { usePageVariables } from './usePageVariables'
 import type { PageVariable } from '../pageConfig'
+
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
 const variables: PageVariable[] = [
   { name: 'count', type: 'number', default: 5 },
@@ -48,5 +50,28 @@ describe('usePageVariables', () => {
     act(() => result.current.setVar('count', 99))
     act(() => result.current.reset())
     expect(result.current.vars.count).toBe(5)
+  })
+
+  it('excludes computed variables from seeding (they derive per render)', () => {
+    const { result } = renderHook(() =>
+      usePageVariables([
+        { name: 'a', type: 'number', default: 1 },
+        { name: 'b', type: 'number', kind: 'computed', expression: 'vars.a + 1' },
+      ])
+    )
+    expect(result.current.vars).toEqual({ a: 1 })
+  })
+
+  it('rejects setVar on a computed variable (no write, error toast)', async () => {
+    const { toast } = await import('sonner')
+    const { result } = renderHook(() =>
+      usePageVariables([
+        { name: 'a', type: 'number', default: 1 },
+        { name: 'b', type: 'number', kind: 'computed', expression: 'vars.a + 1' },
+      ])
+    )
+    act(() => result.current.setVar('b', 42))
+    expect(result.current.vars).toEqual({ a: 1 })
+    expect(toast.error).toHaveBeenCalled()
   })
 })

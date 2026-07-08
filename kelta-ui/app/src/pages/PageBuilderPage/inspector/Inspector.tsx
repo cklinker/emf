@@ -227,7 +227,45 @@ export function Inspector({ node, onChange }: InspectorProps): React.ReactElemen
             </div>
           ))
         )}
+
+        {/* Universal Visibility row (app-platform slice 1) — every widget, no per-descriptor
+            schema edits. Absent prop = visible, so the checkbox displays checked by default. */}
+        <div className="flex flex-col gap-3" data-testid="property-group-visibility">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('builder.inspector.group.visibility')}
+          </h4>
+          <div className="flex flex-col gap-1">
+            <BindableField
+              schema={visibilityFieldSchema(t('builder.inspector.visible'))}
+              value={getByPath(node.props, 'visible') as PropValue | undefined}
+              onChange={(v) => {
+                const props =
+                  v === undefined
+                    ? deleteByPath(node.props, 'visible')
+                    : setByPath(node.props, 'visible', v)
+                onChange({ props })
+              }}
+              node={node}
+              fieldId="property-visible"
+              renderLiteral={(args) => (
+                <BooleanField
+                  schema={visibilityFieldSchema(t('builder.inspector.visible'))}
+                  value={(args.value ?? true) as boolean}
+                  onChange={args.onChange as (v: boolean) => void}
+                  node={node}
+                  fieldId="property-visible"
+                />
+              )}
+              literalDefault={true}
+            />
+          </div>
+        </div>
       </div>
     </div>
   )
+}
+
+/** Synthetic schema for the universal `visible` prop (not part of any descriptor). */
+function visibilityFieldSchema(label: string): PropFieldSchema {
+  return { key: 'visible', label, kind: 'boolean', bindable: true }
 }

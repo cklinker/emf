@@ -105,4 +105,29 @@ describe('Inspector', () => {
     expect(screen.getByTestId('property-type')).toHaveTextContent('totally-unknown')
     expect(screen.getByTestId('property-empty')).toBeInTheDocument()
   })
+
+  it('renders the universal Visibility row on every widget — even schema-less ones', () => {
+    render(<Inspector node={make({ type: 'totally-unknown' })} onChange={vi.fn()} />, { wrapper })
+    expect(screen.getByTestId('property-group-visibility')).toBeInTheDocument()
+    expect(screen.getByTestId('property-visible')).toBeInTheDocument()
+  })
+
+  it('visibility checkbox displays checked by default (absent prop = visible)', () => {
+    render(<Inspector node={make({ type: 'heading' })} onChange={vi.fn()} />, { wrapper })
+    expect(screen.getByTestId('property-visible')).toBeChecked()
+  })
+
+  it('unchecking visibility writes props.visible = false', async () => {
+    const onChange = vi.fn()
+    render(<Inspector node={make({ type: 'heading', props: {} })} onChange={onChange} />, {
+      wrapper,
+    })
+    await userEvent.click(screen.getByTestId('property-visible'))
+    expect(onChange).toHaveBeenLastCalledWith({ props: { visible: false } })
+  })
+
+  it('the visibility row is bindable (fx toggle present)', () => {
+    render(<Inspector node={make({ type: 'heading' })} onChange={vi.fn()} />, { wrapper })
+    expect(screen.getByTestId('bindable-fx-visible')).toBeInTheDocument()
+  })
 })

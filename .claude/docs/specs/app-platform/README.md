@@ -96,8 +96,8 @@ plus runtime metadata into something that behaves like an **app platform**:
 
 | Slice | Child spec | Axis |
 |-------|-----------|------|
-| 1 — Conditional visibility | `1-conditional-visibility.md` | builder/runtime (FE) |
-| 2 — Computed variables | `2-computed-variables.md` | builder/runtime (FE) |
+| 1 — Conditional visibility | `1-conditional-visibility.md` — **SHIPPED 2026-07-08** (universal bindable `visible`; runtime hides, editor ghosts/badges) | builder/runtime (FE) |
+| 2 — Computed variables | `2-computed-variables.md` — **SHIPPED 2026-07-08** (bare-identifier expressions — the formula parser rejects dotted refs; data.* not readable in v1) | builder/runtime (FE) |
 | 3 — Apps (nav v2) | `3-apps-nav.md` | **backend+FE** (migration + NATS) |
 | 4 — Builder undo/redo | `4-undo-redo.md` | builder editor (FE) |
 

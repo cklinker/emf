@@ -28,6 +28,7 @@ import {
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useI18n } from '@/context/I18nContext'
+import { PresenceAvatars } from '@/components/PresenceAvatars'
 import { useRecordApprovalState } from '@/hooks/useRecordApprovalState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
@@ -728,6 +729,10 @@ export function ObjectDetailPage(): React.ReactElement {
       header={
         record ? (
           <div className="flex items-start gap-2">
+            {/* Who else is viewing this record (app-intelligence slice 3) */}
+            <PresenceAvatars
+              resource={collectionName && recordId ? `record:${collectionName}/${recordId}` : null}
+            />
             <div className="flex-1 min-w-0">
               <RecordHeader
                 record={record}

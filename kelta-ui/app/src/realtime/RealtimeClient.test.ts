@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { RealtimeClient, type RecordChangedEvent } from './RealtimeClient'
+import { RealtimeClient, type PresenceUser, type RecordChangedEvent } from './RealtimeClient'
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
@@ -112,5 +112,75 @@ describe('RealtimeClient', () => {
     client.close()
     await vi.advanceTimersByTimeAsync(1000)
     expect(FakeWebSocket.instances).toHaveLength(1)
+  })
+
+  describe('presence (app-intelligence slice 3)', () => {
+    it('joins on the first listener, dispatches snapshots, leaves on the last', async () => {
+      const client = makeClient([])
+      await client.connect()
+      const ws = FakeWebSocket.instances[0]
+      ws.open()
+
+      const seen: PresenceUser[][] = []
+      const listener = (users: PresenceUser[]) => seen.push(users)
+      client.joinPresence('record:orders/1', listener)
+      expect(ws.sent.map((m) => JSON.parse(m))).toContainEqual({
+        action: 'presence.join',
+        resource: 'record:orders/1',
+      })
+
+      ws.onmessage?.({
+        data: JSON.stringify({
+          event: 'presence.changed',
+          resource: 'record:orders/1',
+          users: [{ id: 'u1', email: 'a@x.com' }],
+        }),
+      })
+      expect(seen).toEqual([[{ id: 'u1', email: 'a@x.com' }]])
+
+      client.leavePresence('record:orders/1', listener)
+      expect(ws.sent.map((m) => JSON.parse(m))).toContainEqual({
+        action: 'presence.leave',
+        resource: 'record:orders/1',
+      })
+    })
+
+    it('re-joins presence resources on reconnect', async () => {
+      const client = makeClient([])
+      client.joinPresence('record:orders/1', () => {})
+      await client.connect()
+      const first = FakeWebSocket.instances[0]
+      first.open()
+      expect(first.sent.map((m) => JSON.parse(m))).toContainEqual({
+        action: 'presence.join',
+        resource: 'record:orders/1',
+      })
+
+      first.close() // triggers reconnect
+      await vi.advanceTimersByTimeAsync(50)
+      const second = FakeWebSocket.instances[1]
+      second.open()
+      expect(second.sent.map((m) => JSON.parse(m))).toContainEqual({
+        action: 'presence.join',
+        resource: 'record:orders/1',
+      })
+    })
+
+    it('snapshots for other resources do not reach a listener', async () => {
+      const client = makeClient([])
+      await client.connect()
+      const ws = FakeWebSocket.instances[0]
+      ws.open()
+      const seen: PresenceUser[][] = []
+      client.joinPresence('record:orders/1', (u) => seen.push(u))
+      ws.onmessage?.({
+        data: JSON.stringify({
+          event: 'presence.changed',
+          resource: 'record:orders/2',
+          users: [{ id: 'u9' }],
+        }),
+      })
+      expect(seen).toEqual([])
+    })
   })
 })

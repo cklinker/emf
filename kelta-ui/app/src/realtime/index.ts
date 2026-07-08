@@ -1,4 +1,5 @@
-export { RealtimeProvider } from './RealtimeProvider'
+export { RealtimeProvider, useRealtimeClient } from './RealtimeProvider'
+export { usePresence } from './usePresence'
 export { RealtimeClient, MAX_SUBSCRIPTIONS } from './RealtimeClient'
-export type { RecordChangedEvent } from './RealtimeClient'
+export type { RecordChangedEvent, PresenceUser, PresenceListener } from './RealtimeClient'
 export { queryKeysForEvent } from './invalidation'

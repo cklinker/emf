@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/context/AuthContext'
 import { useConfig } from '@/context/ConfigContext'
@@ -22,12 +22,21 @@ function buildSocketUrl(token: string): string {
  * collections; bursts are debounced per collection. Offline → socket closed; the offline
  * SyncEngine owns reconnect data sync, this provider just reconnects the socket.
  */
+/** Exposes the live socket client so hooks (usePresence) can join resources. */
+const RealtimeContext = createContext<{ client: RealtimeClient | null }>({ client: null })
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useRealtimeClient(): RealtimeClient | null {
+  return useContext(RealtimeContext).client
+}
+
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { getAccessToken, isAuthenticated } = useAuth()
   const { config } = useConfig()
   const online = useOnlineStatus()
   const queryClient = useQueryClient()
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const [activeClient, setActiveClient] = useState<RealtimeClient | null>(null)
 
   const collections = useMemo(() => {
     const fromNav = buildNavTabs(config?.menus)
@@ -64,13 +73,19 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       client.subscribe(collection)
     }
     void client.connect()
+    // Deferred so no setState runs synchronously inside the effect (compiler rule).
+    const exposeTimer = setTimeout(() => setActiveClient(client), 0)
 
     return () => {
+      clearTimeout(exposeTimer)
+      setActiveClient(null)
       client.close()
       for (const timer of timers.values()) clearTimeout(timer)
       timers.clear()
     }
   }, [isAuthenticated, online, collections, getAccessToken, queryClient])
 
-  return <>{children}</>
+  const contextValue = useMemo(() => ({ client: activeClient }), [activeClient])
+
+  return <RealtimeContext.Provider value={contextValue}>{children}</RealtimeContext.Provider>
 }

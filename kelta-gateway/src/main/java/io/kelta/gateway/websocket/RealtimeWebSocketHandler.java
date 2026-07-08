@@ -36,11 +36,14 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
 
     private final SubscriptionManager subscriptionManager;
     private final DynamicReactiveJwtDecoder jwtDecoder;
+    private final PresenceService presenceService;
 
     public RealtimeWebSocketHandler(SubscriptionManager subscriptionManager,
-                                     DynamicReactiveJwtDecoder jwtDecoder) {
+                                     DynamicReactiveJwtDecoder jwtDecoder,
+                                     PresenceService presenceService) {
         this.subscriptionManager = subscriptionManager;
         this.jwtDecoder = jwtDecoder;
+        this.presenceService = presenceService;
     }
 
     @Override
@@ -75,9 +78,13 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
             return session.close(CloseStatus.POLICY_VIOLATION);
         }
 
-        // Store context in session attributes
+        // Store context in session attributes (email feeds presence display).
         session.getAttributes().put("tenantId", tenantId);
         session.getAttributes().put("userId", userId);
+        String email = jwt.getClaimAsString("email");
+        if (email != null && !email.isBlank()) {
+            session.getAttributes().put("userEmail", email);
+        }
 
         log.info("WebSocket connected: session={} user={} tenant={}", session.getId(), userId, tenantId);
         securityLog.info("security_event=WEBSOCKET_CONNECTED user={} tenant={}", userId, tenantId);
@@ -120,9 +127,19 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
             Map<String, String> payload = MAPPER.readValue(msg.getPayloadAsText(), Map.class);
             String action = payload.get("action");
             String collection = payload.get("collection");
+            String resource = payload.get("resource");
 
-            if (action == null || collection == null) {
+            if (action == null) {
+                sendMessage(session, Map.of("action", "error", "message", "Missing action"));
+                return;
+            }
+            // Record subscriptions require a collection; presence actions a resource.
+            if (("subscribe".equals(action) || "unsubscribe".equals(action)) && collection == null) {
                 sendMessage(session, Map.of("action", "error", "message", "Missing action or collection"));
+                return;
+            }
+            if (action.startsWith("presence.") && (resource == null || resource.isBlank())) {
+                sendMessage(session, Map.of("action", "error", "message", "Missing resource"));
                 return;
             }
 
@@ -139,6 +156,14 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
                     subscriptionManager.unsubscribe(session, tenantId, collection);
                     sendMessage(session, Map.of("action", "unsubscribed", "collection", collection));
                 }
+                case "presence.join" -> {
+                    if (presenceService.join(session, tenantId, resource)) {
+                        log.debug("Session {} joined presence {}", session.getId(), resource);
+                    } else {
+                        sendMessage(session, Map.of("action", "error", "message", "Presence limit reached"));
+                    }
+                }
+                case "presence.leave" -> presenceService.leave(session, tenantId, resource);
                 default -> sendMessage(session, Map.of("action", "error", "message", "Unknown action: " + action));
             }
         } catch (Exception e) {
@@ -166,6 +191,7 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
 
     private void cleanup(WebSocketSession session) {
         subscriptionManager.removeSession(session);
+        presenceService.removeSession(session);
         String userId = (String) session.getAttributes().get("userId");
         log.info("WebSocket disconnected: session={} user={}", session.getId(), userId);
     }

@@ -3,12 +3,17 @@
  *
  * Manages saved list views for collection record browsers.
  * Each view captures filter conditions, sort configuration,
- * visible columns, and page size. Views are persisted in
- * localStorage keyed by collection name.
+ * visible columns, and page size.
+ *
+ * Persistence (app-data-entry slice 1): server-side per user via the
+ * `user-ui-preferences` store (prefType `list-view`, prefKey = collection),
+ * with the legacy localStorage key as warm cache, offline fallback, and
+ * one-time migration source. Views finally follow the user across browsers.
  */
 
-import { useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { uuid } from '@/utils/uuid'
+import { usePreferenceValue } from './usePreferenceStore'
 
 /**
  * A single filter condition within a saved view.
@@ -90,7 +95,38 @@ export function useSavedViews(collectionName: string): UseSavedViewsReturn {
     return loaded.find((v) => v.isDefault) ?? null
   })
 
-  // Reload views when collectionName changes (derived state pattern)
+  // Server-side persistence: one preference row per collection holding the view array.
+  const pref = usePreferenceValue<SavedView[]>('list-view', collectionName, {
+    localKey: getStorageKey(collectionName),
+  })
+  const prefSave = pref.save
+  const syncedRef = useRef<string | null>(null)
+
+  // When the server value loads: server wins (cross-device source of truth); an empty
+  // server with existing local views triggers the one-time migration push.
+  useEffect(() => {
+    if (!pref.isLoaded || syncedRef.current === collectionName) return
+    syncedRef.current = collectionName
+    if (pref.value !== null) {
+      const serverViews = Array.isArray(pref.value) ? pref.value : []
+      persistViews(collectionName, serverViews)
+      // Deferred so the adoption never sets state synchronously inside the effect
+      // (avoids a cascading render when the server answer arrives on mount).
+      const timer = setTimeout(() => {
+        setViews(serverViews)
+        setActiveView((prev) => prev ?? serverViews.find((v) => v.isDefault) ?? null)
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+    const local = loadViews(collectionName)
+    if (local.length > 0) {
+      prefSave(local)
+    }
+  }, [pref.isLoaded, pref.value, collectionName, prefSave])
+
+  // Reload views when collectionName changes (derived state pattern). No ref reset
+  // needed: the sync guard compares syncedRef.current to the CURRENT collection name,
+  // so a collection switch re-arms it naturally.
   if (collectionName !== currentCollection) {
     setCurrentCollection(collectionName)
     const loaded = loadViews(collectionName)
@@ -130,10 +166,11 @@ export function useSavedViews(collectionName: string): UseSavedViewsReturn {
         }
 
         persistViews(collectionName, updated)
+        prefSave(updated)
         return updated
       })
     },
-    [collectionName]
+    [collectionName, prefSave]
   )
 
   const deleteView = useCallback(
@@ -141,11 +178,12 @@ export function useSavedViews(collectionName: string): UseSavedViewsReturn {
       setViews((prev) => {
         const updated = prev.filter((v) => v.id !== viewId)
         persistViews(collectionName, updated)
+        prefSave(updated)
         return updated
       })
       setActiveView((prev) => (prev?.id === viewId ? null : prev))
     },
-    [collectionName]
+    [collectionName, prefSave]
   )
 
   const renameView = useCallback(
@@ -153,11 +191,12 @@ export function useSavedViews(collectionName: string): UseSavedViewsReturn {
       setViews((prev) => {
         const updated = prev.map((v) => (v.id === viewId ? { ...v, name: newName } : v))
         persistViews(collectionName, updated)
+        prefSave(updated)
         return updated
       })
       setActiveView((prev) => (prev?.id === viewId ? { ...prev, name: newName } : prev))
     },
-    [collectionName]
+    [collectionName, prefSave]
   )
 
   const setDefaultView = useCallback(
@@ -168,6 +207,7 @@ export function useSavedViews(collectionName: string): UseSavedViewsReturn {
           isDefault: v.id === viewId,
         }))
         persistViews(collectionName, updated)
+        prefSave(updated)
         return updated
       })
       setActiveView((prev) => {
@@ -180,7 +220,7 @@ export function useSavedViews(collectionName: string): UseSavedViewsReturn {
         return prev
       })
     },
-    [collectionName]
+    [collectionName, prefSave]
   )
 
   const selectView = useCallback((viewId: string | null) => {

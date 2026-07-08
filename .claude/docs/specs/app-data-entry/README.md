@@ -22,7 +22,7 @@ Read this parent first; every child references it.
 | Slice | Child spec | Axis |
 |-------|-----------|------|
 | 0 — This spec + doc wiring | (this file) | foundation (docs) |
-| 1 — `user-ui-preferences` + server-side views | `1-user-preferences.md` | **backend+FE, security** |
+| 1 — `user-ui-preferences` + server-side views | `1-user-preferences.md` — **SHIPPED 2026-07-08** (favorites/recents migration deferred to its own PR) | **backend+FE, security** |
 | 2 — List power pack | `2-list-power.md` | **columns/sort/density (BE+FE)** |
 | 3 — Page grouping + aggregates | `3-grouping.md` | **list UX (FE)** |
 | 4 — Main-list mass edit | `4-mass-edit.md` | **bulk UX (FE)** |

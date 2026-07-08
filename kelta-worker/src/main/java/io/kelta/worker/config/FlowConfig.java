@@ -508,6 +508,22 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Owner guard for user-ui-preferences: a write may only touch rows whose userId equals
+     * the caller's canonical UUID. No NATS refresh hook — preference rows are read
+     * per-request through the generic route; nothing caches them in a registry.
+     */
+    @Bean
+    public io.kelta.worker.listener.UserPreferenceGuardHook userPreferenceGuardHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.runtime.router.UserIdResolver userIdResolver,
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+        io.kelta.worker.listener.UserPreferenceGuardHook hook =
+                new io.kelta.worker.listener.UserPreferenceGuardHook(userIdResolver, jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public LayoutRuleRefreshHook layoutRuleRefreshHook(
             BeforeSaveHookRegistry hookRegistry,

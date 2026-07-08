@@ -111,6 +111,10 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   path). Authorization stays in `ApprovalService` (`assigned_to`/`submitted_by` UUID
   comparison). `GET /api/me/identity` exposes the same resolution to the frontend (the JWT
   `sub` is the UUID only on direct-login; the auth-code flow mints the email).
+- **User preference writes** (`/api/user-ui-preferences`, generic route): owner-guarded by
+  `UserPreferenceGuardHook` (BeforeSaveHook, order −100) — the row's `userId` must equal the
+  caller's canonical UUID (`X-User-Id` → `UserIdResolver`; fail-closed on unresolvable,
+  internal tier admitted). Reads remain tenant-scoped only (see concerns.md).
 - **Delegated administration** (`/api/admin/delegated*`, security feature): full admins define
   `delegated-admin-scopes` (V157) so listed non-admins manage users within limits without
   `MANAGE_USERS`. `DelegatedAdminScopeController` (`MANAGE_DELEGATED_ADMINS`) owns scope CRUD;

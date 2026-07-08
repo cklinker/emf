@@ -80,6 +80,7 @@ public class ProposalService {
             case "propose_update_field" -> "update_field";
             case "propose_remove_field" -> "remove_field";
             case "propose_picklist" -> "picklist";
+            case "propose_ui_page" -> "ui_page";
             default -> "unknown";
         };
     }
@@ -114,6 +115,7 @@ public class ProposalService {
             case "update_field" -> applyUpdateFieldProposal(tenantId, userId, proposal.data());
             case "remove_field" -> applyRemoveFieldProposal(tenantId, userId, proposal.data());
             case "picklist" -> applyPicklistProposal(tenantId, userId, proposal.data());
+            case "ui_page" -> applyUiPageProposal(tenantId, userId, proposal.data());
             default -> throw new IllegalArgumentException("Unknown proposal type: " + proposal.type());
         };
     }
@@ -593,5 +595,113 @@ public class ProposalService {
 
     private Map<String, Object> applyLayoutProposal(String tenantId, String userId, Map<String, Object> data) {
         return workerApiClient.createPageLayout(tenantId, userId, data);
+    }
+
+    // =========================================================================
+    // UI page proposals (app-intelligence slice 2)
+    // =========================================================================
+
+    /**
+     * Widget types the page-builder registry ships (kelta-ui `widgets/builtins`).
+     * KEEP IN SYNC: adding a widget there means adding it here (and in
+     * ProposeUiPageHandler's description) or the AI cannot propose it.
+     */
+    static final java.util.Set<String> ALLOWED_WIDGET_TYPES = java.util.Set.of(
+            "heading", "text", "button", "image", "card", "container", "table", "form",
+            "grid", "row", "column", "divider", "field-value", "list", "repeater",
+            "chart", "tabs", "tab-panel", "nav", "icon", "link", "metric",
+            "text-input", "number-input", "checkbox", "dropdown", "datepicker",
+            "lookup", "multi-picklist", "rich-text");
+
+    static final int MAX_UI_PAGE_NODES = 200;
+    static final int MAX_UI_PAGE_DEPTH = 8;
+
+    /**
+     * Validate the proposed widget tree and create the ui-page as an UNPUBLISHED
+     * draft — publishing stays a human act in the page builder. The tree persists
+     * inside the {@code config} JSON column (the only column the worker keeps),
+     * stamped {@code schemaVersion: 2} to match the builder's save path.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> applyUiPageProposal(String tenantId, String userId, Map<String, Object> data) {
+        String name = String.valueOf(data.get("name"));
+        if (name == null || name.isBlank() || "null".equals(name)) {
+            throw new IllegalArgumentException("ui_page proposal requires a name");
+        }
+
+        List<Map<String, Object>> components =
+                (List<Map<String, Object>>) data.getOrDefault("components", List.of());
+        if (components.isEmpty()) {
+            throw new IllegalArgumentException("ui_page proposal requires at least one component");
+        }
+
+        java.util.List<String> unknownTypes = new java.util.ArrayList<>();
+        int nodeCount = validateTree(components, 1, 0, unknownTypes);
+        if (!unknownTypes.isEmpty()) {
+            throw new IllegalArgumentException("Unknown widget types: " + String.join(", ", unknownTypes));
+        }
+
+        Map<String, Object> config = new java.util.LinkedHashMap<>();
+        config.put("components", components);
+        if (data.get("variables") instanceof List<?> vars && !vars.isEmpty()) {
+            config.put("variables", vars);
+        }
+        if (data.get("dataSources") instanceof List<?> sources && !sources.isEmpty()) {
+            config.put("dataSources", sources);
+        }
+        config.put("schemaVersion", 2);
+
+        Map<String, Object> attributes = new java.util.LinkedHashMap<>();
+        attributes.put("name", name);
+        if (data.get("title") != null) attributes.put("title", data.get("title"));
+        if (data.get("description") != null) attributes.put("description", data.get("description"));
+        attributes.put("published", false); // draft — never published by the AI
+        attributes.put("active", true);
+        attributes.put("config", config);
+
+        Map<String, Object> created = workerApiClient.createUiPage(tenantId, userId, attributes);
+        String pageId = extractId(created);
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("pageId", pageId);
+        result.put("name", name);
+        result.put("componentCount", nodeCount);
+        result.put("published", false);
+        return result;
+    }
+
+    /**
+     * Walk the tree: enforce the widget-type allow-list, node + depth caps, and
+     * assign missing node ids ({@code ai-<n>}). Returns the total node count.
+     */
+    @SuppressWarnings("unchecked")
+    private int validateTree(List<Map<String, Object>> nodes, int depth, int countSoFar,
+                              List<String> unknownTypes) {
+        if (depth > MAX_UI_PAGE_DEPTH) {
+            throw new IllegalArgumentException(
+                    "ui_page tree exceeds the maximum depth of " + MAX_UI_PAGE_DEPTH);
+        }
+        int count = countSoFar;
+        for (Map<String, Object> node : nodes) {
+            count++;
+            if (count > MAX_UI_PAGE_NODES) {
+                throw new IllegalArgumentException(
+                        "ui_page tree exceeds the maximum of " + MAX_UI_PAGE_NODES + " nodes");
+            }
+            String type = String.valueOf(node.get("type"));
+            if (!ALLOWED_WIDGET_TYPES.contains(type)) {
+                unknownTypes.add(type);
+            }
+            if (node.get("id") == null || String.valueOf(node.get("id")).isBlank()) {
+                node.put("id", "ai-" + count);
+            }
+            if (node.get("props") == null) {
+                node.put("props", new java.util.LinkedHashMap<String, Object>());
+            }
+            if (node.get("children") instanceof List<?> children && !children.isEmpty()) {
+                count = validateTree((List<Map<String, Object>>) children, depth + 1, count, unknownTypes);
+            }
+        }
+        return count;
     }
 }

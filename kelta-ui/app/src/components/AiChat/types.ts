@@ -26,6 +26,7 @@ export type AiProposalType =
   | 'update_field'
   | 'remove_field'
   | 'picklist'
+  | 'ui_page'
 
 export interface AiProposal {
   id: string

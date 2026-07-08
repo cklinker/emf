@@ -2069,6 +2069,16 @@
     "density": "Row density",
     "compact": "Compact",
     "normal": "Normal",
-    "comfortable": "Comfortable"
+    "comfortable": "Comfortable",
+    "groupBy": "Group by",
+    "noGrouping": "No grouping",
+    "groupsPageOnly": "Groups reflect this page only"
+  },
+  "massEdit": {
+    "success": "Updated {success} of {total} records",
+    "partial": "Updated {success} of {total} records — {failed} failed. Check the Bulk Jobs page for details.",
+    "terminal": "Bulk update {status} — check the Bulk Jobs page for details",
+    "stillRunning": "Bulk update is still running — check the Bulk Jobs page for its result",
+    "viewJobs": "View jobs"
   }
 }

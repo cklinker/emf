@@ -59,4 +59,22 @@ describe('ListViewToolbar', () => {
     render(<ListViewToolbar {...defaultProps} totalCount={0} />)
     expect(screen.queryByText('(0)')).toBeNull()
   })
+
+  it('shows the mass edit button in the bulk bar only when onMassEdit is provided', () => {
+    const onMassEdit = vi.fn()
+    render(<ListViewToolbar {...defaultProps} selectedCount={3} onMassEdit={onMassEdit} />)
+    const btn = screen.getByTestId('mass-edit-button')
+    fireEvent.click(btn)
+    expect(onMassEdit).toHaveBeenCalledOnce()
+  })
+
+  it('hides the mass edit button without onMassEdit', () => {
+    render(<ListViewToolbar {...defaultProps} selectedCount={3} />)
+    expect(screen.queryByTestId('mass-edit-button')).toBeNull()
+  })
+
+  it('hides the mass edit button when nothing is selected (no bulk bar)', () => {
+    render(<ListViewToolbar {...defaultProps} selectedCount={0} onMassEdit={vi.fn()} />)
+    expect(screen.queryByTestId('mass-edit-button')).toBeNull()
+  })
 })

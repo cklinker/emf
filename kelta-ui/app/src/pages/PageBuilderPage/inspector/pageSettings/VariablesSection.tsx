@@ -82,15 +82,40 @@ export function VariablesSection({
                   ))}
                 </select>
               </label>
-              <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                {t('builder.variables.default')}
-                <input
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                {t('builder.variables.kind')}
+                <select
                   className={INPUT_CLASS}
-                  value={variable.default == null ? '' : String(variable.default)}
-                  onChange={(e) => update(i, { default: e.target.value })}
-                  data-testid={`variable-default-${i}`}
-                />
+                  value={variable.kind ?? 'static'}
+                  onChange={(e) => update(i, { kind: e.target.value as PageVariable['kind'] })}
+                  data-testid={`variable-kind-${i}`}
+                >
+                  <option value="static">{t('builder.variables.kindStatic')}</option>
+                  <option value="computed">{t('builder.variables.kindComputed')}</option>
+                </select>
               </label>
+              {variable.kind === 'computed' ? (
+                <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                  {t('builder.variables.expression')}
+                  <input
+                    className={INPUT_CLASS}
+                    value={variable.expression ?? ''}
+                    placeholder={t('builder.variables.expressionPlaceholder')}
+                    onChange={(e) => update(i, { expression: e.target.value })}
+                    data-testid={`variable-expression-${i}`}
+                  />
+                </label>
+              ) : (
+                <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                  {t('builder.variables.default')}
+                  <input
+                    className={INPUT_CLASS}
+                    value={variable.default == null ? '' : String(variable.default)}
+                    onChange={(e) => update(i, { default: e.target.value })}
+                    data-testid={`variable-default-${i}`}
+                  />
+                </label>
+              )}
               <button
                 type="button"
                 className="mb-1 inline-flex h-8 w-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent focus:outline-2 focus:outline-primary focus:outline-offset-2"

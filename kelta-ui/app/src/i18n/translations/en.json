@@ -516,8 +516,12 @@
         "content": "Content",
         "data": "Data",
         "events": "Events",
-        "layout": "Layout"
+        "layout": "Layout",
+        "visibility": "Visibility"
       },
+      "visible": "Visible",
+      "visibilityConditional": "Conditional",
+      "visibilityHidden": "Hidden",
       "bindable": {
         "toggle": "Toggle expression mode"
       },
@@ -654,7 +658,12 @@
       "type": "Type",
       "default": "Default",
       "namePlaceholder": "e.g. count",
-      "empty": "No variables yet."
+      "empty": "No variables yet.",
+      "kind": "Kind",
+      "kindStatic": "Static",
+      "kindComputed": "Computed",
+      "expression": "Expression",
+      "expressionPlaceholder": "e.g. a + b"
     },
     "data": {
       "title": "Data sources",

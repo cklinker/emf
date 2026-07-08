@@ -28,6 +28,7 @@ import { PageTreeRenderer, type PageNode } from './PageTreeRenderer'
 import type { PageDataSource, PageVariable } from '@/pages/PageBuilderPage/pageConfig'
 import { usePageVariables } from '@/pages/PageBuilderPage/hooks/usePageVariables'
 import { usePageDataSources } from '@/pages/PageBuilderPage/hooks/usePageDataSources'
+import { evaluateComputedVariables } from '@/pages/PageBuilderPage/model/computedVars'
 import type { BindingScope } from '@/pages/PageBuilderPage/model/bindingScope'
 import type { PageRuntimeValue } from '@/pages/PageBuilderPage/runtime/PageRuntimeContext'
 
@@ -113,9 +114,15 @@ export function CustomPage({ slug: slugOverride }: CustomPageProps = {}): React.
     () => ({ slug: pageSlug, params: pageSlug ? { pageSlug } : undefined }),
     [pageSlug]
   )
-  // Data sources may read vars/page in their filter/recordId bindings.
+  // Data sources may read vars/page in their filter/recordId bindings. They see STATIC
+  // vars only — a computed var whose inputs are data would be a fetch↔derive cycle.
   const { data } = usePageDataSources(dataSources, { vars, page }, pageSlug)
-  const scope: BindingScope = React.useMemo(() => ({ vars, data, page }), [vars, data, page])
+  // Computed variables (app-platform slice 2): derive over the live scope and merge
+  // into `vars` so bindings/visibility/actions read them like any variable.
+  const scope: BindingScope = React.useMemo(() => {
+    const computed = evaluateComputedVariables(variables, { vars, data, page })
+    return { vars: { ...vars, ...computed }, data, page }
+  }, [variables, vars, data, page])
 
   // Page-level action deps (slice 2e): `setVar` writes a page variable; `dataSourceQueryKey` mirrors the
   // `usePageDataSources` query-key prefix so `refreshData` invalidates the right source's on-load fetch.

@@ -50,6 +50,19 @@ export function resolveBinding(binding: Binding, scope: BindingScope): unknown {
 }
 
 /**
+ * The identifiers an expression references, per the shared parser — throw-safe
+ * (malformed expression ⇒ `[]`). Used by computed-variable dependency analysis
+ * (app-platform slice 2) alongside the flat-scope bridge below.
+ */
+export function extractExpressionRefs(expr: string): string[] {
+  try {
+    return evaluator.extractFieldRefs(expr)
+  } catch {
+    return []
+  }
+}
+
+/**
  * The flat-scope bridge to `@kelta/formula`. The parser is flat-key only (it cannot read `record.name`
  * as one identifier — `parser.ts` `parseIdentifierOrFunction` stops at `.`), so for `mode:'expr'` we:
  *   1. spread the `record` / `item` / `vars` LEAVES into a flat map, so a bare `count` reads

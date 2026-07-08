@@ -196,6 +196,8 @@ public final class KeltaStack {
             // for up to a full refresh interval.
             .withEnv("KELTA_GATEWAY_TENANT_SLUG_CACHE_REFRESH_MS", "2000")
             .withExposedPorts(8080)
+            .withLogConsumer(new org.testcontainers.containers.output.Slf4jLogConsumer(
+                    org.slf4j.LoggerFactory.getLogger("kelta-gateway-container")))
             .waitingFor(Wait.forHttp("/actuator/health").withStartupTimeout(Duration.ofMinutes(2)));
 
     // ── Accessors ────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
 import React, { useState } from 'react'
 import { useI18n } from '@/context/I18nContext'
 import { useFieldDef } from './useFieldDef'
-import { usePicklistOptions } from './usePicklistOptions'
+import { usePicklistOptions } from '@/hooks/usePicklistOptions'
 import { InputEmpty, InputField } from './InputShell'
 import { defaultAsString, type InputControlProps } from './types'
 

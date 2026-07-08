@@ -16,7 +16,7 @@ import { MultiPicklistSelect, normalizeMultiPicklistValue } from '@/components/M
 import { RichTextEditor } from '@/components/RichTextEditor'
 import { FieldRenderer } from '@/components/FieldRenderer/FieldRenderer'
 import type { FieldDefinition as UiFieldDefinition } from '@/hooks/useCollectionSchema'
-import { usePicklistOptions } from './inputs/usePicklistOptions'
+import { usePicklistOptions } from '@/hooks/usePicklistOptions'
 import { useLookupOptions } from './inputs/useLookupOptions'
 
 /** Bridge the SDK FieldDefinition (ResourceForm) to the UI FieldDefinition the lookup hook expects. */

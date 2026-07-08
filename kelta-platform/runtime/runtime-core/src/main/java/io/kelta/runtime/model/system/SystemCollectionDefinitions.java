@@ -69,6 +69,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(layoutAssignments());
         definitions.add(layoutRules());
         definitions.add(listViews());
+        definitions.add(userUiPreferences());
         definitions.add(uiPages());
         definitions.add(uiMenus());
         definitions.add(uiMenuItems());
@@ -332,6 +333,25 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.integer("rowLimit").withColumnName("row_limit")
                 .withDefault(50))
             .addField(FieldDefinition.json("chartConfig").withColumnName("chart_config"))
+            .build();
+    }
+
+    /**
+     * Per-user UI preferences (saved list views, favorites, recents). One row per
+     * (userId, prefType, prefKey); writes are owner-guarded by the worker's
+     * UserPreferenceGuardHook — any tenant user may otherwise reach this collection
+     * through the generic route.
+     */
+    public static CollectionDefinition userUiPreferences() {
+        return systemBuilder("user-ui-preferences", "User UI Preferences", "user_ui_preference")
+            .displayFieldName("prefKey")
+            .addField(FieldDefinition.requiredString("userId", 36)
+                .withColumnName("user_id"))
+            .addField(FieldDefinition.requiredString("prefType", 30)
+                .withColumnName("pref_type"))
+            .addField(FieldDefinition.requiredString("prefKey", 200)
+                .withColumnName("pref_key").withDefault("-"))
+            .addField(FieldDefinition.requiredJson("value"))
             .build();
     }
 

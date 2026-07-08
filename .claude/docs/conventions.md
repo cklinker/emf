@@ -108,6 +108,14 @@ consumers therefore NEVER write pushed `data` into caches — on `record.changed
 the matching React Query keys (`src/realtime/invalidation.ts` is the canonical mapping) and
 let the refetch go through the authorized JSON:API path where per-viewer authz applies.
 
+### Per-user UI preferences
+
+Persist per-user UI state (saved views, favorites, panel layouts) ONLY through
+`usePreferenceValue` (`kelta-ui/app/src/hooks/usePreferenceStore.ts`) — one
+`user-ui-preferences` row per (prefType, prefKey), owner-guarded server-side, with a
+localStorage `localKey` as warm cache/offline fallback. Never write a new bare
+localStorage preference; never write another user's row (the guard rejects it).
+
 ## REST API: pagination
 
 Every paginated REST endpoint MUST use **JSON:API bracket syntax** — `page[number]` and `page[size]`. The flat forms `pageNumber` / `pageSize` are not honored and a request that sends them silently falls back to defaults.

@@ -159,7 +159,7 @@
     "picklistOverrides": "Substitutions de listes de choix",
     "noPicklistFields": "Cette collection n'a pas de champs de liste de choix à configurer.",
     "allValuesAvailable": "Toutes les valeurs disponibles",
-    "restrictedValues": "{count} sur {total} valeurs disponibles",
+    "restrictedValues": "{{count}} sur {{total}} valeurs disponibles",
     "defaultValue": "Valeur par défaut",
     "noDefault": "Aucune valeur par défaut",
     "overrideSaved": "Substitutions de listes de choix enregistrées avec succès",

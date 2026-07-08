@@ -15,6 +15,6 @@ export { MultiPicklistInput } from './MultiPicklistInput'
 export { RichTextInput } from './RichTextInput'
 
 export { useFieldDef } from './useFieldDef'
-export { usePicklistOptions, resolvePicklistSource } from './usePicklistOptions'
+export { usePicklistOptions, resolvePicklistSource } from '@/hooks/usePicklistOptions'
 export { useLookupOptions } from './useLookupOptions'
 export type { InputWidgetProps, InputControlProps } from './types'

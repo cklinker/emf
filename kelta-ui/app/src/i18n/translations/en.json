@@ -2080,5 +2080,20 @@
     "terminal": "Bulk update {status} — check the Bulk Jobs page for details",
     "stillRunning": "Bulk update is still running — check the Bulk Jobs page for its result",
     "viewJobs": "View jobs"
+  },
+  "altViews": {
+    "viewType": "View type",
+    "table": "Table",
+    "kanban": "Kanban",
+    "calendar": "Calendar",
+    "gallery": "Gallery",
+    "laneField": "Lane",
+    "dateField": "Date",
+    "imageField": "Image",
+    "none": "None",
+    "noLaneField": "Kanban needs a picklist field to define lanes.",
+    "noDateField": "Calendar needs a date or datetime field.",
+    "moveFailed": "Move failed \u2014 the record changed or the value was rejected",
+    "showingFirst": "Showing the first {count} of {total} records in this range"
   }
 }

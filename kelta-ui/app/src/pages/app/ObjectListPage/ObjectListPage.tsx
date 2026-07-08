@@ -19,7 +19,17 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
-import { Loader2, AlertCircle, Rows3, Layers, ChevronDown } from 'lucide-react'
+import {
+  Loader2,
+  AlertCircle,
+  Rows3,
+  Layers,
+  ChevronDown,
+  Table2,
+  SquareKanban,
+  CalendarDays,
+  LayoutGrid,
+} from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,7 +71,11 @@ import { REFERENCE_FIELD_TYPES, referenceIncludeParam } from './listIncludes'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
 import { buildSortParam, parseListViewParams } from './listUrlState'
 import { ColumnChooser } from '@/components/ColumnChooser/ColumnChooser'
-import { viewSorts, type SavedViewDensity } from '@/hooks/useSavedViews'
+import { KanbanBoard } from '@/components/KanbanBoard'
+import { CalendarMonthView, currentMonthKey, monthRange } from '@/components/CalendarMonthView'
+import { GalleryGrid } from '@/components/GalleryGrid'
+import { usePicklistOptions } from '@/hooks/usePicklistOptions'
+import { viewSorts, type SavedViewDensity, type SavedViewType } from '@/hooks/useSavedViews'
 import { ListShell } from '@/components/record/ListShell'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
@@ -108,6 +122,17 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 
 // URL state helpers (parseFilters/parseListViewParams) live in listUrlState.ts,
 // shared with dashboard drill-through and saved views.
+
+/** Renderer switcher entries (slices 5-7); labels come from `altViews.<type>` keys. */
+const VIEW_TYPE_META: Array<{
+  type: SavedViewType
+  icon: React.ComponentType<{ className?: string }>
+}> = [
+  { type: 'table', icon: Table2 },
+  { type: 'kanban', icon: SquareKanban },
+  { type: 'calendar', icon: CalendarDays },
+  { type: 'gallery', icon: LayoutGrid },
+]
 
 export function ObjectListPage(): React.ReactElement {
   const { tenantSlug, collection: collectionName } = useParams<{
@@ -177,6 +202,11 @@ export function ObjectListPage(): React.ReactElement {
   const [groupBy, setGroupBy] = useState<string | null>(null)
   // Mass edit (slice 4)
   const [massEditOpen, setMassEditOpen] = useState(false)
+  // Renderer + per-type config (slices 5-7) — from the active view or the toolbar pickers.
+  const [viewType, setViewType] = useState<SavedViewType>('table')
+  const [typeConfig, setTypeConfig] = useState<SavedView['typeConfig'] | null>(null)
+  // Visible calendar month ('YYYY-MM'); drives the calendar range filter.
+  const [calendarMonth, setCalendarMonth] = useState<string>(() => currentMonthKey())
 
   // Accessible (non-system, FLS-visible) fields — feeds the column chooser and
   // the group-by picker.
@@ -198,6 +228,42 @@ export function ObjectListPage(): React.ReactElement {
         : null
     return fromOverride ?? fromView ?? accessibleFields.slice(0, 6)
   }, [accessibleFields, activeView, columnOverride])
+
+  // Alt-view field resolution (slices 5-7): explicit typeConfig wins, else the
+  // first accessible field of the right type; none ⇒ the renderer shows an
+  // inline empty-state instead of crashing.
+  const kanbanLaneField = useMemo(() => {
+    const configured = typeConfig?.kanban?.laneField
+    const picklists = accessibleFields.filter((f) => f.type === 'picklist')
+    return (configured && picklists.find((f) => f.name === configured)) || picklists[0] || null
+  }, [typeConfig, accessibleFields])
+  const calendarDateField = useMemo(() => {
+    const configured = typeConfig?.calendar?.dateField
+    const dateFields = accessibleFields.filter((f) => f.type === 'date' || f.type === 'datetime')
+    return (configured && dateFields.find((f) => f.name === configured)) || dateFields[0] || null
+  }, [typeConfig, accessibleFields])
+  const galleryImageField = useMemo(() => {
+    const configured = typeConfig?.gallery?.imageField
+    if (!configured) return undefined
+    return accessibleFields.find((f) => f.name === configured && f.type === 'url')
+  }, [typeConfig, accessibleFields])
+  // Card/chip title: gallery override > the schema display field > 'name'.
+  const titleField = typeConfig?.gallery?.titleField || schema?.displayFieldName || 'name'
+  // Kanban card body: configured names, else the first 3 visible non-title columns.
+  const kanbanCardFields = useMemo(() => {
+    const configured = typeConfig?.kanban?.cardFields
+    const source = configured
+      ? configured
+          .map((name) => accessibleFields.find((f) => f.name === name))
+          .filter((f): f is (typeof accessibleFields)[number] => Boolean(f))
+      : visibleFields.filter((f) => f.name !== titleField)
+    return source.slice(0, 3)
+  }, [typeConfig, accessibleFields, visibleFields, titleField])
+  // Lanes come from the lane field's picklist values (fetched only in kanban view).
+  const { options: laneOptions } = usePicklistOptions(
+    kanbanLaneField ?? undefined,
+    viewType === 'kanban'
+  )
 
   // Fields offered by the mass-edit picker (same rule as RelatedList): user-editable
   // schema fields only (excludes id, system audit fields, server-computed types).
@@ -234,7 +300,30 @@ export function ObjectListPage(): React.ReactElement {
     ]
   }, [groupBy, sorts])
 
-  // Fetch records with includes for reference fields
+  // Calendar merges the visible month as gte/lte conditions on the date field —
+  // view state, not user chips (FilterBar keeps showing only `filters`).
+  const effectiveFilters = useMemo(() => {
+    if (viewType !== 'calendar' || !calendarDateField) return filters
+    const range = monthRange(calendarMonth)
+    return [
+      ...filters,
+      {
+        id: '__calendar_gte',
+        field: calendarDateField.name,
+        operator: 'greater_than_or_equal' as const,
+        value: range.gte,
+      },
+      {
+        id: '__calendar_lte',
+        field: calendarDateField.name,
+        operator: 'less_than_or_equal' as const,
+        value: range.lte,
+      },
+    ]
+  }, [filters, viewType, calendarDateField, calendarMonth])
+
+  // Fetch records with includes for reference fields. Calendar fetches up to the
+  // HTTP clamp so a month isn't truncated at the table's page size.
   const {
     data: records,
     total,
@@ -244,10 +333,10 @@ export function ObjectListPage(): React.ReactElement {
     rawResponse,
   } = useCollectionRecords({
     collectionName,
-    page,
-    pageSize,
+    page: viewType === 'calendar' ? 1 : page,
+    pageSize: viewType === 'calendar' ? 200 : pageSize,
     sort: effectiveSorts.length > 0 ? effectiveSorts : undefined,
-    filters: filters.length > 0 ? filters : undefined,
+    filters: effectiveFilters.length > 0 ? effectiveFilters : undefined,
     enabled: !!schema,
     include: includeParam,
   })
@@ -352,6 +441,42 @@ export function ObjectListPage(): React.ReactElement {
     [schema, selectedIds, apiClient, t, navigate, tenantSlug, refetch]
   )
 
+  // Alt views navigate on card/chip click (same route as a table row).
+  const handleRecordNavigate = useCallback(
+    (record: CollectionRecord) => {
+      navigate(`${basePath}/o/${collectionName}/${record.id}`)
+    },
+    [navigate, basePath, collectionName]
+  )
+
+  /**
+   * Kanban drop (slice 5): fetch a fresh ETag, PATCH the lane field with
+   * If-Match. Any rejection (409 stale write, validation) toasts and refetches;
+   * the board reverts its optimistic move on the rejection.
+   */
+  const handleMoveCard = useCallback(
+    async (recordId: string, lane: string | null): Promise<void> => {
+      const laneName = kanbanLaneField?.name
+      if (!laneName) return
+      try {
+        const { etag } = await apiClient.getWithMeta(`/api/${collectionName}/${recordId}`)
+        await mutations.patch.mutateAsync({
+          id: recordId,
+          data: { [laneName]: lane },
+          ifMatch: etag,
+        })
+      } catch (e) {
+        toast.error(
+          t('altViews.moveFailed', 'Move failed — the record changed or the value was rejected')
+        )
+        await refetch()
+        throw e instanceof Error ? e : new Error('Move failed')
+      }
+      await refetch()
+    },
+    [kanbanLaneField, apiClient, collectionName, mutations.patch, refetch, t]
+  )
+
   // Collection label
   const collectionLabel =
     schema?.displayName ||
@@ -390,6 +515,8 @@ export function ObjectListPage(): React.ReactElement {
       setColumnOverride(null)
       setDensity(view?.density ?? 'normal')
       setGroupBy(view?.groupBy ?? null)
+      setViewType(view?.viewType ?? 'table')
+      setTypeConfig(view?.typeConfig ?? null)
       if (view) {
         updateParams({
           filter: view.filters.length > 0 ? JSON.stringify(view.filters) : undefined,
@@ -427,13 +554,26 @@ export function ObjectListPage(): React.ReactElement {
         sorts,
         density,
         groupBy,
+        viewType,
+        typeConfig: typeConfig ?? undefined,
         visibleColumns: visibleFields.map((f) => f.name),
         pageSize,
         isDefault: false,
       })
       setColumnOverride(null)
     },
-    [savedViews, filters, sort, sorts, density, groupBy, visibleFields, pageSize]
+    [
+      savedViews,
+      filters,
+      sort,
+      sorts,
+      density,
+      groupBy,
+      viewType,
+      typeConfig,
+      visibleFields,
+      pageSize,
+    ]
   )
 
   const rejectSharedViewEdit = useCallback(() => {
@@ -480,6 +620,8 @@ export function ObjectListPage(): React.ReactElement {
           setActiveViewId(linked.id)
           setDensity(linked.density ?? 'normal')
           setGroupBy(linked.groupBy ?? null)
+          setViewType(linked.viewType ?? 'table')
+          setTypeConfig(linked.typeConfig ?? null)
         }, 0)
         return () => clearTimeout(timer)
       }
@@ -772,6 +914,138 @@ export function ObjectListPage(): React.ReactElement {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            {/* Renderer switcher (slices 5-7) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="view-type-trigger"
+                  aria-label={t('altViews.viewType', 'View type')}
+                >
+                  {(() => {
+                    const meta =
+                      VIEW_TYPE_META.find((m) => m.type === viewType) ?? VIEW_TYPE_META[0]
+                    const Icon = meta.icon
+                    return (
+                      <>
+                        <Icon className="mr-1.5 h-4 w-4" aria-hidden />
+                        {t(`altViews.${meta.type}`, meta.type)}
+                        <ChevronDown className="ml-1 h-3.5 w-3.5" aria-hidden />
+                      </>
+                    )
+                  })()}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {VIEW_TYPE_META.map(({ type, icon: Icon }) => (
+                  <DropdownMenuItem
+                    key={type}
+                    onClick={() => setViewType(type)}
+                    data-testid={`view-type-${type}`}
+                  >
+                    <Icon className="mr-2 h-4 w-4" aria-hidden />
+                    {t(`altViews.${type}`, type)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Per-type config pickers */}
+            {viewType === 'kanban' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="lane-field-trigger">
+                    {t('altViews.laneField', 'Lane')}:{' '}
+                    {kanbanLaneField ? kanbanLaneField.displayName || kanbanLaneField.name : '—'}
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {accessibleFields
+                    .filter((f) => f.type === 'picklist')
+                    .map((f) => (
+                      <DropdownMenuItem
+                        key={f.name}
+                        onClick={() =>
+                          setTypeConfig((prev) => ({ ...prev, kanban: { laneField: f.name } }))
+                        }
+                        data-testid={`lane-field-${f.name}`}
+                      >
+                        {f.displayName || f.name}
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {viewType === 'calendar' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="date-field-trigger">
+                    {t('altViews.dateField', 'Date')}:{' '}
+                    {calendarDateField
+                      ? calendarDateField.displayName || calendarDateField.name
+                      : '—'}
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {accessibleFields
+                    .filter((f) => f.type === 'date' || f.type === 'datetime')
+                    .map((f) => (
+                      <DropdownMenuItem
+                        key={f.name}
+                        onClick={() =>
+                          setTypeConfig((prev) => ({ ...prev, calendar: { dateField: f.name } }))
+                        }
+                        data-testid={`date-field-${f.name}`}
+                      >
+                        {f.displayName || f.name}
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {viewType === 'gallery' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="image-field-trigger">
+                    {t('altViews.imageField', 'Image')}:{' '}
+                    {galleryImageField
+                      ? galleryImageField.displayName || galleryImageField.name
+                      : t('altViews.none', 'None')}
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    onClick={() =>
+                      setTypeConfig((prev) => {
+                        const next = { ...prev }
+                        delete next.gallery
+                        return next
+                      })
+                    }
+                    data-testid="image-field-none"
+                  >
+                    {t('altViews.none', 'None')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {accessibleFields
+                    .filter((f) => f.type === 'url')
+                    .map((f) => (
+                      <DropdownMenuItem
+                        key={f.name}
+                        onClick={() =>
+                          setTypeConfig((prev) => ({ ...prev, gallery: { imageField: f.name } }))
+                        }
+                        data-testid={`image-field-${f.name}`}
+                      >
+                        {f.displayName || f.name}
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       }
@@ -797,35 +1071,94 @@ export function ObjectListPage(): React.ReactElement {
         </>
       }
       table={
-        <>
-          <ObjectDataTable
+        viewType === 'kanban' ? (
+          kanbanLaneField ? (
+            <KanbanBoard
+              records={records}
+              laneField={kanbanLaneField}
+              laneOptions={laneOptions}
+              titleField={titleField}
+              cardFields={kanbanCardFields}
+              canEdit={permissions.canEdit}
+              onCardClick={handleRecordNavigate}
+              onMoveCard={handleMoveCard}
+              tenantSlug={tenantSlug}
+              lookupDisplayMap={lookupDisplayMap}
+            />
+          ) : (
+            <div
+              className="rounded-[10px] border border-border bg-card p-8 text-center text-sm text-muted-foreground"
+              data-testid="kanban-empty-state"
+            >
+              {t('altViews.noLaneField', 'Kanban needs a picklist field to define lanes.')}
+            </div>
+          )
+        ) : viewType === 'calendar' ? (
+          calendarDateField ? (
+            <>
+              <CalendarMonthView
+                records={records}
+                dateField={calendarDateField}
+                titleField={titleField}
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                onRecordClick={handleRecordNavigate}
+              />
+              {total > 200 && (
+                <p className="px-1 pt-1 text-xs text-muted-foreground" data-testid="calendar-clamp">
+                  {t('altViews.showingFirst', { count: 200, total })}
+                </p>
+              )}
+            </>
+          ) : (
+            <div
+              className="rounded-[10px] border border-border bg-card p-8 text-center text-sm text-muted-foreground"
+              data-testid="calendar-empty-state"
+            >
+              {t('altViews.noDateField', 'Calendar needs a date or datetime field.')}
+            </div>
+          )
+        ) : viewType === 'gallery' ? (
+          <GalleryGrid
             records={records}
-            fields={visibleFields}
-            sort={sort}
-            onSortChange={handleSortChange}
-            sorts={sorts}
-            density={density}
-            stickyFirstColumn
-            groupBy={groupBy ?? undefined}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            isLoading={recordsLoading}
-            collectionName={collectionName || ''}
-            onEdit={permissions.canEdit ? handleEdit : undefined}
-            onDelete={permissions.canDelete ? handleDeleteClick : undefined}
+            imageField={galleryImageField}
+            titleField={titleField}
+            cardFields={visibleFields}
+            onCardClick={handleRecordNavigate}
+            tenantSlug={tenantSlug}
             lookupDisplayMap={lookupDisplayMap}
-            editable={permissions.canEdit}
-            onCellCommit={handleCellCommit}
           />
-          {groupBy && (
-            <p className="px-1 pt-1 text-xs text-muted-foreground" data-testid="group-caption">
-              {t('listPower.groupsPageOnly', 'Groups reflect this page only')}
-            </p>
-          )}
-        </>
+        ) : (
+          <>
+            <ObjectDataTable
+              records={records}
+              fields={visibleFields}
+              sort={sort}
+              onSortChange={handleSortChange}
+              sorts={sorts}
+              density={density}
+              stickyFirstColumn
+              groupBy={groupBy ?? undefined}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              isLoading={recordsLoading}
+              collectionName={collectionName || ''}
+              onEdit={permissions.canEdit ? handleEdit : undefined}
+              onDelete={permissions.canDelete ? handleDeleteClick : undefined}
+              lookupDisplayMap={lookupDisplayMap}
+              editable={permissions.canEdit}
+              onCellCommit={handleCellCommit}
+            />
+            {groupBy && (
+              <p className="px-1 pt-1 text-xs text-muted-foreground" data-testid="group-caption">
+                {t('listPower.groupsPageOnly', 'Groups reflect this page only')}
+              </p>
+            )}
+          </>
+        )
       }
       pagination={
-        !recordsLoading && records.length > 0 ? (
+        viewType !== 'calendar' && !recordsLoading && records.length > 0 ? (
           <DataTablePagination
             page={page}
             pageSize={pageSize}

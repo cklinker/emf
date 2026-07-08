@@ -7,7 +7,7 @@ import React, { useState } from 'react'
 import { MultiPicklistSelect, normalizeMultiPicklistValue } from '@/components/MultiPicklistSelect'
 import { useI18n } from '@/context/I18nContext'
 import { useFieldDef } from './useFieldDef'
-import { usePicklistOptions } from './usePicklistOptions'
+import { usePicklistOptions } from '@/hooks/usePicklistOptions'
 import { InputEmpty, InputField } from './InputShell'
 import type { InputControlProps } from './types'
 

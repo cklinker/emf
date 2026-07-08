@@ -16,7 +16,7 @@ const fieldDefHolder = vi.hoisted(() => ({ current: undefined as FieldDefinition
 vi.mock('./useFieldDef', () => ({
   useFieldDef: () => ({ fieldDef: fieldDefHolder.current, isLoading: false }),
 }))
-vi.mock('./usePicklistOptions', () => ({
+vi.mock('@/hooks/usePicklistOptions', () => ({
   usePicklistOptions: () => ({ options: ['Open', 'Closed'], isLoading: false }),
   resolvePicklistSource: () => ({ sourceId: 'x', sourceType: 'FIELD' }),
 }))

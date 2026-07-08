@@ -53,20 +53,24 @@ public class NatsSubscriptionConfig {
 
     @EventListener(ApplicationStartedEvent.class)
     public void registerSubscriptions() {
-        subscriptionManager.register(EventSubscription.queueGroup(
-                "gateway-realtime", "kelta.record.changed.>", "gateway-realtime",
+        // Every gateway subscription mutates per-pod state only (local WebSocket
+        // sessions, RouteRegistry, in-memory caches), so all of them must be
+        // BROADCAST — a queue group would deliver each event to exactly one pod
+        // and leave every other pod's sessions and caches stale.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-realtime", "kelta.record.changed.>",
                 realtimeBridge::onRecordChanged));
 
-        subscriptionManager.register(EventSubscription.queueGroup(
-                "gateway-record-routes", "kelta.record.changed.>", "gateway-record-routes",
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-record-routes", "kelta.record.changed.>",
                 systemCollectionRouteListener::onRecordChanged));
 
-        subscriptionManager.register(EventSubscription.queueGroup(
-                "gateway-config", "kelta.config.collection.changed.*", "gateway-config",
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-config", "kelta.config.collection.changed.*",
                 configEventListener::handleCollectionChanged));
 
-        subscriptionManager.register(EventSubscription.queueGroup(
-                "gateway-config-assignment", "kelta.worker.assignment.changed.*", "gateway-config-assignment",
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-config-assignment", "kelta.worker.assignment.changed.*",
                 configEventListener::handleWorkerAssignmentChanged));
 
         subscriptionManager.register(EventSubscription.broadcast(

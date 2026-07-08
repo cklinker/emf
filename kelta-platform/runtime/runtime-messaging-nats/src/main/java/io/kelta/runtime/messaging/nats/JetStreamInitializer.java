@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 
 import java.time.Duration;
 import java.util.List;
@@ -29,7 +30,13 @@ public class JetStreamInitializer {
         this.connectionManager = connectionManager;
     }
 
+    /**
+     * Runs before {@link NatsSubscriptionManager#startSubscriptions()} (see the
+     * {@code @Order} values) so every stream exists before the first subscribe
+     * attempt — the unordered race left pods with dead subscriptions until restart.
+     */
     @EventListener(ApplicationReadyEvent.class)
+    @Order(0)
     public void initializeStreams() {
         try {
             JetStreamManagement jsm = connectionManager.jetStreamManagement();
@@ -57,11 +64,15 @@ public class JetStreamInitializer {
                     name, info.getStreamState().getMsgCount(), info.getStreamState().getByteCount());
         } catch (Exception e) {
             try {
+                // NATS rejects a stream whose duplicates window exceeds its max age
+                // (error 10052), so clamp the window for short-lived streams.
+                Duration duplicateWindow = maxAge.compareTo(Duration.ofMinutes(2)) < 0
+                        ? maxAge : Duration.ofMinutes(2);
                 StreamConfiguration config = StreamConfiguration.builder()
                         .name(name)
                         .subjects(subjects)
                         .maxAge(maxAge)
-                        .duplicateWindow(Duration.ofMinutes(2))
+                        .duplicateWindow(duplicateWindow)
                         .build();
                 jsm.addStream(config);
                 log.info("Created JetStream stream '{}' with subjects {}", name, subjects);

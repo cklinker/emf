@@ -2015,5 +2015,8 @@
     "lightMode": "Light",
     "darkMode": "Dark",
     "systemMode": "System"
+  },
+  "savedViews": {
+    "sharedReadOnly": "Shared views are managed in Setup → List Views"
   }
 }

@@ -24,8 +24,8 @@ Read this parent first; every child references it.
 | 1 — Analytics authorization (`VIEW_ANALYTICS`) | `1-analytics-authz.md` — **SHIPPED 2026-07-08** | **backend, security** |
 | 2 — Approvals inbox + record actions | `2-approvals-inbox.md` | **workflow UX (FE+BE hardening, security)** |
 | 3 — End-user analytics viewer | `3-analytics-viewer.md` | **dashboards/reporting UX (FE)** |
-| 4 — Realtime client | `4-realtime-client.md` | **liveness (FE)** |
-| 5 — Saved views in the app | `5-saved-views.md` | **data-entry UX (FE)** |
+| 4 — Realtime client | `4-realtime-client.md` — **SHIPPED 2026-07-08** (invalidation-only; nav-derived subscriptions) | **liveness (FE)** |
+| 5 — Saved views in the app | `5-saved-views.md` — **SHIPPED 2026-07-08** (personal localStorage + shared read-only `list-views`; view columns drive the grid) | **data-entry UX (FE)** |
 
 **Dependency order (hard edges): 1 → 3.** Slices 2, 4, 5 are independent of each other and of
 1/3. Slice 4 enhances 2 and 3 (live refresh) but neither depends on it.

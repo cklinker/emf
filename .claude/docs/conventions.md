@@ -94,6 +94,14 @@ it with specifics.
 gate (`requireAnalyticsAccess` in `ReportExecutionController`/`DashboardDataController`) accepts
 either. Grant `VIEW_ANALYTICS` to end-user profiles; reserve `MANAGE_REPORTS` for builders.
 
+### Realtime events are invalidation-only
+
+`/ws/realtime` pushes record `data` to every tenant subscriber with NO per-subscriber
+FLS/Cerbos check (masking-configured collections already suppress `data`). Frontend
+consumers therefore NEVER write pushed `data` into caches — on `record.changed`, invalidate
+the matching React Query keys (`src/realtime/invalidation.ts` is the canonical mapping) and
+let the refetch go through the authorized JSON:API path where per-viewer authz applies.
+
 ## REST API: pagination
 
 Every paginated REST endpoint MUST use **JSON:API bracket syntax** — `page[number]` and `page[size]`. The flat forms `pageNumber` / `pageSize` are not honored and a request that sends them silently falls back to defaults.

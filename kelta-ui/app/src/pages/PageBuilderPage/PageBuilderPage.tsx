@@ -39,6 +39,7 @@ import './widgets/builtins'
 import type { PageComponent as ModelPageComponent, ResponsiveSpan } from './model/pageModel'
 import { insertNode, findNode } from './model/treeOps'
 import { migrateTree, needsMigration } from './model/migrate'
+import { useEditorHistory } from './hooks/useEditorHistory'
 
 /**
  * UI Page interface matching the API response
@@ -566,6 +567,20 @@ export function PageBuilderPage({
   // Preview mode state (Requirement 7.7)
   const [isPreviewMode, setIsPreviewMode] = useState(false)
 
+  // Undo/redo history over the authored artifact (app-platform slice 4). Selection,
+  // preview, and drawer state are deliberately excluded; access/isHomePage too (rare,
+  // drawer-authored). Recording is effect-based below; `applyingHistoryRef` keeps an
+  // undo/redo application from re-recording; the saved-snapshot refs keep
+  // `hasUnsavedChanges` truthful when undoing back to the last-saved state.
+  const history = useEditorHistory<{
+    components: PageComponent[]
+    variables: PageVariable[]
+    dataSources: PageDataSource[]
+  }>()
+  const applyingHistoryRef = useRef(false)
+  const currentSnapshotJsonRef = useRef('')
+  const savedSnapshotJsonRef = useRef('')
+
   // Fetch all pages query
   const {
     data: pages = [],
@@ -597,6 +612,8 @@ export function PageBuilderPage({
     setPageAccess(cfg.access)
     setPageIsHomePage(cfg.isHomePage === true)
     setHasUnsavedChanges(false)
+    // The undo baseline for the freshly-seeded page is established by the history
+    // effect below (it detects the loadedPageId change) — no ref access in render.
   }
 
   // Create mutation
@@ -633,6 +650,8 @@ export function PageBuilderPage({
       queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] })
       showToast(t('success.updated', { item: t('builder.pages.page') }), 'success')
       setHasUnsavedChanges(false)
+      // Undoing back past this point should re-light the unsaved flag (slice 4).
+      savedSnapshotJsonRef.current = currentSnapshotJsonRef.current
       handleCloseForm()
     },
     onError: (error: Error) => {
@@ -911,6 +930,98 @@ export function PageBuilderPage({
     setHasUnsavedChanges(true)
   }, [])
 
+  // History bookkeeping (slice 4): one effect watches the authored artifact. When the
+  // loaded page changes it establishes the fresh baseline (reset + saved-marker);
+  // otherwise it records the change. Both are deferred by a 0ms timer (cleanup
+  // cancels) so same-render bursts collapse and no setState runs synchronously inside
+  // the effect; the hook itself coalesces rapid edits (400ms) and skips identical
+  // snapshots. `applyingHistoryRef` keeps undo/redo applications from re-recording.
+  const { record: recordHistory, reset: resetHistory } = history
+  const historyPageRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (viewMode !== 'editor' || !loadedPageId) return
+    const snapshot = {
+      components,
+      variables: pageVariables,
+      dataSources: pageDataSources,
+    }
+    currentSnapshotJsonRef.current = JSON.stringify(snapshot)
+    if (historyPageRef.current !== loadedPageId) {
+      historyPageRef.current = loadedPageId
+      savedSnapshotJsonRef.current = currentSnapshotJsonRef.current
+      const timer = setTimeout(() => resetHistory(snapshot), 0)
+      return () => clearTimeout(timer)
+    }
+    if (applyingHistoryRef.current) {
+      applyingHistoryRef.current = false
+      return
+    }
+    const timer = setTimeout(() => recordHistory(snapshot), 0)
+    return () => clearTimeout(timer)
+  }, [
+    components,
+    pageVariables,
+    pageDataSources,
+    viewMode,
+    loadedPageId,
+    recordHistory,
+    resetHistory,
+  ])
+
+  // Apply an undo/redo snapshot: swap the three states, drop the selection (the node
+  // may be gone), and recompute the unsaved flag against the last-saved snapshot.
+  const applyHistorySnapshot = useCallback(
+    (
+      snapshot: {
+        components: PageComponent[]
+        variables: PageVariable[]
+        dataSources: PageDataSource[]
+      } | null
+    ) => {
+      if (!snapshot) return
+      applyingHistoryRef.current = true
+      setComponents(snapshot.components)
+      setPageVariables(snapshot.variables)
+      setPageDataSources(snapshot.dataSources)
+      setSelectedComponentId(null)
+      const json = JSON.stringify(snapshot)
+      currentSnapshotJsonRef.current = json
+      setHasUnsavedChanges(json !== savedSnapshotJsonRef.current)
+    },
+    []
+  )
+  // Destructured for stable identities (the hook's callbacks are dependency-free).
+  const { undo: undoHistory, redo: redoHistory } = history
+  const handleUndo = useCallback(
+    () => applyHistorySnapshot(undoHistory()),
+    [applyHistorySnapshot, undoHistory]
+  )
+  const handleRedo = useCallback(
+    () => applyHistorySnapshot(redoHistory()),
+    [applyHistorySnapshot, redoHistory]
+  )
+
+  // Cmd/Ctrl+Z / Shift+Cmd/Ctrl+Z while editing — inert inside text inputs so the
+  // native text-field undo wins.
+  useEffect(() => {
+    if (viewMode !== 'editor') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return
+      }
+      e.preventDefault()
+      if (e.shiftKey) handleRedo()
+      else handleUndo()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [viewMode, handleUndo, handleRedo])
+
   // Handle preview mode toggle (Requirement 7.7)
   const handleTogglePreview = useCallback(() => {
     setIsPreviewMode((prev) => !prev)
@@ -1009,6 +1120,29 @@ export function PageBuilderPage({
             {currentPage && <StatusBadge published={currentPage.published} />}
           </div>
           <div className="flex items-center gap-2 max-md:w-full max-md:justify-between">
+            {/* Undo/redo (app-platform slice 4) */}
+            <button
+              type="button"
+              className="px-3 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleUndo}
+              disabled={!history.canUndo}
+              aria-label={t('builder.pages.undo')}
+              title={t('builder.pages.undo')}
+              data-testid="undo-button"
+            >
+              ↶
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleRedo}
+              disabled={!history.canRedo}
+              aria-label={t('builder.pages.redo')}
+              title={t('builder.pages.redo')}
+              data-testid="redo-button"
+            >
+              ↷
+            </button>
             {/* Preview button (Requirement 7.7) */}
             <button
               type="button"

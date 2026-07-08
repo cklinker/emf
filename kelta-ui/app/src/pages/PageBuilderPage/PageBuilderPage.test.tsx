@@ -632,6 +632,57 @@ describe('PageBuilderPage', () => {
     })
   })
 
+  describe('Undo/Redo (app-platform slice 4)', () => {
+    beforeEach(() => {
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/ui-pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
+        }
+        return Promise.resolve({ data: mockPages })
+      })
+    })
+
+    async function openEditor(user: ReturnType<typeof userEvent.setup>) {
+      render(<PageBuilderPage />, { wrapper: createTestWrapper() })
+      await waitFor(() => {
+        expect(screen.getByText('dashboard')).toBeInTheDocument()
+      })
+      await user.click(screen.getByTestId('page-name-0'))
+      await waitFor(() => {
+        expect(screen.getByTestId('palette-item-heading')).toBeInTheDocument()
+      })
+    }
+
+    it('undo removes an added component and redo restores it', async () => {
+      const user = userEvent.setup()
+      await openEditor(user)
+
+      expect(screen.getByTestId('undo-button')).toBeDisabled()
+      expect(screen.getByTestId('redo-button')).toBeDisabled()
+
+      await user.click(screen.getByTestId('palette-item-heading'))
+      const canvas = screen.getByTestId('page-canvas')
+      await waitFor(() => {
+        expect(canvas.querySelector('[data-testid^="canvas-component-"]')).toBeInTheDocument()
+      })
+      // The record effect defers by a 0ms timer — wait for the button to arm.
+      await waitFor(() => {
+        expect(screen.getByTestId('undo-button')).toBeEnabled()
+      })
+
+      await user.click(screen.getByTestId('undo-button'))
+      await waitFor(() => {
+        expect(canvas.querySelector('[data-testid^="canvas-component-"]')).toBeNull()
+      })
+      expect(screen.getByTestId('redo-button')).toBeEnabled()
+
+      await user.click(screen.getByTestId('redo-button'))
+      await waitFor(() => {
+        expect(canvas.querySelector('[data-testid^="canvas-component-"]')).toBeInTheDocument()
+      })
+    })
+  })
+
   describe('Property Panel', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {

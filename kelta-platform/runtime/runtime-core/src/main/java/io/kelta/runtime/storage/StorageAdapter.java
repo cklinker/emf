@@ -196,4 +196,23 @@ public interface StorageAdapter {
      * @throws StorageException if the uniqueness check fails
      */
     boolean isUnique(CollectionDefinition definition, String fieldName, Object value, String excludeId);
+
+    /**
+     * Clears (sets {@code NULL}) a {@code VECTOR} column for every row in the collection.
+     *
+     * <p>Used to purge stale, plaintext-derived embeddings when the field's embedding source
+     * gains (or loses) a data-masking config: a vector computed from a now-masked source would
+     * otherwise let semantic search match against the masked text by inference. After clearing,
+     * rows re-embed correctly on their next write (the embed-on-write hook skips a masked source).
+     *
+     * <p>Default: no-op returning {@code 0} — external stores (REST/JDBC connectors) have no
+     * pgvector column to clear.
+     *
+     * @param definition the collection definition
+     * @param fieldName  the VECTOR field to clear; ignored if absent or not a VECTOR field
+     * @return the number of rows whose column was cleared
+     */
+    default int clearVectorColumn(CollectionDefinition definition, String fieldName) {
+        return 0;
+    }
 }

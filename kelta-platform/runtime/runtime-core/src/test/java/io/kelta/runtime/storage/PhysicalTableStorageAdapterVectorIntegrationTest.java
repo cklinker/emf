@@ -91,4 +91,23 @@ class PhysicalTableStorageAdapterVectorIntegrationTest {
         assertThat(((Number) results.get(0).get("_distance")).doubleValue())
                 .isLessThan(((Number) results.get(1).get("_distance")).doubleValue());
     }
+
+    @Test
+    @DisplayName("clearVectorColumn NULLs every vector value (purges stale embeddings on masking toggle)")
+    void clearsVectorColumn() {
+        CollectionDefinition docs = docsCollection();
+        adapter.initializeCollection(docs);
+        adapter.create(docs, record("r1", "a", List.of(1.0, 0.0, 0.0)));
+        adapter.create(docs, record("r2", "b", List.of(0.0, 1.0, 0.0)));
+
+        int cleared = adapter.clearVectorColumn(docs, "embedding");
+
+        assertThat(cleared).isEqualTo(2);
+        assertThat(adapter.getById(docs, "r1").orElseThrow().get("embedding")).isNull();
+        // Idempotent: a second call clears nothing (WHERE col IS NOT NULL).
+        assertThat(adapter.clearVectorColumn(docs, "embedding")).isZero();
+        // A non-VECTOR / unknown field is a safe no-op.
+        assertThat(adapter.clearVectorColumn(docs, "title")).isZero();
+        assertThat(adapter.clearVectorColumn(docs, "nope")).isZero();
+    }
 }

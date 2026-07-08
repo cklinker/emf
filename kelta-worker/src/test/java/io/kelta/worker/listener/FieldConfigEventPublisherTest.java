@@ -32,6 +32,7 @@ class FieldConfigEventPublisherTest {
     private CerbosAuthorizationService cerbosAuthorizationService;
     private FormulaRecomputeService formulaRecomputeService;
     private io.kelta.worker.service.SearchIndexService searchIndexService;
+    private io.kelta.worker.service.VectorMaintenanceService vectorMaintenanceService;
     private FieldConfigEventPublisher publisher;
 
     @BeforeEach
@@ -42,8 +43,10 @@ class FieldConfigEventPublisherTest {
         cerbosAuthorizationService = mock(CerbosAuthorizationService.class);
         formulaRecomputeService = mock(FormulaRecomputeService.class);
         searchIndexService = mock(io.kelta.worker.service.SearchIndexService.class);
+        vectorMaintenanceService = mock(io.kelta.worker.service.VectorMaintenanceService.class);
         publisher = new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager,
-                cerbosAuthorizationService, formulaRecomputeService, searchIndexService);
+                cerbosAuthorizationService, formulaRecomputeService, searchIndexService,
+                vectorMaintenanceService);
     }
 
     @Test
@@ -275,6 +278,8 @@ class FieldConfigEventPublisherTest {
         publisher.afterUpdate("field-1", record, previous, "tenant-1");
 
         verify(searchIndexService).rebuildCollectionIndexAsync("tenant-1", "people");
+        // Stale plaintext-derived vectors embedding this field must also be purged.
+        verify(vectorMaintenanceService).purgeVectorsForSourceAsync("tenant-1", "people", "ssn");
     }
 
     @Test
@@ -293,6 +298,7 @@ class FieldConfigEventPublisherTest {
         publisher.afterUpdate("field-1", record, previous, "tenant-1");
 
         verify(searchIndexService, never()).rebuildCollectionIndexAsync(anyString(), anyString());
+        verify(vectorMaintenanceService, never()).purgeVectorsForSourceAsync(anyString(), anyString(), anyString());
     }
 
     @Test

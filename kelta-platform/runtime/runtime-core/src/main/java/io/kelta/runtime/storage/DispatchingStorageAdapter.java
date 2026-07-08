@@ -131,4 +131,9 @@ public class DispatchingStorageAdapter implements StorageAdapter {
     public boolean isUnique(CollectionDefinition definition, String fieldName, Object value, String excludeId) {
         return adapterFor(definition).isUnique(definition, fieldName, value, excludeId);
     }
+
+    @Override
+    public int clearVectorColumn(CollectionDefinition definition, String fieldName) {
+        return adapterFor(definition).clearVectorColumn(definition, fieldName);
+    }
 }

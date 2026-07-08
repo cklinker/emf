@@ -327,10 +327,12 @@ public class FlowConfig {
             CollectionLifecycleManager lifecycleManager,
             io.kelta.worker.service.CerbosAuthorizationService cerbosAuthorizationService,
             io.kelta.worker.service.FormulaRecomputeService formulaRecomputeService,
-            io.kelta.worker.service.SearchIndexService searchIndexService) {
+            io.kelta.worker.service.SearchIndexService searchIndexService,
+            io.kelta.worker.service.VectorMaintenanceService vectorMaintenanceService) {
         FieldConfigEventPublisher publisher =
                 new FieldConfigEventPublisher(eventPublisher, jdbcTemplate, lifecycleManager,
-                        cerbosAuthorizationService, formulaRecomputeService, searchIndexService);
+                        cerbosAuthorizationService, formulaRecomputeService, searchIndexService,
+                        vectorMaintenanceService);
         hookRegistry.register(publisher);
         return publisher;
     }

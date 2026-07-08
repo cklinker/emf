@@ -11,6 +11,7 @@ import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.FormulaRecomputeService;
 import io.kelta.worker.service.SearchIndexService;
+import io.kelta.worker.service.VectorMaintenanceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,19 +46,22 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
     private final CerbosAuthorizationService cerbosAuthorizationService;
     private final FormulaRecomputeService formulaRecomputeService;
     private final SearchIndexService searchIndexService;
+    private final VectorMaintenanceService vectorMaintenanceService;
 
     public FieldConfigEventPublisher(PlatformEventPublisher eventPublisher,
                                       JdbcTemplate jdbcTemplate,
                                       CollectionLifecycleManager lifecycleManager,
                                       CerbosAuthorizationService cerbosAuthorizationService,
                                       FormulaRecomputeService formulaRecomputeService,
-                                      SearchIndexService searchIndexService) {
+                                      SearchIndexService searchIndexService,
+                                      VectorMaintenanceService vectorMaintenanceService) {
         this.eventPublisher = eventPublisher;
         this.jdbcTemplate = jdbcTemplate;
         this.lifecycleManager = lifecycleManager;
         this.cerbosAuthorizationService = cerbosAuthorizationService;
         this.formulaRecomputeService = formulaRecomputeService;
         this.searchIndexService = searchIndexService;
+        this.vectorMaintenanceService = vectorMaintenanceService;
     }
 
     @Override
@@ -92,6 +96,10 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         // so re-index the collection to purge (or restore) the field's plaintext.
         if (maskingPresenceChanged(record, previous)) {
             scheduleReindex(record, tenantId);
+            // A masked field must not remain embedded: purge any VECTOR field that embeds
+            // this field so a stale plaintext-derived vector can't leak via semantic-search
+            // ranking. Rows re-embed correctly on their next write.
+            scheduleVectorPurge(record, tenantId);
         }
     }
 
@@ -210,6 +218,22 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         log.info("Masking config toggled on a field of '{}' — rebuilding search index (tenant={})",
                 collectionName, tenantId);
         searchIndexService.rebuildCollectionIndexAsync(tenantId, collectionName);
+    }
+
+    private void scheduleVectorPurge(Map<String, Object> record, String tenantId) {
+        if (vectorMaintenanceService == null) {
+            return;
+        }
+        String collectionId = getString(record, "collectionId");
+        String fieldName = getString(record, "name");
+        if (collectionId == null || fieldName == null || fieldName.isBlank()) {
+            return;
+        }
+        String collectionName = resolveCollectionName(collectionId);
+        if (collectionName == null) {
+            return;
+        }
+        vectorMaintenanceService.purgeVectorsForSourceAsync(tenantId, collectionName, fieldName);
     }
 
     private void scheduleFormulaRecompute(Map<String, Object> record, String tenantId) {

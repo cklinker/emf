@@ -727,6 +727,44 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
     }
 
+    @Override
+    public int clearVectorColumn(CollectionDefinition definition, String fieldName) {
+        FieldDefinition field = definition.fields().stream()
+                .filter(f -> f.name().equals(fieldName))
+                .findFirst().orElse(null);
+        if (field == null || field.type() != FieldType.VECTOR) {
+            return 0;
+        }
+        TableRef tableRef = getTableRef(definition);
+        String col = sanitizeIdentifier(resolveColumnName(definition, fieldName));
+
+        StringBuilder sql = new StringBuilder("UPDATE ");
+        sql.append(tableRef.toSql());
+        sql.append(" SET ").append(col).append(" = NULL WHERE ").append(col).append(" IS NOT NULL");
+
+        List<Object> params = new ArrayList<>();
+        // User collections use schema-per-tenant isolation (no tenant_id column); the rare
+        // tenant-scoped system collection needs an explicit tenant filter (mirrors isUnique).
+        if (definition.systemCollection() && definition.tenantScoped()) {
+            String tenantId = io.kelta.runtime.context.TenantContext.get();
+            if (tenantId != null && !tenantId.isBlank()) {
+                sql.append(" AND tenant_id = ?");
+                params.add(tenantId);
+            }
+        }
+
+        try {
+            int cleared = jdbcTemplate.update(sql.toString(), params.toArray());
+            if (cleared > 0) {
+                log.info("Cleared {} stale vector value(s) in {}.{}", cleared, definition.name(), fieldName);
+            }
+            return cleared;
+        } catch (DataAccessException e) {
+            throw new StorageException("Failed to clear vector column " + fieldName
+                    + " in collection: " + definition.name(), e);
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     /**

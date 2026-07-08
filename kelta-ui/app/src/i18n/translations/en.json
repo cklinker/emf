@@ -2121,5 +2121,17 @@
     "pendingSync": "pending sync",
     "retry": "Retry",
     "discard": "Discard"
+  },
+  "translations": {
+    "title": "Translations",
+    "locale": "Locale",
+    "search": "Search keys or values…",
+    "hint": "Overrides replace the built-in text for this tenant. Keys are dotted paths (e.g. listPower.groupBy); use the same placeholders as the original string.",
+    "key": "Key",
+    "value": "Value",
+    "valuePlaceholder": "Override text",
+    "add": "Add",
+    "empty": "No overrides for this locale yet.",
+    "duplicate": "That key already has a value for this locale"
   }
 }

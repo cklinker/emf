@@ -59,6 +59,7 @@ import {
   Workflow,
   X,
   Zap,
+  Languages,
 } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
@@ -432,6 +433,13 @@ const CATEGORIES: SetupCategory[] = [
         description: 'Monitor bulk data operations',
         icon: ListChecks,
         permission: 'MANAGE_DATA',
+      },
+      {
+        name: 'Translations',
+        path: '/translations',
+        description: 'Override UI text per locale for this tenant',
+        icon: Languages,
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'Deduplicate',

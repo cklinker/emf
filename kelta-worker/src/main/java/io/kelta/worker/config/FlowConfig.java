@@ -566,6 +566,21 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Tenant i18n authoring: translation writes broadcast
+     * kelta.config.translation.changed.<tenantId> so every pod evicts its cached
+     * ui-translations responses (TranslationCacheInvalidationListener).
+     */
+    @Bean
+    public io.kelta.worker.listener.TranslationConfigEventPublisher translationConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.TranslationConfigEventPublisher hook =
+                new io.kelta.worker.listener.TranslationConfigEventPublisher(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public io.kelta.worker.listener.MenuConfigEventPublisher menuItemConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,

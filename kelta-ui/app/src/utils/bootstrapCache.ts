@@ -70,6 +70,25 @@ function unwrapList(body: unknown): Record<string, unknown>[] {
  * Each menu is returned with an `items` array of its child menu-items,
  * sorted by `displayOrder`.
  */
+/**
+ * Group ui-translations rows into locale → key → value (app-intelligence slice 4).
+ * Later duplicates win (there should be none — the table is unique per
+ * tenant+locale+key). Exported for unit tests.
+ */
+export function groupTranslations(
+  rows: Array<Record<string, unknown>>
+): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {}
+  for (const row of rows) {
+    const locale = typeof row.locale === 'string' ? row.locale : undefined
+    const key = typeof row.key === 'string' ? row.key : undefined
+    const value = typeof row.value === 'string' ? row.value : undefined
+    if (!locale || !key || value === undefined) continue
+    ;(out[locale] ??= {})[key] = value
+  }
+  return out
+}
+
 function unwrapMenusWithItems(body: unknown): Record<string, unknown>[] {
   if (!body || typeof body !== 'object') return []
   const obj = body as Record<string, unknown>
@@ -181,19 +200,30 @@ export function fetchBootstrapConfig(): Promise<unknown> {
         return r.json()
       }
     ),
+    // Tenant translation overlay (app-intelligence slice 4) — failure-tolerant:
+    // a non-ok response OR a thrown fetch resolves empty so the overlay can never
+    // take the whole bootstrap down.
+    fetch(`${base}/api/ui-translations?page[size]=2000`)
+      .then(async (r) => {
+        if (!r.ok) return { data: [] }
+        return r.json()
+      })
+      .catch(() => ({ data: [] })),
   ])
-    .then(([pagesRes, menusRes, providersRes, tenantsRes]) => {
+    .then(([pagesRes, menusRes, providersRes, tenantsRes, translationsRes]) => {
       const pages = unwrapList(pagesRes)
       const menus = unwrapMenusWithItems(menusRes)
       const oidcProviders = unwrapList(providersRes)
       const tenants = unwrapList(tenantsRes)
       const tenantId = tenants.length > 0 ? (tenants[0].id as string) : undefined
       const tenantName = tenants.length > 0 ? (tenants[0].name as string) : undefined
+      const translations = groupTranslations(unwrapList(translationsRes))
 
       return {
         pages,
         menus,
         oidcProviders,
+        translations,
         theme: DEFAULT_THEME,
         branding: {
           ...DEFAULT_BRANDING,

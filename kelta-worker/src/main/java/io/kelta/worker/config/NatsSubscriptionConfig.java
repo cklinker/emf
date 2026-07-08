@@ -15,6 +15,7 @@ import io.kelta.worker.listener.RecordWebhookPublisher;
 import io.kelta.worker.listener.SvixWebhookPublisher;
 import io.kelta.worker.listener.MenuCacheInvalidationListener;
 import io.kelta.worker.listener.SystemFeatureCacheInvalidationListener;
+import io.kelta.worker.listener.TranslationCacheInvalidationListener;
 import io.kelta.worker.listener.TenantEmailCacheInvalidationListener;
 import io.kelta.worker.module.ModuleEventListener;
 import jakarta.annotation.PostConstruct;
@@ -50,6 +51,7 @@ public class NatsSubscriptionConfig {
     private final SystemFeatureCacheInvalidationListener systemFeatureCacheInvalidationListener;
     private final LayoutCacheInvalidationListener layoutCacheInvalidationListener;
     private final MenuCacheInvalidationListener menuCacheInvalidationListener;
+    private final TranslationCacheInvalidationListener translationCacheInvalidationListener;
 
     @Autowired(required = false)
     private CredentialCacheInvalidationListener credentialCacheInvalidationListener;
@@ -76,7 +78,8 @@ public class NatsSubscriptionConfig {
                                    CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener,
                                    SystemFeatureCacheInvalidationListener systemFeatureCacheInvalidationListener,
                                    LayoutCacheInvalidationListener layoutCacheInvalidationListener,
-                                   MenuCacheInvalidationListener menuCacheInvalidationListener) {
+                                   MenuCacheInvalidationListener menuCacheInvalidationListener,
+                                   TranslationCacheInvalidationListener translationCacheInvalidationListener) {
         this.subscriptionManager = subscriptionManager;
         this.flowEventListener = flowEventListener;
         this.natsTriggerFlowListener = natsTriggerFlowListener;
@@ -88,6 +91,7 @@ public class NatsSubscriptionConfig {
         this.systemFeatureCacheInvalidationListener = systemFeatureCacheInvalidationListener;
         this.layoutCacheInvalidationListener = layoutCacheInvalidationListener;
         this.menuCacheInvalidationListener = menuCacheInvalidationListener;
+        this.translationCacheInvalidationListener = translationCacheInvalidationListener;
     }
 
     @PostConstruct
@@ -167,6 +171,12 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.broadcast(
                 "worker-menu-cache", "kelta.config.menu.changed.*",
                 menuCacheInvalidationListener::handleMenuChanged));
+
+        // Tenant translation invalidation (tenant i18n authoring) — every pod evicts
+        // its cached ui-translations responses when a translation changes anywhere.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-translation-cache", "kelta.config.translation.changed.*",
+                translationCacheInvalidationListener::handleTranslationChanged));
 
         // Optional queue group subscriptions — only registered when the integration is enabled
         if (supersetCollectionSyncListener != null) {

@@ -56,7 +56,8 @@ export interface ObjectDataTableProps {
   /** Current sort state */
   sort?: SortState
   /** Callback when a column header is clicked for sorting */
-  onSortChange: (field: string) => void
+  /** Additive=true on shift-click appends/toggles a secondary sort level (opt-in multi-sort). */
+  onSortChange: (field: string, additive?: boolean) => void
   /** Set of selected record IDs */
   selectedIds: Set<string>
   /** Callback when selection changes */
@@ -85,6 +86,12 @@ export interface ObjectDataTableProps {
   editable?: boolean
   /** Persist a single edited cell (partial PATCH). Rejects surface inline in the cell. */
   onCellCommit?: (recordId: string, fieldName: string, value: unknown) => Promise<void>
+  /** Ordered multi-sort state; when present it supersedes `sort` for indicators. */
+  sorts?: SortState[]
+  /** Row density (opt-in; default 'normal' preserves current sizing). */
+  density?: 'compact' | 'normal' | 'comfortable'
+  /** Freeze the first data column (plus selection checkbox) on horizontal scroll. */
+  stickyFirstColumn?: boolean
 }
 
 /**
@@ -99,14 +106,39 @@ function maskedFieldsOf(record: CollectionRecord): Set<string> {
 /**
  * Renders a sort indicator icon based on the current sort state.
  */
-function SortIcon({ field, sort }: { field: string; sort?: SortState }) {
-  if (!sort || sort.field !== field) {
+function SortIcon({
+  field,
+  sort,
+  sorts,
+}: {
+  field: string
+  sort?: SortState
+  sorts?: SortState[]
+}) {
+  const levels = sorts && sorts.length > 0 ? sorts : sort ? [sort] : []
+  const index = levels.findIndex((s) => s.field === field)
+  if (index === -1) {
     return <ArrowUpDown className="ml-1 h-3.5 w-3.5 text-muted-foreground/50" />
   }
-  if (sort.direction === 'asc') {
-    return <ArrowUp className="ml-1 h-3.5 w-3.5" />
-  }
-  return <ArrowDown className="ml-1 h-3.5 w-3.5" />
+  const icon =
+    levels[index].direction === 'asc' ? (
+      <ArrowUp className="ml-1 h-3.5 w-3.5" />
+    ) : (
+      <ArrowDown className="ml-1 h-3.5 w-3.5" />
+    )
+  return (
+    <span className="inline-flex items-center">
+      {icon}
+      {levels.length > 1 && (
+        <span
+          className="ml-0.5 text-[10px] font-semibold text-muted-foreground"
+          data-testid={`sort-level-${field}`}
+        >
+          {index + 1}
+        </span>
+      )}
+    </span>
+  )
 }
 
 /**
@@ -151,6 +183,8 @@ function DataRow({
   onDelete,
   editable,
   onCellCommit,
+  density,
+  stickyFirstColumn,
 }: {
   record: CollectionRecord
   fields: FieldDefinition[]
@@ -169,8 +203,11 @@ function DataRow({
   onDelete?: (record: CollectionRecord) => void
   editable?: boolean
   onCellCommit?: (recordId: string, fieldName: string, value: unknown) => Promise<void>
+  density?: 'compact' | 'normal' | 'comfortable'
+  stickyFirstColumn?: boolean
 }) {
   const inlineEditing = !!editable && !!onCellCommit
+  const densityClass = density === 'compact' ? 'py-1' : density === 'comfortable' ? 'py-4' : ''
   return (
     <TableRow
       key={record.id}
@@ -185,7 +222,14 @@ function DataRow({
       onClick={() => onRowClick(record)}
     >
       {/* Checkbox */}
-      <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+      <TableCell
+        className={cn(
+          'w-[40px]',
+          densityClass,
+          stickyFirstColumn && 'sticky left-0 z-10 bg-inherit'
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
         <Checkbox
           checked={isSelected}
           onCheckedChange={() => onSelectRow(record.id)}
@@ -194,7 +238,7 @@ function DataRow({
       </TableCell>
 
       {/* Data cells */}
-      {fields.map((field) => {
+      {fields.map((field, cellIndex) => {
         const fieldValue = record[field.name]
         const isLookup =
           field.type === 'master_detail' || field.type === 'lookup' || field.type === 'reference'
@@ -207,7 +251,14 @@ function DataRow({
           // No cell-level stopPropagation: a value click still bubbles to the row's navigation
           // handler; editing is triggered only by the hover pencil (editOn="pencil").
           return (
-            <TableCell key={field.name} className="max-w-[300px]">
+            <TableCell
+              key={field.name}
+              className={cn(
+                'max-w-[300px]',
+                densityClass,
+                stickyFirstColumn && cellIndex === 0 && 'sticky left-[40px] z-10 bg-inherit'
+              )}
+            >
               <InlineFieldValue
                 field={field}
                 value={fieldValue}
@@ -223,7 +274,14 @@ function DataRow({
         }
 
         return (
-          <TableCell key={field.name} className="max-w-[300px]">
+          <TableCell
+            key={field.name}
+            className={cn(
+              'max-w-[300px]',
+              densityClass,
+              stickyFirstColumn && cellIndex === 0 && 'sticky left-[40px] z-10 bg-inherit'
+            )}
+          >
             <FieldRenderer
               type={field.type}
               value={fieldValue}
@@ -278,6 +336,9 @@ export function ObjectDataTable({
   fields,
   sort,
   onSortChange,
+  sorts,
+  density = 'normal',
+  stickyFirstColumn = false,
   selectedIds,
   onSelectionChange,
   isLoading = false,
@@ -398,7 +459,9 @@ export function ObjectDataTable({
     <TableHeader>
       <TableRow className="kelta-table-header hover:bg-transparent">
         {/* Checkbox column */}
-        <TableHead className="w-[40px]">
+        <TableHead
+          className={`w-[40px] ${stickyFirstColumn ? 'sticky left-0 z-20 bg-inherit' : ''}`}
+        >
           <Checkbox
             checked={allSelected ? true : someSelected ? 'indeterminate' : false}
             onCheckedChange={handleSelectAll}
@@ -407,15 +470,17 @@ export function ObjectDataTable({
         </TableHead>
 
         {/* Data columns */}
-        {fields.map((field) => (
+        {fields.map((field, index) => (
           <TableHead
             key={field.name}
-            className="cursor-pointer select-none whitespace-nowrap"
-            onClick={() => onSortChange(field.name)}
+            className={`cursor-pointer select-none whitespace-nowrap ${
+              stickyFirstColumn && index === 0 ? 'sticky left-[40px] z-20 bg-inherit' : ''
+            }`}
+            onClick={(e) => onSortChange(field.name, e.shiftKey)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                onSortChange(field.name)
+                onSortChange(field.name, e.shiftKey)
               }
             }}
             tabIndex={0}
@@ -424,7 +489,7 @@ export function ObjectDataTable({
           >
             <div className="flex items-center">
               {field.displayName || field.name}
-              <SortIcon field={field.name} sort={sort} />
+              <SortIcon field={field.name} sort={sort} sorts={sorts} />
             </div>
           </TableHead>
         ))}
@@ -485,6 +550,8 @@ export function ObjectDataTable({
                 onSelectRow={handleSelectRow}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                density={density}
+                stickyFirstColumn={stickyFirstColumn}
               />
             )
           })}
@@ -521,6 +588,8 @@ export function ObjectDataTable({
           onSelectRow={handleSelectRow}
           onEdit={onEdit}
           onDelete={onDelete}
+          density={density}
+          stickyFirstColumn={stickyFirstColumn}
           editable={editable}
           onCellCommit={onCellCommit}
         />

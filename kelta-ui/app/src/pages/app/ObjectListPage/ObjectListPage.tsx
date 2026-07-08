@@ -19,7 +19,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, Rows3 } from 'lucide-react'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -47,7 +47,9 @@ import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { REFERENCE_FIELD_TYPES, referenceIncludeParam } from './listIncludes'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
-import { parseListViewParams } from './listUrlState'
+import { buildSortParam, parseListViewParams } from './listUrlState'
+import { ColumnChooser } from '@/components/ColumnChooser/ColumnChooser'
+import { viewSorts, type SavedViewDensity } from '@/hooks/useSavedViews'
 import { ListShell } from '@/components/record/ListShell'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
@@ -107,7 +109,7 @@ export function ObjectListPage(): React.ReactElement {
   const basePath = `/${tenantSlug}/app`
 
   // Parse list state from URL params (deep linking support)
-  const { page, pageSize, sort, filters } = useMemo(
+  const { page, pageSize, sort, sorts, filters, viewId } = useMemo(
     () => parseListViewParams(searchParams),
     [searchParams]
   )
@@ -151,17 +153,21 @@ export function ObjectListPage(): React.ReactElement {
     () => allViews.find((v) => v.id === activeViewId) ?? null,
     [allViews, activeViewId]
   )
+  // Ad-hoc column override from the chooser (wins over the active view until saved).
+  const [columnOverride, setColumnOverride] = useState<string[] | null>(null)
+  const [density, setDensity] = useState<SavedViewDensity>('normal')
 
   const visibleFields = useMemo(() => {
     if (!fields.length) return []
     const accessible = fields
       .filter((f) => !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name))
       .filter((f) => isFieldVisible(f.name))
-    // An active view's column list drives the column set (view order wins);
-    // otherwise the default first-6 rule applies.
-    const fromView = activeView ? orderFieldsByView(accessible, activeView.visibleColumns) : null
-    return fromView ?? accessible.slice(0, 6)
-  }, [fields, isFieldVisible, activeView])
+    // Precedence: chooser override > active view's column list > default first-6 rule.
+    const fromOverride = columnOverride ? orderFieldsByView(accessible, columnOverride) : null
+    const fromView =
+      !fromOverride && activeView ? orderFieldsByView(accessible, activeView.visibleColumns) : null
+    return fromOverride ?? fromView ?? accessible.slice(0, 6)
+  }, [fields, isFieldVisible, activeView, columnOverride])
 
   // Identify reference fields in visible columns that need included resources
   const referenceFields = useMemo(
@@ -184,7 +190,7 @@ export function ObjectListPage(): React.ReactElement {
     collectionName,
     page,
     pageSize,
-    sort,
+    sort: sorts.length > 0 ? sorts : undefined,
     filters: filters.length > 0 ? filters : undefined,
     enabled: !!schema,
     include: includeParam,
@@ -281,17 +287,24 @@ export function ObjectListPage(): React.ReactElement {
   const applyView = useCallback(
     (view: SavedView | null) => {
       setActiveViewId(view?.id ?? null)
+      setColumnOverride(null)
+      setDensity(view?.density ?? 'normal')
       if (view) {
         updateParams({
           filter: view.filters.length > 0 ? JSON.stringify(view.filters) : undefined,
-          sort: view.sortField
-            ? `${view.sortDirection === 'desc' ? '-' : ''}${view.sortField}`
-            : undefined,
+          sort: buildSortParam(viewSorts(view)),
           pageSize: String(view.pageSize),
           page: undefined,
+          view: view.id,
         })
       } else {
-        updateParams({ filter: undefined, sort: undefined, pageSize: undefined, page: undefined })
+        updateParams({
+          filter: undefined,
+          sort: undefined,
+          pageSize: undefined,
+          page: undefined,
+          view: undefined,
+        })
       }
     },
     [updateParams]
@@ -310,12 +323,15 @@ export function ObjectListPage(): React.ReactElement {
         filters,
         sortField: sort?.field ?? null,
         sortDirection: sort?.direction ?? 'asc',
+        sorts,
+        density,
         visibleColumns: visibleFields.map((f) => f.name),
         pageSize,
         isDefault: false,
       })
+      setColumnOverride(null)
     },
-    [savedViews, filters, sort, visibleFields, pageSize]
+    [savedViews, filters, sort, sorts, density, visibleFields, pageSize]
   )
 
   const rejectSharedViewEdit = useCallback(() => {
@@ -348,9 +364,24 @@ export function ObjectListPage(): React.ReactElement {
   )
 
   // Auto-apply the default view on a clean first visit — explicit URL state always wins.
+  // A `view=<id>` deep link selects that view (its state params are already in the URL
+  // when shared from an applied view; selecting keeps columns/density in sync).
   const appliedDefaultRef = useRef(false)
   useEffect(() => {
     if (appliedDefaultRef.current) return
+    if (viewId) {
+      const linked = allViews.find((v) => v.id === viewId)
+      if (linked) {
+        appliedDefaultRef.current = true
+        // Deferred: no synchronous setState inside the effect (cascading-render rule).
+        const timer = setTimeout(() => {
+          setActiveViewId(linked.id)
+          setDensity(linked.density ?? 'normal')
+        }, 0)
+        return () => clearTimeout(timer)
+      }
+      return
+    }
     const urlHasState = ['page', 'pageSize', 'sort', 'filter'].some((k) => searchParams.has(k))
     if (urlHasState) {
       appliedDefaultRef.current = true
@@ -366,20 +397,35 @@ export function ObjectListPage(): React.ReactElement {
       const timer = setTimeout(() => applyView(def), 0)
       return () => clearTimeout(timer)
     }
-  }, [savedViews.views, sharedViews, searchParams, applyView])
+  }, [savedViews.views, sharedViews, searchParams, applyView, viewId, allViews])
 
-  // Sort handler: cycle through asc → desc → none
+  // Sort handler. Plain click: single-level cycle asc → desc → none. Shift-click:
+  // additive — appends the field as a new level, or cycles/removes its existing level
+  // while keeping the others (server accepts the comma grammar natively).
   const handleSortChange = useCallback(
-    (field: string) => {
-      let newSort: string | undefined
-      if (sort?.field === field) {
-        newSort = sort.direction === 'asc' ? `-${field}` : undefined
-      } else {
-        newSort = field
+    (field: string, additive?: boolean) => {
+      if (!additive) {
+        let newSort: string | undefined
+        if (sorts.length === 1 && sorts[0].field === field) {
+          newSort = sorts[0].direction === 'asc' ? `-${field}` : undefined
+        } else {
+          newSort = field
+        }
+        updateParams({ sort: newSort, page: undefined })
+        return
       }
-      updateParams({ sort: newSort, page: undefined })
+      const index = sorts.findIndex((s) => s.field === field)
+      let next = [...sorts]
+      if (index === -1) {
+        next.push({ field, direction: 'asc' })
+      } else if (next[index].direction === 'asc') {
+        next[index] = { field, direction: 'desc' }
+      } else {
+        next = next.filter((s) => s.field !== field)
+      }
+      updateParams({ sort: buildSortParam(next), page: undefined })
     },
-    [sort, updateParams]
+    [sorts, updateParams]
   )
 
   // Page change handler
@@ -558,7 +604,7 @@ export function ObjectListPage(): React.ReactElement {
               />
             }
           />
-          <div className="flex items-center">
+          <div className="flex flex-wrap items-center gap-2">
             <ViewSelector
               views={allViews}
               activeView={activeView}
@@ -568,6 +614,34 @@ export function ObjectListPage(): React.ReactElement {
               onRenameView={handleRenameView}
               onSetDefault={handleSetDefaultView}
             />
+            <ColumnChooser
+              fields={fields
+                .filter(
+                  (f) => !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name)
+                )
+                .filter((f) => isFieldVisible(f.name))
+                .map((f) => ({ name: f.name, displayName: f.displayName }))}
+              visibleColumns={visibleFields.map((f) => f.name)}
+              onChange={setColumnOverride}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setDensity((d) =>
+                  d === 'normal' ? 'compact' : d === 'compact' ? 'comfortable' : 'normal'
+                )
+              }
+              data-testid="density-toggle"
+              aria-label={t('listPower.density', 'Row density')}
+            >
+              <Rows3 className="mr-1.5 h-4 w-4" aria-hidden />
+              {density === 'compact'
+                ? t('listPower.compact', 'Compact')
+                : density === 'comfortable'
+                  ? t('listPower.comfortable', 'Comfortable')
+                  : t('listPower.normal', 'Normal')}
+            </Button>
           </div>
         </div>
       }
@@ -598,6 +672,9 @@ export function ObjectListPage(): React.ReactElement {
           fields={visibleFields}
           sort={sort}
           onSortChange={handleSortChange}
+          sorts={sorts}
+          density={density}
+          stickyFirstColumn
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
           isLoading={recordsLoading}

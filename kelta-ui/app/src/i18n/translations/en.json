@@ -2060,5 +2060,15 @@
   },
   "savedViews": {
     "sharedReadOnly": "Shared views are managed in Setup → List Views"
+  },
+  "columnChooser": {
+    "trigger": "Columns",
+    "heading": "Visible columns"
+  },
+  "listPower": {
+    "density": "Row density",
+    "compact": "Compact",
+    "normal": "Normal",
+    "comfortable": "Comfortable"
   }
 }

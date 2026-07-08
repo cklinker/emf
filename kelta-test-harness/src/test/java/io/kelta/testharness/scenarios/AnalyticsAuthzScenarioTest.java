@@ -86,11 +86,14 @@ class AnalyticsAuthzScenarioTest extends ScenarioBase {
                 // ---- admin (MANAGE_REPORTS holder) authors a real report -> proves the fallback
                 String customersCollectionId = collectionIdByName(db, tenantId, "customers");
                 assertThat(customersCollectionId).as("harness ecommerce collection exists").isNotNull();
+                // columns is a JSON-typed field — the write path validates for real JSON
+                // (a JSON-encoded string is rejected with "Invalid type, expected JSON").
                 reportId = createReport(adminToken, slug, Map.of(
                         "name", "Authz Probe " + suffix,
                         "reportType", "TABULAR",
                         "primaryCollectionId", customersCollectionId,
-                        "columns", "[{\"fieldName\":\"id\",\"label\":\"Id\",\"type\":\"string\"}]"));
+                        "columns", java.util.List.of(Map.of(
+                                "fieldName", "id", "label", "Id", "type", "string"))));
 
                 ResponseEntity<Map> adminRun = executeReport(adminToken, slug, reportId);
                 assertThat(adminRun.getStatusCode())

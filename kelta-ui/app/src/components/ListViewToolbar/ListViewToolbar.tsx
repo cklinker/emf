@@ -9,7 +9,7 @@
  */
 
 import React from 'react'
-import { Plus, Download, Upload, Trash2, ChevronDown } from 'lucide-react'
+import { Plus, Download, Upload, Trash2, ChevronDown, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -38,6 +38,11 @@ export interface ListViewToolbarProps {
   onImportCsv?: () => void
   /** Callback to clear selection */
   onClearSelection?: () => void
+  /**
+   * Mass edit (one field across the selection). Pass only when the caller's
+   * gate holds (canEdit + MANAGE_DATA) — the toolbar stays permission-ignorant.
+   */
+  onMassEdit?: () => void
   /** Whether the user can create records (controls New button visibility) */
   canCreate?: boolean
   /** Whether the user can delete records (controls Delete action visibility) */
@@ -56,6 +61,7 @@ export function ListViewToolbar({
   onExportJson,
   onImportCsv,
   onClearSelection,
+  onMassEdit,
   canCreate = true,
   canDelete = true,
   quickActionsSlot,
@@ -140,6 +146,18 @@ export function ListViewToolbar({
           <span className="font-medium">
             {selectedCount} record{selectedCount !== 1 ? 's' : ''} selected
           </span>
+          {onMassEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7"
+              onClick={onMassEdit}
+              data-testid="mass-edit-button"
+            >
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              Edit field
+            </Button>
+          )}
           {canDelete && onBulkDelete && (
             <Button
               variant="ghost"

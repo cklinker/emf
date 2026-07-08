@@ -24,8 +24,8 @@ Read this parent first; every child references it.
 | 0 — This spec + doc wiring | (this file) | foundation (docs) |
 | 1 — `user-ui-preferences` + server-side views | `1-user-preferences.md` — **SHIPPED 2026-07-08** (favorites/recents migration deferred to its own PR) | **backend+FE, security** |
 | 2 — List power pack | `2-list-power.md` — **SHIPPED 2026-07-08** (FE-only: the parent's "multi-sort needs a backend extension" claim was wrong — the server already accepts `sort=a,-b` end-to-end) | **columns/sort/density (FE)** |
-| 3 — Page grouping + aggregates | `3-grouping.md` | **list UX (FE)** |
-| 4 — Main-list mass edit | `4-mass-edit.md` | **bulk UX (FE)** |
+| 3 — Page grouping + aggregates | `3-grouping.md` — **SHIPPED 2026-07-08** (client-side page grouping, collapsible headers, count + numeric sums; group field prepended to server sort) | **list UX (FE)** |
+| 4 — Main-list mass edit | `4-mass-edit.md` — **SHIPPED 2026-07-08** (bulk-job submit/poll extracted to shared `utils/bulkUpdate.ts`; RelatedList refactored onto it) | **bulk UX (FE)** |
 | 5 — Kanban view | `5-kanban.md` | **alt views (FE)** |
 | 6 — Calendar view | `6-calendar.md` | **alt views (FE)** |
 | 7 — Gallery view | `7-gallery.md` | **alt views (FE)** |

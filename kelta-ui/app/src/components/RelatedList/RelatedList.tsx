@@ -52,6 +52,7 @@ import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useApi } from '@/context/ApiContext'
 import { useToast } from '@/components'
 import { buildIncludedDisplayMap, extractIncluded } from '@/utils/jsonapi'
+import { runBulkUpdate } from '@/utils/bulkUpdate'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
@@ -79,23 +80,6 @@ const DEFAULT_LIMIT = 5
 
 /** System permission required to submit bulk jobs (mass edit). */
 const MANAGE_DATA_PERMISSION = 'MANAGE_DATA'
-
-/** Interval between bulk-job status polls. */
-const POLL_INTERVAL_MS = 2000
-
-/** Maximum number of status polls (~60s at 2s intervals). */
-const MAX_POLL_ATTEMPTS = 30
-
-/** Bulk-job statuses that end polling. */
-const TERMINAL_JOB_STATUSES = new Set(['COMPLETED', 'FAILED', 'ABORTED'])
-
-/** JSON:API attributes returned by GET /api/bulk-jobs/{id}. */
-interface BulkJobPollAttributes {
-  status?: string
-  processedRecords?: number
-  successRecords?: number
-  errorRecords?: number
-}
 
 export interface RelatedListProps {
   /** Related collection name */
@@ -509,30 +493,15 @@ export function RelatedList({
     const collectionId = schema?.id
     if (!collectionId) throw new Error('Collection schema is not loaded yet')
     const ids = [...visibleSelectedIds]
-    const created = await apiClient.post<{ data?: { id?: string } }>('/api/bulk-jobs', {
+    const {
+      status: finalStatus,
+      successRecords,
+      errorRecords,
+    } = await runBulkUpdate(
+      apiClient,
       collectionId,
-      operation: 'UPDATE',
-      records: ids.map((id) => ({ id, [fieldName]: value })),
-    })
-    const jobId = created?.data?.id
-    if (!jobId) throw new Error('Bulk job was not created')
-
-    let finalStatus: string | undefined
-    let successRecords = 0
-    let errorRecords = 0
-    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-      const poll = await apiClient.get<{ data?: { attributes?: BulkJobPollAttributes } }>(
-        `/api/bulk-jobs/${jobId}`
-      )
-      const attrs = poll?.data?.attributes
-      if (attrs?.status && TERMINAL_JOB_STATUSES.has(attrs.status)) {
-        finalStatus = attrs.status
-        successRecords = attrs.successRecords ?? 0
-        errorRecords = attrs.errorRecords ?? 0
-        break
-      }
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
-    }
+      ids.map((id) => ({ id, [fieldName]: value }))
+    )
 
     if (finalStatus !== 'COMPLETED') {
       const message = finalStatus

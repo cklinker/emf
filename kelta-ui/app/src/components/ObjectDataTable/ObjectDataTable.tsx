@@ -11,10 +11,20 @@
  * - Virtual scrolling for large datasets (>100 rows)
  */
 
-import React, { useCallback, useMemo, useRef } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react'
+import {
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
+  ChevronRight,
+  MoreHorizontal,
+  Eye,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -47,6 +57,58 @@ const ROW_HEIGHT_ESTIMATE = 40
 
 /** Max visible height for the virtual scrollable area */
 const VIRTUAL_MAX_HEIGHT = 600
+
+/** Field types summed in group headers (matches FieldRenderer's numeric cases). */
+const NUMERIC_FIELD_TYPES = new Set(['number', 'currency', 'percent'])
+
+/** One page-local group bucket (app-data-entry slice 3). */
+interface RecordGroup {
+  /** Stable bucket key (String(value), '' for null/empty). */
+  key: string
+  /** Raw group-field value of the bucket (label rendering). */
+  value: unknown
+  records: CollectionRecord[]
+}
+
+/**
+ * Bucket records by a field, preserving arrival order (the caller prepends the
+ * group field to the server sort, so buckets arrive contiguous — Map insertion
+ * order keeps them that way even if they don't).
+ */
+function groupRecords(records: CollectionRecord[], groupBy: string): RecordGroup[] {
+  const buckets = new Map<string, RecordGroup>()
+  for (const record of records) {
+    const value = record[groupBy]
+    const key = value === null || value === undefined || value === '' ? '' : String(value)
+    const bucket = buckets.get(key)
+    if (bucket) {
+      bucket.records.push(record)
+    } else {
+      buckets.set(key, { key, value, records: [record] })
+    }
+  }
+  return [...buckets.values()]
+}
+
+/** Per-group sums for the visible numeric columns; non-parsable values are skipped. */
+function groupSums(
+  group: RecordGroup,
+  fields: FieldDefinition[]
+): Array<[FieldDefinition, number]> {
+  const sums: Array<[FieldDefinition, number]> = []
+  for (const field of fields) {
+    if (!NUMERIC_FIELD_TYPES.has(field.type)) continue
+    let sum = 0
+    for (const record of group.records) {
+      const value = record[field.name]
+      if (value === null || value === undefined || value === '') continue
+      const n = Number(value)
+      if (Number.isFinite(n)) sum += n
+    }
+    sums.push([field, sum])
+  }
+  return sums
+}
 
 export interface ObjectDataTableProps {
   /** Records to display */
@@ -92,6 +154,12 @@ export interface ObjectDataTableProps {
   density?: 'compact' | 'normal' | 'comfortable'
   /** Freeze the first data column (plus selection checkbox) on horizontal scroll. */
   stickyFirstColumn?: boolean
+  /**
+   * Group rows by this field over the fetched page (opt-in; app-data-entry slice 3).
+   * Renders collapsible group-header rows with count + numeric sums and disables
+   * virtualization (page-sized data only). Absent = today's flat rendering.
+   */
+  groupBy?: string
 }
 
 /**
@@ -339,6 +407,7 @@ export function ObjectDataTable({
   sorts,
   density = 'normal',
   stickyFirstColumn = false,
+  groupBy,
   selectedIds,
   onSelectionChange,
   isLoading = false,
@@ -357,27 +426,56 @@ export function ObjectDataTable({
   // Ref for virtual scrolling container
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Whether to use virtual scrolling
-  const useVirtual = records.length > VIRTUAL_THRESHOLD
+  // Grouping (slice 3). Collapse keys carry the group field so switching fields
+  // never leaks collapsed buckets across fields (no reset effect needed).
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
+  const groups = useMemo(
+    () => (groupBy ? groupRecords(records, groupBy) : null),
+    [records, groupBy]
+  )
+  const collapseKey = useCallback((key: string) => `${groupBy}:${key}`, [groupBy])
+  const toggleGroup = useCallback(
+    (key: string) => {
+      const full = collapseKey(key)
+      setCollapsedGroups((prev) => {
+        const next = new Set(prev)
+        if (next.has(full)) next.delete(full)
+        else next.add(full)
+        return next
+      })
+    },
+    [collapseKey]
+  )
+
+  // Rows actually shown, in display order — keyboard nav indexes into this list
+  // (collapsed groups are skipped). Identical to `records` when not grouping.
+  const visibleRecords = useMemo(() => {
+    if (!groups) return records
+    return groups.flatMap((g) => (collapsedGroups.has(collapseKey(g.key)) ? [] : g.records))
+  }, [groups, records, collapsedGroups, collapseKey])
+
+  // Whether to use virtual scrolling. Grouping opts out: header rows break the
+  // fixed-height row estimate and pages are clamped at 200 rows anyway.
+  const useVirtual = !groupBy && records.length > VIRTUAL_THRESHOLD
 
   // Keyboard navigation
   const { handleKeyDown, tableRef, getRowProps } = useTableKeyboardNav({
-    rowCount: records.length,
+    rowCount: visibleRecords.length,
     onRowActivate: (index) => {
-      if (records[index]) {
+      if (visibleRecords[index]) {
         if (onRowClick) {
-          onRowClick(records[index])
+          onRowClick(visibleRecords[index])
         } else {
-          navigate(`${basePath}/o/${collectionName}/${records[index].id}`)
+          navigate(`${basePath}/o/${collectionName}/${visibleRecords[index].id}`)
         }
       }
     },
     onRowToggle: (index) => {
-      if (records[index]) {
-        handleSelectRow(records[index].id)
+      if (visibleRecords[index]) {
+        handleSelectRow(visibleRecords[index].id)
       }
     },
-    enabled: !isLoading && records.length > 0,
+    enabled: !isLoading && visibleRecords.length > 0,
   })
 
   // Virtual row virtualizer (only active when useVirtual is true)
@@ -516,6 +614,83 @@ export function ObjectDataTable({
           </TableCell>
         </TableRow>
       )
+    }
+
+    // Grouped path (slice 3): collapsible header rows with count + numeric sums.
+    if (groups) {
+      let flatIndex = 0
+      return groups.map((group) => {
+        const collapsed = collapsedGroups.has(collapseKey(group.key))
+        const isEmpty = group.value === null || group.value === undefined || group.value === ''
+        const label = isEmpty
+          ? '—'
+          : (lookupDisplayMap?.[groupBy!]?.[String(group.value)] ?? String(group.value))
+        const sums = groupSums(group, fields)
+        return (
+          <React.Fragment key={`g:${group.key}`}>
+            <TableRow
+              className="bg-muted/60 hover:bg-muted/60"
+              data-testid={`group-header-${group.key}`}
+            >
+              <TableCell colSpan={fields.length + 2} className="py-1.5">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 font-medium"
+                    onClick={() => toggleGroup(group.key)}
+                    aria-expanded={!collapsed}
+                    data-testid={`group-toggle-${group.key}`}
+                  >
+                    {collapsed ? (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden />
+                    )}
+                    <span>{label}</span>
+                    <span className="font-normal tabular-nums text-muted-foreground">
+                      ({group.records.length})
+                    </span>
+                  </button>
+                  {sums.map(([field, sum]) => (
+                    <span
+                      key={field.name}
+                      className="text-xs tabular-nums text-muted-foreground"
+                      data-testid={`group-sum-${group.key}-${field.name}`}
+                    >
+                      Σ {field.displayName || field.name}:{' '}
+                      {sum.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                  ))}
+                </div>
+              </TableCell>
+            </TableRow>
+            {!collapsed &&
+              group.records.map((record) => {
+                const index = flatIndex
+                flatIndex += 1
+                return (
+                  <DataRow
+                    key={record.id}
+                    record={record}
+                    fields={fields}
+                    isSelected={selectedIds.has(record.id)}
+                    rowProps={getRowProps(index)}
+                    tenantSlug={tenantSlug}
+                    lookupDisplayMap={lookupDisplayMap}
+                    onRowClick={handleRowClick}
+                    onSelectRow={handleSelectRow}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    density={density}
+                    stickyFirstColumn={stickyFirstColumn}
+                    editable={editable}
+                    onCellCommit={onCellCommit}
+                  />
+                )
+              })}
+          </React.Fragment>
+        )
+      })
     }
 
     // Virtual scrolling path: render only visible rows with spacers

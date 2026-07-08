@@ -19,7 +19,14 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
-import { Loader2, AlertCircle, Rows3 } from 'lucide-react'
+import { Loader2, AlertCircle, Rows3, Layers, ChevronDown } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -44,6 +51,11 @@ import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useCollectionRecords } from '@/hooks/useCollectionRecords'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
+import { useSystemPermissions } from '@/hooks/useSystemPermissions'
+import { useApi } from '@/context/ApiContext'
+import { getFieldControl } from '@/components/fieldControl'
+import { runBulkUpdate } from '@/utils/bulkUpdate'
+import { MassEditDialog } from '@/components/RelatedList/MassEditDialog'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { REFERENCE_FIELD_TYPES, referenceIncludeParam } from './listIncludes'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
@@ -139,6 +151,11 @@ export function ObjectListPage(): React.ReactElement {
     isLoading: permissionsLoading,
   } = useCollectionPermissions(collectionName)
 
+  // Mass edit posts to /api/bulk-jobs, which requires the MANAGE_DATA system
+  // permission (in-controller gate) — hide the affordance without it.
+  const { hasPermission } = useSystemPermissions()
+  const { apiClient } = useApi()
+
   // Determine visible fields (first 6 fields by default, excluding system and hidden fields)
   // Saved views: personal (localStorage, the admin ResourceListPage mechanism) + shared
   // (admin-authored PUBLIC `list-views` rows, read-only with a `shared:` id prefix).
@@ -156,18 +173,46 @@ export function ObjectListPage(): React.ReactElement {
   // Ad-hoc column override from the chooser (wins over the active view until saved).
   const [columnOverride, setColumnOverride] = useState<string[] | null>(null)
   const [density, setDensity] = useState<SavedViewDensity>('normal')
+  // This-page grouping field (slice 3) — from the active view or the toolbar picker.
+  const [groupBy, setGroupBy] = useState<string | null>(null)
+  // Mass edit (slice 4)
+  const [massEditOpen, setMassEditOpen] = useState(false)
+
+  // Accessible (non-system, FLS-visible) fields — feeds the column chooser and
+  // the group-by picker.
+  const accessibleFields = useMemo(
+    () =>
+      fields
+        .filter((f) => !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name))
+        .filter((f) => isFieldVisible(f.name)),
+    [fields, isFieldVisible]
+  )
 
   const visibleFields = useMemo(() => {
-    if (!fields.length) return []
-    const accessible = fields
-      .filter((f) => !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name))
-      .filter((f) => isFieldVisible(f.name))
+    if (!accessibleFields.length) return []
     // Precedence: chooser override > active view's column list > default first-6 rule.
-    const fromOverride = columnOverride ? orderFieldsByView(accessible, columnOverride) : null
+    const fromOverride = columnOverride ? orderFieldsByView(accessibleFields, columnOverride) : null
     const fromView =
-      !fromOverride && activeView ? orderFieldsByView(accessible, activeView.visibleColumns) : null
-    return fromOverride ?? fromView ?? accessible.slice(0, 6)
-  }, [fields, isFieldVisible, activeView, columnOverride])
+      !fromOverride && activeView
+        ? orderFieldsByView(accessibleFields, activeView.visibleColumns)
+        : null
+    return fromOverride ?? fromView ?? accessibleFields.slice(0, 6)
+  }, [accessibleFields, activeView, columnOverride])
+
+  // Fields offered by the mass-edit picker (same rule as RelatedList): user-editable
+  // schema fields only (excludes id, system audit fields, server-computed types).
+  const massEditableFields = useMemo(
+    () =>
+      fields.filter(
+        (f) =>
+          f.name !== 'id' &&
+          !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name) &&
+          getFieldControl(f.type).editable
+      ),
+    [fields]
+  )
+  const canMassEdit =
+    permissions.canEdit && hasPermission('MANAGE_DATA') && massEditableFields.length > 0
 
   // Identify reference fields in visible columns that need included resources
   const referenceFields = useMemo(
@@ -177,6 +222,17 @@ export function ObjectListPage(): React.ReactElement {
 
   // Build the JSON:API `include` param from the reference FIELD names (see referenceIncludeParam).
   const includeParam = useMemo(() => referenceIncludeParam(referenceFields), [referenceFields])
+
+  // Grouping prepends the group field to the server sort so buckets arrive
+  // contiguous; the user's own sort levels order rows within groups. The URL
+  // `sort=` param is left untouched.
+  const effectiveSorts = useMemo(() => {
+    if (!groupBy) return sorts
+    return [
+      { field: groupBy, direction: 'asc' as const },
+      ...sorts.filter((s) => s.field !== groupBy),
+    ]
+  }, [groupBy, sorts])
 
   // Fetch records with includes for reference fields
   const {
@@ -190,7 +246,7 @@ export function ObjectListPage(): React.ReactElement {
     collectionName,
     page,
     pageSize,
-    sort: sorts.length > 0 ? sorts : undefined,
+    sort: effectiveSorts.length > 0 ? effectiveSorts : undefined,
     filters: filters.length > 0 ? filters : undefined,
     enabled: !!schema,
     include: includeParam,
@@ -252,6 +308,50 @@ export function ObjectListPage(): React.ReactElement {
     [mutations.patch, refetch]
   )
 
+  /**
+   * Mass edit (slice 4): apply one field value to every selected row via the
+   * shared bulk-jobs flow. Throws on failure so MassEditDialog stays open with
+   * the error inline; toasts link to the Bulk Jobs page (same MANAGE_DATA gate).
+   */
+  const handleMassEditSubmit = useCallback(
+    async (fieldName: string, value: unknown): Promise<void> => {
+      const collectionId = schema?.id
+      if (!collectionId) throw new Error('Collection schema is not loaded yet')
+      const ids = Array.from(selectedIds)
+      const { status, successRecords, errorRecords } = await runBulkUpdate(
+        apiClient,
+        collectionId,
+        ids.map((id) => ({ id, [fieldName]: value }))
+      )
+      const viewJobs = {
+        label: t('massEdit.viewJobs', 'View jobs'),
+        onClick: () => navigate(`/${tenantSlug}/bulk-jobs`),
+      }
+      if (status !== 'COMPLETED') {
+        const message = status
+          ? t('massEdit.terminal', { status: status.toLowerCase() })
+          : t('massEdit.stillRunning', 'Bulk update is still running — check the Bulk Jobs page')
+        toast.error(message, { action: viewJobs })
+        throw new Error(message)
+      }
+      if (errorRecords > 0) {
+        toast.error(
+          t('massEdit.partial', {
+            success: successRecords,
+            total: ids.length,
+            failed: errorRecords,
+          }),
+          { action: viewJobs }
+        )
+      } else {
+        toast.success(t('massEdit.success', { success: successRecords, total: ids.length }))
+      }
+      setSelectedIds(new Set())
+      await refetch()
+    },
+    [schema, selectedIds, apiClient, t, navigate, tenantSlug, refetch]
+  )
+
   // Collection label
   const collectionLabel =
     schema?.displayName ||
@@ -289,6 +389,7 @@ export function ObjectListPage(): React.ReactElement {
       setActiveViewId(view?.id ?? null)
       setColumnOverride(null)
       setDensity(view?.density ?? 'normal')
+      setGroupBy(view?.groupBy ?? null)
       if (view) {
         updateParams({
           filter: view.filters.length > 0 ? JSON.stringify(view.filters) : undefined,
@@ -325,13 +426,14 @@ export function ObjectListPage(): React.ReactElement {
         sortDirection: sort?.direction ?? 'asc',
         sorts,
         density,
+        groupBy,
         visibleColumns: visibleFields.map((f) => f.name),
         pageSize,
         isDefault: false,
       })
       setColumnOverride(null)
     },
-    [savedViews, filters, sort, sorts, density, visibleFields, pageSize]
+    [savedViews, filters, sort, sorts, density, groupBy, visibleFields, pageSize]
   )
 
   const rejectSharedViewEdit = useCallback(() => {
@@ -377,6 +479,7 @@ export function ObjectListPage(): React.ReactElement {
         const timer = setTimeout(() => {
           setActiveViewId(linked.id)
           setDensity(linked.density ?? 'normal')
+          setGroupBy(linked.groupBy ?? null)
         }, 0)
         return () => clearTimeout(timer)
       }
@@ -594,6 +697,7 @@ export function ObjectListPage(): React.ReactElement {
             onExportJson={handleExportJson}
             onImportCsv={permissions.canCreate ? () => setShowImportDialog(true) : undefined}
             onClearSelection={handleClearSelection}
+            onMassEdit={canMassEdit ? () => setMassEditOpen(true) : undefined}
             canCreate={permissions.canCreate}
             canDelete={permissions.canDelete}
             quickActionsSlot={
@@ -615,12 +719,7 @@ export function ObjectListPage(): React.ReactElement {
               onSetDefault={handleSetDefaultView}
             />
             <ColumnChooser
-              fields={fields
-                .filter(
-                  (f) => !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name)
-                )
-                .filter((f) => isFieldVisible(f.name))
-                .map((f) => ({ name: f.name, displayName: f.displayName }))}
+              fields={accessibleFields.map((f) => ({ name: f.name, displayName: f.displayName }))}
               visibleColumns={visibleFields.map((f) => f.name)}
               onChange={setColumnOverride}
             />
@@ -642,6 +741,37 @@ export function ObjectListPage(): React.ReactElement {
                   ? t('listPower.comfortable', 'Comfortable')
                   : t('listPower.normal', 'Normal')}
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="group-by-trigger"
+                  aria-label={t('listPower.groupBy', 'Group by')}
+                >
+                  <Layers className="mr-1.5 h-4 w-4" aria-hidden />
+                  {groupBy
+                    ? (fields.find((f) => f.name === groupBy)?.displayName ?? groupBy)
+                    : t('listPower.groupBy', 'Group by')}
+                  <ChevronDown className="ml-1 h-3.5 w-3.5" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setGroupBy(null)} data-testid="group-by-none">
+                  {t('listPower.noGrouping', 'No grouping')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {accessibleFields.map((f) => (
+                  <DropdownMenuItem
+                    key={f.name}
+                    onClick={() => setGroupBy(f.name)}
+                    data-testid={`group-by-${f.name}`}
+                  >
+                    {f.displayName || f.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       }
@@ -667,24 +797,32 @@ export function ObjectListPage(): React.ReactElement {
         </>
       }
       table={
-        <ObjectDataTable
-          records={records}
-          fields={visibleFields}
-          sort={sort}
-          onSortChange={handleSortChange}
-          sorts={sorts}
-          density={density}
-          stickyFirstColumn
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-          isLoading={recordsLoading}
-          collectionName={collectionName || ''}
-          onEdit={permissions.canEdit ? handleEdit : undefined}
-          onDelete={permissions.canDelete ? handleDeleteClick : undefined}
-          lookupDisplayMap={lookupDisplayMap}
-          editable={permissions.canEdit}
-          onCellCommit={handleCellCommit}
-        />
+        <>
+          <ObjectDataTable
+            records={records}
+            fields={visibleFields}
+            sort={sort}
+            onSortChange={handleSortChange}
+            sorts={sorts}
+            density={density}
+            stickyFirstColumn
+            groupBy={groupBy ?? undefined}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            isLoading={recordsLoading}
+            collectionName={collectionName || ''}
+            onEdit={permissions.canEdit ? handleEdit : undefined}
+            onDelete={permissions.canDelete ? handleDeleteClick : undefined}
+            lookupDisplayMap={lookupDisplayMap}
+            editable={permissions.canEdit}
+            onCellCommit={handleCellCommit}
+          />
+          {groupBy && (
+            <p className="px-1 pt-1 text-xs text-muted-foreground" data-testid="group-caption">
+              {t('listPower.groupsPageOnly', 'Groups reflect this page only')}
+            </p>
+          )}
+        </>
       }
       pagination={
         !recordsLoading && records.length > 0 ? (
@@ -700,6 +838,17 @@ export function ObjectListPage(): React.ReactElement {
       }
       dialogs={
         <>
+          {/* Mass edit (slice 4): one field across the selection via bulk jobs */}
+          {massEditOpen && (
+            <MassEditDialog
+              fields={massEditableFields}
+              tenantSlug={tenantSlug || ''}
+              selectedCount={selectedIds.size}
+              onSubmit={handleMassEditSubmit}
+              onClose={() => setMassEditOpen(false)}
+            />
+          )}
+
           {/* CSV import dialog */}
           <CsvImportDialog
             open={showImportDialog}

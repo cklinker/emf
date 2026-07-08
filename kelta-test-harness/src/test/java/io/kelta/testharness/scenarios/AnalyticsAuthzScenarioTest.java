@@ -1,6 +1,7 @@
 package io.kelta.testharness.scenarios;
 
 import io.kelta.testharness.ScenarioBase;
+import io.kelta.testharness.fixtures.TenantFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -46,9 +47,12 @@ class AnalyticsAuthzScenarioTest extends ScenarioBase {
     @DisplayName("VIEW_ANALYTICS gates report execution; MANAGE_REPORTS passes; no-permission profile is 403")
     @SuppressWarnings("unchecked")
     void viewAnalyticsGatesReportExecution() throws Exception {
-        String adminToken = auth.loginAsAdmin();
+        // The ecommerce fixture tenant owns the seeded `customers` collection the probe
+        // report targets (Default Org does not have it) — same idiom as RecordMergeScenarioTest.
+        String slug = TenantFixture.ECOMMERCE_SLUG;
+        String adminToken = auth.loginAsAdmin(slug);
         String tenantId = auth.extractTenantId(adminToken);
-        String slug = tenants.slugForTenantId(tenantId);
+        waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/customers", HttpStatus.OK, 20);
         waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/reports", HttpStatus.OK, 20);
 
         String suffix = Long.toHexString(System.nanoTime());

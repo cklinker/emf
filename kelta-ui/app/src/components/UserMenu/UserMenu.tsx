@@ -19,6 +19,7 @@ import {
   Settings,
   ArrowLeft,
   Check,
+  CheckSquare,
   Key,
 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
@@ -119,6 +120,10 @@ export function UserMenu({
 
   const handleNavigateToTokens = useCallback(() => {
     navigate(`/${tenantSlug}/app/api-tokens`)
+  }, [navigate, tenantSlug])
+
+  const handleNavigateToApprovals = useCallback(() => {
+    navigate(`/${tenantSlug}/app/approvals`)
   }, [navigate, tenantSlug])
 
   return (
@@ -232,6 +237,12 @@ export function UserMenu({
         <DropdownMenuItem data-testid="profile-menu-item">
           <UserIcon className="mr-2 h-4 w-4" />
           {t('userMenu.profile')}
+        </DropdownMenuItem>
+
+        {/* Approvals inbox */}
+        <DropdownMenuItem onClick={handleNavigateToApprovals} data-testid="approvals-menu-item">
+          <CheckSquare className="mr-2 h-4 w-4" />
+          {t('navigation.approvals', 'Approvals')}
         </DropdownMenuItem>
 
         {/* API Tokens */}

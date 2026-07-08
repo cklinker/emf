@@ -1,20 +1,26 @@
 package io.kelta.worker.controller;
 
+import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.router.UserIdResolver;
 import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Serves the current user's permissions (system, object, and field level).
@@ -38,13 +44,44 @@ public class UserPermissionsController {
     private final CerbosPermissionResolver permissionResolver;
     private final JdbcTemplate jdbcTemplate;
     private final WorkerCacheManager cacheManager;
+    private final UserIdResolver userIdResolver;
 
     public UserPermissionsController(CerbosPermissionResolver permissionResolver,
                                      JdbcTemplate jdbcTemplate,
-                                     WorkerCacheManager cacheManager) {
+                                     WorkerCacheManager cacheManager,
+                                     UserIdResolver userIdResolver) {
         this.permissionResolver = permissionResolver;
         this.jdbcTemplate = jdbcTemplate;
         this.cacheManager = cacheManager;
+        this.userIdResolver = userIdResolver;
+    }
+
+    /**
+     * Returns the calling user's canonical identity: the {@code platform_user.id} UUID,
+     * email, and profile id. Exists because the JWT {@code sub} is not a reliable user id
+     * client-side (the direct-login path mints the UUID, but the authorization-code path
+     * mints the email), while filters on {@code assignedTo}/{@code submittedBy} need the
+     * UUID. Resolution mirrors the approval write path: gateway-stamped {@code X-User-Id}
+     * → {@link UserIdResolver} → UUID; fail-closed 403 when absent or unresolvable.
+     */
+    @GetMapping("/identity")
+    public ResponseEntity<Map<String, Object>> getIdentity(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            HttpServletRequest request) {
+        if (userId == null || userId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No identity");
+        }
+        String resolved = userIdResolver.resolve(userId, TenantContext.get());
+        try {
+            UUID.fromString(resolved);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Unresolvable user identity");
+        }
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("userId", resolved);
+        identity.put("email", permissionResolver.getEmail(request));
+        identity.put("profileId", permissionResolver.getProfileId(request));
+        return ResponseEntity.ok(identity);
     }
 
     @GetMapping("/permissions")

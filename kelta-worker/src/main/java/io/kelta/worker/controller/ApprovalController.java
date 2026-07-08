@@ -1,15 +1,19 @@
 package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.router.UserIdResolver;
 import io.kelta.worker.service.ApprovalService;
 import io.kelta.worker.service.ApprovalService.ApprovalActionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * REST controller for approval workflow operations.
@@ -30,9 +34,34 @@ public class ApprovalController {
     private static final Logger log = LoggerFactory.getLogger(ApprovalController.class);
 
     private final ApprovalService approvalService;
+    private final UserIdResolver userIdResolver;
 
-    public ApprovalController(ApprovalService approvalService) {
+    public ApprovalController(ApprovalService approvalService, UserIdResolver userIdResolver) {
         this.approvalService = approvalService;
+        this.userIdResolver = userIdResolver;
+    }
+
+    /**
+     * Resolves the acting user for an approval write from the gateway-stamped
+     * {@code X-User-Id} header ONLY — body-supplied identity ({@code userId}/{@code submittedBy})
+     * is never trusted (any caller could act as any assignee). The gateway strips the header
+     * from client requests and re-stamps it from the validated principal, so its value is
+     * trustworthy but is an email identifier; {@code assigned_to}/{@code submitted_by} store
+     * platform_user UUIDs, so it must resolve through {@link UserIdResolver}. Fail-closed:
+     * a missing header or an identifier that does not resolve to a UUID is rejected with 403
+     * (the resolver returns its input unchanged on failure, hence the UUID-shape check).
+     */
+    private String resolveActingUser(String headerUserId) {
+        if (headerUserId == null || headerUserId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No identity");
+        }
+        String resolved = userIdResolver.resolve(headerUserId, TenantContext.get());
+        try {
+            UUID.fromString(resolved);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Unresolvable user identity");
+        }
+        return resolved;
     }
 
     /**
@@ -46,6 +75,9 @@ public class ApprovalController {
      *   "processId": "..." (optional, auto-detects if omitted)
      * }
      * </pre>
+     *
+     * <p>The submitter is always the authenticated caller (gateway-stamped {@code X-User-Id});
+     * a body {@code submittedBy} is accepted on the wire for back-compat but ignored.
      */
     @PostMapping("/submit")
     public ResponseEntity<Map<String, Object>> submitForApproval(@RequestBody Map<String, Object> body,
@@ -64,15 +96,10 @@ public class ApprovalController {
                     Map.of("error", "collectionId and recordId are required"));
         }
 
-        if (userId == null) {
-            userId = (String) body.get("submittedBy");
-        }
-        if (userId == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "User ID is required"));
-        }
+        String actingUser = resolveActingUser(userId);
 
         ApprovalActionResult result = approvalService.submitForApproval(
-                collectionId, recordId, userId, processId);
+                collectionId, recordId, actingUser, processId);
 
         if (!result.success()) {
             return ResponseEntity.badRequest().body(result.toMap());
@@ -100,16 +127,10 @@ public class ApprovalController {
             return ResponseEntity.badRequest().body(Map.of("error", "No tenant context"));
         }
 
-        if (userId == null && body != null) {
-            userId = (String) body.get("userId");
-        }
-        if (userId == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "User ID is required"));
-        }
-
+        String actingUser = resolveActingUser(userId);
         String comments = body != null ? (String) body.get("comments") : null;
 
-        ApprovalActionResult result = approvalService.approve(instanceId, userId, comments);
+        ApprovalActionResult result = approvalService.approve(instanceId, actingUser, comments);
 
         if (!result.success()) {
             return ResponseEntity.badRequest().body(result.toMap());
@@ -137,16 +158,10 @@ public class ApprovalController {
             return ResponseEntity.badRequest().body(Map.of("error", "No tenant context"));
         }
 
-        if (userId == null && body != null) {
-            userId = (String) body.get("userId");
-        }
-        if (userId == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "User ID is required"));
-        }
-
+        String actingUser = resolveActingUser(userId);
         String comments = body != null ? (String) body.get("comments") : null;
 
-        ApprovalActionResult result = approvalService.reject(instanceId, userId, comments);
+        ApprovalActionResult result = approvalService.reject(instanceId, actingUser, comments);
 
         if (!result.success()) {
             return ResponseEntity.badRequest().body(result.toMap());
@@ -167,14 +182,9 @@ public class ApprovalController {
             return ResponseEntity.badRequest().body(Map.of("error", "No tenant context"));
         }
 
-        if (userId == null && body != null) {
-            userId = (String) body.get("userId");
-        }
-        if (userId == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "User ID is required"));
-        }
+        String actingUser = resolveActingUser(userId);
 
-        ApprovalActionResult result = approvalService.recall(instanceId, userId);
+        ApprovalActionResult result = approvalService.recall(instanceId, actingUser);
 
         if (!result.success()) {
             return ResponseEntity.badRequest().body(result.toMap());

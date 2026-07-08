@@ -150,9 +150,15 @@ ever exposed to a lower-privilege role. It is deliberately **not** auto-invoked 
   `values` verbatim, so a match on a field masked for the requester is rejected 400
   (`DuplicateDetectionService` via `MaskingPrincipal` + `RecordMaskingService`) — a grouping key
   can't be masked without collapsing distinct values, so reject (mirrors group-by).
-- Re-embedding pre-existing vectors when a field *gains* masking (new writes skip embed;
-  old embeddings are left stale — full re-embed automation is v2). NOTE: `EmbeddingOnWriteHook`
-  should be re-verified to actually skip a masking-configured source on write before relying on it.
+- Stale pre-existing vectors when a source field's masking toggles — **closed (2026-07-05)**.
+  `EmbeddingOnWriteHook` already skips embedding a masking-configured source on write (verified);
+  the gap was rows embedded *before* masking was added. `FieldConfigEventPublisher` now, on a
+  masking-presence toggle, purges the dependent VECTOR columns (`VectorMaintenanceService`
+  → `StorageAdapter.clearVectorColumn`, a single `UPDATE … SET vec = NULL` per vector field via
+  the adapter's schema/RLS-safe table ref) alongside the existing tsvector reindex, so no stale
+  plaintext-derived vector survives to leak via semantic-search *ranking* (values in results are
+  already masked by the read advice — the ranking was the inference oracle). Rows re-embed on
+  their next write (masked source → stays NULL; unmasked → re-embeds). External adapters no-op.
 Also: between storage-adapter decryption and the advice, plaintext exists in-process —
 never log field values on that path. **`field_history` is now live** (writer:
 `FieldHistoryHook`, wildcard, captures create/update/delete diffs of `trackHistory` fields;

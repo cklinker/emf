@@ -165,7 +165,7 @@
     "picklistOverrides": "Picklist Overrides",
     "noPicklistFields": "This collection has no picklist fields to configure.",
     "allValuesAvailable": "All values available",
-    "restrictedValues": "{count} of {total} values available",
+    "restrictedValues": "{{count}} of {{total}} values available",
     "defaultValue": "Default Value",
     "noDefault": "No default",
     "overrideSaved": "Picklist overrides saved successfully",

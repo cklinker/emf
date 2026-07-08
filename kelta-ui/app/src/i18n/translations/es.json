@@ -159,7 +159,7 @@
     "picklistOverrides": "Anulaciones de lista de seleccion",
     "noPicklistFields": "Esta coleccion no tiene campos de lista de seleccion para configurar.",
     "allValuesAvailable": "Todos los valores disponibles",
-    "restrictedValues": "{count} de {total} valores disponibles",
+    "restrictedValues": "{{count}} de {{total}} valores disponibles",
     "defaultValue": "Valor predeterminado",
     "noDefault": "Sin predeterminado",
     "overrideSaved": "Anulaciones de lista de seleccion guardadas correctamente",

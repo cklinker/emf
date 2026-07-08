@@ -133,7 +133,7 @@
     "picklistOverrides": "تجاوزات قائمة الاختيار",
     "noPicklistFields": "لا توجد حقول قائمة اختيار في هذه المجموعة للتكوين.",
     "allValuesAvailable": "جميع القيم متاحة",
-    "restrictedValues": "{count} من {total} قيم متاحة",
+    "restrictedValues": "{{count}} من {{total}} قيم متاحة",
     "defaultValue": "القيمة الافتراضية",
     "noDefault": "بدون افتراضي",
     "overrideSaved": "تم حفظ تجاوزات قائمة الاختيار بنجاح",

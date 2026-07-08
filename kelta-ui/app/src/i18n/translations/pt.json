@@ -159,7 +159,7 @@
     "picklistOverrides": "Substituicoes de Lista de Opcoes",
     "noPicklistFields": "Esta colecao nao tem campos de lista de opcoes para configurar.",
     "allValuesAvailable": "Todos os valores disponiveis",
-    "restrictedValues": "{count} de {total} valores disponiveis",
+    "restrictedValues": "{{count}} de {{total}} valores disponiveis",
     "defaultValue": "Valor Padrao",
     "noDefault": "Sem padrao",
     "overrideSaved": "Substituicoes de lista de opcoes salvas com sucesso",

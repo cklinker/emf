@@ -159,7 +159,7 @@
     "picklistOverrides": "Auswahllisten-Überschreibungen",
     "noPicklistFields": "Diese Sammlung hat keine Auswahllistenfelder zur Konfiguration.",
     "allValuesAvailable": "Alle Werte verfügbar",
-    "restrictedValues": "{count} von {total} Werten verfügbar",
+    "restrictedValues": "{{count}} von {{total}} Werten verfügbar",
     "defaultValue": "Standardwert",
     "noDefault": "Kein Standard",
     "overrideSaved": "Auswahllisten-Überschreibungen erfolgreich gespeichert",

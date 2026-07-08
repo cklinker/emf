@@ -375,6 +375,12 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.integer("displayOrder").withColumnName("display_order")
                 .withDefault(0))
+            // Apps (nav v2): a menu is the "app" unit — switcher icon, default app,
+            // and an active flag that hides the app from the end-user shell (V164).
+            .addField(FieldDefinition.string("icon", 100))
+            .addField(FieldDefinition.bool("isDefault").withColumnName("is_default")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("active").withDefault(true).withNullable(false))
             .build();
     }
 

@@ -98,7 +98,7 @@ plus runtime metadata into something that behaves like an **app platform**:
 |-------|-----------|------|
 | 1 — Conditional visibility | `1-conditional-visibility.md` — **SHIPPED 2026-07-08** (universal bindable `visible`; runtime hides, editor ghosts/badges) | builder/runtime (FE) |
 | 2 — Computed variables | `2-computed-variables.md` — **SHIPPED 2026-07-08** (bare-identifier expressions — the formula parser rejects dotted refs; data.* not readable in v1) | builder/runtime (FE) |
-| 3 — Apps (nav v2) | `3-apps-nav.md` | **backend+FE** (migration + NATS) |
+| 3 — Apps (nav v2) | `3-apps-nav.md` — **SHIPPED 2026-07-08** (V164 icon/isDefault/active on ui_menu; `kelta.config.menu.changed` broadcast; TopNavBar switcher persisted via user preference) | **backend+FE** (migration + NATS) |
 | 4 — Builder undo/redo | `4-undo-redo.md` | builder editor (FE) |
 
 **Dependency order: none hard.** 1 and 2 share the binding layer (land 1 first for

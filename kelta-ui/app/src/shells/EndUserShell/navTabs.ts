@@ -58,6 +58,36 @@ export function menuItemToTab(item: MenuItemConfig): NavTab | null {
 }
 
 /**
+ * The app list (apps/nav v2): menus with `active !== false`, sorted by `displayOrder`
+ * then name. An "app" IS a ui-menu — the shell renders one app's items at a time.
+ */
+export function activeMenus(menus: MenuConfig[] | undefined): MenuConfig[] {
+  if (!menus) return []
+  return menus
+    .filter((m) => m.active !== false)
+    .sort(
+      (a, b) =>
+        (a.displayOrder ?? 0) - (b.displayOrder ?? 0) || (a.name || '').localeCompare(b.name || '')
+    )
+}
+
+/**
+ * Resolve the app to render: the user's stored preference when it still exists, else
+ * the `isDefault` app, else the first by display order. Null when there are no apps.
+ */
+export function resolveActiveMenu(
+  menus: MenuConfig[],
+  preferredId: string | null | undefined
+): MenuConfig | null {
+  if (menus.length === 0) return null
+  if (preferredId) {
+    const preferred = menus.find((m) => m.id === preferredId)
+    if (preferred) return preferred
+  }
+  return menus.find((m) => m.isDefault) ?? menus[0]
+}
+
+/**
  * Extract navigation tabs (collections + custom pages) from menu config, preserving menu and
  * `displayOrder` order (the bootstrap loader already sorts items by `displayOrder`).
  * Pure function — safe for React compiler optimization.

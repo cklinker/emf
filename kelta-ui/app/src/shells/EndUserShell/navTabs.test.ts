@@ -2,7 +2,7 @@
  * Unit tests for the menu-config → nav-tab mapping (collections + custom pages).
  */
 import { describe, it, expect } from 'vitest'
-import { buildNavTabs, menuItemToTab } from './navTabs'
+import { activeMenus, buildNavTabs, menuItemToTab, resolveActiveMenu } from './navTabs'
 import type { MenuConfig } from '@/types/config'
 
 describe('menuItemToTab', () => {
@@ -103,5 +103,54 @@ describe('buildNavTabs', () => {
   it('still ignores unrelated paths after the analytics kinds', () => {
     expect(menuItemToTab({ id: 'x', label: 'Nope', path: '/dashboards' })).toBeNull()
     expect(menuItemToTab({ id: 'y', label: 'Nope', path: '/reporting/thing' })).toBeNull()
+  })
+})
+
+describe('activeMenus (apps/nav v2)', () => {
+  const menus: MenuConfig[] = [
+    { id: 'b', name: 'Beta', items: [], displayOrder: 2 },
+    { id: 'a', name: 'Alpha', items: [], displayOrder: 1 },
+    { id: 'c', name: 'Closed', items: [], active: false },
+  ]
+
+  it('filters inactive menus and sorts by displayOrder', () => {
+    expect(activeMenus(menus).map((m) => m.id)).toEqual(['c', 'a', 'b'].slice(1))
+  })
+
+  it('treats absent active as active and absent displayOrder as 0', () => {
+    const out = activeMenus([
+      { id: 'x', name: 'X', items: [] },
+      { id: 'y', name: 'Y', items: [], displayOrder: -1 },
+    ])
+    expect(out.map((m) => m.id)).toEqual(['y', 'x'])
+  })
+
+  it('returns empty for undefined', () => {
+    expect(activeMenus(undefined)).toEqual([])
+  })
+})
+
+describe('resolveActiveMenu (apps/nav v2)', () => {
+  const menus: MenuConfig[] = [
+    { id: 'a', name: 'Alpha', items: [] },
+    { id: 'b', name: 'Beta', items: [], isDefault: true },
+    { id: 'c', name: 'Gamma', items: [] },
+  ]
+
+  it('prefers the stored app when it still exists', () => {
+    expect(resolveActiveMenu(menus, 'c')?.id).toBe('c')
+  })
+
+  it('falls back to the default app when the stored id is stale', () => {
+    expect(resolveActiveMenu(menus, 'gone')?.id).toBe('b')
+  })
+
+  it('falls back to the first app when nothing is default', () => {
+    const noDefault = menus.map((m) => ({ ...m, isDefault: false }))
+    expect(resolveActiveMenu(noDefault, null)?.id).toBe('a')
+  })
+
+  it('returns null with no apps', () => {
+    expect(resolveActiveMenu([], 'a')).toBeNull()
   })
 })

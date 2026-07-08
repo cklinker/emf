@@ -552,6 +552,30 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Apps/nav v2: menu + menu-item writes broadcast kelta.config.menu.changed.<tenantId>
+     * so every pod evicts its cached navigation config (MenuCacheInvalidationListener).
+     */
+    @Bean
+    public io.kelta.worker.listener.MenuConfigEventPublisher menuConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.MenuConfigEventPublisher hook =
+                new io.kelta.worker.listener.MenuConfigEventPublisher(eventPublisher, "ui-menus");
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public io.kelta.worker.listener.MenuConfigEventPublisher menuItemConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.MenuConfigEventPublisher hook =
+                new io.kelta.worker.listener.MenuConfigEventPublisher(eventPublisher, "ui-menu-items");
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public LayoutSectionRefreshHook layoutSectionRefreshHook(
             BeforeSaveHookRegistry hookRegistry,

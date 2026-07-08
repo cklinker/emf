@@ -38,6 +38,7 @@ Files attach to any record via the `attachments` system collection (backed by `f
 | Subject | Purpose |
 |---------|---------|
 | `kelta.config.collection.changed` | Schema change events |
+| `kelta.config.menu.changed.<tenantId>` | Nav menu/menu-item changed (apps/nav v2) — `MenuConfigEventPublisher` hooks on `ui-menus`+`ui-menu-items`; every worker pod evicts its `SystemCollectionCache` menu entries (`MenuCacheInvalidationListener`) |
 | `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist changed → gateway refreshes its allowlist cache |
 | `kelta.config.environment.changed.<tenantId>.<envId>` | Sandbox environment lifecycle (created/cloned/refreshed/archived) |
 | `kelta.config.promotion.executed.<tenantId>.<promotionId>` | Metadata promotion executed/failed/rolled back |

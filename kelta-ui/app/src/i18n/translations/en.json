@@ -495,7 +495,12 @@
         "labelRequired": "Label is required",
         "labelTooLong": "Label must be 100 characters or less",
         "pathFormat": "Path must start with /"
-      }
+      },
+      "icon": "App icon",
+      "iconPlaceholder": "e.g. briefcase",
+      "iconHint": "Lucide icon name shown in the app switcher",
+      "isDefault": "Default app (selected when a user has no preference)",
+      "activeFlag": "Active (visible in the end-user app)"
     },
     "palette": {
       "addAria": "Add {{label}} component",
@@ -2102,7 +2107,7 @@
     "none": "None",
     "noLaneField": "Kanban needs a picklist field to define lanes.",
     "noDateField": "Calendar needs a date or datetime field.",
-    "moveFailed": "Move failed \u2014 the record changed or the value was rejected",
+    "moveFailed": "Move failed — the record changed or the value was rejected",
     "showingFirst": "Showing the first {count} of {total} records in this range"
   }
 }

@@ -34,6 +34,13 @@ export interface MenuConfig {
   id: string
   name: string
   items: MenuItemConfig[]
+  /** Lucide icon name shown in the app switcher (apps/nav v2). */
+  icon?: string
+  /** The app selected when the user has no stored preference (apps/nav v2). */
+  isDefault?: boolean
+  /** Inactive apps are hidden from the end-user shell (apps/nav v2). Absent = active. */
+  active?: boolean
+  displayOrder?: number
 }
 
 /**

@@ -80,6 +80,7 @@
   "navigation": {
     "main": "Main navigation",
     "home": "Home",
+    "approvals": "Approvals",
     "dashboard": "Dashboard",
     "collections": "Collections",
     "authorization": "Authorization",
@@ -1249,6 +1250,22 @@
     "startedBy": "Started By",
     "triggerRecord": "Trigger Record",
     "currentNode": "Current Node"
+  },
+  "approvalsInbox": {
+    "title": "Approvals",
+    "pendingTab": "Pending on me",
+    "submissionsTab": "My submissions",
+    "pendingEmpty": "No approvals waiting on you.",
+    "submissionsEmpty": "You have not submitted anything for approval.",
+    "waitingSince": "Waiting since {{time}}",
+    "unknownCollection": "Record",
+    "recallConfirm": "Withdraw this record from approval?",
+    "actionFailed": "Action failed — the step may no longer be pending"
+  },
+  "approvalsDialog": {
+    "approveTitle": "Approve record",
+    "rejectTitle": "Reject record",
+    "commentLabel": "Comment (optional)"
   },
   "approvals": {
     "instances": "Instances",

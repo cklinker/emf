@@ -1,9 +1,12 @@
 package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.router.UserIdResolver;
 import io.kelta.worker.service.ApprovalService;
 import io.kelta.worker.service.ApprovalService.ApprovalActionResult;
 import org.junit.jupiter.api.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -11,19 +14,29 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @DisplayName("ApprovalController")
 class ApprovalControllerTest {
 
+    /** UUID the mocked resolver returns for the gateway-stamped identifier. */
+    private static final String USER_UUID = "11111111-1111-1111-1111-111111111111";
+
     private ApprovalService approvalService;
+    private UserIdResolver userIdResolver;
     private ApprovalController controller;
 
     @BeforeEach
     void setUp() {
         approvalService = mock(ApprovalService.class);
-        controller = new ApprovalController(approvalService);
+        userIdResolver = mock(UserIdResolver.class);
+        // Default: the header identifier resolves to the platform_user UUID; unknown
+        // identifiers fall through to the resolver's pass-through contract.
+        when(userIdResolver.resolve(anyString(), any()))
+                .thenAnswer(inv -> "user-1".equals(inv.getArgument(0)) ? USER_UUID : inv.getArgument(0));
+        controller = new ApprovalController(approvalService, userIdResolver);
         TenantContext.set("t1");
     }
 
@@ -37,9 +50,9 @@ class ApprovalControllerTest {
     class Submit {
 
         @Test
-        @DisplayName("Should submit successfully")
+        @DisplayName("Should submit successfully with the header-resolved UUID")
         void shouldSubmitSuccessfully() {
-            when(approvalService.submitForApproval("col-1", "rec-1", "user-1", null))
+            when(approvalService.submitForApproval("col-1", "rec-1", USER_UUID, null))
                     .thenReturn(ApprovalActionResult.success("inst-1", "PENDING", "Submitted"));
 
             var body = new HashMap<String, Object>();
@@ -51,6 +64,7 @@ class ApprovalControllerTest {
             assertThat(response.getStatusCode().value()).isEqualTo(200);
             assertThat(response.getBody()).containsEntry("success", true);
             assertThat(response.getBody()).containsEntry("instanceId", "inst-1");
+            verify(userIdResolver).resolve("user-1", "t1");
         }
 
         @Test
@@ -65,32 +79,64 @@ class ApprovalControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 400 for missing userId")
-        void shouldReturn400ForMissingUserId() {
+        @DisplayName("Should reject a caller without the identity header (403)")
+        void shouldRejectMissingIdentity() {
             var body = new HashMap<String, Object>();
             body.put("collectionId", "col-1");
             body.put("recordId", "rec-1");
 
-            var response = controller.submitForApproval(body, null);
-
-            assertThat(response.getStatusCode().value()).isEqualTo(400);
+            assertThatThrownBy(() -> controller.submitForApproval(body, null))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isEqualTo(HttpStatus.FORBIDDEN);
+            verifyNoInteractions(approvalService);
         }
 
         @Test
-        @DisplayName("Should fall back to body submittedBy when header missing")
-        void shouldFallBackToBodySubmittedBy() {
-            when(approvalService.submitForApproval("col-1", "rec-1", "body-user", null))
+        @DisplayName("Should ignore a body submittedBy — header identity always wins")
+        void shouldIgnoreBodySubmittedBy() {
+            when(approvalService.submitForApproval("col-1", "rec-1", USER_UUID, null))
                     .thenReturn(ApprovalActionResult.success("inst-1", "PENDING", "Submitted"));
 
             var body = new HashMap<String, Object>();
             body.put("collectionId", "col-1");
             body.put("recordId", "rec-1");
-            body.put("submittedBy", "body-user");
+            body.put("submittedBy", "spoofed-user");
 
-            var response = controller.submitForApproval(body, null);
+            var response = controller.submitForApproval(body, "user-1");
 
             assertThat(response.getStatusCode().value()).isEqualTo(200);
-            verify(approvalService).submitForApproval("col-1", "rec-1", "body-user", null);
+            verify(approvalService).submitForApproval("col-1", "rec-1", USER_UUID, null);
+            verify(approvalService, never()).submitForApproval(any(), any(), eq("spoofed-user"), any());
+        }
+
+        @Test
+        @DisplayName("Should reject a body submittedBy with no header (spoof path dead, 403)")
+        void shouldRejectBodyOnlyIdentity() {
+            var body = new HashMap<String, Object>();
+            body.put("collectionId", "col-1");
+            body.put("recordId", "rec-1");
+            body.put("submittedBy", "spoofed-user");
+
+            assertThatThrownBy(() -> controller.submitForApproval(body, null))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isEqualTo(HttpStatus.FORBIDDEN);
+            verifyNoInteractions(approvalService);
+        }
+
+        @Test
+        @DisplayName("Should reject an identifier the resolver cannot map to a UUID (403)")
+        void shouldRejectUnresolvableIdentity() {
+            var body = new HashMap<String, Object>();
+            body.put("collectionId", "col-1");
+            body.put("recordId", "rec-1");
+
+            assertThatThrownBy(() -> controller.submitForApproval(body, "ghost@example.com"))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isEqualTo(HttpStatus.FORBIDDEN);
+            verifyNoInteractions(approvalService);
         }
 
         @Test
@@ -115,7 +161,7 @@ class ApprovalControllerTest {
         @Test
         @DisplayName("Should approve successfully")
         void shouldApproveSuccessfully() {
-            when(approvalService.approve("inst-1", "user-1", "LGTM"))
+            when(approvalService.approve("inst-1", USER_UUID, "LGTM"))
                     .thenReturn(ApprovalActionResult.success("inst-1", "APPROVED", "Approved"));
 
             var body = Map.<String, Object>of("comments", "LGTM");
@@ -128,12 +174,38 @@ class ApprovalControllerTest {
         @Test
         @DisplayName("Should return 400 when service returns error")
         void shouldReturn400OnServiceError() {
-            when(approvalService.approve("inst-1", "user-1", null))
+            when(approvalService.approve("inst-1", USER_UUID, null))
                     .thenReturn(ApprovalActionResult.error("No pending step"));
 
             var response = controller.approve("inst-1", null, "user-1");
 
             assertThat(response.getStatusCode().value()).isEqualTo(400);
+        }
+
+        @Test
+        @DisplayName("Should ignore a body userId — header identity always wins")
+        void shouldIgnoreBodyUserId() {
+            when(approvalService.approve("inst-1", USER_UUID, null))
+                    .thenReturn(ApprovalActionResult.success("inst-1", "APPROVED", "Approved"));
+
+            var body = Map.<String, Object>of("userId", "spoofed-assignee-uuid");
+            var response = controller.approve("inst-1", body, "user-1");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            verify(approvalService).approve("inst-1", USER_UUID, null);
+            verify(approvalService, never()).approve(any(), eq("spoofed-assignee-uuid"), any());
+        }
+
+        @Test
+        @DisplayName("Should reject approve without identity header even when body carries userId (403)")
+        void shouldRejectApproveWithoutHeader() {
+            var body = Map.<String, Object>of("userId", "spoofed-assignee-uuid");
+
+            assertThatThrownBy(() -> controller.approve("inst-1", body, null))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isEqualTo(HttpStatus.FORBIDDEN);
+            verifyNoInteractions(approvalService);
         }
     }
 
@@ -144,7 +216,7 @@ class ApprovalControllerTest {
         @Test
         @DisplayName("Should reject successfully")
         void shouldRejectSuccessfully() {
-            when(approvalService.reject("inst-1", "user-1", "Needs revision"))
+            when(approvalService.reject("inst-1", USER_UUID, "Needs revision"))
                     .thenReturn(ApprovalActionResult.success("inst-1", "REJECTED", "Rejected"));
 
             var body = Map.<String, Object>of("comments", "Needs revision");
@@ -162,13 +234,27 @@ class ApprovalControllerTest {
         @Test
         @DisplayName("Should recall successfully")
         void shouldRecallSuccessfully() {
-            when(approvalService.recall("inst-1", "user-1"))
+            when(approvalService.recall("inst-1", USER_UUID))
                     .thenReturn(ApprovalActionResult.success("inst-1", "RECALLED", "Recalled"));
 
             var response = controller.recall("inst-1", "user-1", null);
 
             assertThat(response.getStatusCode().value()).isEqualTo(200);
             assertThat(response.getBody()).containsEntry("status", "RECALLED");
+        }
+
+        @Test
+        @DisplayName("Should ignore a body userId on recall — header identity always wins")
+        void shouldIgnoreBodyUserIdOnRecall() {
+            when(approvalService.recall("inst-1", USER_UUID))
+                    .thenReturn(ApprovalActionResult.success("inst-1", "RECALLED", "Recalled"));
+
+            var response = controller.recall("inst-1", "user-1",
+                    Map.of("userId", "spoofed-submitter-uuid"));
+
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            verify(approvalService).recall("inst-1", USER_UUID);
+            verify(approvalService, never()).recall(any(), eq("spoofed-submitter-uuid"));
         }
     }
 

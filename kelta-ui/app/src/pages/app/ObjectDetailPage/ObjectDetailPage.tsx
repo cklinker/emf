@@ -13,7 +13,22 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Loader2, AlertCircle, Pencil, Copy, Trash2, Mail, Phone, MapPin } from 'lucide-react'
+import {
+  Loader2,
+  AlertCircle,
+  Pencil,
+  Copy,
+  Trash2,
+  Mail,
+  Phone,
+  MapPin,
+  Lock,
+  SendHorizonal,
+} from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { useI18n } from '@/context/I18nContext'
+import { useRecordApprovalState } from '@/hooks/useRecordApprovalState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -243,6 +258,7 @@ export function ObjectDetailPage(): React.ReactElement {
   const { addRecentItem } = useAppContext()
   const { user } = useAuth()
   const { apiClient } = useApi()
+  const { t } = useI18n()
   const collectionStore = useCollectionStore()
   const basePath = `/${tenantSlug}/app`
 
@@ -563,6 +579,24 @@ export function ObjectDetailPage(): React.ReactElement {
 
   const inspect = useInspectMode()
 
+  const approval = useRecordApprovalState(schema?.id, recordId)
+
+  const submitApprovalMutation = useMutation({
+    mutationFn: async () =>
+      apiClient.post('/api/approvals/submit', {
+        collectionId: schema?.id,
+        recordId,
+      }),
+    onSuccess: () => {
+      toast.success(t('recordActions.approvalSubmitted', 'Submitted for approval successfully'))
+      approval.invalidate()
+    },
+    onError: () => {
+      toast.error(t('recordActions.approvalError', 'Failed to submit for approval'))
+      approval.invalidate()
+    },
+  })
+
   const headerActions = useMemo<RecordHeaderAction[]>(() => {
     const list: RecordHeaderAction[] = []
     if (permissions.canEdit) {
@@ -574,8 +608,24 @@ export function ObjectDetailPage(): React.ReactElement {
         testId: 'edit-button',
       })
     }
+    if (permissions.canEdit && approval.hasProcess && !approval.hasActiveApproval) {
+      list.push({
+        label: t('recordActions.submitForApproval', 'Submit for Approval'),
+        icon: <SendHorizonal className="h-3.5 w-3.5" aria-hidden="true" />,
+        onClick: () => submitApprovalMutation.mutate(),
+        variant: 'ghost',
+        testId: 'submit-approval-button',
+      })
+    }
     return list
-  }, [permissions.canEdit, handleEdit])
+  }, [
+    permissions.canEdit,
+    handleEdit,
+    approval.hasProcess,
+    approval.hasActiveApproval,
+    submitApprovalMutation,
+    t,
+  ])
 
   // Prefer layout-driven header config; fall back to auto-derived meta row
   // when admins haven't configured one. metaFields on the layout reference
@@ -712,6 +762,15 @@ export function ObjectDetailPage(): React.ReactElement {
                   </>
                 }
               />
+              {approval.hasActiveApproval && (
+                <span
+                  className="mt-2 inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded text-[11px] font-semibold border bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/55"
+                  data-testid="pending-approval-badge"
+                >
+                  {approval.locked && <Lock className="h-3 w-3" aria-hidden="true" />}
+                  {t('recordActions.pendingApproval', 'Pending Approval')}
+                </span>
+              )}
               {mutations.remove.isPending && (
                 <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />

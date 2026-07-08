@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   BarChart3,
   Check,
+  CheckSquare,
   Key,
 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
@@ -120,6 +121,10 @@ export function UserMenu({
 
   const handleNavigateToTokens = useCallback(() => {
     navigate(`/${tenantSlug}/app/api-tokens`)
+  }, [navigate, tenantSlug])
+
+  const handleNavigateToApprovals = useCallback(() => {
+    navigate(`/${tenantSlug}/app/approvals`)
   }, [navigate, tenantSlug])
 
   const handleNavigateToAnalytics = useCallback(() => {
@@ -241,6 +246,11 @@ export function UserMenu({
           {t('userMenu.profile')}
         </DropdownMenuItem>
 
+        {/* Approvals inbox */}
+        <DropdownMenuItem onClick={handleNavigateToApprovals} data-testid="approvals-menu-item">
+          <CheckSquare className="mr-2 h-4 w-4" />
+          {t('navigation.approvals', 'Approvals')}
+        </DropdownMenuItem>
         {/* Analytics hub (permission-gated) */}
         {variant === 'app' && canViewAnalytics && (
           <DropdownMenuItem onClick={handleNavigateToAnalytics} data-testid="analytics-menu-item">

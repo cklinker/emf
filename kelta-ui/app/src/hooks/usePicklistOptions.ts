@@ -69,7 +69,7 @@ export function usePicklistOptions(
       try {
         const { sourceId, sourceType } = resolvePicklistSource(field)
         const values = await apiClient.getList<PicklistValueDto>(
-          `/api/picklist-values?filter[picklistSourceId][eq]=${encodeURIComponent(sourceId)}&filter[picklistSourceType][eq]=${sourceType}`
+          `/api/picklist-values?filter[picklistSourceId][eq]=${encodeURIComponent(sourceId)}&filter[picklistSourceType][eq]=${sourceType}&page[size]=200`
         )
         return values
           .filter((v) => v.isActive)

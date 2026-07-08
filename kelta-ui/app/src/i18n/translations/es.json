@@ -1176,6 +1176,7 @@
     "removeRule": "Eliminar regla de validacion",
     "globalPicklist": "Lista de seleccion global",
     "selectPicklist": "Seleccionar una lista de seleccion...",
+    "loadingPicklist": "Cargando listas…",
     "globalPicklistHint": "Seleccione la lista de seleccion global que proporciona valores para este campo.",
     "descriptionPlaceholder": "Introduzca una descripcion para este campo...",
     "trackHistory": "Rastrear historial",

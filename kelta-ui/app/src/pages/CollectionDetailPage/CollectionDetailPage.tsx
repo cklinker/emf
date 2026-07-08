@@ -325,8 +325,10 @@ export function CollectionDetailPage({
   const { data: globalPicklists = [] } = useQuery({
     queryKey: ['global-picklists'],
     queryFn: async () => {
+      // Default page size is 20 — an unpaginated fetch silently dropped any
+      // picklist past the first page, so a field bound to one rendered as unset.
       const response = await apiClient.getList<{ id: string; name: string }>(
-        '/api/global-picklists'
+        '/api/global-picklists?page[size]=200'
       )
       return response
     },

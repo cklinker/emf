@@ -173,6 +173,28 @@ describe('FieldEditor Component', () => {
       expect(screen.getByTestId('field-default-value-input')).toHaveValue('default')
     })
 
+    it('keeps the stored global picklist selected when the options list arrives after mount', () => {
+      // Regression: the picklists query is enabled on modal open, so on first
+      // open the select mounted before options existed — an uncontrolled select
+      // snapped to the placeholder and never re-applied the stored value.
+      const picklistField: FieldDefinition = {
+        ...mockField,
+        type: 'picklist',
+        fieldTypeConfig: { globalPicklistId: 'gp-late' },
+      }
+      const { rerender } = renderWithProviders(
+        <FieldEditor {...defaultProps} field={picklistField} picklists={[]} />
+      )
+      rerender(
+        <FieldEditor
+          {...defaultProps}
+          field={picklistField}
+          picklists={[{ id: 'gp-late', name: 'Late Picklist' }]}
+        />
+      )
+      expect(screen.getByTestId('field-global-picklist-select')).toHaveValue('gp-late')
+    })
+
     it('should render submit button with "Save" text in edit mode', () => {
       renderWithProviders(<FieldEditor {...defaultProps} field={mockField} />)
 

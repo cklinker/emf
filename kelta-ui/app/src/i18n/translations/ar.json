@@ -870,6 +870,7 @@
     "removeRule": "إزالة قاعدة التحقق",
     "globalPicklist": "قائمة الاختيار العامة",
     "selectPicklist": "اختر قائمة اختيار...",
+    "loadingPicklist": "جارٍ تحميل القوائم…",
     "globalPicklistHint": "اختر قائمة الاختيار العامة التي توفر القيم لهذا الحقل.",
     "descriptionPlaceholder": "أدخل وصفاً لهذا الحقل...",
     "trackHistory": "تتبع السجل",

@@ -16,7 +16,11 @@
 > Timeline inline approve/reject was **deferred** — the inbox, record-header actions, and
 > bell cover every flow; the timeline kept the read-only entries plus the server-side filter
 > fix. (3) All four write endpoints had the body-identity fallback (not just submit); all
-> hardened.
+> hardened. (4) The parent's "gateway static route `/api/approvals/**` exists" claim (from a
+> verification agent) was WRONG — only `approval-processes` was registered, so the
+> ApprovalController action endpoints were unreachable through the gateway all along; the
+> route is registered in this slice (`RouteConfigService.registerStaticRoutes`) with a
+> regression assertion in `RouteConfigServiceTest`.
 
 ## 1. Goal & scope
 

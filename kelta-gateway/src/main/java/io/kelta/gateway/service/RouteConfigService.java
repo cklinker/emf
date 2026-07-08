@@ -198,6 +198,10 @@ public class RouteConfigService {
                 // Automation & integration
                 {"flows", "/api/flows/**", "flows"},
                 {"approval-processes", "/api/approval-processes/**", "approval-processes"},
+                // Approval ACTION endpoints (submit/approve/reject/recall/status/history) —
+                // distinct from the approval-processes CONFIG collection route above; without
+                // this row ApprovalController is unreachable through the gateway (404).
+                {"approvals", "/api/approvals/**", "approvals"},
                 {"svix", "/api/svix/**", "svix"},
                 {"webhooks", "/api/webhooks/**", "webhooks"},
                 {"connected-apps", "/api/connected-apps/**", "connected-apps"},

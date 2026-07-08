@@ -13,6 +13,9 @@ import type { MenuConfig, MenuItemConfig } from '@/types/config'
 
 /** Matches a custom-page menu path: `/p/<slug>` or `/app/p/<slug>` → captures the slug. */
 const PAGE_PATH_RE = /^\/(?:app\/)?p\/([^/]+)/
+/** Matches an analytics menu path: `/dashboards/<id>` or `/reports/<id>` (± `/app` prefix). */
+const DASHBOARD_PATH_RE = /^\/(?:app\/)?dashboards\/([^/]+)/
+const REPORT_PATH_RE = /^\/(?:app\/)?reports\/([^/]+)/
 
 /**
  * Map a single menu item to a nav tab, or `null` if its path is not a surfaceable target.
@@ -37,6 +40,18 @@ export function menuItemToTab(item: MenuItemConfig): NavTab | null {
   if (pageMatch) {
     const slug = pageMatch[1]
     return { key: path, kind: 'page', target: slug, label: item.label || slug, icon: item.icon }
+  }
+
+  const dashboardMatch = DASHBOARD_PATH_RE.exec(path)
+  if (dashboardMatch) {
+    const id = dashboardMatch[1]
+    return { key: path, kind: 'dashboard', target: id, label: item.label || id, icon: item.icon }
+  }
+
+  const reportMatch = REPORT_PATH_RE.exec(path)
+  if (reportMatch) {
+    const id = reportMatch[1]
+    return { key: path, kind: 'report', target: id, label: item.label || id, icon: item.icon }
   }
 
   return null

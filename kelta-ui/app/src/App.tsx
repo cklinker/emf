@@ -91,6 +91,21 @@ const GlobalSearchPage = React.lazy(() =>
 const EndUserCustomPage = React.lazy(() =>
   import('./pages/app/CustomPage/CustomPage').then((m) => ({ default: m.CustomPage }))
 )
+const EndUserAnalyticsHubPage = React.lazy(() =>
+  import('./pages/app/AnalyticsHubPage/AnalyticsHubPage').then((m) => ({
+    default: m.AnalyticsHubPage,
+  }))
+)
+const EndUserDashboardViewPage = React.lazy(() =>
+  import('./pages/app/DashboardViewPage/DashboardViewPage').then((m) => ({
+    default: m.DashboardViewPage,
+  }))
+)
+const EndUserReportViewPage = React.lazy(() =>
+  import('./pages/app/ReportViewPage/ReportViewPage').then((m) => ({
+    default: m.ReportViewPage,
+  }))
+)
 
 // Heavy admin pages — lazy-loaded so their large libraries (react-flow, recharts, dnd-kit)
 // split into their own chunks instead of bloating the main bundle the installable PWA
@@ -1421,6 +1436,36 @@ function TenantRoutes(): React.ReactElement {
               <React.Suspense fallback={<PageLoader message="Loading..." />}>
                 <EndUserCustomPage />
               </React.Suspense>
+            }
+          />
+          <Route
+            path="analytics"
+            element={
+              <RequirePermission permission="VIEW_ANALYTICS">
+                <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                  <EndUserAnalyticsHubPage />
+                </React.Suspense>
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="dashboards/:id"
+            element={
+              <RequirePermission permission="VIEW_ANALYTICS">
+                <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                  <EndUserDashboardViewPage />
+                </React.Suspense>
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="reports/:id"
+            element={
+              <RequirePermission permission="VIEW_ANALYTICS">
+                <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                  <EndUserReportViewPage />
+                </React.Suspense>
+              </RequirePermission>
             }
           />
           <Route path="api-tokens" element={<ApiTokensPage />} />

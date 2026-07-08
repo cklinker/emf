@@ -82,4 +82,26 @@ describe('buildNavTabs', () => {
   it('tolerates a menu with no items', () => {
     expect(buildNavTabs([{ id: 'm', name: 'Empty', items: [] }])).toEqual([])
   })
+
+  it('maps dashboard and report paths to analytics tabs', () => {
+    expect(menuItemToTab({ id: 'd', label: 'Sales', path: '/dashboards/dash-1' })).toEqual({
+      key: '/dashboards/dash-1',
+      kind: 'dashboard',
+      target: 'dash-1',
+      label: 'Sales',
+      icon: undefined,
+    })
+    expect(menuItemToTab({ id: 'r', label: 'Pipeline', path: '/app/reports/rep-9' })).toEqual({
+      key: '/app/reports/rep-9',
+      kind: 'report',
+      target: 'rep-9',
+      label: 'Pipeline',
+      icon: undefined,
+    })
+  })
+
+  it('still ignores unrelated paths after the analytics kinds', () => {
+    expect(menuItemToTab({ id: 'x', label: 'Nope', path: '/dashboards' })).toBeNull()
+    expect(menuItemToTab({ id: 'y', label: 'Nope', path: '/reporting/thing' })).toBeNull()
+  })
 })

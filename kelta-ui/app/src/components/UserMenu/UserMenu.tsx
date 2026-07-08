@@ -18,6 +18,7 @@ import {
   LogOut,
   Settings,
   ArrowLeft,
+  BarChart3,
   Check,
   Key,
 } from 'lucide-react'
@@ -120,6 +121,12 @@ export function UserMenu({
   const handleNavigateToTokens = useCallback(() => {
     navigate(`/${tenantSlug}/app/api-tokens`)
   }, [navigate, tenantSlug])
+
+  const handleNavigateToAnalytics = useCallback(() => {
+    navigate(`/${tenantSlug}/app/analytics`)
+  }, [navigate, tenantSlug])
+
+  const canViewAnalytics = hasPermission('VIEW_ANALYTICS')
 
   return (
     <DropdownMenu>
@@ -233,6 +240,14 @@ export function UserMenu({
           <UserIcon className="mr-2 h-4 w-4" />
           {t('userMenu.profile')}
         </DropdownMenuItem>
+
+        {/* Analytics hub (permission-gated) */}
+        {variant === 'app' && canViewAnalytics && (
+          <DropdownMenuItem onClick={handleNavigateToAnalytics} data-testid="analytics-menu-item">
+            <BarChart3 className="mr-2 h-4 w-4" />
+            {t('navigation.analytics', 'Analytics')}
+          </DropdownMenuItem>
+        )}
 
         {/* API Tokens */}
         <DropdownMenuItem onClick={handleNavigateToTokens} data-testid="api-tokens-menu-item">

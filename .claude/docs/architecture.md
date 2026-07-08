@@ -117,6 +117,12 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   gateway `IdentityHeaderStripFilter` (order −400) strips client-supplied `X-User-Email`/
   `X-User-Profile-Id`/`X-User-Profile-Name`/`X-Cerbos-Scope` at the chain head so the worker never
   trusts a forged identity header on any path.
+- **End-user analytics viewer** (slice 3): `/app/dashboards/:id` consumes the pass-through
+  dashboard-data contract — `POST /api/dashboards/{id}/data` returns widget payloads keyed by
+  componentId with NO layout metadata; the client joins them onto `dashboard-components` rows
+  (positions/spans/config) fetched via the generic JSON:API route. Per-viewer masking is
+  server-side; a masked-field rejection surfaces as that widget's `error` string, rendered
+  verbatim.
 - **New top-level path**: a brand-new `/api/<x>/**` segment must be registered as a static
   route in `kelta-gateway/.../service/RouteConfigService.registerStaticRoutes()` (and
   `config/RouteInitializer.registerStaticRoutes()`) or the gateway returns **404**. Sub-paths

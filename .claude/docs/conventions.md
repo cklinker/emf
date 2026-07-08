@@ -87,6 +87,13 @@ it with specifics.
 - **Wildcard hook** (`getCollectionName() == "*"`) — override the collection-name-aware form when behaviour depends on which collection triggered the call (e.g. routing audit events by collection).
 - Never override **both** variants on the same hook — the collection-name-aware default already calls through, so duplicating logic risks running it twice if the registry contract ever changes.
 
+### End-user list deep links
+
+`kelta-ui/app/src/pages/app/ObjectListPage/listUrlState.ts` owns the list-view URL contract
+(`?page/pageSize/sort/filter=<JSON FilterCondition[]>`). Build deep links ONLY through its
+`buildListUrl(tenantSlug, collection, filters, sort?)` — the canonical drill-through helper
+(dashboard chart segments, saved views); never hand-assemble the `filter` param.
+
 ## REST API: pagination
 
 Every paginated REST endpoint MUST use **JSON:API bracket syntax** — `page[number]` and `page[size]`. The flat forms `pageNumber` / `pageSize` are not honored and a request that sends them silently falls back to defaults.

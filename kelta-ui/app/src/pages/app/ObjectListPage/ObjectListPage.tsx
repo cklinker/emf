@@ -46,7 +46,8 @@ import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { REFERENCE_FIELD_TYPES, referenceIncludeParam } from './listIncludes'
-import type { SortState, FilterCondition, CollectionRecord } from '@/hooks/useCollectionRecords'
+import type { CollectionRecord } from '@/hooks/useCollectionRecords'
+import { parseListViewParams } from './listUrlState'
 import { ListShell } from '@/components/record/ListShell'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
@@ -85,66 +86,8 @@ function downloadFile(content: string, filename: string, mimeType: string): void
   URL.revokeObjectURL(url)
 }
 
-/**
- * Parse filter conditions from a URL search param.
- * Filters are stored as a JSON-encoded array of FilterCondition objects.
- * Returns an empty array if the param is missing or invalid.
- */
-function parseFilters(filterParam: string | null): FilterCondition[] {
-  if (!filterParam) return []
-  try {
-    const parsed = JSON.parse(filterParam)
-    if (Array.isArray(parsed)) {
-      return parsed.filter(
-        (f: unknown) =>
-          f &&
-          typeof f === 'object' &&
-          'field' in (f as Record<string, unknown>) &&
-          'operator' in (f as Record<string, unknown>) &&
-          'value' in (f as Record<string, unknown>)
-      ) as FilterCondition[]
-    }
-    return []
-  } catch {
-    return []
-  }
-}
-
-/**
- * Parse list view state from URL search params.
- * Returns page, pageSize, sort, and filters with sensible defaults.
- *
- * URL format:
- * - page=2&pageSize=50&sort=-createdAt
- * - filter=[{"id":"f1","field":"status","operator":"equals","value":"active"}]
- */
-function parseListViewParams(searchParams: URLSearchParams): {
-  page: number
-  pageSize: number
-  sort: SortState | undefined
-  filters: FilterCondition[]
-} {
-  const pageParam = parseInt(searchParams.get('page') || '1', 10)
-  const pageSizeParam = parseInt(searchParams.get('pageSize') || '25', 10)
-  const sortParam = searchParams.get('sort')
-  const filterParam = searchParams.get('filter')
-
-  let sort: SortState | undefined
-  if (sortParam) {
-    if (sortParam.startsWith('-')) {
-      sort = { field: sortParam.slice(1), direction: 'desc' }
-    } else {
-      sort = { field: sortParam, direction: 'asc' }
-    }
-  }
-
-  return {
-    page: isNaN(pageParam) || pageParam < 1 ? 1 : pageParam,
-    pageSize: [10, 25, 50, 100].includes(pageSizeParam) ? pageSizeParam : 25,
-    sort,
-    filters: parseFilters(filterParam),
-  }
-}
+// URL state helpers (parseFilters/parseListViewParams) live in listUrlState.ts,
+// shared with dashboard drill-through and saved views.
 
 export function ObjectListPage(): React.ReactElement {
   const { tenantSlug, collection: collectionName } = useParams<{

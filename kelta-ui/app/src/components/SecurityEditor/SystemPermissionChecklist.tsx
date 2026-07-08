@@ -110,6 +110,11 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: 'Create and manage reports and dashboards',
       },
       {
+        name: 'VIEW_ANALYTICS',
+        label: 'View Analytics',
+        description: 'Run reports and view dashboards',
+      },
+      {
         name: 'MANAGE_LISTVIEWS',
         label: 'Manage List Views',
         description: 'Create and manage public list views',

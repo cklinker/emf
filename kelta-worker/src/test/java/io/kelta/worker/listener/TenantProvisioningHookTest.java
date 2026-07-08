@@ -91,8 +91,8 @@ class TenantProvisioningHookTest {
                     contains("INSERT INTO profile"),
                     anyString(), eq(TENANT_ID), anyString(), anyString());
 
-            // 7 profiles × 23 permissions = 161 permission records
-            verify(jdbcTemplate, times(161)).update(
+            // 7 profiles × 24 permissions = 168 permission records
+            verify(jdbcTemplate, times(168)).update(
                     contains("INSERT INTO profile_system_permission"),
                     anyString(), anyString(), anyString(), anyString(), anyBoolean());
         }
@@ -124,6 +124,25 @@ class TenantProvisioningHookTest {
             verify(jdbcTemplate, times(7)).update(
                     contains("INSERT INTO profile_system_permission"),
                     anyString(), anyString(), anyString(), eq("MANAGE_TENANTS"), eq(false));
+        }
+
+        @Test
+        @DisplayName("Should grant VIEW_ANALYTICS to every built-in profile except Minimum Access")
+        void shouldGrantViewAnalyticsToAllButMinimumAccess() {
+            when(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM profile WHERE tenant_id = ?",
+                    Integer.class, TENANT_ID))
+                    .thenReturn(0);
+
+            hook.seedDefaultProfiles(TENANT_ID);
+
+            // 6 of 7 profiles granted (Minimum Access is the single false)
+            verify(jdbcTemplate, times(6)).update(
+                    contains("INSERT INTO profile_system_permission"),
+                    anyString(), anyString(), anyString(), eq("VIEW_ANALYTICS"), eq(true));
+            verify(jdbcTemplate, times(1)).update(
+                    contains("INSERT INTO profile_system_permission"),
+                    anyString(), anyString(), anyString(), eq("VIEW_ANALYTICS"), eq(false));
         }
     }
 

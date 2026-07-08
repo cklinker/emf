@@ -87,6 +87,13 @@ it with specifics.
 - **Wildcard hook** (`getCollectionName() == "*"`) — override the collection-name-aware form when behaviour depends on which collection triggered the call (e.g. routing audit events by collection).
 - Never override **both** variants on the same hook — the collection-name-aware default already calls through, so duplicating logic risks running it twice if the registry contract ever changes.
 
+### Analytics permission semantics
+
+`VIEW_ANALYTICS` = run/consume analytics (report execute/export, dashboard data);
+`MANAGE_REPORTS` = author/admin reports and dashboards, and **implies** view — the in-controller
+gate (`requireAnalyticsAccess` in `ReportExecutionController`/`DashboardDataController`) accepts
+either. Grant `VIEW_ANALYTICS` to end-user profiles; reserve `MANAGE_REPORTS` for builders.
+
 ## REST API: pagination
 
 Every paginated REST endpoint MUST use **JSON:API bracket syntax** — `page[number]` and `page[size]`. The flat forms `pageNumber` / `pageSize` are not honored and a request that sends them silently falls back to defaults.

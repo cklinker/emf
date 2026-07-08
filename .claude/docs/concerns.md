@@ -82,15 +82,16 @@ MUST stay intact:
   through the generic collection route (the collections are read-only) — keep it that way.
 
 **Power controllers gated only by blanket `API_ACCESS` + RLS (2026-07-02 audit).**
-`ReportExecutionController`, `DashboardDataController`, and `PackageController` do
-**not** enforce a specific system permission in-controller — they rely on tenant-scoping
-(RLS) plus the gateway's blanket `API_ACCESS` check and the fact that their UIs sit
-behind `VIEW_SETUP` nav. A PAT holder with only `API_ACCESS` can call them directly.
-`DataExportController` was the most exfiltration-sensitive (one call → whole-tenant dump)
-and is gated on `VIEW_ALL_DATA` (2026-07-02); **`BulkOperationsController` write
-endpoints (create/upload/abort) are now gated on `MANAGE_DATA`** (2026-07-04 — bulk
+`PackageController` does **not** enforce a specific system permission in-controller — it
+relies on tenant-scoping (RLS) plus the gateway's blanket `API_ACCESS` check and the fact
+that its UI sits behind `VIEW_SETUP` nav. A PAT holder with only `API_ACCESS` can call it
+directly. `DataExportController` was the most exfiltration-sensitive (one call →
+whole-tenant dump) and is gated on `VIEW_ALL_DATA` (2026-07-02); **`BulkOperationsController`
+write endpoints (create/upload/abort) are now gated on `MANAGE_DATA`** (2026-07-04 — bulk
 writes bypass per-record Cerbos advice, so the in-controller gate is the boundary; reads
-keep `API_ACCESS`). Remaining follow-up: `MANAGE_REPORTS` for reports/dashboards,
+keep `API_ACCESS`); **`ReportExecutionController` + `DashboardDataController` are now gated
+on `VIEW_ANALYTICS` (or `MANAGE_REPORTS`)** (2026-07-08, app-surfacing slice 1 — closes the
+reports/dashboards half of this item). Remaining follow-up:
 `CUSTOMIZE_APPLICATION`/`VIEW_SETUP` for packages.
 
 **Record merge write path — field-level write-FLS not applied (accepted trade-off).**

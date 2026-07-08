@@ -15,11 +15,12 @@ import { GlobalSearch } from './GlobalSearch'
 import { OfflineIndicator } from './OfflineIndicator'
 import { OfflineProvider } from '@/offline'
 import { RealtimeProvider } from '@/realtime'
-import { buildNavTabs } from './navTabs'
+import { activeMenus, buildNavTabs, resolveActiveMenu } from './navTabs'
 import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
 import { useConfig } from '@/context/ConfigContext'
 import { useMyIdentity } from '@/hooks/useMyIdentity'
+import { usePreferenceValue } from '@/hooks/usePreferenceStore'
 import { usePendingApprovalsCount } from '@/hooks/useMyApprovals'
 import { initPushNotifications } from '@/push/deviceRegistration'
 import { PageLoader } from '@/components/PageLoader'
@@ -41,8 +42,23 @@ export function EndUserShell(): React.ReactElement {
     void initPushNotifications(apiClient)
   }, [apiClient])
 
-  // Build navigation tabs from bootstrap config menus
-  const tabs = buildNavTabs(config?.menus)
+  // Apps (nav v2): an app IS a ui-menu. Render ONE active app's items; the
+  // selection persists per user (server-backed preference, localStorage mirror).
+  const apps = activeMenus(config?.menus)
+  const { value: storedAppId, save: saveActiveApp } = usePreferenceValue<string>(
+    'nav',
+    'active-app',
+    { localKey: 'kelta_active_app' }
+  )
+  const activeApp = resolveActiveMenu(apps, storedAppId)
+  const tabs = buildNavTabs(activeApp ? [activeApp] : undefined)
+  const handleAppChange = useCallback(
+    (appId: string) => {
+      saveActiveApp(appId)
+      navigate(`/${tenantSlug}/app/home`)
+    },
+    [saveActiveApp, navigate, tenantSlug]
+  )
 
   // Global keyboard shortcut: Cmd+K / Ctrl+K → open search
   useEffect(() => {
@@ -78,6 +94,9 @@ export function EndUserShell(): React.ReactElement {
       <TopNavBar
         appName={appName}
         tabs={tabs}
+        apps={apps.map((a) => ({ id: a.id, name: a.name, icon: a.icon }))}
+        activeAppId={activeApp?.id ?? null}
+        onAppChange={handleAppChange}
         user={user}
         onLogout={handleLogout}
         onSearchOpen={() => setSearchOpen(true)}

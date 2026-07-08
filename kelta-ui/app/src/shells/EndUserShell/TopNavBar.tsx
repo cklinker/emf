@@ -23,10 +23,19 @@ import {
   Database,
   FileText,
   BarChart3,
+  Check,
+  ChevronDown,
+  icons,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useSystemPermissions } from '@/hooks/useSystemPermissions'
 import { UserMenu } from '@/components/UserMenu'
@@ -49,11 +58,25 @@ export interface NavTab {
   icon?: string
 }
 
+/** One entry in the app switcher (apps/nav v2) — an active ui-menu. */
+export interface AppSwitcherEntry {
+  id: string
+  name: string
+  /** Lucide icon name; unknown names fall back to a grid icon. */
+  icon?: string
+}
+
 interface TopNavBarProps {
   /** Application display name */
   appName?: string
   /** Navigation tabs (collections) */
   tabs?: NavTab[]
+  /** Active apps for the switcher; hidden when fewer than two (apps/nav v2). */
+  apps?: AppSwitcherEntry[]
+  /** The currently rendered app's id. */
+  activeAppId?: string | null
+  /** Select another app. */
+  onAppChange?: (appId: string) => void
   /** Full User object for the shared UserMenu */
   user?: User | null
   /** Callback when logout is requested */
@@ -68,9 +91,24 @@ interface TopNavBarProps {
   userRoles?: string[]
 }
 
+/** Resolve a lucide icon component by its PascalCase-converted name (grid fallback). */
+function appIcon(name?: string): React.ComponentType<{ className?: string }> {
+  if (!name) return LayoutGrid
+  const pascal = name
+    .split(/[-_\s]/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('')
+  return (
+    (icons as Record<string, React.ComponentType<{ className?: string }>>)[pascal] ?? LayoutGrid
+  )
+}
+
 export function TopNavBar({
   appName = 'Kelta',
   tabs = [],
+  apps = [],
+  activeAppId,
+  onAppChange,
   user,
   onLogout,
   onSearchOpen,
@@ -215,17 +253,61 @@ export function TopNavBar({
         </Sheet>
       </div>
 
-      {/* Left section: App launcher + name (hidden on mobile for space) */}
+      {/* Left section: App launcher/switcher + name (hidden on mobile for space) */}
       <div className="hidden items-center gap-3 md:flex">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          aria-label="App launcher"
-          onClick={() => navigate(`${basePath}/home`)}
-        >
-          <LayoutGrid className="h-4 w-4" />
-        </Button>
+        {apps.length >= 2 && onAppChange ? (
+          // App switcher (apps/nav v2): pick which active app's nav renders.
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 px-2"
+                aria-label="Switch app"
+                data-testid="app-switcher-trigger"
+              >
+                {(() => {
+                  const active = apps.find((a) => a.id === activeAppId) ?? apps[0]
+                  const Icon = appIcon(active.icon)
+                  return (
+                    <>
+                      <Icon className="h-4 w-4" />
+                      <span className="max-w-32 truncate text-sm font-medium">{active.name}</span>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </>
+                  )
+                })()}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {apps.map((app) => {
+                const Icon = appIcon(app.icon)
+                const isActive = app.id === activeAppId
+                return (
+                  <DropdownMenuItem
+                    key={app.id}
+                    onClick={() => onAppChange(app.id)}
+                    data-testid={`app-switcher-${app.id}`}
+                  >
+                    <Icon className="mr-2 h-4 w-4" />
+                    <span className="flex-1">{app.name}</span>
+                    {isActive && <Check className="ml-2 h-4 w-4" aria-hidden />}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="App launcher"
+            onClick={() => navigate(`${basePath}/home`)}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        )}
         <Link
           to={`${basePath}/home`}
           className="text-sm font-semibold text-foreground no-underline hover:text-primary"

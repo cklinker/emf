@@ -203,6 +203,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.page.changed.<pageId>` | UI page (screen builder) changed |
 | `kelta.config.flow.changed.<tenantId>` | Flow definition changed |
 | `kelta.config.feature.changed.<tenantId>` | System feature toggled |
+| `kelta.config.menu.changed.<tenantId>` | Nav menu / menu item changed (apps/nav v2) — pods evict `SystemCollectionCache` for `ui-menus`/`ui-menu-items` |
 | `kelta.config.domain.changed.<domainId>` | Custom domain changed |
 | `kelta.config.credential.changed.*` | Credential changed |
 | `kelta.config.api-spec.changed.<tenantId>` | API spec changed |

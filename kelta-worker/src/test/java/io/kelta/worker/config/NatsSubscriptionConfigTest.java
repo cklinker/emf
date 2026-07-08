@@ -8,6 +8,7 @@ import io.kelta.worker.listener.CredentialCacheInvalidationListener;
 import io.kelta.worker.listener.CustomDomainCacheInvalidationListener;
 import io.kelta.worker.listener.FlowEventListener;
 import io.kelta.worker.listener.LayoutCacheInvalidationListener;
+import io.kelta.worker.listener.MenuCacheInvalidationListener;
 import io.kelta.worker.listener.NatsTriggerFlowListener;
 import io.kelta.worker.listener.SearchIndexListener;
 import io.kelta.worker.listener.SystemFeatureCacheInvalidationListener;
@@ -41,7 +42,8 @@ class NatsSubscriptionConfigTest {
                 mock(CerbosCacheInvalidationListener.class),
                 mock(CustomDomainCacheInvalidationListener.class),
                 mock(SystemFeatureCacheInvalidationListener.class),
-                mock(LayoutCacheInvalidationListener.class));
+                mock(LayoutCacheInvalidationListener.class),
+                mock(MenuCacheInvalidationListener.class));
     }
 
     @Test
@@ -55,7 +57,7 @@ class NatsSubscriptionConfigTest {
         // worker-search-index, worker-schema, worker-modules, worker-cerbos,
         // worker-flow-cache, worker-nats-trigger-cache, worker-domain-cache,
         // worker-feature-cache, worker-layout-cache. Credential/Superset/Svix are conditional.
-        verify(subscriptionManager, times(11)).register(any(EventSubscription.class));
+        verify(subscriptionManager, times(12)).register(any(EventSubscription.class));
     }
 
     @Test
@@ -66,6 +68,6 @@ class NatsSubscriptionConfigTest {
 
         config.registerSubscriptions();
 
-        verify(subscriptionManager, times(12)).register(any(EventSubscription.class));
+        verify(subscriptionManager, times(13)).register(any(EventSubscription.class));
     }
 }

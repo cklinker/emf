@@ -71,6 +71,12 @@ export interface UIMenuItem {
  */
 interface MenuFormData {
   name: string
+  /** Lucide icon name shown in the end-user app switcher (apps/nav v2). */
+  icon: string
+  /** The app selected when the user has no stored preference (apps/nav v2). */
+  isDefault: boolean
+  /** Inactive apps are hidden from the end-user shell (apps/nav v2). */
+  active: boolean
 }
 
 /**
@@ -196,6 +202,9 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
   const isEditing = !!menu
   const [formData, setFormData] = useState<MenuFormData>({
     name: menu?.name ?? '',
+    icon: menu?.icon ?? '',
+    isDefault: menu?.isDefault ?? false,
+    active: menu?.active ?? true,
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -206,7 +215,7 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
   }, [])
 
   const handleChange = useCallback(
-    (field: keyof MenuFormData, value: string) => {
+    (field: keyof MenuFormData, value: string | boolean) => {
       setFormData((prev) => ({ ...prev, [field]: value }))
       if (errors[field as keyof FormErrors]) {
         setErrors((prev) => ({ ...prev, [field]: undefined }))
@@ -316,6 +325,48 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
                 </span>
               )}
             </div>
+
+            {/* Apps (nav v2): switcher icon + default/active flags */}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="menu-icon" className="text-sm font-medium text-foreground">
+                {t('builder.menus.icon')}
+              </label>
+              <input
+                id="menu-icon"
+                type="text"
+                className="rounded-md border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                value={formData.icon}
+                onChange={(e) => handleChange('icon', e.target.value)}
+                placeholder={t('builder.menus.iconPlaceholder')}
+                disabled={isSubmitting}
+                data-testid="menu-icon-input"
+              />
+              <span className="mt-1 text-xs text-muted-foreground">
+                {t('builder.menus.iconHint')}
+              </span>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-border accent-primary"
+                checked={formData.isDefault}
+                onChange={(e) => handleChange('isDefault', e.target.checked)}
+                disabled={isSubmitting}
+                data-testid="menu-default-checkbox"
+              />
+              {t('builder.menus.isDefault')}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-border accent-primary"
+                checked={formData.active}
+                onChange={(e) => handleChange('active', e.target.checked)}
+                disabled={isSubmitting}
+                data-testid="menu-active-checkbox"
+              />
+              {t('builder.menus.activeFlag')}
+            </label>
 
             <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border max-md:flex-col">
               <button
@@ -1251,6 +1302,9 @@ export function MenuBuilderPage({
     (data: MenuFormData) => {
       const menuData: Partial<UIMenu> = {
         name: data.name,
+        icon: data.icon.trim() === '' ? undefined : data.icon.trim(),
+        isDefault: data.isDefault,
+        active: data.active,
       }
 
       if (editingMenu) {

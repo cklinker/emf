@@ -24,6 +24,26 @@ vi.mock('@/hooks/useSystemPermissions', () => ({
   useSystemPermissions: () => ({ hasPermission: () => false }),
 }))
 
+// Radix DropdownMenu (app switcher) rendered flat for jsdom.
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: React.PropsWithChildren<{ asChild?: boolean }>) => (
+    <div>{children}</div>
+  ),
+  DropdownMenuContent: ({ children }: React.PropsWithChildren<Record<string, unknown>>) => (
+    <div>{children}</div>
+  ),
+  DropdownMenuItem: ({
+    children,
+    onClick,
+    ...rest
+  }: React.PropsWithChildren<{ onClick?: () => void }>) => (
+    <button type="button" onClick={onClick} {...rest}>
+      {children}
+    </button>
+  ),
+}))
+
 vi.mock('@/components/ui/sheet', () => ({
   Sheet: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
   SheetTrigger: ({ children }: React.PropsWithChildren<{ asChild?: boolean }>) => (
@@ -71,5 +91,34 @@ describe('TopNavBar', () => {
     // Mobile sheet (mocked open) renders its Collections + Pages section headings.
     expect(screen.getByText('Collections')).toBeInTheDocument()
     expect(screen.getByText('Pages')).toBeInTheDocument()
+  })
+})
+
+describe('app switcher (apps/nav v2)', () => {
+  const APPS = [
+    { id: 'sales', name: 'Sales', icon: 'briefcase' },
+    { id: 'support', name: 'Support' },
+  ]
+
+  it('is hidden with fewer than two apps (launcher button remains)', () => {
+    render(<TopNavBar tabs={TABS} apps={[APPS[0]]} activeAppId="sales" onAppChange={vi.fn()} />)
+    expect(screen.queryByTestId('app-switcher-trigger')).toBeNull()
+    expect(screen.getByLabelText('App launcher')).toBeInTheDocument()
+  })
+
+  it('shows the active app name and lists every app', () => {
+    render(<TopNavBar tabs={TABS} apps={APPS} activeAppId="support" onAppChange={vi.fn()} />)
+    expect(
+      within(screen.getByTestId('app-switcher-trigger')).getByText('Support')
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('app-switcher-sales')).toBeInTheDocument()
+    expect(screen.getByTestId('app-switcher-support')).toBeInTheDocument()
+  })
+
+  it('fires onAppChange with the picked app id', () => {
+    const onAppChange = vi.fn()
+    render(<TopNavBar tabs={TABS} apps={APPS} activeAppId="sales" onAppChange={onAppChange} />)
+    fireEvent.click(screen.getByTestId('app-switcher-support'))
+    expect(onAppChange).toHaveBeenCalledWith('support')
   })
 })

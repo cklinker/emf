@@ -1176,6 +1176,7 @@
     "removeRule": "Validierungsregel entfernen",
     "globalPicklist": "Globale Auswahlliste",
     "selectPicklist": "Auswahlliste auswählen...",
+    "loadingPicklist": "Auswahllisten werden geladen…",
     "globalPicklistHint": "Wählen Sie die globale Auswahlliste, die Werte für dieses Feld bereitstellt.",
     "descriptionPlaceholder": "Geben Sie eine Beschreibung für dieses Feld ein...",
     "trackHistory": "Verlauf verfolgen",

@@ -637,7 +637,7 @@ export class AdminClient {
 
   readonly picklists = {
     listGlobal: async (_tenantId?: string): Promise<GlobalPicklist[]> => {
-      const response = await this.axios.get('/api/global-picklists');
+      const response = await this.axios.get('/api/global-picklists?page[size]=200');
       return unwrapJsonApiList<GlobalPicklist>(response.data);
     },
 

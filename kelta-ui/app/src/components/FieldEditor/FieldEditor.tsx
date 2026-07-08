@@ -550,6 +550,10 @@ export function FieldEditor({
   // Watch field type to show/hide reference target and validation rules
   // eslint-disable-next-line react-hooks/incompatible-library
   const watchedType = watch('type')
+  // Controlled value: the picklists prop loads lazily (query enabled on modal
+  // open) — an uncontrolled select mounted before options arrive snaps to the
+  // placeholder and never re-applies the stored value once options render.
+  const watchedGlobalPicklistId = watch('globalPicklistId')
   const watchedRollupChild = watch('rollupChildCollection')
   const watchedRollupFn = watch('rollupFunction')
   const watchedMaskingType = watch('maskingType')
@@ -1068,6 +1072,7 @@ export function FieldEditor({
             }
             data-testid="field-global-picklist-select"
             {...register('globalPicklistId')}
+            value={watchedGlobalPicklistId ?? ''}
           >
             <option value="">{t('fieldEditor.selectPicklist')}</option>
             {picklists.map((picklist) => (
@@ -1075,6 +1080,10 @@ export function FieldEditor({
                 {picklist.name}
               </option>
             ))}
+            {watchedGlobalPicklistId &&
+              !picklists.some((p) => p.id === watchedGlobalPicklistId) && (
+                <option value={watchedGlobalPicklistId}>{t('fieldEditor.loadingPicklist')}</option>
+              )}
           </select>
           {errors.globalPicklistId && (
             <span

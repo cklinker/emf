@@ -4,6 +4,7 @@ import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.ReportExecutionService;
 import io.kelta.worker.service.ReportExecutionService.MaskingPrincipal;
@@ -11,9 +12,11 @@ import io.kelta.worker.service.ReportExecutionService.ReportResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,20 +38,44 @@ import java.util.*;
 public class ReportExecutionController {
 
     private static final Logger log = LoggerFactory.getLogger(ReportExecutionController.class);
+    private static final String VIEW_PERMISSION = "VIEW_ANALYTICS";
+    private static final String MANAGE_PERMISSION = "MANAGE_REPORTS";
 
     private final ReportExecutionService reportExecutionService;
     private final QueryEngine queryEngine;
     private final CollectionRegistry collectionRegistry;
     private final CerbosPermissionResolver permissionResolver;
+    private final BootstrapRepository bootstrapRepository;
 
     public ReportExecutionController(ReportExecutionService reportExecutionService,
                                      QueryEngine queryEngine,
                                      CollectionRegistry collectionRegistry,
-                                     CerbosPermissionResolver permissionResolver) {
+                                     CerbosPermissionResolver permissionResolver,
+                                     BootstrapRepository bootstrapRepository) {
         this.reportExecutionService = reportExecutionService;
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
         this.permissionResolver = permissionResolver;
+        this.bootstrapRepository = bootstrapRepository;
+    }
+
+    /**
+     * Gates report execution on the VIEW_ANALYTICS system permission; MANAGE_REPORTS
+     * (the authoring permission) also passes. Fail-closed: no resolvable profile is rejected.
+     * Must run before the endpoint's try/catch so the 403 is not converted to a 500.
+     */
+    private void requireAnalyticsAccess(HttpServletRequest request) {
+        String profileId = permissionResolver.getProfileId(request);
+        if (profileId == null || profileId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No identity");
+        }
+        boolean granted = bootstrapRepository.findProfileSystemPermissions(profileId).stream()
+                .anyMatch(p -> (VIEW_PERMISSION.equals(p.get("permission_name"))
+                        || MANAGE_PERMISSION.equals(p.get("permission_name")))
+                        && Boolean.TRUE.equals(p.get("granted")));
+        if (!granted) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, VIEW_PERMISSION + " permission required");
+        }
     }
 
     /** Builds the data-masking principal for the calling user from the gateway-forwarded identity headers. */
@@ -73,6 +100,8 @@ public class ReportExecutionController {
             @RequestParam(value = "page[number]", defaultValue = "1") int pageNumber,
             @RequestParam(value = "page[size]", defaultValue = "200") int pageSize,
             HttpServletRequest request) {
+
+        requireAnalyticsAccess(request);
 
         try {
             // Load the report config from the reports system collection
@@ -137,6 +166,8 @@ public class ReportExecutionController {
             @RequestParam(defaultValue = "csv") String format,
             HttpServletRequest request,
             HttpServletResponse response) {
+
+        requireAnalyticsAccess(request);
 
         try {
             Map<String, Object> reportConfig = loadReportConfig(reportId);

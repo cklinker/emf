@@ -4,6 +4,7 @@ import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.system.SystemCollectionDefinitions;
 import io.kelta.runtime.query.*;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.DashboardDataService;
 import io.kelta.worker.service.DashboardDataService.WidgetExecutionException;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
@@ -26,6 +28,7 @@ class DashboardDataControllerTest {
     private QueryEngine queryEngine;
     private CollectionRegistry collectionRegistry;
     private CerbosPermissionResolver permissionResolver;
+    private BootstrapRepository bootstrapRepository;
     private HttpServletRequest request;
     private DashboardDataController controller;
 
@@ -35,9 +38,18 @@ class DashboardDataControllerTest {
         queryEngine = mock(QueryEngine.class);
         collectionRegistry = mock(CollectionRegistry.class);
         permissionResolver = mock(CerbosPermissionResolver.class);
+        bootstrapRepository = mock(BootstrapRepository.class);
         request = mock(HttpServletRequest.class);
         controller = new DashboardDataController(
-            dashboardDataService, queryEngine, collectionRegistry, permissionResolver);
+            dashboardDataService, queryEngine, collectionRegistry, permissionResolver,
+            bootstrapRepository);
+        grantPermission("VIEW_ANALYTICS");
+    }
+
+    private void grantPermission(String permissionName) {
+        when(permissionResolver.getProfileId(request)).thenReturn("profile-1");
+        when(bootstrapRepository.findProfileSystemPermissions("profile-1")).thenReturn(List.of(
+                Map.of("permission_name", permissionName, "granted", true)));
     }
 
     @SuppressWarnings("unchecked")
@@ -264,6 +276,60 @@ class DashboardDataControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.executeComponent(
             "dash-1", "comp-1", null, request);
 
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    // =========================================================================
+    // Authorization gate tests
+    // =========================================================================
+
+    @Test
+    void dashboardRejectsCallerWithoutIdentity() {
+        when(permissionResolver.getProfileId(request)).thenReturn(null);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.executeDashboard("dash-1", null, request));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verifyNoInteractions(dashboardDataService);
+    }
+
+    @Test
+    void dashboardRejectsProfileWithoutAnalyticsPermission() {
+        when(permissionResolver.getProfileId(request)).thenReturn("profile-1");
+        when(bootstrapRepository.findProfileSystemPermissions("profile-1")).thenReturn(List.of(
+                Map.of("permission_name", "API_ACCESS", "granted", true),
+                Map.of("permission_name", "VIEW_ANALYTICS", "granted", false)));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.executeDashboard("dash-1", null, request));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verifyNoInteractions(dashboardDataService);
+    }
+
+    @Test
+    void componentRejectsProfileWithoutAnalyticsPermission() {
+        when(permissionResolver.getProfileId(request)).thenReturn("profile-1");
+        when(bootstrapRepository.findProfileSystemPermissions("profile-1")).thenReturn(List.of(
+                Map.of("permission_name", "API_ACCESS", "granted", true)));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.executeComponent("dash-1", "comp-1", null, request));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verifyNoInteractions(dashboardDataService);
+    }
+
+    @Test
+    void dashboardAcceptsManageReportsAsFallback() {
+        grantPermission("MANAGE_REPORTS");
+        setupDashboardRegistry();
+        when(queryEngine.getById(any(), eq("dash-1"))).thenReturn(Optional.empty());
+
+        ResponseEntity<Map<String, Object>> response = controller.executeDashboard("dash-1", null, request);
+
+        // Gate passed — the 404 proves the request reached the dashboard lookup
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
 

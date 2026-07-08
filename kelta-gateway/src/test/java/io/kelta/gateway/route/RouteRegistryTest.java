@@ -142,6 +142,36 @@ class RouteRegistryTest {
     }
     
     @Test
+    void testUpdateRouteSamePathNeverDropsRoute() throws Exception {
+        // Regression: updateRoute used to remove-then-add, leaving a window with no
+        // route for the collection — a concurrent reader (SCG route rebuild) caught
+        // mid-update saw 404s until the next config event.
+        registry.addRoute(createRoute("users-collection", "/api/users/**"));
+
+        java.util.concurrent.atomic.AtomicBoolean missing = new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(true);
+        Thread reader = new Thread(() -> {
+            while (running.get()) {
+                if (registry.findByPath("/api/users/**").isEmpty()) {
+                    missing.set(true);
+                }
+            }
+        });
+        reader.start();
+        try {
+            for (int i = 0; i < 5_000; i++) {
+                registry.updateRoute(createRoute("users-collection", "/api/users/**"));
+            }
+        } finally {
+            running.set(false);
+            reader.join(TimeUnit.SECONDS.toMillis(5));
+        }
+
+        assertFalse(missing.get(), "route must never be absent during same-path updates");
+        assertEquals(1, registry.size());
+    }
+
+    @Test
     void testUpdateNullRoute() {
         RouteDefinition route = createRoute("users-collection", "/api/users/**");
         registry.addRoute(route);

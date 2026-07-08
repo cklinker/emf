@@ -77,10 +77,15 @@ public class RouteRegistry {
     }
     
     /**
-     * Updates an existing route in the registry.
-     * This is equivalent to adding a route, as it will replace any existing route
-     * with the same path.
-     * 
+     * Updates an existing route in the registry atomically.
+     *
+     * <p>The new definition is put first and any stale entry with the same ID at a
+     * different path is pruned afterwards. The previous remove-then-add order left a
+     * window with no route for the collection at all — a Spring Cloud Gateway route
+     * rebuild (RefreshRoutesEvent) landing in that window served 404s for the
+     * collection until the NEXT config event arrived. Frequent field-change events
+     * (each publishes a collection UPDATED event) made that window easy to hit.
+     *
      * @param route The updated route definition
      */
     public void updateRoute(RouteDefinition route) {
@@ -88,12 +93,30 @@ public class RouteRegistry {
             logger.warn("Attempted to update with null route");
             return;
         }
-        
-        // First remove any existing route with the same ID but different path
-        removeRoute(route.getId());
-        
-        // Then add the updated route
-        addRoute(route);
+        if (route.getPath() == null || route.getPath().isEmpty()) {
+            logger.error("Cannot update route with null or empty path: {}", route);
+            return;
+        }
+
+        RouteDefinition previous = routes.put(route.getPath(), route);
+
+        // Prune entries for the same collection left at an old path (rename case).
+        // Doing this AFTER the put means the collection always has at least one
+        // live route; a brief overlap of old+new path is harmless (same backend).
+        routes.entrySet().removeIf(entry -> {
+            if (route.getId().equals(entry.getValue().getId())
+                    && !entry.getKey().equals(route.getPath())) {
+                logger.info("Pruned stale route for ID '{}' at old path '{}'", route.getId(), entry.getKey());
+                return true;
+            }
+            return false;
+        });
+
+        if (previous != null) {
+            logger.info("Updated route for path '{}': {}", route.getPath(), route);
+        } else {
+            logger.info("Registered route for path '{}': {}", route.getPath(), route);
+        }
     }
     
     /**

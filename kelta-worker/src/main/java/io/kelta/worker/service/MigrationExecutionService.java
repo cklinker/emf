@@ -6,6 +6,7 @@ import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.EventFactory;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.PlatformEventPublisher;
+import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.registry.CollectionRegistry;
@@ -169,6 +170,12 @@ public class MigrationExecutionService {
                 systemCollectionCache.evict(tenantId, "collections");
             }
 
+            // The gateway's response cache for /api/fields is evicted only by
+            // kelta.record.changed events (the CRUD path publishes them; these raw
+            // writes don't) — without this, the gateway serves the pre-migration
+            // fields list until an unrelated field change happens to evict it.
+            broadcastFieldsRecordChanged(collectionId, tenantId);
+
             // 4. Record per-step progress + complete the run.
             recordSteps(runId, applied);
             runRepository.updateRunStatus(runId, "COMPLETED", null);
@@ -240,6 +247,17 @@ public class MigrationExecutionService {
             steps.add(step);
         }
         return steps;
+    }
+
+    private void broadcastFieldsRecordChanged(String collectionId, String tenantId) {
+        RecordChangedPayload payload = new RecordChangedPayload();
+        payload.setCollectionName("fields");
+        payload.setRecordId(collectionId);
+        payload.setChangeType(ChangeType.UPDATED);
+        PlatformEvent<RecordChangedPayload> event =
+                EventFactory.createEvent("kelta.record.changed", payload);
+        event.setTenantId(tenantId);
+        eventPublisher.publish("kelta.record.changed." + tenantId + ".fields", event);
     }
 
     private void broadcastCollectionChanged(String collectionId, CollectionDefinition def, String tenantId) {

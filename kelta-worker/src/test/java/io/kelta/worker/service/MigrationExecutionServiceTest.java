@@ -145,6 +145,9 @@ class MigrationExecutionServiceTest {
         verify(eventPublisher).publish(startsWith("kelta.config.collection.changed."), any());
         // Stale system-collection list cache (GET /api/fields) is evicted after the raw metadata writes.
         verify(systemCollectionCache).evict("t1", "fields");
+        // The gateway's /api/fields response cache is evicted via record.changed — the raw
+        // metadata writes publish it explicitly (the CRUD path would have done it for us).
+        verify(eventPublisher).publish(eq("kelta.record.changed.t1.fields"), any());
         verify(runRepository).insertStep(eq("run-1"), eq(1), eq("REMOVE_FIELD"), eq("COMPLETED"), any(), isNull());
         verify(runRepository).updateRunStatus("run-1", "COMPLETED", null);
     }

@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate, useParams } from 'react-router-dom'
 import { TopNavBar } from './TopNavBar'
 import { GlobalSearch } from './GlobalSearch'
 import { OfflineIndicator } from './OfflineIndicator'
@@ -18,6 +18,8 @@ import { buildNavTabs } from './navTabs'
 import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
 import { useConfig } from '@/context/ConfigContext'
+import { useMyIdentity } from '@/hooks/useMyIdentity'
+import { usePendingApprovalsCount } from '@/hooks/useMyApprovals'
 import { initPushNotifications } from '@/push/deviceRegistration'
 import { PageLoader } from '@/components/PageLoader'
 import { SkipLinks } from '@/components/SkipLinks'
@@ -27,6 +29,10 @@ export function EndUserShell(): React.ReactElement {
   const { apiClient } = useApi()
   const { config, isLoading: configLoading } = useConfig()
   const [searchOpen, setSearchOpen] = useState(false)
+  const navigate = useNavigate()
+  const { tenantSlug } = useParams<{ tenantSlug: string }>()
+  const { identity } = useMyIdentity()
+  const { count: pendingApprovals } = usePendingApprovalsCount(identity?.userId)
 
   // Register the device's push token when running in the Capacitor native shell.
   // No-op on the web (does not touch any Capacitor code).
@@ -74,7 +80,8 @@ export function EndUserShell(): React.ReactElement {
         user={user}
         onLogout={handleLogout}
         onSearchOpen={() => setSearchOpen(true)}
-        notificationCount={0}
+        notificationCount={pendingApprovals}
+        onNotificationsOpen={() => navigate(`/${tenantSlug}/app/approvals`)}
       />
       <OfflineIndicator />
       <main id="main-content" className="flex-1 overflow-auto" role="main" tabIndex={-1}>

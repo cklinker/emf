@@ -1,0 +1,1 @@
+export { ApprovalsInboxPage } from './ApprovalsInboxPage'

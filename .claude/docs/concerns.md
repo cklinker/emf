@@ -93,6 +93,15 @@ writes bypass per-record Cerbos advice, so the in-controller gate is the boundar
 keep `API_ACCESS`). Remaining follow-up: `MANAGE_REPORTS` for reports/dashboards,
 `CUSTOMIZE_APPLICATION`/`VIEW_SETUP` for packages.
 
+**Approval instances/steps are tenant-visible to every user (accepted for now, 2026-07-08).**
+`approval-instances` and `approval-step-instances` are ordinary system collections on the
+generic JSON:API routes with no row-level read restriction beyond tenant RLS — any tenant
+user can list every approval (including `comments`). This predates the approvals inbox
+(`ActivityTimeline` always read these routes; the inbox added server-side filters but no new
+exposure). Deferred fix: a row-level read policy (submitter/assignee/admin) needs a design
+pass — likely a read-side hook or Cerbos record policy on these collections. Revisit before
+approvals carry sensitive comments in anger.
+
 **Record merge write path — field-level write-FLS not applied (accepted trade-off).**
 `RecordMergeController` (`POST /api/collections/{name}/merge`) applies the master's
 `fieldOverrides` and re-parents children by calling the `QueryEngine` **from the service

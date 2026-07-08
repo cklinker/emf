@@ -75,6 +75,11 @@ const AppHomePage = React.lazy(() =>
 const EndUserObjectListPage = React.lazy(() =>
   import('./pages/app/ObjectListPage/ObjectListPage').then((m) => ({ default: m.ObjectListPage }))
 )
+const EndUserApprovalsInboxPage = React.lazy(() =>
+  import('./pages/app/ApprovalsInboxPage/ApprovalsInboxPage').then((m) => ({
+    default: m.ApprovalsInboxPage,
+  }))
+)
 const EndUserObjectDetailPage = React.lazy(() =>
   import('./pages/app/ObjectDetailPage/ObjectDetailPage').then((m) => ({
     default: m.ObjectDetailPage,
@@ -1420,6 +1425,14 @@ function TenantRoutes(): React.ReactElement {
             element={
               <React.Suspense fallback={<PageLoader message="Loading..." />}>
                 <EndUserCustomPage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="approvals"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserApprovalsInboxPage />
               </React.Suspense>
             }
           />

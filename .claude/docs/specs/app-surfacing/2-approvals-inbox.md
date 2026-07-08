@@ -8,6 +8,16 @@
 > **Security-typed change — never auto-merged** (actor-identity hardening on the approval
 > write path). Source-verified 2026-07-08.
 
+> **Post-implementation deltas (2026-07-08):** (1) the §8 JWT-`sub` check came back
+> NEGATIVE for the auth-code flow (`KeltaUserDetails.getUsername()` returns the email, so
+> Spring AS mints `sub = email`; only direct-login mints the UUID) — the fallback shipped as
+> **`GET /api/me/identity`** on `UserPermissionsController` (gateway header → `UserIdResolver`
+> → `{userId, email, profileId}`, fail-closed 403) and the FE `useMyIdentity` hook. (2)
+> Timeline inline approve/reject was **deferred** — the inbox, record-header actions, and
+> bell cover every flow; the timeline kept the read-only entries plus the server-side filter
+> fix. (3) All four write endpoints had the body-identity fallback (not just submit); all
+> hardened.
+
 ## 1. Goal & scope
 
 **Delivers:**

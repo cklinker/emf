@@ -13,6 +13,12 @@ export interface BootstrapConfig {
   theme: ThemeConfig
   branding: BrandingConfig
   oidcProviders: OIDCProviderSummary[]
+  /**
+   * Tenant-authored translation overlay (app-intelligence slice 4), keyed
+   * locale → flat dotted key → value. Merged over the static bundles by
+   * I18nContext (tenant wins); absent/empty when the tenant has none.
+   */
+  translations?: Record<string, Record<string, string>>
 }
 
 /**

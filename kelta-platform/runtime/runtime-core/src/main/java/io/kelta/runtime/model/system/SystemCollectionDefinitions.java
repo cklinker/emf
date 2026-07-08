@@ -73,6 +73,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(uiPages());
         definitions.add(uiMenus());
         definitions.add(uiMenuItems());
+        definitions.add(uiTranslations());
 
         // Picklists
         definitions.add(globalPicklists());
@@ -352,6 +353,22 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredString("prefKey", 200)
                 .withColumnName("pref_key").withDefault("-"))
             .addField(FieldDefinition.requiredJson("value"))
+            .build();
+    }
+
+    /**
+     * Tenant-authored UI translations (app-intelligence slice 4): a per-locale
+     * key/value overlay over the static FE bundles. Unique per
+     * (tenant, locale, key) — V165.
+     */
+    public static CollectionDefinition uiTranslations() {
+        return systemBuilder("ui-translations", "UI Translations", "ui_translation")
+            .displayFieldName("key")
+            .addField(FieldDefinition.requiredString("locale", 10))
+            .addField(FieldDefinition.requiredString("key", 200)
+                .withColumnName("translation_key"))
+            .addField(FieldDefinition.requiredString("value", 2000)
+                .withColumnName("translation_value"))
             .build();
     }
 

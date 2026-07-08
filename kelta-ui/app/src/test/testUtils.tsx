@@ -73,7 +73,7 @@ function jsonApiListResponse(type: string, items: Record<string, unknown>[]) {
  * Create a fetch wrapper that always handles bootstrap JSON:API config requests.
  *
  * Bootstrap is now composed from 4 parallel JSON:API calls:
- *   /api/ui-pages, /api/ui-menus, /api/oidc-providers, /api/tenants
+ *   /api/ui-pages, /api/ui-menus, /api/ui-translations, /api/oidc-providers, /api/tenants
  */
 function createBootstrapFetchWrapper(baseFetch: typeof fetch): typeof fetch {
   return ((url: string | URL | Request, ...args: unknown[]) => {
@@ -107,6 +107,9 @@ function createBootstrapFetchWrapper(baseFetch: typeof fetch): typeof fetch {
     }
     if (urlString.includes('/api/ui-menus')) {
       return Promise.resolve(makeJsonResponse(jsonApiListResponse('ui-menus', [])))
+    }
+    if (urlString.includes('/api/ui-translations')) {
+      return Promise.resolve(makeJsonResponse(jsonApiListResponse('ui-translations', [])))
     }
     if (urlString.includes('/api/oidc-providers')) {
       return Promise.resolve(

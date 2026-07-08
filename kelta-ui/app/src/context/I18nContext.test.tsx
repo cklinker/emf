@@ -636,4 +636,56 @@ describe('I18nContext', () => {
       expect(DEFAULT_LOCALE).toBe('en')
     })
   })
+
+  describe('tenant overlay (app-intelligence slice 4)', () => {
+    function OverlayProbe({ overlay }: { overlay: Record<string, Record<string, string>> }) {
+      const { t, setTenantOverlay } = useI18n()
+      return (
+        <div>
+          <button onClick={() => setTenantOverlay(overlay)} data-testid="install-overlay">
+            install
+          </button>
+          <span data-testid="overlay-known">{t('common.save')}</span>
+          <span data-testid="overlay-params">{t('massEdit.viewJobs', { n: 1 })}</span>
+          <span data-testid="overlay-custom">{t('custom.greeting', 'fallback')}</span>
+        </div>
+      )
+    }
+
+    it('overlay values win over the bundle, support params, and cover new keys', async () => {
+      const user = userEvent.setup()
+      render(
+        <I18nProvider initialLocale="en">
+          <OverlayProbe
+            overlay={{
+              en: {
+                'common.save': 'Persist!',
+                'massEdit.viewJobs': 'See {{n}} job(s)',
+                'custom.greeting': 'Howdy',
+              },
+            }}
+          />
+        </I18nProvider>
+      )
+      // Before install: bundle values / inline fallback.
+      expect(screen.getByTestId('overlay-custom')).toHaveTextContent('fallback')
+
+      await user.click(screen.getByTestId('install-overlay'))
+
+      expect(screen.getByTestId('overlay-known')).toHaveTextContent('Persist!')
+      expect(screen.getByTestId('overlay-params')).toHaveTextContent('See 1 job(s)')
+      expect(screen.getByTestId('overlay-custom')).toHaveTextContent('Howdy')
+    })
+
+    it('an overlay for another locale does not leak into the active one', async () => {
+      const user = userEvent.setup()
+      render(
+        <I18nProvider initialLocale="en">
+          <OverlayProbe overlay={{ de: { 'common.save': 'Speichern!' } }} />
+        </I18nProvider>
+      )
+      await user.click(screen.getByTestId('install-overlay'))
+      expect(screen.getByTestId('overlay-known')).not.toHaveTextContent('Speichern!')
+    })
+  })
 })

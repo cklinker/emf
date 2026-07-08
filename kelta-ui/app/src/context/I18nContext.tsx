@@ -50,6 +50,12 @@ export interface I18nContextValue {
   /** Set the current locale */
   setLocale: (locale: string) => void
   /**
+   * Install the tenant-authored translation overlay (app-intelligence slice 4),
+   * keyed locale → flat dotted key → value. Overlay values win over the bundles;
+   * pushed by TenantTranslationsBridge from the bootstrap config.
+   */
+  setTenantOverlay: (overlay: Record<string, Record<string, string>>) => void
+  /**
    * Translate a key with optional parameter interpolation.
    * The second arg may be either an interpolation params object, or a string
    * fallback (used when the key is missing from the translation tables).
@@ -278,6 +284,7 @@ export function I18nProvider({
   defaultCurrency = DEFAULT_CURRENCY,
 }: I18nProviderProps): React.ReactElement {
   // Initialize locale from stored preference, browser setting, initial prop, or default
+  const [tenantOverlay, setTenantOverlay] = useState<Record<string, Record<string, string>>>({})
   const [locale, setLocaleState] = useState<string>(() => {
     // Priority: stored preference > initial prop > browser detection > default
     const stored = getStoredLocale()
@@ -325,6 +332,13 @@ export function I18nProvider({
     (key: string, paramsOrFallback?: Record<string, string | number> | string): string => {
       const inlineFallback = typeof paramsOrFallback === 'string' ? paramsOrFallback : undefined
       const params = typeof paramsOrFallback === 'object' ? paramsOrFallback : undefined
+
+      // Tenant-authored overlay wins over every bundle (flat dotted keys).
+      const overlayValue = tenantOverlay[locale]?.[key]
+      if (overlayValue !== undefined) {
+        return interpolate(overlayValue, params)
+      }
+
       const translation = getNestedValue(translations, key)
 
       if (translation === undefined) {
@@ -345,7 +359,7 @@ export function I18nProvider({
 
       return interpolate(translation, params)
     },
-    [translations, locale]
+    [translations, locale, tenantOverlay]
   )
 
   /**
@@ -435,6 +449,7 @@ export function I18nProvider({
     () => ({
       locale,
       setLocale,
+      setTenantOverlay,
       t,
       formatDate,
       formatNumber,
@@ -446,6 +461,7 @@ export function I18nProvider({
     [
       locale,
       setLocale,
+      setTenantOverlay,
       t,
       formatDate,
       formatNumber,

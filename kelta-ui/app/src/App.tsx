@@ -32,6 +32,7 @@ import { CollectionStoreProvider } from './context/CollectionStoreContext'
 import { ConfigProvider, useConfig } from './context/ConfigContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { I18nProvider } from './context/I18nContext'
+import { TenantTranslationsBridge } from './components/TenantTranslationsBridge/TenantTranslationsBridge'
 import { PluginProvider } from './context/PluginContext'
 import { TenantProvider, useTenant, isCustomDomainHost } from './context/TenantContext'
 import { AppContextProvider } from './context/AppContext'
@@ -262,6 +263,9 @@ const ApiTokensPage = React.lazy(() =>
 )
 const ModulesPage = React.lazy(() =>
   import('./pages/ModulesPage').then((m) => ({ default: m.ModulesPage }))
+)
+const TranslationsPage = React.lazy(() =>
+  import('./pages/TranslationsPage').then((m) => ({ default: m.TranslationsPage }))
 )
 const BulkJobsPage = React.lazy(() =>
   import('./pages/BulkJobsPage').then((m) => ({ default: m.BulkJobsPage }))
@@ -621,6 +625,8 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
           <ConfigProvider>
             <ThemeProvider>
               <I18nProvider>
+                {/* Pushes tenant-authored translations from bootstrap into i18n (slice 4). */}
+                <TenantTranslationsBridge />
                 <PluginProvider plugins={plugins}>
                   <AppContextProvider>
                     <AiChatProvider>
@@ -1317,6 +1323,18 @@ function TenantRoutes(): React.ReactElement {
             <AdminPageRoute>
               <RequirePermission permission="VIEW_API_SPECS">
                 <ApiSpecDetailPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Tenant translations route (app-intelligence slice 4) */}
+        <Route
+          path="translations"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="CUSTOMIZE_APPLICATION">
+                <TranslationsPage />
               </RequirePermission>
             </AdminPageRoute>
           }

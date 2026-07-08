@@ -684,14 +684,14 @@ describe('ConfigContext', () => {
       })
 
       // Initial fetch makes 4 parallel JSON:API calls
-      expect(mockFetch).toHaveBeenCalledTimes(4)
+      expect(mockFetch).toHaveBeenCalledTimes(5)
 
       // Click reload button
       await user.click(screen.getByText('Reload'))
 
       await waitFor(() => {
         // Reload fires another 4 JSON:API calls
-        expect(mockFetch).toHaveBeenCalledTimes(8)
+        expect(mockFetch).toHaveBeenCalledTimes(10)
       })
     })
 
@@ -827,7 +827,7 @@ describe('ConfigContext', () => {
       })
 
       // Initial fetch makes 4 parallel JSON:API calls
-      expect(mockFetch).toHaveBeenCalledTimes(4)
+      expect(mockFetch).toHaveBeenCalledTimes(5)
 
       // Advance time by poll interval
       await act(async () => {
@@ -836,7 +836,7 @@ describe('ConfigContext', () => {
 
       await waitFor(() => {
         // Second poll: another 4 calls
-        expect(mockFetch).toHaveBeenCalledTimes(8)
+        expect(mockFetch).toHaveBeenCalledTimes(10)
       })
 
       // Advance again
@@ -846,7 +846,7 @@ describe('ConfigContext', () => {
 
       await waitFor(() => {
         // Third poll: another 4 calls
-        expect(mockFetch).toHaveBeenCalledTimes(12)
+        expect(mockFetch).toHaveBeenCalledTimes(15)
       })
     })
 
@@ -861,7 +861,7 @@ describe('ConfigContext', () => {
       })
 
       // Initial fetch makes 4 parallel JSON:API calls
-      expect(mockFetch).toHaveBeenCalledTimes(4)
+      expect(mockFetch).toHaveBeenCalledTimes(5)
 
       // Advance time
       await act(async () => {
@@ -869,7 +869,7 @@ describe('ConfigContext', () => {
       })
 
       // Should still be 4 calls (no additional polling)
-      expect(mockFetch).toHaveBeenCalledTimes(4)
+      expect(mockFetch).toHaveBeenCalledTimes(5)
     })
 
     it('should not poll when in error state', async () => {
@@ -883,7 +883,7 @@ describe('ConfigContext', () => {
       })
 
       // Initial fetch (failed) — still makes 4 calls (all fail)
-      expect(mockFetch).toHaveBeenCalledTimes(4)
+      expect(mockFetch).toHaveBeenCalledTimes(5)
 
       // Advance time
       await act(async () => {
@@ -891,7 +891,7 @@ describe('ConfigContext', () => {
       })
 
       // Should still be 4 calls (no polling during error)
-      expect(mockFetch).toHaveBeenCalledTimes(4)
+      expect(mockFetch).toHaveBeenCalledTimes(5)
     })
   })
 })

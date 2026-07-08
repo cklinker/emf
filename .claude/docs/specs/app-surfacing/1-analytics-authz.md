@@ -6,7 +6,7 @@
 > and [Security](./README.md#security) sections.
 >
 > **Security-typed change — never auto-merged** (closes a live authorization gap).
-> Source-verified 2026-07-08 (Flyway head V1__baseline; next V2).
+> Source-verified 2026-07-08 (Flyway head file V1__baseline; next new migration V162 — deployed flyway_schema_history keeps pre-flatten numbering, never number below it).
 
 ## 1. Goal & scope
 
@@ -69,7 +69,7 @@ Reporting**: "View Analytics — Run reports and view dashboards" (rendered by t
 - **Endpoint shapes unchanged.** The gate runs before any service call;
   `MaskingPrincipal` resolution (`principalOf(request)`) is untouched.
 - **Default grants matrix** (new tenants via `TenantProvisioningHook`, existing tenants via
-  V2 — identical outcome):
+  V162 — identical outcome):
 
   | Built-in profile | `VIEW_ANALYTICS` | Rationale |
   |------------------|------------------|-----------|
@@ -91,8 +91,8 @@ Reporting**: "View Analytics — Run reports and view dashboards" (rendered by t
 
 ## 4. DB migrations
 
-**`kelta-worker/src/main/resources/db/migration/V2__seed_view_analytics_permission.sql`**
-(verify head is still V1 before numbering):
+**`kelta-worker/src/main/resources/db/migration/V162__seed_view_analytics_permission.sql`**
+(numbering starts at V162 — deployed environments retain pre-flatten history entries up to V161, so anything lower is silently skipped by Flyway; verify the directory + deployed history before numbering):
 
 ```sql
 -- Backfill VIEW_ANALYTICS for every existing profile, all tenants.
@@ -127,7 +127,7 @@ mixed hook/migration ordering safe.
 
 | File | Change |
 |------|--------|
-| `kelta-worker/src/main/resources/db/migration/V2__seed_view_analytics_permission.sql` | **New** — SQL above. |
+| `kelta-worker/src/main/resources/db/migration/V162__seed_view_analytics_permission.sql` | **New** — SQL above. |
 | `kelta-worker/src/main/java/io/kelta/worker/controller/ReportExecutionController.java` | Add `BootstrapRepository` constructor dep (5th). Add `private void requireAnalyticsAccess(HttpServletRequest request)` — the `EnvironmentController.requirePermission` pattern, accepting `VIEW_ANALYTICS` or `MANAGE_REPORTS` (one permissions fetch, one `anyMatch` over both names). Call it first in `executeReport(...)` (line ~70) and `exportReport(...)` (line ~134), before any service/`principalOf` work. |
 | `kelta-worker/src/main/java/io/kelta/worker/controller/DashboardDataController.java` | Same: `BootstrapRepository` dep + `requireAnalyticsAccess` + call first in `executeDashboard(...)` (~63) and `executeComponent(...)` (~138). (Two private copies mirror the existing per-controller convention — `EnvironmentController`, `DelegatedAdminScopeController` each own theirs; do not invent a shared helper class in this slice.) |
 | `kelta-worker/src/main/java/io/kelta/worker/listener/TenantProvisioningHook.java` | Append `"VIEW_ANALYTICS"` to `ALL_PERMISSIONS` (lines 35-43). Add it to `grantedPermissions` for System Administrator, Solution Manager, Standard User, Read Only, Marketing User, Contract Manager (lines 122-147). Minimum Access unchanged (empty set — the insert loop writes the row with `granted=false`). |
@@ -154,13 +154,13 @@ controller, `TenantContext.set/clear` around each test):** for each of the two c
 **`TenantProvisioningHook` unit:** catalog contains `VIEW_ANALYTICS`; per-profile grant
 matrix matches §3.
 
-**kelta-test-harness (real Postgres + RLS + Flyway V2 — the migration itself is under
+**kelta-test-harness (real Postgres + RLS + Flyway V162 — the migration itself is under
 test):** `AnalyticsAuthzScenarioTest` extends `ScenarioBase`:
 1. `auth.loginAsAdmin()`; create a minimal report via JSON:API `POST /api/reports` (admin
    holds `MANAGE_REPORTS` → passes the gate; proves fallback acceptance live).
 2. Via `openDbConnection()`: `profileIdByName(db, tenantId, "Standard User")` and
    `"Minimum Access"`; `seedActiveUser(...)` one user per profile; `directLogin(...)` each.
-3. Standard User calls `POST /{slug}/api/reports/{id}/execute` → **200** (V2 backfill
+3. Standard User calls `POST /{slug}/api/reports/{id}/execute` → **200** (V162 backfill
    granted it — asserts the migration's grant rule on real data).
 4. Minimum Access user calls the same → **403**.
 5. Same 200/403 pair against `POST /{slug}/api/dashboards/{id}/data` (create a dashboard row
@@ -198,7 +198,7 @@ slice 3's spec (post-deploy, per parent).
   per-request query. If a cache exists by implementation time, reuse its invalidation path —
   do not ship a stale-grant gate.
 - **Ordering — hook vs migration:** new tenants provisioned *after* this deploy get the row
-  from `TenantProvisioningHook`; V2's `NOT EXISTS` guard makes the overlap harmless either
+  from `TenantProvisioningHook`; V162's `NOT EXISTS` guard makes the overlap harmless either
   way.
 - **`Read Only` grant is opinionated** (its seeded permission set is only `VIEW_ALL_DATA`,
   no `API_ACCESS` — such users may not be able to reach the API at all today; the grant is

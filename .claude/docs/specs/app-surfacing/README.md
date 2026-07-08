@@ -8,7 +8,7 @@
 > sections below.
 >
 > Source-verified against the codebase on 2026-07-07 (Flyway head **V1__baseline** after the
-> #1189 flatten — next new migration is **V2**; check the directory before numbering). If code
+> #1189 flatten — next new migration is **V162**: deployed flyway_schema_history keeps pre-flatten numbering (entries up to V161), so lower numbers are silently skipped — check the directory + deployed history before numbering). If code
 > and this doc disagree, trust the code and fix this doc.
 
 ## How to use this document
@@ -203,7 +203,7 @@ helper into `pages/app/ObjectListPage/listUrlState.ts` and both slices use it.
   standing rule). Slice 1 closes the `concerns.md` "reports/dashboards reachable with bare
   `API_ACCESS`" item; update that row in the same PR.
 - **New permission `VIEW_ANALYTICS`** follows the V157 `MANAGE_DELEGATED_ADMINS` pattern
-  (now folded into V1 baseline): **V2 migration** backfills a grant per existing profile
+  (now folded into V1 baseline): **V162 migration** backfills a grant per existing profile
   (granted where the profile already holds `MANAGE_REPORTS`; plus granted to the built-in
   Standard User profile — opinionated default: standard users may *run* analytics, Minimum
   Access may not); `TenantProvisioningHook` seeds it for new tenants; FE
@@ -225,7 +225,7 @@ helper into `pages/app/ObjectListPage/listUrlState.ts` and both slices use it.
 - **Slice 0 — Parent spec + doc wiring** (this file). Author parent + child specs; add the
   specs row to `CLAUDE.md`; fix the stale Flyway-head lines in `CLAUDE.md` (code head is
   **V1__baseline**, doc said V159). No code.
-- **Slice 1 — Analytics authorization** (backend, security). V2 migration seeding
+- **Slice 1 — Analytics authorization** (backend, security). V162 migration seeding
   `VIEW_ANALYTICS`; `TenantProvisioningHook` + FE checklist catalog entries;
   `requirePermission` gates on the four analytics endpoints (accepting
   `VIEW_ANALYTICS` or `MANAGE_REPORTS`); worker unit tests (grant/deny/either-permission) +
@@ -278,7 +278,7 @@ Each `<slice>.md` must include every section (sections that don't apply state "N
 3. **Data & API contracts** — exact TS interfaces / JSON shapes / endpoint signatures;
    versioning + back-compat.
 4. **DB migrations** — exact Flyway `V<n>__*.sql` or "None". Verify head before numbering
-   (head **V1__baseline**, next **V2**).
+   (baseline file **V1__baseline**, next **V162** — deployed history keeps pre-flatten numbering).
 5. **File-by-file code changes** — every file, functions/components, registration/wiring.
 6. **Test plan** — Vitest (FE), worker unit w/ mocked JdbcTemplate/QueryEngine (BE),
    kelta-test-harness scenario (DB/RLS-sensitive), post-deploy Playwright.

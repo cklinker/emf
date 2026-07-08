@@ -52,7 +52,10 @@ class AnalyticsAuthzScenarioTest extends ScenarioBase {
         String slug = TenantFixture.ECOMMERCE_SLUG;
         String adminToken = auth.loginAsAdmin(slug);
         String tenantId = auth.extractTenantId(adminToken);
-        waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/customers", HttpStatus.OK, 60);
+        // Alphabetically the FIRST ecommerce-tenant scenario — it absorbs the whole
+        // runtime-provisioning warm-up (slug cache + dynamic route propagation), observed
+        // just over 30s in CI. Budget 2 minutes; later scenarios' waits then pass instantly.
+        waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/customers", HttpStatus.OK, 240);
         waitForStatus(gatewayClientWithToken(adminToken), "/" + slug + "/api/reports", HttpStatus.OK, 60);
 
         String suffix = Long.toHexString(System.nanoTime());

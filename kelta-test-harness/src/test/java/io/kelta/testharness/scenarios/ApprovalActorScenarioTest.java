@@ -148,7 +148,15 @@ class ApprovalActorScenarioTest extends ScenarioBase {
                     deleteRowById(db, "approval_process", processId);
                 }
                 if (customerId != null) {
-                    deleteRowById(db, "customers", customerId);
+                    // User-collection tables live in the tenant's own schema (not public),
+                    // so the raw harness connection can't reach them — delete via the API.
+                    try {
+                        gatewayClientWithToken(adminToken)
+                                .delete().uri("/" + slug + "/api/customers/" + customerId)
+                                .retrieve().toBodilessEntity();
+                    } catch (Exception cleanupFailure) {
+                        // Best-effort cleanup; the record is suffix-unique per run.
+                    }
                 }
                 deleteUserByEmail(db, tenantId, approverEmail);
                 deleteUserByEmail(db, tenantId, submitterEmail);

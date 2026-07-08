@@ -39,7 +39,7 @@ public class TenantProvisioningHook implements BeforeSaveHook {
             "MODIFY_ALL_DATA", "MANAGE_APPROVALS", "MANAGE_LISTVIEWS", "MANAGE_TENANTS",
             "MANAGE_CREDENTIALS", "VIEW_CREDENTIALS",
             "MANAGE_API_SPECS", "VIEW_API_SPECS", "MANAGE_CAMPAIGNS",
-            "MANAGE_DELEGATED_ADMINS", "MANAGE_SANDBOXES"
+            "MANAGE_DELEGATED_ADMINS", "MANAGE_SANDBOXES", "VIEW_ANALYTICS"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -128,23 +128,25 @@ public class TenantProvisioningHook implements BeforeSaveHook {
                                 "MODIFY_ALL_DATA", "MANAGE_APPROVALS", "MANAGE_LISTVIEWS",
                                 "MANAGE_CREDENTIALS", "VIEW_CREDENTIALS",
                                 "MANAGE_API_SPECS", "VIEW_API_SPECS", "MANAGE_CAMPAIGNS",
-                                "MANAGE_DELEGATED_ADMINS", "MANAGE_SANDBOXES")),
+                                "MANAGE_DELEGATED_ADMINS", "MANAGE_SANDBOXES", "VIEW_ANALYTICS")),
                 new ProfileDef("Standard User",
                         "Read, create, and edit records in all collections",
-                        Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "VIEW_CREDENTIALS", "VIEW_API_SPECS")),
+                        Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "VIEW_CREDENTIALS", "VIEW_API_SPECS",
+                                "VIEW_ANALYTICS")),
                 new ProfileDef("Read Only",
                         "View all records and reports, no create/edit/delete capability",
-                        Set.of("VIEW_ALL_DATA")),
+                        Set.of("VIEW_ALL_DATA", "VIEW_ANALYTICS")),
                 new ProfileDef("Marketing User",
                         "Standard User plus manage email templates and campaigns",
-                        Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "MANAGE_EMAIL_TEMPLATES", "MANAGE_CAMPAIGNS")),
+                        Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "MANAGE_EMAIL_TEMPLATES", "MANAGE_CAMPAIGNS",
+                                "VIEW_ANALYTICS")),
                 new ProfileDef("Contract Manager",
                         "Standard User plus manage approval processes",
-                        Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "MANAGE_APPROVALS")),
+                        Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "MANAGE_APPROVALS", "VIEW_ANALYTICS")),
                 new ProfileDef("Solution Manager",
                         "Customize application structure: collections, fields, layouts, picklists, reports",
                         Set.of("VIEW_SETUP", "CUSTOMIZE_APPLICATION", "MANAGE_REPORTS",
-                                "MANAGE_WORKFLOWS", "MANAGE_LISTVIEWS", "API_ACCESS")),
+                                "MANAGE_WORKFLOWS", "MANAGE_LISTVIEWS", "API_ACCESS", "VIEW_ANALYTICS")),
                 new ProfileDef("Minimum Access",
                         "Login only, no data access until explicitly granted via Permission Sets",
                         Set.of())

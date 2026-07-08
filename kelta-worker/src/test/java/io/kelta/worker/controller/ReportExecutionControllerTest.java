@@ -4,15 +4,18 @@ import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.system.SystemCollectionDefinitions;
 import io.kelta.runtime.query.*;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.ReportExecutionService;
 import io.kelta.worker.service.ReportExecutionService.ColumnConfig;
 import io.kelta.worker.service.ReportExecutionService.ReportResult;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
@@ -25,6 +28,8 @@ class ReportExecutionControllerTest {
     private ReportExecutionService reportExecutionService;
     private QueryEngine queryEngine;
     private CollectionRegistry collectionRegistry;
+    private CerbosPermissionResolver permissionResolver;
+    private BootstrapRepository bootstrapRepository;
     private ReportExecutionController controller;
     private HttpServletRequest request;
 
@@ -33,9 +38,18 @@ class ReportExecutionControllerTest {
         reportExecutionService = mock(ReportExecutionService.class);
         queryEngine = mock(QueryEngine.class);
         collectionRegistry = mock(CollectionRegistry.class);
+        permissionResolver = mock(CerbosPermissionResolver.class);
+        bootstrapRepository = mock(BootstrapRepository.class);
         request = mock(HttpServletRequest.class);
         controller = new ReportExecutionController(reportExecutionService, queryEngine,
-                collectionRegistry, mock(CerbosPermissionResolver.class));
+                collectionRegistry, permissionResolver, bootstrapRepository);
+        grantPermission("VIEW_ANALYTICS");
+    }
+
+    private void grantPermission(String permissionName) {
+        when(permissionResolver.getProfileId(request)).thenReturn("profile-1");
+        when(bootstrapRepository.findProfileSystemPermissions("profile-1")).thenReturn(List.of(
+                Map.of("permission_name", permissionName, "granted", true)));
     }
 
     @SuppressWarnings("unchecked")
@@ -164,5 +178,57 @@ class ReportExecutionControllerTest {
         Map<String, Object> attrs = getAttributes(response.getBody());
         assertNotNull(attrs.get("groups"));
         assertNotNull(attrs.get("groupAggregations"));
+    }
+
+    @Test
+    void executeRejectsCallerWithoutIdentity() {
+        when(permissionResolver.getProfileId(request)).thenReturn(null);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.executeReport("report-1", 1, 200, request));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verifyNoInteractions(reportExecutionService);
+    }
+
+    @Test
+    void executeRejectsProfileWithoutAnalyticsPermission() {
+        when(permissionResolver.getProfileId(request)).thenReturn("profile-1");
+        when(bootstrapRepository.findProfileSystemPermissions("profile-1")).thenReturn(List.of(
+                Map.of("permission_name", "API_ACCESS", "granted", true),
+                Map.of("permission_name", "VIEW_ANALYTICS", "granted", false)));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.executeReport("report-1", 1, 200, request));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verifyNoInteractions(reportExecutionService);
+    }
+
+    @Test
+    void executeAcceptsManageReportsAsFallback() {
+        grantPermission("MANAGE_REPORTS");
+        CollectionDefinition reportsDef = SystemCollectionDefinitions.reports();
+        when(collectionRegistry.get("reports")).thenReturn(reportsDef);
+        when(queryEngine.getById(eq(reportsDef), eq("report-1"))).thenReturn(Optional.empty());
+
+        ResponseEntity<Map<String, Object>> response = controller.executeReport("report-1", 1, 200, request);
+
+        // Gate passed — the 404 proves the request reached the report lookup
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void exportRejectsProfileWithoutAnalyticsPermission() {
+        when(permissionResolver.getProfileId(request)).thenReturn("profile-1");
+        when(bootstrapRepository.findProfileSystemPermissions("profile-1")).thenReturn(List.of(
+                Map.of("permission_name", "API_ACCESS", "granted", true)));
+        HttpServletResponse response = mock(HttpServletResponse.class);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.exportReport("report-1", "csv", request, response));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verifyNoInteractions(reportExecutionService);
     }
 }

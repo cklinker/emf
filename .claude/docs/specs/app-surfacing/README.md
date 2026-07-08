@@ -21,7 +21,7 @@ Read this parent first; every child references it.
 | Slice | Child spec | Axis |
 |-------|-----------|------|
 | 0 — This spec + doc wiring | (this file) | foundation (docs) |
-| 1 — Analytics authorization (`VIEW_ANALYTICS`) | `1-analytics-authz.md` | **backend, security** |
+| 1 — Analytics authorization (`VIEW_ANALYTICS`) | `1-analytics-authz.md` — **SHIPPED 2026-07-08** | **backend, security** |
 | 2 — Approvals inbox + record actions | `2-approvals-inbox.md` | **workflow UX (FE+BE hardening, security)** |
 | 3 — End-user analytics viewer | `3-analytics-viewer.md` — **SHIPPED 2026-07-08** | **dashboards/reporting UX (FE)** |
 | 4 — Realtime client | `4-realtime-client.md` | **liveness (FE)** |

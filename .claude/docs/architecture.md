@@ -117,6 +117,15 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   gateway `IdentityHeaderStripFilter` (order −400) strips client-supplied `X-User-Email`/
   `X-User-Profile-Id`/`X-User-Profile-Name`/`X-Cerbos-Scope` at the chain head so the worker never
   trusts a forged identity header on any path.
+- **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
+  `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
+  `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted
+  **`VIEW_ANALYTICS`** (or `MANAGE_REPORTS`, the authoring permission) via the standard
+  `CerbosPermissionResolver` + `BootstrapRepository.findProfileSystemPermissions` check;
+  fail-closed 403 on missing identity. The gate runs *before* each endpoint's try/catch (a
+  `ResponseStatusException` thrown inside would be swallowed into a 500). Scheduled report
+  delivery calls `ReportExecutionService` at the service layer and is deliberately ungated
+  (system-trust tier, same contract as masking's null principal).
 - **End-user analytics viewer** (slice 3): `/app/dashboards/:id` consumes the pass-through
   dashboard-data contract — `POST /api/dashboards/{id}/data` returns widget payloads keyed by
   componentId with NO layout metadata; the client joins them onto `dashboard-components` rows

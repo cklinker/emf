@@ -4,6 +4,7 @@ import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.query.*;
 import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.DashboardDataService;
 import io.kelta.worker.service.DashboardDataService.WidgetResult;
@@ -11,8 +12,10 @@ import io.kelta.worker.service.ReportExecutionService.MaskingPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
@@ -29,20 +32,44 @@ import java.util.*;
 public class DashboardDataController {
 
     private static final Logger log = LoggerFactory.getLogger(DashboardDataController.class);
+    private static final String VIEW_PERMISSION = "VIEW_ANALYTICS";
+    private static final String MANAGE_PERMISSION = "MANAGE_REPORTS";
 
     private final DashboardDataService dashboardDataService;
     private final QueryEngine queryEngine;
     private final CollectionRegistry collectionRegistry;
     private final CerbosPermissionResolver permissionResolver;
+    private final BootstrapRepository bootstrapRepository;
 
     public DashboardDataController(DashboardDataService dashboardDataService,
                                    QueryEngine queryEngine,
                                    CollectionRegistry collectionRegistry,
-                                   CerbosPermissionResolver permissionResolver) {
+                                   CerbosPermissionResolver permissionResolver,
+                                   BootstrapRepository bootstrapRepository) {
         this.dashboardDataService = dashboardDataService;
         this.queryEngine = queryEngine;
         this.collectionRegistry = collectionRegistry;
         this.permissionResolver = permissionResolver;
+        this.bootstrapRepository = bootstrapRepository;
+    }
+
+    /**
+     * Gates dashboard data access on the VIEW_ANALYTICS system permission; MANAGE_REPORTS
+     * (the authoring permission) also passes. Fail-closed: no resolvable profile is rejected.
+     * Must run before the endpoint's try/catch so the 403 is not converted to a 500.
+     */
+    private void requireAnalyticsAccess(HttpServletRequest request) {
+        String profileId = permissionResolver.getProfileId(request);
+        if (profileId == null || profileId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No identity");
+        }
+        boolean granted = bootstrapRepository.findProfileSystemPermissions(profileId).stream()
+                .anyMatch(p -> (VIEW_PERMISSION.equals(p.get("permission_name"))
+                        || MANAGE_PERMISSION.equals(p.get("permission_name")))
+                        && Boolean.TRUE.equals(p.get("granted")));
+        if (!granted) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, VIEW_PERMISSION + " permission required");
+        }
     }
 
     /** Builds the data-masking principal for the calling user from the gateway-forwarded identity headers. */
@@ -65,6 +92,8 @@ public class DashboardDataController {
             @PathVariable String dashboardId,
             @RequestBody(required = false) Map<String, String> body,
             HttpServletRequest request) {
+
+        requireAnalyticsAccess(request);
 
         try {
             // Load dashboard record
@@ -141,6 +170,8 @@ public class DashboardDataController {
             @PathVariable String componentId,
             @RequestBody(required = false) Map<String, String> body,
             HttpServletRequest request) {
+
+        requireAnalyticsAccess(request);
 
         try {
             // Load the specific component

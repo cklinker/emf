@@ -135,6 +135,12 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `ResponseStatusException` thrown inside would be swallowed into a 500). Scheduled report
   delivery calls `ReportExecutionService` at the service layer and is deliberately ungated
   (system-trust tier, same contract as masking's null principal).
+- **End-user analytics viewer** (slice 3): `/app/dashboards/:id` consumes the pass-through
+  dashboard-data contract — `POST /api/dashboards/{id}/data` returns widget payloads keyed by
+  componentId with NO layout metadata; the client joins them onto `dashboard-components` rows
+  (positions/spans/config) fetched via the generic JSON:API route. Per-viewer masking is
+  server-side; a masked-field rejection surfaces as that widget's `error` string, rendered
+  verbatim.
 - **New top-level path**: a brand-new `/api/<x>/**` segment must be registered as a static
   route in `kelta-gateway/.../service/RouteConfigService.registerStaticRoutes()` (and
   `config/RouteInitializer.registerStaticRoutes()`) or the gateway returns **404**. Sub-paths

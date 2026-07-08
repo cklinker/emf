@@ -13,7 +13,17 @@
 
 import React, { useState, useCallback } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Search, Bell, Settings, LayoutGrid, Menu, Home, Database, FileText } from 'lucide-react'
+import {
+  Search,
+  Bell,
+  Settings,
+  LayoutGrid,
+  Menu,
+  Home,
+  Database,
+  FileText,
+  BarChart3,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -30,8 +40,8 @@ export interface NavTab {
   /** Stable, unique key for the tab (the source menu-item path). */
   key: string
   /** What this tab points at. */
-  kind: 'collection' | 'page'
-  /** Collection API name (kind `collection`) or page slug (kind `page`). */
+  kind: 'collection' | 'page' | 'dashboard' | 'report'
+  /** Collection API name, page slug, or dashboard/report id per `kind`. */
   target: string
   /** Display label */
   label: string
@@ -77,8 +87,18 @@ export function TopNavBar({
   const basePath = `/${tenantSlug}/app`
 
   const tabPath = useCallback(
-    (tab: NavTab) =>
-      tab.kind === 'page' ? `${basePath}/p/${tab.target}` : `${basePath}/o/${tab.target}`,
+    (tab: NavTab) => {
+      switch (tab.kind) {
+        case 'page':
+          return `${basePath}/p/${tab.target}`
+        case 'dashboard':
+          return `${basePath}/dashboards/${tab.target}`
+        case 'report':
+          return `${basePath}/reports/${tab.target}`
+        default:
+          return `${basePath}/o/${tab.target}`
+      }
+    },
     [basePath]
   )
 
@@ -92,6 +112,7 @@ export function TopNavBar({
 
   const collectionTabs = tabs.filter((tab) => tab.kind === 'collection')
   const pageTabs = tabs.filter((tab) => tab.kind === 'page')
+  const analyticsTabs = tabs.filter((tab) => tab.kind === 'dashboard' || tab.kind === 'report')
 
   const handleMobileNavClick = useCallback(
     (path: string) => {
@@ -156,6 +177,24 @@ export function TopNavBar({
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
                 >
                   <FileText className="h-4 w-4 text-muted-foreground" />
+                  {tab.label}
+                </button>
+              ))}
+              {analyticsTabs.length > 0 && (
+                <>
+                  <Separator className="my-2" />
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Analytics
+                  </p>
+                </>
+              )}
+              {analyticsTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => handleMobileNavClick(tabPath(tab))}
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
                   {tab.label}
                 </button>
               ))}

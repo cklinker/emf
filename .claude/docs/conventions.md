@@ -94,6 +94,13 @@ it with specifics.
 gate (`requireAnalyticsAccess` in `ReportExecutionController`/`DashboardDataController`) accepts
 either. Grant `VIEW_ANALYTICS` to end-user profiles; reserve `MANAGE_REPORTS` for builders.
 
+### End-user list deep links
+
+`kelta-ui/app/src/pages/app/ObjectListPage/listUrlState.ts` owns the list-view URL contract
+(`?page/pageSize/sort/filter=<JSON FilterCondition[]>`). Build deep links ONLY through its
+`buildListUrl(tenantSlug, collection, filters, sort?)` — the canonical drill-through helper
+(dashboard chart segments, saved views); never hand-assemble the `filter` param.
+
 ## REST API: pagination
 
 Every paginated REST endpoint MUST use **JSON:API bracket syntax** — `page[number]` and `page[size]`. The flat forms `pageNumber` / `pageSize` are not honored and a request that sends them silently falls back to defaults.

@@ -32,6 +32,7 @@ public class NatsSubscriptionConfig {
     private final CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener;
     private final LayoutCacheInvalidationListener layoutCacheInvalidationListener;
     private final IpAllowlistCacheInvalidationListener ipAllowlistCacheInvalidationListener;
+    private final io.kelta.gateway.websocket.PresenceService presenceService;
 
     public NatsSubscriptionConfig(NatsSubscriptionManager subscriptionManager,
                                    RealtimeBridge realtimeBridge,
@@ -40,7 +41,8 @@ public class NatsSubscriptionConfig {
                                    CerbosCacheInvalidationListener cerbosCacheInvalidationListener,
                                    CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener,
                                    LayoutCacheInvalidationListener layoutCacheInvalidationListener,
-                                   IpAllowlistCacheInvalidationListener ipAllowlistCacheInvalidationListener) {
+                                   IpAllowlistCacheInvalidationListener ipAllowlistCacheInvalidationListener,
+                                   io.kelta.gateway.websocket.PresenceService presenceService) {
         this.subscriptionManager = subscriptionManager;
         this.realtimeBridge = realtimeBridge;
         this.systemCollectionRouteListener = systemCollectionRouteListener;
@@ -49,6 +51,7 @@ public class NatsSubscriptionConfig {
         this.customDomainCacheInvalidationListener = customDomainCacheInvalidationListener;
         this.layoutCacheInvalidationListener = layoutCacheInvalidationListener;
         this.ipAllowlistCacheInvalidationListener = ipAllowlistCacheInvalidationListener;
+        this.presenceService = presenceService;
     }
 
     @EventListener(ApplicationStartedEvent.class)
@@ -88,5 +91,11 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.broadcast(
                 "gateway-ip-allowlist-cache", "kelta.config.tenant.ip-allowlist.changed.*",
                 ipAllowlistCacheInvalidationListener::handleIpAllowlistChanged));
+
+        // Presence deltas (app-intelligence slice 3): BROADCAST — every pod merges the
+        // fleet-wide view and rebroadcasts snapshots to its local sessions.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-presence", "kelta.presence.*",
+                presenceService::onPresenceEvent));
     }
 }

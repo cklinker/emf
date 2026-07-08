@@ -104,7 +104,7 @@ Four independent capabilities that make the platform feel intelligent and resili
 |-------|-----------|------|
 | 1 — Offline outbox UI | `1-offline-outbox.md` — **SHIPPED 2026-07-08** (failed replays retained + retry/discard; banner + panel; fixed single-brace i18n interpolation in the Phase-2 keys en route) | offline UX (FE, IndexedDB v3) |
 | 2 — AI page generation | `2-ai-page-generation.md` — **SHIPPED 2026-07-08** (`propose_ui_page` tool + validated apply → unpublished draft; proposal card + builder link) | **kelta-ai + FE** |
-| 3 — Presence | `3-presence.md` | **gateway + FE** (native-image risk) |
+| 3 — Presence | `3-presence.md` — **SHIPPED 2026-07-08** (presence.join/leave/changed protocol, KELTA_PRESENCE NATS bridge w/ heartbeat+expiry, record-detail avatars; Map-only payloads ⇒ no new reflect-config) — **PHASE 4 COMPLETE** | **gateway + FE** (native-image risk) |
 | 4 — Tenant i18n authoring | `4-tenant-i18n.md` — **SHIPPED 2026-07-08** (`ui-translations` V165 + Rule-1 broadcast; I18nContext overlay via bootstrap; Setup Translations editor) | **worker + FE** (migration) |
 
 **Dependency order: none — all four are independent.** Suggested sequence: 1 (small,

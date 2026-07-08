@@ -51,6 +51,11 @@ public class JetStreamInitializer {
             ensureStream(jsm, "KELTA_TRIGGERS",
                     List.of("kelta.trigger.>"),
                     Duration.ofHours(24));
+            // Ephemeral presence deltas (app-intelligence slice 3) — shortest-lived
+            // stream; presence state expires client-side in 90s anyway.
+            ensureStream(jsm, "KELTA_PRESENCE",
+                    List.of("kelta.presence.>"),
+                    Duration.ofMinutes(1));
         } catch (Exception e) {
             log.error("Failed to initialize JetStream streams: {}", e.getMessage(), e);
         }

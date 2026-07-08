@@ -36,7 +36,8 @@ class NatsSubscriptionConfigTest {
                 mock(CerbosCacheInvalidationListener.class),
                 mock(CustomDomainCacheInvalidationListener.class),
                 mock(LayoutCacheInvalidationListener.class),
-                mock(IpAllowlistCacheInvalidationListener.class));
+                mock(IpAllowlistCacheInvalidationListener.class),
+                mock(io.kelta.gateway.websocket.PresenceService.class));
     }
 
     @Test
@@ -69,6 +70,6 @@ class NatsSubscriptionConfigTest {
         assertThat(captor.getAllValues())
                 .extracting(EventSubscription::name)
                 .contains("gateway-realtime", "gateway-record-routes",
-                        "gateway-config", "gateway-config-assignment");
+                        "gateway-config", "gateway-config-assignment", "gateway-presence");
     }
 }

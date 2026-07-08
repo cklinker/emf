@@ -19,6 +19,14 @@ export interface RecordChangedEvent {
   timestamp?: string
 }
 
+/** One user present on a resource (app-intelligence slice 3). */
+export interface PresenceUser {
+  id: string
+  email?: string
+}
+
+export type PresenceListener = (users: PresenceUser[]) => void
+
 export interface RealtimeClientOptions {
   /** Returns a fresh connect URL (fetches a current token) — called on every (re)connect. */
   urlFactory: () => Promise<string>
@@ -37,6 +45,8 @@ export class RealtimeClient {
     RealtimeClientOptions
   private socket: WebSocket | null = null
   private subscriptions = new Set<string>()
+  // resource → listeners; joined resources re-join on every (re)connect.
+  private presenceListeners = new Map<string, Set<PresenceListener>>()
   private reconnectAttempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private closed = false
@@ -56,6 +66,31 @@ export class RealtimeClient {
   unsubscribe(collection: string): void {
     if (!this.subscriptions.delete(collection)) return
     this.send({ action: 'unsubscribe', collection })
+  }
+
+  /**
+   * Join presence on a resource (slice 3). The first listener sends presence.join;
+   * joined resources re-join automatically on every reconnect.
+   */
+  joinPresence(resource: string, listener: PresenceListener): void {
+    let listeners = this.presenceListeners.get(resource)
+    if (!listeners) {
+      listeners = new Set()
+      this.presenceListeners.set(resource, listeners)
+      this.send({ action: 'presence.join', resource })
+    }
+    listeners.add(listener)
+  }
+
+  /** Remove a listener; the last one sends presence.leave. */
+  leavePresence(resource: string, listener: PresenceListener): void {
+    const listeners = this.presenceListeners.get(resource)
+    if (!listeners) return
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      this.presenceListeners.delete(resource)
+      this.send({ action: 'presence.leave', resource })
+    }
   }
 
   async connect(): Promise<void> {
@@ -83,12 +118,22 @@ export class RealtimeClient {
       for (const collection of this.subscriptions) {
         socket.send(JSON.stringify({ action: 'subscribe', collection }))
       }
+      for (const resource of this.presenceListeners.keys()) {
+        socket.send(JSON.stringify({ action: 'presence.join', resource }))
+      }
     }
     socket.onmessage = (message: MessageEvent) => {
       try {
         const parsed = JSON.parse(String(message.data))
         if (parsed?.event === 'record.changed' && typeof parsed.collection === 'string') {
           this.options.onEvent(parsed as RecordChangedEvent)
+        }
+        if (parsed?.event === 'presence.changed' && typeof parsed.resource === 'string') {
+          const listeners = this.presenceListeners.get(parsed.resource)
+          if (listeners) {
+            const users = Array.isArray(parsed.users) ? (parsed.users as PresenceUser[]) : []
+            for (const listener of listeners) listener(users)
+          }
         }
       } catch {
         // Non-JSON or unknown frame — ignore.

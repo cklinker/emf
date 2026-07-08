@@ -40,6 +40,7 @@ Files attach to any record via the `attachments` system collection (backed by `f
 | `kelta.config.collection.changed` | Schema change events |
 | `kelta.config.menu.changed.<tenantId>` | Nav menu/menu-item changed (apps/nav v2) — `MenuConfigEventPublisher` hooks on `ui-menus`+`ui-menu-items`; every worker pod evicts its `SystemCollectionCache` menu entries (`MenuCacheInvalidationListener`) |
 | `kelta.config.translation.changed.<tenantId>` | Tenant UI translation changed (tenant i18n) — `TranslationConfigEventPublisher` hook on `ui-translations`; every worker pod evicts its `SystemCollectionCache` translation entries (`TranslationCacheInvalidationListener`) |
+| `kelta.presence.<tenantId>` | gateway `PresenceService` (join/leave/heartbeat deltas, plain-Map payload) | every gateway pod merges the fleet-wide viewer set and pushes `presence.changed` snapshots to its local sockets (broadcast; KELTA_PRESENCE stream, 1-min retention) |
 | `kelta.config.tenant.ip-allowlist.changed.<tenantId>` | Tenant IP allowlist changed → gateway refreshes its allowlist cache |
 | `kelta.config.environment.changed.<tenantId>.<envId>` | Sandbox environment lifecycle (created/cloned/refreshed/archived) |
 | `kelta.config.promotion.executed.<tenantId>.<promotionId>` | Metadata promotion executed/failed/rolled back |

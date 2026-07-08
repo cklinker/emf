@@ -205,6 +205,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.feature.changed.<tenantId>` | System feature toggled |
 | `kelta.config.menu.changed.<tenantId>` | Nav menu / menu item changed (apps/nav v2) — pods evict `SystemCollectionCache` for `ui-menus`/`ui-menu-items` |
 | `kelta.config.translation.changed.<tenantId>` | Tenant UI translation changed (tenant i18n) — pods evict `SystemCollectionCache` for `ui-translations` |
+| `kelta.presence.<tenantId>` | Ephemeral presence deltas (join/leave/heartbeat; KELTA_PRESENCE stream, 1-min retention) — gateway pods merge fleet-wide viewer sets and push `presence.changed` to co-present sockets |
 | `kelta.config.domain.changed.<domainId>` | Custom domain changed |
 | `kelta.config.credential.changed.*` | Credential changed |
 | `kelta.config.api-spec.changed.<tenantId>` | API spec changed |

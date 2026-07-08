@@ -71,6 +71,14 @@ public final class EcommerceSeedFixture {
         if (existing != null) {
             log.info("Ecommerce fixture tenant '{}' already present ({}), skipping seed",
                     TenantFixture.ECOMMERCE_SLUG, existing);
+            // Rerun against a pre-seeded CI schema: the collections exist in the DB but the
+            // fresh gateway/worker only pick the tenant's dynamic routes up on the periodic
+            // bootstrap refresh (observed ~2 minutes). Block here — once, for everyone —
+            // so scenarios don't each burn (and overrun) their own wait budgets.
+            String token = auth.loginAsAdmin(TenantFixture.ECOMMERCE_SLUG);
+            waitForStatus(gatewayClient(token),
+                    "/" + TenantFixture.ECOMMERCE_SLUG + "/api/customers", HttpStatus.OK, 360);
+            log.info("Ecommerce fixture routes are live after rerun warm-up");
             return;
         }
 

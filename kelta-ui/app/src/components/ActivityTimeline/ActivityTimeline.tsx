@@ -304,9 +304,13 @@ export function ActivityTimeline({
     queryKey: ['activity-approvals', collectionId, recordId],
     queryFn: async () => {
       try {
-        const instances = await apiClient.getList<ApprovalInstance>(`/api/approval-instances`)
-        // Filter client-side for instances matching this record
-        return (instances || []).filter((instance) => instance.recordId === recordId)
+        // Server-side filter (matches every sibling fetch below) — the previous
+        // list-everything + client-filter shape pulled the whole tenant's instances.
+        const instances = await apiClient.getList<ApprovalInstance>(
+          `/api/approval-instances?filter[collectionId][eq]=${encodeURIComponent(collectionId)}` +
+            `&filter[recordId][eq]=${encodeURIComponent(recordId)}`
+        )
+        return instances || []
       } catch {
         // Gracefully handle 404 or other errors
         return []

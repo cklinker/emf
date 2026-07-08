@@ -22,8 +22,8 @@ Read this parent first; every child references it.
 |-------|-----------|------|
 | 0 — This spec + doc wiring | (this file) | foundation (docs) |
 | 1 — Analytics authorization (`VIEW_ANALYTICS`) | `1-analytics-authz.md` — **SHIPPED 2026-07-08** | **backend, security** |
-| 2 — Approvals inbox + record actions | `2-approvals-inbox.md` | **workflow UX (FE+BE hardening, security)** |
-| 3 — End-user analytics viewer | `3-analytics-viewer.md` | **dashboards/reporting UX (FE)** |
+| 2 — Approvals inbox + record actions | `2-approvals-inbox.md` — **SHIPPED 2026-07-08** (timeline inline actions deferred; `GET /api/me/identity` added — the JWT `sub` proved unreliable; the `/api/approvals/**` gateway static route was missing and is registered in this slice) | **workflow UX (FE+BE hardening, security)** |
+| 3 — End-user analytics viewer | `3-analytics-viewer.md` — **SHIPPED 2026-07-08** | **dashboards/reporting UX (FE)** |
 | 4 — Realtime client | `4-realtime-client.md` — **SHIPPED 2026-07-08** (invalidation-only; nav-derived subscriptions) | **liveness (FE)** |
 | 5 — Saved views in the app | `5-saved-views.md` — **SHIPPED 2026-07-08** (personal localStorage + shared read-only `list-views`; view columns drive the grid) | **data-entry UX (FE)** |
 

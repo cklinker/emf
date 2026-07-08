@@ -102,6 +102,15 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   identical to the gateway), denying the whole batch (403, fail-closed) before executing if any op is
   unauthorized. The `IdentityCollectionGuardHook` still guards identity-collection writes underneath
   (see "Delegated administration" below).
+- **Approval writes** (`/api/approvals/{submit,{id}/approve|reject|recall}`): the acting user
+  is ONLY the gateway-stamped `X-User-Id` (an email — `IdentityHeaderStripFilter` strips
+  client-supplied values, `HeaderTransformationFilter` re-stamps from the validated
+  principal), resolved to the `platform_user` UUID via `UserIdResolver` in
+  `ApprovalController.resolveActingUser` (fail-closed 403 when absent/unresolvable). Body
+  `userId`/`submittedBy` are accepted on the wire but **inert** (the pre-hardening spoof
+  path). Authorization stays in `ApprovalService` (`assigned_to`/`submitted_by` UUID
+  comparison). `GET /api/me/identity` exposes the same resolution to the frontend (the JWT
+  `sub` is the UUID only on direct-login; the auth-code flow mints the email).
 - **Delegated administration** (`/api/admin/delegated*`, security feature): full admins define
   `delegated-admin-scopes` (V157) so listed non-admins manage users within limits without
   `MANAGE_USERS`. `DelegatedAdminScopeController` (`MANAGE_DELEGATED_ADMINS`) owns scope CRUD;
@@ -126,6 +135,12 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `ResponseStatusException` thrown inside would be swallowed into a 500). Scheduled report
   delivery calls `ReportExecutionService` at the service layer and is deliberately ungated
   (system-trust tier, same contract as masking's null principal).
+- **End-user analytics viewer** (slice 3): `/app/dashboards/:id` consumes the pass-through
+  dashboard-data contract — `POST /api/dashboards/{id}/data` returns widget payloads keyed by
+  componentId with NO layout metadata; the client joins them onto `dashboard-components` rows
+  (positions/spans/config) fetched via the generic JSON:API route. Per-viewer masking is
+  server-side; a masked-field rejection surfaces as that widget's `error` string, rendered
+  verbatim.
 - **New top-level path**: a brand-new `/api/<x>/**` segment must be registered as a static
   route in `kelta-gateway/.../service/RouteConfigService.registerStaticRoutes()` (and
   `config/RouteInitializer.registerStaticRoutes()`) or the gateway returns **404**. Sub-paths

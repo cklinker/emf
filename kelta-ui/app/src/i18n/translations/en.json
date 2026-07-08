@@ -80,6 +80,7 @@
   "navigation": {
     "main": "Main navigation",
     "home": "Home",
+    "approvals": "Approvals",
     "dashboard": "Dashboard",
     "collections": "Collections",
     "authorization": "Authorization",
@@ -96,7 +97,8 @@
     "plugins": "Plugins",
     "settings": "Settings",
     "menu": "Menu",
-    "noMenus": "No menus available"
+    "noMenus": "No menus available",
+    "analytics": "Analytics"
   },
   "collections": {
     "title": "Collections",
@@ -1249,6 +1251,22 @@
     "triggerRecord": "Trigger Record",
     "currentNode": "Current Node"
   },
+  "approvalsInbox": {
+    "title": "Approvals",
+    "pendingTab": "Pending on me",
+    "submissionsTab": "My submissions",
+    "pendingEmpty": "No approvals waiting on you.",
+    "submissionsEmpty": "You have not submitted anything for approval.",
+    "waitingSince": "Waiting since {{time}}",
+    "unknownCollection": "Record",
+    "recallConfirm": "Withdraw this record from approval?",
+    "actionFailed": "Action failed — the step may no longer be pending"
+  },
+  "approvalsDialog": {
+    "approveTitle": "Approve record",
+    "rejectTitle": "Reject record",
+    "commentLabel": "Comment (optional)"
+  },
   "approvals": {
     "instances": "Instances",
     "approvalInstances": "Approval Instances",
@@ -2015,6 +2033,30 @@
     "lightMode": "Light",
     "darkMode": "Dark",
     "systemMode": "System"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "dashboardsSection": "Dashboards",
+    "reportsSection": "Reports",
+    "hubEmpty": "No dashboards or reports yet.",
+    "run": "Run",
+    "widgetUnavailable": "This widget is unavailable",
+    "unknownWidget": "Unsupported widget type",
+    "noRecords": "No records",
+    "dashboardEmpty": "This dashboard has no widgets yet.",
+    "loadFailed": "Couldn't load this view. Retry, or check its configuration.",
+    "exportCsv": "Export CSV",
+    "exportPdf": "Export PDF",
+    "exportFailed": "Export failed",
+    "reportMeta": "{{count}} records · page {{page}} of {{pages}}",
+    "prev": "Prev",
+    "next": "Next",
+    "rangeAll": "All time",
+    "rangeToday": "Today",
+    "range7d": "Last 7 days",
+    "range30d": "Last 30 days",
+    "range90d": "Last 90 days",
+    "range1y": "Last year"
   },
   "savedViews": {
     "sharedReadOnly": "Shared views are managed in Setup → List Views"

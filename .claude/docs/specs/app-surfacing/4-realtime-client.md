@@ -24,7 +24,9 @@ bell count updates when a step instance changes.
 ## 3. Data & API contracts
 
 Server contract consumed verbatim (parent §Shared contracts): connect
-`wss://<origin>/ws/realtime?token=<jwt>` (fresh token via `AuthContext.getAccessToken()` on
+`wss://<gateway-origin>/ws/realtime?token=<jwt>` — gateway origin from `VITE_API_BASE_URL`,
+page-origin fallback for local dev (in production the page origin serves only static assets
+and cannot upgrade WebSockets) — (fresh token via `AuthContext.getAccessToken()` on
 every (re)connect — covers close 4001), `{"action":"subscribe","collection"}` frames, max 50
 subscriptions. Client modules:
 

@@ -29,6 +29,7 @@ import { RailBlocksEditor } from './RailBlocksEditor'
 
 interface MultiSelectFieldPickerProps {
   label: string
+  hint?: string
   values: string[]
   availableFieldNames: string[]
   onChange: (next: string[]) => void
@@ -36,6 +37,7 @@ interface MultiSelectFieldPickerProps {
 
 function MultiSelectFieldPicker({
   label,
+  hint,
   values,
   availableFieldNames,
   onChange,
@@ -54,6 +56,7 @@ function MultiSelectFieldPicker({
       <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </Label>
+      {hint && <p className="text-[11px] leading-snug text-muted-foreground">{hint}</p>}
       <div className="flex flex-wrap gap-1.5">
         {values.length === 0 && (
           <span className="text-xs text-muted-foreground">None — leave empty to auto-derive.</span>
@@ -239,6 +242,7 @@ export function DetailExtrasPanel(): React.ReactElement | null {
 
         <MultiSelectFieldPicker
           label="Avatar from"
+          hint="An image-URL field shows as the avatar picture; text fields contribute their first letters as initials."
           values={avatarFrom}
           availableFieldNames={availableFieldNames}
           onChange={(next) => updateHeader({ avatarFrom: next })}

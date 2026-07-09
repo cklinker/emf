@@ -151,6 +151,17 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
+/* Image avatar — fills the hero box when headerConfig.avatarFrom points at an
+   image-URL field. Absolute so the presence dot keeps its -2px overhang. */
+.kelta-hero-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 /* Online presence dot — bottom-right, 3px ring of page bg */
 .kelta-presence-dot {
   position: absolute;

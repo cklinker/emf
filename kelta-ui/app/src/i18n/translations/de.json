@@ -1185,6 +1185,7 @@
       "nameRequired": "Feldname ist erforderlich",
       "nameTooLong": "Feldname darf maximal 50 Zeichen lang sein",
       "nameFormat": "Name muss kleingeschrieben sein, mit einem Buchstaben beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten",
+      "fieldNameFormat": "Der Name muss mit einem Buchstaben beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten",
       "displayNameTooLong": "Anzeigename darf maximal 100 Zeichen lang sein",
       "typeRequired": "Feldtyp ist erforderlich",
       "referenceTargetRequired": "Zielsammlung ist für Referenzfelder erforderlich",

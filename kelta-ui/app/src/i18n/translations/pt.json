@@ -1185,6 +1185,7 @@
       "nameRequired": "O nome do campo e obrigatorio",
       "nameTooLong": "O nome do campo deve ter no maximo 50 caracteres",
       "nameFormat": "O nome deve ser em minusculas, comecar com uma letra e conter apenas letras, numeros e sublinhados",
+      "fieldNameFormat": "O nome deve começar com uma letra e conter apenas letras, números e sublinhados",
       "displayNameTooLong": "O nome de exibicao deve ter no maximo 100 caracteres",
       "typeRequired": "O tipo do campo e obrigatorio",
       "referenceTargetRequired": "A colecao de destino e obrigatoria para campos de referencia",

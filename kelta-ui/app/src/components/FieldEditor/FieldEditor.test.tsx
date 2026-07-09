@@ -476,15 +476,18 @@ describe('FieldEditor Component', () => {
       })
     })
 
-    it('should show error when name contains uppercase letters', async () => {
+    it('should accept camelCase names (backend FieldLifecycleHook contract)', async () => {
+      // Field API names are camelCase (e.g. dataSource → column data_source);
+      // only collection names are lowercase-only. The old lowercase-only rule
+      // blocked saving any existing camelCase field from the edit dialog.
       const user = userEvent.setup()
       renderWithProviders(<FieldEditor {...defaultProps} />)
 
-      await user.type(screen.getByTestId('field-name-input'), 'TestField')
+      await user.type(screen.getByTestId('field-name-input'), 'dataSource')
       await user.tab()
 
       await waitFor(() => {
-        expect(screen.getByTestId('field-name-error')).toBeInTheDocument()
+        expect(screen.queryByTestId('field-name-error')).not.toBeInTheDocument()
       })
     })
 

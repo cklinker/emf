@@ -1751,6 +1751,7 @@
       "nameRequired": "Field name is required",
       "nameTooLong": "Field name must be 50 characters or less",
       "nameFormat": "Name must be lowercase, start with a letter, and contain only letters, numbers, and underscores",
+      "fieldNameFormat": "Name must start with a letter and contain only letters, numbers, and underscores",
       "displayNameTooLong": "Display name must be 100 characters or less",
       "typeRequired": "Field type is required",
       "referenceTargetRequired": "Target collection is required for reference fields",

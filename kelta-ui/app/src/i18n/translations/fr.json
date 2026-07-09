@@ -1185,6 +1185,7 @@
       "nameRequired": "Le nom du champ est obligatoire",
       "nameTooLong": "Le nom du champ ne doit pas dépasser 50 caractères",
       "nameFormat": "Le nom doit être en minuscules, commencer par une lettre et ne contenir que des lettres, des chiffres et des underscores",
+      "fieldNameFormat": "Le nom doit commencer par une lettre et ne contenir que des lettres, des chiffres et des tirets bas",
       "displayNameTooLong": "Le nom d'affichage ne doit pas dépasser 100 caractères",
       "typeRequired": "Le type de champ est obligatoire",
       "referenceTargetRequired": "La collection cible est obligatoire pour les champs de référence",

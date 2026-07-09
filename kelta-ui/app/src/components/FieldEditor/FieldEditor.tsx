@@ -268,7 +268,10 @@ export const fieldEditorSchema = z
       .string()
       .min(1, 'validation.nameRequired')
       .max(50, 'validation.nameTooLong')
-      .regex(/^[a-z][a-z0-9_]*$/, 'validation.nameFormat'),
+      // Mirrors the backend FieldLifecycleHook rule (^[a-zA-Z][a-zA-Z0-9_]*$):
+      // field API names are camelCase (the storage adapter derives the
+      // snake_case column) — only COLLECTION names are lowercase-only.
+      .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'validation.fieldNameFormat'),
     displayName: z.string().max(100, 'validation.displayNameTooLong').optional().or(z.literal('')),
     type: z.enum(
       [

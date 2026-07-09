@@ -1185,6 +1185,7 @@
       "nameRequired": "El nombre del campo es obligatorio",
       "nameTooLong": "El nombre del campo debe tener 50 caracteres o menos",
       "nameFormat": "El nombre debe estar en minusculas, comenzar con una letra y contener solo letras, numeros y guiones bajos",
+      "fieldNameFormat": "El nombre debe comenzar con una letra y contener solo letras, números y guiones bajos",
       "displayNameTooLong": "El nombre para mostrar debe tener 100 caracteres o menos",
       "typeRequired": "El tipo de campo es obligatorio",
       "referenceTargetRequired": "La coleccion destino es obligatoria para campos de referencia",

@@ -49,6 +49,23 @@ export interface RecordHeaderProps {
   showPresence?: boolean;
 }
 
+/** http(s) URLs and data:image URIs are treated as avatar images, not initials sources. */
+function isImageUrl(value: unknown): boolean {
+  return typeof value === 'string' && /^(https?:\/\/|data:image\/)/i.test(value.trim());
+}
+
+function computeAvatarImage(
+  record: Record<string, unknown>,
+  avatarFrom: string[] | undefined
+): string | null {
+  if (!avatarFrom) return null;
+  for (const f of avatarFrom) {
+    const v = record[f];
+    if (typeof v === 'string' && isImageUrl(v)) return v.trim();
+  }
+  return null;
+}
+
 function computeInitials(
   record: Record<string, unknown>,
   avatarFrom: string[] | undefined,
@@ -58,7 +75,9 @@ function computeInitials(
     const chars = avatarFrom
       .map((f) => {
         const v = record[f];
-        return typeof v === 'string' && v.length > 0 ? v.charAt(0).toUpperCase() : '';
+        return typeof v === 'string' && v.length > 0 && !isImageUrl(v)
+          ? v.charAt(0).toUpperCase()
+          : '';
       })
       .filter(Boolean)
       .join('');
@@ -99,11 +118,19 @@ export function RecordHeader({
   showPresence = false,
 }: RecordHeaderProps): React.ReactElement {
   const [copied, setCopied] = useState(false);
+  // Tracks the URL that failed to load so a record/config change retries cleanly.
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
 
   const initials = useMemo(
     () => computeInitials(record, config?.avatarFrom, fallbackTitle),
     [record, config?.avatarFrom, fallbackTitle]
   );
+
+  const avatarUrl = useMemo(
+    () => computeAvatarImage(record, config?.avatarFrom),
+    [record, config?.avatarFrom]
+  );
+  const showAvatarImage = avatarUrl !== null && avatarUrl !== failedAvatarUrl;
 
   const title = useMemo(
     () => computeTitle(record, config?.titleFields, fallbackTitle),
@@ -124,7 +151,16 @@ export function RecordHeader({
     >
       <div className="flex min-w-0 items-start gap-4">
         <div className="kelta-hero-avatar" aria-hidden="true">
-          {initials}
+          {showAvatarImage ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              className="kelta-hero-avatar-img"
+              onError={() => setFailedAvatarUrl(avatarUrl)}
+            />
+          ) : (
+            initials
+          )}
           {showPresence && <span className="kelta-presence-dot" aria-hidden="true" />}
         </div>
 

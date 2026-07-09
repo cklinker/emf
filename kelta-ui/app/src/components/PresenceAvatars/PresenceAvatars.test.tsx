@@ -10,15 +10,25 @@ const state: { users: PresenceUser[] } = { users: [] }
 vi.mock('@/realtime', () => ({
   usePresence: () => state.users,
 }))
+const identityState: { identity?: { userId: string; email: string; profileId: string } } = {
+  identity: { userId: 'u-me', email: 'me@example.com', profileId: 'p1' },
+}
+
 vi.mock('@/hooks/useMyIdentity', () => ({
-  useMyIdentity: () => ({
-    identity: { userId: 'u-me', email: 'me@example.com', profileId: 'p1' },
-  }),
+  useMyIdentity: () => ({ identity: identityState.identity }),
 }))
 
 describe('PresenceAvatars', () => {
   beforeEach(() => {
     state.users = []
+    identityState.identity = { userId: 'u-me', email: 'me@example.com', profileId: 'p1' }
+  })
+
+  it('renders nothing while identity is still loading (cannot filter self yet)', () => {
+    identityState.identity = undefined
+    state.users = [{ id: 'u-me', email: 'me@example.com' }]
+    const { container } = render(<PresenceAvatars resource="record:orders/1" />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders nothing when alone', () => {

@@ -29,6 +29,11 @@ export function PresenceAvatars({
   const users = usePresence(resource)
   const { identity } = useMyIdentity()
 
+  // Others-only filtering is impossible before identity resolves — rendering
+  // in that window shows the viewer their OWN avatar as "1 other person"
+  // (and flashes the header layout, breaking visual baselines).
+  if (!identity) return null
+
   const others = users.filter(
     (u) =>
       u.id !== identity?.userId &&

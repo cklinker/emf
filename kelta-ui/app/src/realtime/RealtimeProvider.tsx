@@ -9,10 +9,19 @@ import { queryKeysForEvent } from './invalidation'
 
 const DEBOUNCE_MS = 250
 
-/** Builds the wss:// connect URL against the current origin with a fresh token. */
-function buildSocketUrl(token: string): string {
-  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${scheme}://${window.location.host}/ws/realtime?token=${encodeURIComponent(token)}`
+/**
+ * Builds the wss:// connect URL against the gateway origin with a fresh token.
+ * The socket lives on the gateway (VITE_API_BASE_URL in production) — the app origin
+ * serves only static assets and cannot upgrade WebSockets. Falls back to the page
+ * origin for local dev, mirroring resolveMcpBaseUrl.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildSocketUrl(token: string): string {
+  const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+  const url = new URL('/ws/realtime', apiBase || window.location.origin)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  url.searchParams.set('token', token)
+  return url.toString()
 }
 
 /**

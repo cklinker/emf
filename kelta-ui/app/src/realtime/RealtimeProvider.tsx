@@ -4,8 +4,13 @@ import { useAuth } from '@/context/AuthContext'
 import { useConfig } from '@/context/ConfigContext'
 import { useOnlineStatus } from '@/offline/useOnlineStatus'
 import { buildNavTabs } from '@/shells/EndUserShell/navTabs'
-import { MAX_SUBSCRIPTIONS, RealtimeClient, type RecordChangedEvent } from './RealtimeClient'
-import { queryKeysForEvent } from './invalidation'
+import {
+  MAX_SUBSCRIPTIONS,
+  RealtimeClient,
+  type ChatEvent,
+  type RecordChangedEvent,
+} from './RealtimeClient'
+import { chatQueryKeysForEvent, queryKeysForEvent } from './invalidation'
 
 const DEBOUNCE_MS = 250
 
@@ -74,9 +79,26 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       )
     }
 
+    const handleChatEvent = (event: ChatEvent) => {
+      // Debounce per conversation, mirroring the per-collection debounce.
+      const debounceKey = `chat:${event.conversationId}`
+      const existing = timers.get(debounceKey)
+      if (existing) clearTimeout(existing)
+      timers.set(
+        debounceKey,
+        setTimeout(() => {
+          timers.delete(debounceKey)
+          for (const key of chatQueryKeysForEvent(event)) {
+            void queryClient.invalidateQueries({ queryKey: key })
+          }
+        }, DEBOUNCE_MS)
+      )
+    }
+
     const client = new RealtimeClient({
       urlFactory: async () => buildSocketUrl(await getAccessToken()),
       onEvent: handleEvent,
+      onChatEvent: handleChatEvent,
     })
     for (const collection of collections) {
       client.subscribe(collection)

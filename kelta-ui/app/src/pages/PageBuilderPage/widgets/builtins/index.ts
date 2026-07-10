@@ -16,6 +16,7 @@ import { navWidget } from './nav'
 import { iconWidget } from './icon'
 import { linkWidget } from './link'
 import { metricWidget } from './metric'
+import { chatPanelWidget } from './chatPanel'
 import { registerFormFieldRenderers } from './registerFormFieldRenderers'
 
 let registered = false
@@ -41,6 +42,7 @@ export function registerBuiltinWidgets(): void {
     iconWidget,
     linkWidget,
     metricWidget,
+    chatPanelWidget,
   ]) {
     widgetRegistry.register(w)
   }

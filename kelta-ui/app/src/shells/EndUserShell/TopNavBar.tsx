@@ -49,8 +49,8 @@ export interface NavTab {
   /** Stable, unique key for the tab (the source menu-item path, or `group:<id>`). */
   key: string
   /** What this tab points at. A `group` renders as a dropdown of its children. */
-  kind: 'collection' | 'page' | 'dashboard' | 'report' | 'group'
-  /** Collection API name, page slug, or dashboard/report id per `kind` ('' for groups). */
+  kind: 'collection' | 'page' | 'dashboard' | 'report' | 'chat' | 'group'
+  /** Collection API name, page slug, or dashboard/report id per `kind` ('' for groups/chat). */
   target: string
   /** Display label */
   label: string
@@ -135,6 +135,8 @@ export function TopNavBar({
           return `${basePath}/dashboards/${tab.target}`
         case 'report':
           return `${basePath}/reports/${tab.target}`
+        case 'chat':
+          return `${basePath}/chat`
         default:
           return `${basePath}/o/${tab.target}`
       }

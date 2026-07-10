@@ -19,6 +19,28 @@ export interface RecordChangedEvent {
   timestamp?: string
 }
 
+/** Chat events (telehealth slice 3) — ids/state only, never bodies. */
+export interface ChatMessageEvent {
+  event: 'chat.message'
+  conversationId: string
+  messageId?: string
+  senderId?: string
+  senderType?: string
+  kind?: string
+  timestamp?: string
+}
+
+export interface ChatConversationEvent {
+  event: 'chat.conversation'
+  conversationId: string
+  status?: string
+  assignedTo?: string
+  queueId?: string
+  timestamp?: string
+}
+
+export type ChatEvent = ChatMessageEvent | ChatConversationEvent
+
 /** One user present on a resource (app-intelligence slice 3). */
 export interface PresenceUser {
   id: string
@@ -31,6 +53,8 @@ export interface RealtimeClientOptions {
   /** Returns a fresh connect URL (fetches a current token) — called on every (re)connect. */
   urlFactory: () => Promise<string>
   onEvent: (event: RecordChangedEvent) => void
+  /** Chat events for joined conversations (invalidation signals — no bodies). */
+  onChatEvent?: (event: ChatEvent) => void
   /** Injectable for tests. */
   webSocketFactory?: (url: string) => WebSocket
   /** Base reconnect delay in ms (doubles per attempt, capped at 30s). */
@@ -39,6 +63,8 @@ export interface RealtimeClientOptions {
 
 const MAX_RECONNECT_DELAY_MS = 30_000
 export const MAX_SUBSCRIPTIONS = 50
+/** Server cap (SubscriptionManager.MAX_CONVERSATIONS_PER_SESSION). */
+export const MAX_JOINED_CONVERSATIONS = 20
 
 export class RealtimeClient {
   private readonly options: Required<Pick<RealtimeClientOptions, 'urlFactory' | 'onEvent'>> &
@@ -47,6 +73,8 @@ export class RealtimeClient {
   private subscriptions = new Set<string>()
   // resource → listeners; joined resources re-join on every (re)connect.
   private presenceListeners = new Map<string, Set<PresenceListener>>()
+  // conversationId → refcount; joined conversations re-join on every (re)connect.
+  private conversations = new Map<string, number>()
   private reconnectAttempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private closed = false
@@ -80,6 +108,32 @@ export class RealtimeClient {
       this.send({ action: 'presence.join', resource })
     }
     listeners.add(listener)
+  }
+
+  /**
+   * Join a chat conversation channel (telehealth slice 3). Ref-counted so the
+   * thread view and a widget can share one join; the first ref sends
+   * chat.join, joined conversations re-join automatically on reconnect. The
+   * server verifies membership — a denied join simply produces an error frame
+   * and no events.
+   */
+  joinConversation(conversationId: string): void {
+    const count = this.conversations.get(conversationId) ?? 0
+    if (count === 0) {
+      if (this.conversations.size >= MAX_JOINED_CONVERSATIONS) return
+      this.send({ action: 'chat.join', conversationId })
+    }
+    this.conversations.set(conversationId, count + 1)
+  }
+
+  leaveConversation(conversationId: string): void {
+    const count = this.conversations.get(conversationId) ?? 0
+    if (count <= 1) {
+      this.conversations.delete(conversationId)
+      this.send({ action: 'chat.leave', conversationId })
+    } else {
+      this.conversations.set(conversationId, count - 1)
+    }
   }
 
   /** Remove a listener; the last one sends presence.leave. */
@@ -121,6 +175,9 @@ export class RealtimeClient {
       for (const resource of this.presenceListeners.keys()) {
         socket.send(JSON.stringify({ action: 'presence.join', resource }))
       }
+      for (const conversationId of this.conversations.keys()) {
+        socket.send(JSON.stringify({ action: 'chat.join', conversationId }))
+      }
     }
     socket.onmessage = (message: MessageEvent) => {
       try {
@@ -134,6 +191,12 @@ export class RealtimeClient {
             const users = Array.isArray(parsed.users) ? (parsed.users as PresenceUser[]) : []
             for (const listener of listeners) listener(users)
           }
+        }
+        if (
+          (parsed?.event === 'chat.message' || parsed?.event === 'chat.conversation') &&
+          typeof parsed.conversationId === 'string'
+        ) {
+          this.options.onChatEvent?.(parsed as ChatEvent)
         }
       } catch {
         // Non-JSON or unknown frame — ignore.

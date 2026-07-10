@@ -103,12 +103,17 @@ public class ChatService {
         int limit = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
         int offset = Math.max(0, page) * limit;
 
+        // my_last_read_at feeds the client's unread computation (slice 3):
+        // unread ⇔ last_message_at > my_last_read_at (or never read).
         StringBuilder sql = new StringBuilder("""
                 SELECT c.id, c.queue_id, c.subject, c.status, c.origin, c.assigned_to,
-                       c.context_record_id, c.last_message_at, c.closed_at, c.created_at
+                       c.context_record_id, c.last_message_at, c.closed_at, c.created_at,
+                       (SELECT p2.last_read_at FROM chat_participant p2
+                        WHERE p2.conversation_id = c.id AND p2.user_id = ?) AS my_last_read_at
                 FROM chat_conversation c
                 """);
         List<Object> args = new java.util.ArrayList<>();
+        args.add(actor.userId());
         sql.append("WHERE c.tenant_id = ? ");
         args.add(tenantId);
 
@@ -147,6 +152,7 @@ public class ChatService {
             row.put("lastMessageAt", ts(rs.getTimestamp("last_message_at")));
             row.put("closedAt", ts(rs.getTimestamp("closed_at")));
             row.put("createdAt", ts(rs.getTimestamp("created_at")));
+            row.put("myLastReadAt", ts(rs.getTimestamp("my_last_read_at")));
             return row;
         }, args.toArray());
     }

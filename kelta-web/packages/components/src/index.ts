@@ -16,6 +16,19 @@ export * from './detail';
 export { DataTable } from './DataTable/DataTable';
 export type { DataTableProps, ColumnDefinition } from './DataTable/types';
 
+// Chat primitives (telehealth slice 3)
+export { MessageList } from './Chat/MessageList';
+export { MessageComposer } from './Chat/MessageComposer';
+export { ConversationListItem } from './Chat/ConversationListItem';
+export type {
+  ChatMessageItem,
+  ChatConversationItem,
+  ChatSenderType,
+  MessageListProps,
+  MessageComposerProps,
+  ConversationListItemProps,
+} from './Chat/types';
+
 // ResourceForm
 export {
   ResourceForm,

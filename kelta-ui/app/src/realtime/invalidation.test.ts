@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { queryKeysForEvent } from './invalidation'
+import { chatQueryKeysForEvent, queryKeysForEvent } from './invalidation'
 import type { RecordChangedEvent } from './RealtimeClient'
 
 function event(collection: string): RecordChangedEvent {
@@ -20,5 +20,20 @@ describe('queryKeysForEvent', () => {
     expect(keys).toContainEqual(['my-approvals'])
     expect(keys).toContainEqual(['record-approval-state'])
     expect(keys).toContainEqual(['activity-approvals'])
+  })
+})
+
+describe('chatQueryKeysForEvent', () => {
+  it('chat.message invalidates the thread and the conversation lists', () => {
+    expect(chatQueryKeysForEvent({ event: 'chat.message', conversationId: 'conv-1' })).toEqual([
+      ['chat-conversations'],
+      ['chat-messages', 'conv-1'],
+    ])
+  })
+
+  it('chat.conversation invalidates the lists and the conversation detail', () => {
+    expect(chatQueryKeysForEvent({ event: 'chat.conversation', conversationId: 'conv-1' })).toEqual(
+      [['chat-conversations'], ['chat-conversation', 'conv-1']]
+    )
   })
 })

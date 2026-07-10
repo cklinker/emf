@@ -1,4 +1,4 @@
-import type { RecordChangedEvent } from './RealtimeClient'
+import type { ChatEvent, RecordChangedEvent } from './RealtimeClient'
 
 /** Collections whose changes affect the approvals surfaces (inbox, bell, record badge). */
 const APPROVAL_COLLECTIONS = new Set(['approval-instances', 'approval-step-instances'])
@@ -21,6 +21,21 @@ export function queryKeysForEvent(event: RecordChangedEvent): unknown[][] {
   ]
   if (APPROVAL_COLLECTIONS.has(event.collection)) {
     keys.push(['activity-approvals'], ['my-approvals'], ['record-approval-state'])
+  }
+  return keys
+}
+
+/**
+ * Maps a conversation-scoped chat event to query-key prefixes (telehealth
+ * slice 3). Same invalidation-only rule: the event carries ids only — the
+ * refetch goes through /api/chat/** where participant authz applies.
+ */
+export function chatQueryKeysForEvent(event: ChatEvent): unknown[][] {
+  const keys: unknown[][] = [['chat-conversations']]
+  if (event.event === 'chat.message') {
+    keys.push(['chat-messages', event.conversationId])
+  } else {
+    keys.push(['chat-conversation', event.conversationId])
   }
   return keys
 }

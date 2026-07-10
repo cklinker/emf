@@ -178,7 +178,7 @@ public class CompositeUniqueConstraintService {
         String suffix = String.join("_", columns);
         return PhysicalTableStorageAdapter.buildBoundedIdentifier(
                 INDEX_PREFIX,
-                PhysicalTableStorageAdapter.sanitizeIdentifier(baseTable),
+                PhysicalTableStorageAdapter.identifierPart(baseTable),
                 suffix);
     }
 

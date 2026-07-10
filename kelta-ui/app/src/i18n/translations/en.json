@@ -1075,7 +1075,14 @@
     "noLoginHistory": "No login history available",
     "profile": "Profile",
     "editUser": "Edit User",
-    "delegatedScope": "Delegated scope"
+    "delegatedScope": "Delegated scope",
+    "type": "Type",
+    "typeInternal": "Internal",
+    "typePortal": "Portal",
+    "invitePortal": "Invite Portal User",
+    "portalInviteHint": "Portal users sign in with an emailed link — no password. They only see records explicitly shared with them.",
+    "sendPortalInvite": "Send Invite",
+    "portalInviteSuccess": "Portal invite sent"
   },
   "delegatedAdmins": {
     "title": "Delegated Admins",

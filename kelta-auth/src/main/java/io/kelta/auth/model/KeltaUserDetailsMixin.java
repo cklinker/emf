@@ -25,6 +25,7 @@ public abstract class KeltaUserDetailsMixin {
             @JsonProperty("passwordHash") String passwordHash,
             @JsonProperty("active") boolean active,
             @JsonProperty("locked") boolean locked,
-            @JsonProperty("forceChangePassword") boolean forceChangePassword) {
+            @JsonProperty("forceChangePassword") boolean forceChangePassword,
+            @JsonProperty("userType") String userType) {
     }
 }

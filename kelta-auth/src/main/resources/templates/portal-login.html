@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Sign In — Kelta Platform</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1117; color: #e4e4e7; min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .login-container { width: 100%; max-width: 400px; padding: 2rem; }
+        .logo { text-align: center; margin-bottom: 2rem; }
+        .logo h1 { font-size: 1.5rem; font-weight: 600; color: #f4f4f5; }
+        .logo p { color: #71717a; font-size: 0.875rem; margin-top: 0.5rem; }
+        .card { background: #18181b; border: 1px solid #27272a; border-radius: 0.75rem; padding: 2rem; }
+        .alert-warning {
+            background: #422006; border: 1px solid #78350f; color: #fde68a;
+            padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; margin-bottom: 1.5rem;
+        }
+        .hint { color: #a1a1aa; font-size: 0.875rem; margin-bottom: 1.25rem; line-height: 1.5; }
+        .form-group { margin-bottom: 1.25rem; }
+        label { display: block; font-size: 0.875rem; font-weight: 500; color: #a1a1aa; margin-bottom: 0.5rem; }
+        input[type="email"] {
+            width: 100%; padding: 0.625rem 0.875rem; background: #09090b;
+            border: 1px solid #3f3f46; border-radius: 0.5rem; color: #f4f4f5;
+            font-size: 0.9375rem; outline: none; transition: border-color 0.15s;
+        }
+        input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+        .btn-primary {
+            width: 100%; padding: 0.625rem 1rem; background: #4f46e5; color: #fff;
+            border: none; border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 500;
+            cursor: pointer; transition: background 0.15s; margin-top: 0.5rem;
+        }
+        .btn-primary:hover { background: #4338ca; }
+        .footer { text-align: center; margin-top: 1.5rem; font-size: 0.8125rem; color: #52525b; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>Kelta Platform</h1>
+            <p>Portal sign in</p>
+        </div>
+
+        <div class="card">
+            <div th:if="${!tenantKnown}" class="alert-warning">
+                We couldn't determine your organization. Please open the portal
+                from your organization's link or invitation email.
+            </div>
+
+            <div th:if="${tenantKnown}">
+                <p class="hint">
+                    Enter your email address and we'll send you a sign-in link.
+                    No password needed.
+                </p>
+                <form th:action="@{/portal/login/request}" method="post">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email"
+                               placeholder="you@example.com" required autofocus>
+                    </div>
+                    <button type="submit" class="btn-primary">Email me a sign-in link</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="footer">
+            Kelta Enterprise Platform
+        </div>
+    </div>
+</body>
+</html>

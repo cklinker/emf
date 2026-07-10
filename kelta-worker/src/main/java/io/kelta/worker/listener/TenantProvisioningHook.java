@@ -149,7 +149,10 @@ public class TenantProvisioningHook implements BeforeSaveHook {
                                 "MANAGE_WORKFLOWS", "MANAGE_LISTVIEWS", "API_ACCESS", "VIEW_ANALYTICS")),
                 new ProfileDef("Minimum Access",
                         "Login only, no data access until explicitly granted via Permission Sets",
-                        Set.of())
+                        Set.of()),
+                new ProfileDef("Portal User",
+                        "External portal user (telehealth patient) — login and API access only; data access is granted per record via participant shares",
+                        Set.of("API_ACCESS"))
         );
 
         for (ProfileDef def : profileDefs) {

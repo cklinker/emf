@@ -128,8 +128,21 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `MANAGE_DELEGATED_ADMINS` for scopes) unless a `DelegatedWriteContext` is bound — this is what
   makes the delegated path safe against the generic collection route and `/api/operations`. The
   gateway `IdentityHeaderStripFilter` (order −400) strips client-supplied `X-User-Email`/
-  `X-User-Profile-Id`/`X-User-Profile-Name`/`X-Cerbos-Scope` at the chain head so the worker never
-  trusts a forged identity header on any path.
+  `X-User-Profile-Id`/`X-User-Profile-Name`/`X-Cerbos-Scope`/`X-User-Type` at the chain head so the
+  worker never trusts a forged identity header on any path.
+- **Portal identity** (telehealth slice 1, V167): `platform_user.user_type ∈ INTERNAL|PORTAL`.
+  Portal users are **passwordless** — no `user_credential` row exists (the form-login query
+  inner-joins it, structurally excluding them); their only entry is the magic-link flow on
+  kelta-auth (`/portal/login`, `/portal/login/request`, `/portal/login/verify` — permitAll pages;
+  single-use SHA-256-hashed tokens in `portal_login_token`, 15-min PORTAL_LOGIN / 7-day
+  PORTAL_INVITE, enumeration-safe uniform responses, per-user rate limit). Verified logins get a
+  normal auth session; the JWT carries a `user_type` claim which the gateway re-stamps as
+  `X-User-Type` (`HeaderTransformationFilter`; pre-claim tokens read as INTERNAL).
+  `POST /api/admin/users/portal-invite` (existing `/api/admin/**` static route,
+  `MANAGE_USERS` in-controller) creates the user with the seeded **Portal User** profile
+  (API_ACCESS only) and enforces the `maxPortalUsers` governor; re-posting an existing portal
+  email re-issues the invite link. Record-level access for portal users is granted per record via
+  `ParticipantShareSupport` → `record_share` (the existing Cerbos share-widening path).
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

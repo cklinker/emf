@@ -150,3 +150,38 @@ describe('AdminClient bulkJobs', () => {
     });
   });
 });
+
+describe('AdminClient users.invitePortal', () => {
+  let axios: AxiosInstance;
+  let client: AdminClient;
+  let mockPost: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    axios = createMockAxios();
+    client = new AdminClient(axios);
+    mockPost = axios.post as ReturnType<typeof vi.fn>;
+  });
+
+  it('POSTs the invite as a plain (non-JSON:API) body and returns the result', async () => {
+    mockPost.mockResolvedValue({ data: { userId: 'u1', status: 'INVITED' } });
+
+    const result = await client.users.invitePortal({
+      email: 'pat@example.com',
+      firstName: 'Pat',
+    });
+
+    expect(mockPost).toHaveBeenCalledWith('/api/admin/users/portal-invite', {
+      email: 'pat@example.com',
+      firstName: 'Pat',
+    });
+    expect(result).toEqual({ userId: 'u1', status: 'INVITED' });
+  });
+
+  it('surfaces a re-invite response unchanged', async () => {
+    mockPost.mockResolvedValue({ data: { userId: 'u1', status: 'REINVITED' } });
+
+    const result = await client.users.invitePortal({ email: 'pat@example.com' });
+
+    expect(result.status).toBe('REINVITED');
+  });
+});

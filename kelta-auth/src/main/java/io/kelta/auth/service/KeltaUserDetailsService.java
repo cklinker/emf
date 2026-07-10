@@ -47,6 +47,7 @@ public class KeltaUserDetailsService implements UserDetailsService {
                        COALESCE(pu.first_name || ' ' || pu.last_name, pu.email) AS display_name,
                        uc.password_hash,
                        pu.status,
+                       pu.user_type,
                        uc.locked_until,
                        uc.force_change_on_login
                 FROM platform_user pu
@@ -79,7 +80,8 @@ public class KeltaUserDetailsService implements UserDetailsService {
                 "ACTIVE".equals(rs.getString("status")),
                 rs.getTimestamp("locked_until") != null
                         && rs.getTimestamp("locked_until").toInstant().isAfter(java.time.Instant.now()),
-                rs.getBoolean("force_change_on_login")
+                rs.getBoolean("force_change_on_login"),
+                rs.getString("user_type")
         );
     }
 

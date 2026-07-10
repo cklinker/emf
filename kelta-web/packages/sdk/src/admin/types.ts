@@ -383,6 +383,7 @@ export interface PlatformUser {
   lastName: string;
   username?: string;
   status: 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'PENDING_ACTIVATION';
+  userType?: 'INTERNAL' | 'PORTAL';
   locale: string;
   timezone: string;
   profileId?: string;
@@ -392,6 +393,22 @@ export interface PlatformUser {
   mfaEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Request to create + invite an external portal user (magic-link login,
+ * no password). The server forces user_type=PORTAL + the Portal User profile.
+ */
+export interface PortalInviteRequest {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+/** Response from the portal-invite endpoint. */
+export interface PortalInviteResponse {
+  userId: string;
+  status: 'INVITED' | 'REINVITED';
 }
 
 /**

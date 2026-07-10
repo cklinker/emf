@@ -39,6 +39,7 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
     
     private static final String X_FORWARDED_USER_HEADER = "X-Forwarded-User";
     private static final String X_USER_ID_HEADER = "X-User-Id";
+    private static final String X_USER_TYPE_HEADER = "X-User-Type";
     private static final String X_FORWARDED_ROLES_HEADER = "X-Forwarded-Roles";
     private static final String X_FORWARDED_GROUPS_HEADER = "X-Forwarded-Groups";
     private static final String X_TENANT_ID_HEADER = "X-Tenant-ID";
@@ -77,6 +78,7 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                     // kept here as defense in depth.)
                     headers.remove(X_FORWARDED_USER_HEADER);
                     headers.remove(X_USER_ID_HEADER);
+                    headers.remove(X_USER_TYPE_HEADER);
                     headers.remove(X_FORWARDED_GROUPS_HEADER);
                     headers.remove(X_FORWARDED_ROLES_HEADER);
 
@@ -86,6 +88,13 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                     // Add X-User-Id header (email for platform_user resolution)
                     String userId = resolveUserId(principal);
                     headers.set(X_USER_ID_HEADER, userId);
+
+                    // Add X-User-Type header (INTERNAL|PORTAL) from the JWT
+                    // user_type claim; tokens minted before the claim existed
+                    // read as INTERNAL.
+                    Object userType = principal.getClaims().get("user_type");
+                    headers.set(X_USER_TYPE_HEADER,
+                            userType instanceof String s && !s.isEmpty() ? s : "INTERNAL");
 
                     // Add X-Forwarded-Groups header with comma-separated groups
                     String groups = principal.getGroups().stream()

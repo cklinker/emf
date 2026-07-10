@@ -100,6 +100,7 @@ public class KeltaTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCo
             claims.put("preferred_username", userDetails.getEmail());
             claims.put("tenant_id", userDetails.getTenantId());
             claims.put("profile_id", userDetails.getProfileId());
+            claims.put("user_type", userDetails.getUserType());
             if (userDetails.getProfileName() != null) {
                 claims.put("profile_name", userDetails.getProfileName());
             }
@@ -121,6 +122,7 @@ public class KeltaTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCo
             claims.put("preferred_username", userDetails.getEmail());
             claims.put("tenant_id", userDetails.getTenantId());
             claims.put("profile_id", userDetails.getProfileId());
+            claims.put("user_type", userDetails.getUserType());
             if (userDetails.getProfileName() != null) {
                 claims.put("profile_name", userDetails.getProfileName());
             }

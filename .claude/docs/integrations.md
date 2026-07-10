@@ -246,6 +246,21 @@ route `/api/email/**`) — stored-template-only, `MANAGE_EMAIL_TEMPLATES`-gated,
 per-tenant rate-limited; backs the `send_email` UI Quick Action. See
 `architecture.md` → *Transactional send endpoint*.
 
+## Portal magic-link login (telehealth slice 1)
+
+Passwordless sign-in for external `user_type=PORTAL` users. kelta-auth serves the pages
+(`/portal/login` → request form, `/portal/login/verify?token=` → consume + session) and
+stores only SHA-256 hashes in `portal_login_token` (V167, RLS): purpose `PORTAL_LOGIN`
+(15 min, max 3 outstanding per user per window) or `PORTAL_INVITE` (7 days, written by the
+worker's `PortalUserService` with the invite). Consumption is an atomic conditional
+`UPDATE … RETURNING`; responses are uniform ("check your email") to prevent account
+enumeration. Emails ride the standard template path — system templates `portal.invite` and
+`portal.login-link` (tenant-overridable by key), sent via `WorkerClient.sendTemplateEmail`
+(auth → worker internal) or `EmailService.sendByKey` (worker). After verify, the user is
+redirected to `{ui-base-url}/{tenantSlug}/app`; the app's OIDC redirect then completes
+silently against the authenticated session. MFA/TOTP is not interposed — link possession is
+the factor, and portal users cannot reach enrollment surfaces.
+
 ## Mass-email campaigns (V152)
 
 Bulk send on top of the same SMTP path. Three tenant-scoped tables (RLS): `email_campaign`

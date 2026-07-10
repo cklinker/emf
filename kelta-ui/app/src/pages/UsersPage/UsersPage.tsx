@@ -21,6 +21,7 @@ interface PlatformUser {
   lastName: string
   username?: string
   status: 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'PENDING_ACTIVATION'
+  userType?: 'INTERNAL' | 'PORTAL'
   locale: string
   timezone: string
   profileId?: string
@@ -425,6 +426,27 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
     },
   })
 
+  const [portalInviteOpen, setPortalInviteOpen] = useState(false)
+  const [portalInvite, setPortalInvite] = useState({ email: '', firstName: '', lastName: '' })
+
+  const portalInviteMutation = useMutation({
+    mutationFn: () =>
+      keltaClient.admin.users.invitePortal({
+        email: portalInvite.email,
+        firstName: portalInvite.firstName || undefined,
+        lastName: portalInvite.lastName || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      showToast(t('users.portalInviteSuccess'), 'success')
+      setPortalInviteOpen(false)
+      setPortalInvite({ email: '', firstName: '', lastName: '' })
+    },
+    onError: (err: Error) => {
+      showToast(err.message || t('errors.generic'), 'error')
+    },
+  })
+
   const createMutation = useMutation({
     mutationFn: (formData: CreateUserFormData) =>
       scoped
@@ -547,14 +569,25 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
             </span>
           )}
         </div>
-        {canCreate && (
-          <button
-            className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={() => setIsFormOpen(true)}
-          >
-            {t('users.createUser')}
-          </button>
-        )}
+        <div className="flex gap-2">
+          {!scoped && (
+            <button
+              data-testid="invite-portal-user"
+              className="cursor-pointer rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              onClick={() => setPortalInviteOpen(true)}
+            >
+              {t('users.invitePortal')}
+            </button>
+          )}
+          {canCreate && (
+            <button
+              className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setIsFormOpen(true)}
+            >
+              {t('users.createUser')}
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="mb-4 flex gap-4">
@@ -611,6 +644,9 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                     {t('users.status')}
                   </th>
                   <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
+                    {t('users.type')}
+                  </th>
+                  <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
                     {t('users.lastLogin')}
                   </th>
                   <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
@@ -637,6 +673,20 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                     <td className="border-b border-border p-3">{user.username || '—'}</td>
                     <td className="border-b border-border p-3">
                       <StatusBadge status={user.status} />
+                    </td>
+                    <td className="border-b border-border p-3">
+                      <span
+                        className={cn(
+                          'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
+                          user.userType === 'PORTAL'
+                            ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
+                            : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                        )}
+                      >
+                        {user.userType === 'PORTAL'
+                          ? t('users.typePortal')
+                          : t('users.typeInternal')}
+                      </span>
                     </td>
                     <td className="border-b border-border p-3">
                       {user.lastLoginAt ? formatDate(new Date(user.lastLoginAt)) : t('users.never')}
@@ -720,6 +770,95 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
             queryClient.invalidateQueries({ queryKey: ['users'] })
           }}
         />
+      )}
+
+      {portalInviteOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPortalInviteOpen(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setPortalInviteOpen(false)
+          }}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-[480px] rounded-lg bg-card p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            data-testid="portal-invite-dialog"
+          >
+            <h2 className="mb-2 text-xl font-semibold">{t('users.invitePortal')}</h2>
+            <p className="mb-4 text-sm text-muted-foreground">{t('users.portalInviteHint')}</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                portalInviteMutation.mutate()
+              }}
+            >
+              <div className="mb-3">
+                <label className="mb-1 block text-sm font-medium" htmlFor="portal-email">
+                  {t('users.email')}
+                </label>
+                <input
+                  id="portal-email"
+                  type="email"
+                  required
+                  value={portalInvite.email}
+                  onChange={(e) => setPortalInvite({ ...portalInvite, email: e.target.value })}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="mb-3 flex gap-3">
+                <div className="flex-1">
+                  <label className="mb-1 block text-sm font-medium" htmlFor="portal-first-name">
+                    {t('users.firstName')}
+                  </label>
+                  <input
+                    id="portal-first-name"
+                    type="text"
+                    value={portalInvite.firstName}
+                    onChange={(e) =>
+                      setPortalInvite({ ...portalInvite, firstName: e.target.value })
+                    }
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1 block text-sm font-medium" htmlFor="portal-last-name">
+                    {t('users.lastName')}
+                  </label>
+                  <input
+                    id="portal-last-name"
+                    type="text"
+                    value={portalInvite.lastName}
+                    onChange={(e) => setPortalInvite({ ...portalInvite, lastName: e.target.value })}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="cursor-pointer rounded-md border border-border bg-muted px-4 py-2 text-sm text-foreground"
+                  onClick={() => setPortalInviteOpen(false)}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={portalInviteMutation.isPending}
+                >
+                  {portalInviteMutation.isPending
+                    ? t('common.saving')
+                    : t('users.sendPortalInvite')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {confirmDialog.open && (

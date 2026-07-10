@@ -190,6 +190,26 @@ an audit feed.
 
 (No open bugs from the original audit. See Resolved → Bugs.)
 
+**FIXED (fix/unique-constraint-migration) — field `unique` flag toggles never reached the
+physical schema, and unique-violation 409s named the wrong field (found 2026-07-10 operating
+the student-incentives tenant).** (1) `SchemaMigrationEngine.migrateSchema` diffed added/
+removed/type-changed fields but never the `unique` flag, so PATCHing `unique=false` updated
+metadata while the Postgres constraint (default-named `<table>_<column>_key` from the inline
+`CREATE TABLE ... UNIQUE`) kept rejecting inserts — cross-tenant-invisible and only fixable via
+psql. Now a toggle resolves the actual single-column UNIQUE constraint name(s) from
+`information_schema` (legacy default names included) and drops them (true→false) or adds a
+hyphen-safe `uniq_<table>_<column>` constraint (false→true, idempotent under NATS event
+redelivery, skipped when any constraint already covers the column). Composite `uniq_*`
+*indexes* (CompositeUniqueConstraintService) and the EXTERNAL_ID unique index are untouched —
+the catalog lookup matches single-column constraints only. History rows recorded as
+`ALTER_UNIQUE`. (2) `detectUniqueViolationField` reported the *index name* for composite
+violations and probed only fields still flagged `unique` (a stale physical index therefore
+reported `unknown`); it now parses the Postgres error detail (`Key (country, slug)=(…)`) and
+maps physical columns back to field names, falling back to the old name/probe paths for
+drivers without that detail (H2). Tests: `SchemaMigrationEngineTest$UniqueFlagToggleTests`
+(H2 toggle both ways, idempotence, composite-index survival) +
+`PhysicalTableStorageAdapterTest$UniqueViolationColumnExtraction`.
+
 **FIXED (fix/cerbos-batch-chunking) — list pages over 50 rows silently emptied by the Cerbos
 batch limit (found 2026-07-10, in production).** The Cerbos server rejects CheckResources
 requests over 50 resources (`INVALID_ARGUMENT: number of resources in batch (N) exceeds

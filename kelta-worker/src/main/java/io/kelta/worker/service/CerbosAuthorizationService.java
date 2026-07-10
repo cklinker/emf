@@ -49,6 +49,16 @@ public class CerbosAuthorizationService {
     /** Maximum time (seconds) to wait for a single Cerbos gRPC call. */
     private static final long CERBOS_TIMEOUT_SECONDS = 2;
 
+    /**
+     * Maximum resources per CheckResources call. The Cerbos server rejects larger
+     * batches with INVALID_ARGUMENT ("number of resources in batch (N) exceeds
+     * configured limit (50)" — its default {@code requestLimits.maxActionsPerResource}
+     * companion limit). Larger inputs are transparently split into sequential calls;
+     * without this, any list page over 50 rows came back fully stripped (fail-closed)
+     * and three such pages opened the circuit breaker for the whole pod.
+     */
+    private static final int MAX_RESOURCES_PER_CHECK = 50;
+
     // Circuit breaker thresholds — configurable via kelta.worker.cerbos-cb-threshold
     // and kelta.worker.cerbos-cb-cooldown-seconds (see WorkerProperties).
 
@@ -304,57 +314,69 @@ public class CerbosAuthorizationService {
             toQuery.addAll(cached.asked());
         }
 
-        Future<Set<String>> future = cerbosExecutor.submit(() -> {
-            Principal principal = buildPrincipal(email, profileId, tenantId);
-
-            var batchRequest = cerbosClient.batch(principal);
-            for (String fieldId : toQuery) {
-                Resource resource = Resource.newInstance("field", fieldId)
-                        .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
-                        .withAttribute("fieldId", AttributeValue.stringValue(fieldId))
-                        .withScope(tenantId);
-                batchRequest.addResourceAndActions(resource, action);
+        // All chunks must succeed before the cache is written: a partial allow-set
+        // stored under the full asked-set would persist denials for fields Cerbos
+        // never answered about. Any chunk failure → deny everything, no cache write.
+        Set<String> allowed = new HashSet<>();
+        for (List<String> chunk : partition(List.copyOf(toQuery), MAX_RESOURCES_PER_CHECK)) {
+            if (isCircuitOpen()) {
+                log.warn("Cerbos circuit open — denying all field access (fail-closed): user={} collection={}",
+                        email, collectionId);
+                return List.of();
             }
+            Future<Set<String>> future = cerbosExecutor.submit(() -> {
+                Principal principal = buildPrincipal(email, profileId, tenantId);
 
-            CheckResourcesResult result = batchRequest.check();
-            Set<String> allowed = new HashSet<>();
-            for (String fieldId : toQuery) {
-                result.find(fieldId).ifPresentOrElse(
-                        checkResult -> {
-                            if (checkResult.isAllowed(action)) {
-                                allowed.add(fieldId);
-                            }
-                        },
-                        () -> log.warn("Cerbos batch field check: field not found in result (fail-closed): field={}", fieldId)
-                );
+                var batchRequest = cerbosClient.batch(principal);
+                for (String fieldId : chunk) {
+                    Resource resource = Resource.newInstance("field", fieldId)
+                            .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
+                            .withAttribute("fieldId", AttributeValue.stringValue(fieldId))
+                            .withScope(tenantId);
+                    batchRequest.addResourceAndActions(resource, action);
+                }
+
+                CheckResourcesResult result = batchRequest.check();
+                Set<String> chunkAllowed = new HashSet<>();
+                for (String fieldId : chunk) {
+                    result.find(fieldId).ifPresentOrElse(
+                            checkResult -> {
+                                if (checkResult.isAllowed(action)) {
+                                    chunkAllowed.add(fieldId);
+                                }
+                            },
+                            () -> log.warn("Cerbos batch field check: field not found in result (fail-closed): field={}", fieldId)
+                    );
+                }
+                return chunkAllowed;
+            });
+
+            try {
+                allowed.addAll(future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                recordSuccess();
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                recordFailure();
+                log.error("Cerbos batch field check timed out (fail-closed): user={} collection={} fields={}",
+                        email, collectionId, fieldIds.size());
+                return List.of();
+            } catch (Exception e) {
+                future.cancel(true);
+                recordFailure();
+                log.error("Cerbos batch field check failed (fail-closed): user={} collection={} error={}",
+                        email, collectionId, e.getMessage());
+                return List.of();
             }
-            return allowed;
-        });
-
-        try {
-            Set<String> allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            recordSuccess();
-            fieldAccessCache.put(cacheKey,
-                    new FieldAccessEntry(Set.copyOf(toQuery), Set.copyOf(allowed)));
-            List<String> result = fieldIds.stream()
-                    .filter(allowed::contains)
-                    .toList();
-            log.debug("Cerbos batch field check: user={} collection={} fields={} allowed={}",
-                    email, collectionId, fieldIds.size(), result.size());
-            return result;
-        } catch (TimeoutException e) {
-            future.cancel(true);
-            recordFailure();
-            log.error("Cerbos batch field check timed out (fail-closed): user={} collection={} fields={}",
-                    email, collectionId, fieldIds.size());
-            return List.of();
-        } catch (Exception e) {
-            future.cancel(true);
-            recordFailure();
-            log.error("Cerbos batch field check failed (fail-closed): user={} collection={} error={}",
-                    email, collectionId, e.getMessage());
-            return List.of();
         }
+
+        fieldAccessCache.put(cacheKey,
+                new FieldAccessEntry(Set.copyOf(toQuery), Set.copyOf(allowed)));
+        List<String> result = fieldIds.stream()
+                .filter(allowed::contains)
+                .toList();
+        log.debug("Cerbos batch field check: user={} collection={} fields={} allowed={}",
+                email, collectionId, fieldIds.size(), result.size());
+        return result;
     }
 
     /**
@@ -373,69 +395,88 @@ public class CerbosAuthorizationService {
             return Set.of();
         }
 
-        Future<Set<String>> future = cerbosExecutor.submit(() -> {
-            Principal principal = buildPrincipal(email, profileId, tenantId);
+        // Chunks are independent: a failed chunk denies only its own records
+        // (fail-closed) while the rest of the page stays authorized, so one bad
+        // gRPC call degrades a page instead of blanking it.
+        Set<String> allowed = new HashSet<>();
+        for (List<Map<String, Object>> chunk : partition(records, MAX_RESOURCES_PER_CHECK)) {
+            if (isCircuitOpen()) {
+                log.warn("Cerbos circuit open — denying remaining record access (fail-closed): user={} collection={}",
+                        email, collectionId);
+                break;
+            }
+            Future<Set<String>> future = cerbosExecutor.submit(() -> {
+                Principal principal = buildPrincipal(email, profileId, tenantId);
 
-            var batchRequest = cerbosClient.batch(principal);
-            for (Map<String, Object> record : records) {
-                String recordId = (String) record.get("id");
-                if (recordId == null) continue;
+                var batchRequest = cerbosClient.batch(principal);
+                for (Map<String, Object> record : chunk) {
+                    String recordId = (String) record.get("id");
+                    if (recordId == null) continue;
 
-                Resource resource = Resource.newInstance("record", recordId)
-                        .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
-                        .withAttribute("tenantId", stringAttr(tenantId));
+                    Resource resource = Resource.newInstance("record", recordId)
+                            .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
+                            .withAttribute("tenantId", stringAttr(tenantId));
 
-                @SuppressWarnings("unchecked")
-                Map<String, Object> attrs = (Map<String, Object>) record.get("attributes");
-                if (attrs != null) {
-                    for (Map.Entry<String, Object> entry : attrs.entrySet()) {
-                        if (entry.getValue() != null) {
-                            resource = resource.withAttribute(entry.getKey(), toAttributeValue(entry.getValue()));
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> attrs = (Map<String, Object>) record.get("attributes");
+                    if (attrs != null) {
+                        for (Map.Entry<String, Object> entry : attrs.entrySet()) {
+                            if (entry.getValue() != null) {
+                                resource = resource.withAttribute(entry.getKey(), toAttributeValue(entry.getValue()));
+                            }
                         }
                     }
+                    resource = resource.withScope(tenantId);
+                    batchRequest.addResourceAndActions(resource, action);
                 }
-                resource = resource.withScope(tenantId);
-                batchRequest.addResourceAndActions(resource, action);
-            }
 
-            CheckResourcesResult result = batchRequest.check();
-            Set<String> allowed = new java.util.HashSet<>();
-            for (Map<String, Object> record : records) {
-                String recordId = (String) record.get("id");
-                if (recordId == null) {
-                    continue;
+                CheckResourcesResult result = batchRequest.check();
+                Set<String> chunkAllowed = new HashSet<>();
+                for (Map<String, Object> record : chunk) {
+                    String recordId = (String) record.get("id");
+                    if (recordId == null) {
+                        continue;
+                    }
+                    result.find(recordId).ifPresentOrElse(
+                            checkResult -> {
+                                if (checkResult.isAllowed(action)) {
+                                    chunkAllowed.add(recordId);
+                                }
+                            },
+                            () -> log.warn("Cerbos batch record check: record not found in result (fail-closed): record={}", recordId)
+                    );
                 }
-                result.find(recordId).ifPresentOrElse(
-                        checkResult -> {
-                            if (checkResult.isAllowed(action)) {
-                                allowed.add(recordId);
-                            }
-                        },
-                        () -> log.warn("Cerbos batch record check: record not found in result (fail-closed): record={}", recordId)
-                );
-            }
-            return allowed;
-        });
+                return chunkAllowed;
+            });
 
-        try {
-            Set<String> allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            recordSuccess();
-            log.debug("Cerbos batch record check: user={} collection={} records={} allowed={}",
-                    email, collectionId, records.size(), allowed.size());
-            return allowed;
-        } catch (TimeoutException e) {
-            future.cancel(true);
-            recordFailure();
-            log.error("Cerbos batch record check timed out (fail-closed): user={} collection={} records={}",
-                    email, collectionId, records.size());
-            return Set.of();
-        } catch (Exception e) {
-            future.cancel(true);
-            recordFailure();
-            log.error("Cerbos batch record check failed (fail-closed): user={} collection={} error={}",
-                    email, collectionId, e.getMessage());
-            return Set.of();
+            try {
+                allowed.addAll(future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                recordSuccess();
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                recordFailure();
+                log.error("Cerbos batch record check timed out (chunk denied, fail-closed): user={} collection={} chunk={}",
+                        email, collectionId, chunk.size());
+            } catch (Exception e) {
+                future.cancel(true);
+                recordFailure();
+                log.error("Cerbos batch record check failed (chunk denied, fail-closed): user={} collection={} error={}",
+                        email, collectionId, e.getMessage());
+            }
         }
+
+        log.debug("Cerbos batch record check: user={} collection={} records={} allowed={}",
+                email, collectionId, records.size(), allowed.size());
+        return allowed;
+    }
+
+    /** Splits {@code items} into consecutive sublists of at most {@code size} elements. */
+    private static <T> List<List<T>> partition(List<T> items, int size) {
+        List<List<T>> chunks = new java.util.ArrayList<>();
+        for (int i = 0; i < items.size(); i += size) {
+            chunks.add(items.subList(i, Math.min(i + size, items.size())));
+        }
+        return chunks;
     }
 
     /**

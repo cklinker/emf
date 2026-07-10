@@ -190,6 +190,23 @@ an audit feed.
 
 (No open bugs from the original audit. See Resolved → Bugs.)
 
+**FIXED (fix/cerbos-batch-chunking) — list pages over 50 rows silently emptied by the Cerbos
+batch limit (found 2026-07-10, in production).** The Cerbos server rejects CheckResources
+requests over 50 resources (`INVALID_ARGUMENT: number of resources in batch (N) exceeds
+configured limit (50)`). `CerbosAuthorizationService.batchCheckRecordAccess` sent the whole
+page in one call, so any authenticated list read with `page[size] > 50` on a 51+-row collection
+failed the check, fail-closed stripped **every** row, and the response went out as HTTP 200 with
+`data: []` and a correct `totalCount` — indistinguishable from an empty collection. Three such
+pages also tripped the Cerbos circuit breaker, denying ALL field+record access pod-wide for 10s
+(one over-sized client query = tenant-wide authz brownout). Previously misdiagnosed as an MCP
+`ResponseShaper` bug; MCP `query_collection` and REST both die on it because it lives in the
+worker. `batchCheckFieldAccess` had the same unbounded batch (collections with >50 fields).
+Both now split into ≤50-resource sequential Cerbos calls (`MAX_RESOURCES_PER_CHECK`): record
+chunks fail closed independently (a bad chunk denies only its own records), field chunks deny
+everything and skip the cache write on any failure (a partial allow-set under the full asked-set
+would persist phantom denials). Regression tests in `CerbosAuthorizationServiceTest` (chunk
+fan-out, partial-failure semantics, cache integrity).
+
 **FIXED (fix/mcp-admin-tooling-gaps) — kelta-mcp admin tooling batch (7 defects found building a tenant end-to-end over MCP, 2026-07-10).**
 (1) `FieldBodyBuilder.extractFirstId` substring-scanned for the first `"id"` after `"data"` and
 returned `relationships.createdBy.data.id` — the acting *user's* UUID — because worker responses

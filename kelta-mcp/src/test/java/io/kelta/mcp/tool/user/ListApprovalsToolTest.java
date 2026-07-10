@@ -41,30 +41,30 @@ class ListApprovalsToolTest {
 
     @Test
     void defaultsToPendingFilter() {
-        wm.stubFor(get(urlEqualTo("/api/approvalInstances?filter[status][EQ]=PENDING"))
+        wm.stubFor(get(urlEqualTo("/api/approval-instances?filter[status][EQ]=PENDING"))
                 .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
 
         tool.toSpecification().callHandler().apply(
                 null, new CallToolRequest("list_approvals", Map.of(), null));
 
         wm.verify(WireMock.getRequestedFor(
-                urlEqualTo("/api/approvalInstances?filter[status][EQ]=PENDING")));
+                urlEqualTo("/api/approval-instances?filter[status][EQ]=PENDING")));
     }
 
     @Test
     void allStatusOmitsTheFilter() {
-        wm.stubFor(get(urlEqualTo("/api/approvalInstances"))
+        wm.stubFor(get(urlEqualTo("/api/approval-instances"))
                 .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
 
         tool.toSpecification().callHandler().apply(
                 null, new CallToolRequest("list_approvals", Map.of("status", "all"), null));
 
-        wm.verify(WireMock.getRequestedFor(urlEqualTo("/api/approvalInstances")));
+        wm.verify(WireMock.getRequestedFor(urlEqualTo("/api/approval-instances")));
     }
 
     @Test
     void appendsPagingParams() {
-        wm.stubFor(get(urlEqualTo("/api/approvalInstances?filter[status][EQ]=APPROVED&page[size]=50&page[number]=2"))
+        wm.stubFor(get(urlEqualTo("/api/approval-instances?filter[status][EQ]=APPROVED&page[size]=50&page[number]=2"))
                 .willReturn(aResponse().withStatus(200).withBody("{\"data\":[]}")));
 
         tool.toSpecification().callHandler().apply(
@@ -74,6 +74,6 @@ class ListApprovalsToolTest {
                         "pageNumber", 2), null));
 
         wm.verify(WireMock.getRequestedFor(
-                urlEqualTo("/api/approvalInstances?filter[status][EQ]=APPROVED&page[size]=50&page[number]=2")));
+                urlEqualTo("/api/approval-instances?filter[status][EQ]=APPROVED&page[size]=50&page[number]=2")));
     }
 }

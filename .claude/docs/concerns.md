@@ -252,6 +252,10 @@ create and fail their own type validation — all converted to JSON values, and
 error envelopes rendered as `{"errors":[{}]}` (bean members dropped at serialization on the
 deployed worker); `GlobalExceptionHandler` now emits plain maps (`JsonApiError.toMap()`), which
 serialize reliably under any mapper config — never build error bodies from the bean directly.
+*(Follow-up fix/mcp-kebab-leftovers, 2026-07-10: the batch missed three more camelCase paths —
+`update_layout`/`delete_layout` (`/api/pageLayouts/{id}`) and `list_approvals`
+(`/api/approvalInstances`) — all 404'd against the kebab routes; found when `delete_layout`
+failed during tenant layout setup. New MCP tools MUST use kebab-case system-collection routes.)*
 
 **FIXED (fix/hyphen-collection-refresh) — kebab-case collection names broke generated SQL identifier names.**
 `PhysicalTableStorageAdapter.sanitizeIdentifier` (strict `[a-zA-Z0-9_]`) was fed raw

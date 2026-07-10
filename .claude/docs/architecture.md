@@ -160,6 +160,17 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `RealtimeBridge` SKIPS `chat-*` collections and the WS `subscribe` action rejects them
   (chat.join is the only socket channel for chat). Message bodies never leave the
   authorized HTTP path (not in NATS chat payloads, WS events, or search indexes).
+- **Telehealth scheduling** (slice 4, V169): `/api/telehealth/**` is a static route — authz
+  in-controller (`TelehealthController`): portal actors act on themselves (body-supplied
+  `portalUserId` ignored for portal callers), providers on their own appointments,
+  `view=provider` staff-only; user types re-validated server-side. Booking runs under a
+  per-provider `pg_advisory_xact_lock` + `SlotService` re-check in one transaction
+  (race-safe, no DB extensions) and writes via `QueryEngine` (`AppointmentHook` validates
+  the window + grants the portal participant `record_share`). The scheduling collections
+  carry NO object-permission rows (admin-only generic JSON:API), like chat.
+  `GET /api/telehealth/visits/{token}` is an **unauthenticated path** (signed HMAC visit
+  token → live-row re-check → fresh single-use portal login token → 302 to the auth
+  verify). Reminders: `AppointmentReminderSweep` (atomic UPDATE-claim, multi-pod safe).
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

@@ -261,6 +261,22 @@ redirected to `{ui-base-url}/{tenantSlug}/app`; the app's OIDC redirect then com
 silently against the authenticated session. MFA/TOTP is not interposed — link possession is
 the factor, and portal users cannot reach enrollment surfaces.
 
+## Telehealth visit links + calendar invites (slice 4)
+
+Appointment emails (`appointment.confirmed`/`.reminder`/`.cancelled`, system templates
+V169) carry a **visit link**: a stateless HMAC token (`VisitTokenService`, secret
+`kelta.telehealth.visit-secret` / `KELTA_TELEHEALTH_VISIT_SECRET` — a DEV default with a
+startup warning applies when unset) binding (tenant, appointment, portalUser, exp =
+scheduledEnd+1h). `GET /api/telehealth/visits/{token}` is a gateway
+**unauthenticated path**: it re-validates against the LIVE appointment row (a cancelled
+appointment kills the link), mints a fresh single-use 15-minute `portal_login_token`, and
+302s into the kelta-auth magic-link verify — one click from email to an authenticated
+portal session. Confirmations additionally attach a hand-rolled **RFC 5545 .ics**
+(`IcsGenerator`, single VEVENT, UTC, METHOD:PUBLISH) via
+`DefaultEmailService.queueEmailWithAttachments`. Reminders come from
+`AppointmentReminderSweep` (60s poll, atomic UPDATE-claim on `reminder_sent_at`, offset
+`kelta.telehealth.reminders.offset-minutes`, toggle `…reminders.enabled`).
+
 ## Mass-email campaigns (V152)
 
 Bulk send on top of the same SMTP path. Three tenant-scoped tables (RLS): `email_campaign`

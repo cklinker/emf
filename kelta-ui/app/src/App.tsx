@@ -86,6 +86,11 @@ const EndUserChatConsolePage = React.lazy(() =>
     default: m.ChatConsolePage,
   }))
 )
+const EndUserAppointmentsPage = React.lazy(() =>
+  import('./pages/app/AppointmentsPage/AppointmentsPage').then((m) => ({
+    default: m.AppointmentsPage,
+  }))
+)
 const EndUserObjectDetailPage = React.lazy(() =>
   import('./pages/app/ObjectDetailPage/ObjectDetailPage').then((m) => ({
     default: m.ObjectDetailPage,
@@ -1479,6 +1484,14 @@ function TenantRoutes(): React.ReactElement {
             element={
               <React.Suspense fallback={<PageLoader message="Loading..." />}>
                 <EndUserChatConsolePage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="appointments"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserAppointmentsPage />
               </React.Suspense>
             }
           />

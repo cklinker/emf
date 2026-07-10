@@ -17,6 +17,7 @@ import { iconWidget } from './icon'
 import { linkWidget } from './link'
 import { metricWidget } from './metric'
 import { chatPanelWidget } from './chatPanel'
+import { appointmentSchedulerWidget } from './appointmentScheduler'
 import { registerFormFieldRenderers } from './registerFormFieldRenderers'
 
 let registered = false
@@ -43,6 +44,7 @@ export function registerBuiltinWidgets(): void {
     linkWidget,
     metricWidget,
     chatPanelWidget,
+    appointmentSchedulerWidget,
   ]) {
     widgetRegistry.register(w)
   }

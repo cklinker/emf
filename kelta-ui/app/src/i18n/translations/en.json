@@ -1290,6 +1290,21 @@
     "rejectTitle": "Reject record",
     "commentLabel": "Comment (optional)"
   },
+  "scheduling": {
+    "provider": "Provider",
+    "selectProvider": "Select a provider…",
+    "noSlots": "No open times in the next two weeks.",
+    "reasonPlaceholder": "What is the visit about? (optional)",
+    "confirmBooking": "Confirm appointment",
+    "bookedConfirmation": "Booked! A confirmation email is on its way.",
+    "bookFailed": "That slot is no longer available — pick another.",
+    "upcoming": "Your upcoming appointments",
+    "cancel": "Cancel",
+    "complete": "Complete",
+    "noShow": "No-show",
+    "myScheduleTitle": "My Appointments",
+    "emptySchedule": "No appointments yet"
+  },
   "chat": {
     "title": "Chat",
     "tabMine": "My conversations",

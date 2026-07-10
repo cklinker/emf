@@ -304,6 +304,16 @@ public class FlowConfig {
         return hook;
     }
 
+    @Bean
+    public io.kelta.worker.listener.AppointmentHook appointmentHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.service.ParticipantShareSupport participantShareSupport) {
+        io.kelta.worker.listener.AppointmentHook hook =
+                new io.kelta.worker.listener.AppointmentHook(participantShareSupport);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     /**
      * Runs tenant-defined record-event scripts (record-scripts system collection) through the
      * sandboxed GraalVM ScriptExecutor on record writes (unified record experience, slice 7).

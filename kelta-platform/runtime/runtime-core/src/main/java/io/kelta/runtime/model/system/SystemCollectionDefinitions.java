@@ -110,6 +110,10 @@ public final class SystemCollectionDefinitions {
         definitions.add(chatMessages());
         definitions.add(chatParticipants());
 
+        // Scheduling (telehealth slice 4)
+        definitions.add(telehealthAvailability());
+        definitions.add(telehealthAppointments());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -305,6 +309,54 @@ public final class SystemCollectionDefinitions {
                 .withEnumValues(List.of("AGENT", "PORTAL")))
             .addField(FieldDefinition.datetime("joinedAt").withColumnName("joined_at"))
             .addField(FieldDefinition.datetime("lastReadAt").withColumnName("last_read_at"))
+            .build();
+    }
+
+    // ------------------------------------------------------------------
+    // Scheduling (telehealth slice 4, specs/telehealth/4-scheduling.md).
+    // Like chat: no object-permission rows are seeded — /api/telehealth/**
+    // (participant/provider-checked in-controller) is the product path.
+    // ------------------------------------------------------------------
+
+    public static CollectionDefinition telehealthAvailability() {
+        return systemBuilder("telehealth-availability", "Telehealth Availability", "telehealth_availability")
+            .displayFieldName("id")
+            .addField(FieldDefinition.lookup("providerId", "users", "Provider")
+                .withColumnName("provider_id"))
+            .addField(FieldDefinition.requiredString("kind", 20)
+                .withDefault("RULE")
+                .withEnumValues(List.of("RULE", "EXCEPTION")))
+            .addField(FieldDefinition.integer("weekday"))
+            .addField(FieldDefinition.date("exceptionDate").withColumnName("exception_date"))
+            .addField(FieldDefinition.string("startTime", 8).withColumnName("start_time"))
+            .addField(FieldDefinition.string("endTime", 8).withColumnName("end_time"))
+            .addField(FieldDefinition.requiredString("timezone", 50).withDefault("UTC"))
+            .addField(FieldDefinition.bool("closed").withDefault(false))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .build();
+    }
+
+    public static CollectionDefinition telehealthAppointments() {
+        return systemBuilder("telehealth-appointments", "Telehealth Appointments", "telehealth_appointment")
+            .displayFieldName("id")
+            .addImmutableField("providerId")
+            .addImmutableField("portalUserId")
+            .addField(FieldDefinition.lookup("providerId", "users", "Provider")
+                .withColumnName("provider_id"))
+            .addField(FieldDefinition.lookup("portalUserId", "users", "Portal User")
+                .withColumnName("portal_user_id"))
+            .addField(FieldDefinition.datetime("scheduledStart").withColumnName("scheduled_start"))
+            .addField(FieldDefinition.datetime("scheduledEnd").withColumnName("scheduled_end"))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("CONFIRMED")
+                .withEnumValues(List.of("REQUESTED", "CONFIRMED", "CANCELLED", "COMPLETED", "NO_SHOW")))
+            .addField(FieldDefinition.string("visitType", 100).withColumnName("visit_type"))
+            .addField(FieldDefinition.string("reason", 500))
+            .addField(FieldDefinition.lookup("conversationId", "chat-conversations", "Conversation")
+                .withColumnName("conversation_id"))
+            .addField(FieldDefinition.string("videoSessionId", 36).withColumnName("video_session_id"))
+            .addField(FieldDefinition.datetime("reminderSentAt").withColumnName("reminder_sent_at"))
+            .addField(FieldDefinition.datetime("cancelledAt").withColumnName("cancelled_at"))
             .build();
     }
 

@@ -197,6 +197,9 @@ public class RouteConfigService {
                 {"collection-versions", "/api/collection-versions/**", "collection-versions"},
                 // Chat (telehealth slice 2) — controller enforces participant authz
                 {"chat", "/api/chat/**", "chat"},
+                // Scheduling (telehealth slice 4) — controller enforces owner/provider authz;
+                // /api/telehealth/visits/** additionally rides the unauthenticated-paths list
+                {"telehealth", "/api/telehealth/**", "telehealth"},
                 // Automation & integration
                 {"flows", "/api/flows/**", "flows"},
                 {"approval-processes", "/api/approval-processes/**", "approval-processes"},

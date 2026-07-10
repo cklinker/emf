@@ -132,11 +132,11 @@ public class PortalUserService {
      * email. The raw token exists only inside the emailed link.
      */
     private void issueInviteLink(String tenantId, String userId, String email, String firstName) {
-        String rawToken = generateToken();
+        String rawToken = PortalTokens.generate();
         jdbcTemplate.update(
                 "INSERT INTO portal_login_token (id, tenant_id, user_id, token_hash, purpose, "
                         + "expires_at, created_at) VALUES (?, ?, ?, ?, 'PORTAL_INVITE', ?, NOW())",
-                UUID.randomUUID().toString(), tenantId, userId, sha256(rawToken),
+                UUID.randomUUID().toString(), tenantId, userId, PortalTokens.sha256(rawToken),
                 Timestamp.from(Instant.now().plus(INVITE_EXPIRY)));
 
         String tenantName = jdbcTemplate.queryForList(
@@ -155,18 +155,13 @@ public class PortalUserService {
                 "PORTAL_INVITE", userId);
     }
 
+    // Token material moved to PortalTokens (telehealth slice 4) so every
+    // portal_login_token issuer produces identical hashes.
     static String generateToken() {
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        return HexFormat.of().formatHex(bytes);
+        return PortalTokens.generate();
     }
 
     static String sha256(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
-        }
+        return PortalTokens.sha256(value);
     }
 }

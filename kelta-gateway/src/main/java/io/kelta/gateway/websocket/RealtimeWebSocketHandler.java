@@ -153,6 +153,14 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
 
             switch (action) {
                 case "subscribe" -> {
+                    // Chat collections are conversation-scoped — the tenant-wide
+                    // collection channel is closed for them (use chat.join, which
+                    // is membership-checked). Belt to RealtimeBridge's skip.
+                    if (collection.startsWith("chat-")) {
+                        sendMessage(session, Map.of("action", "error",
+                                "message", "Chat collections use chat.join"));
+                        return;
+                    }
                     if (subscriptionManager.subscribe(session, tenantId, collection)) {
                         sendMessage(session, Map.of("action", "subscribed", "collection", collection));
                         log.debug("Session {} subscribed to {}", session.getId(), collection);

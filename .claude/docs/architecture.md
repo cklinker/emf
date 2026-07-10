@@ -155,8 +155,11 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   events. WebSocket: `chat.join` is verified against `/internal/chat/.../members`
   (reactive `ChatMembershipClient`, 30s cache, fail-closed) before the session enters the
   per-conversation routing index (20 joins/session); `ChatMessageBridge` fans only to
-  joined sessions — never the tenant-wide collection broadcast. Message bodies never leave
-  the authorized HTTP path (not in NATS payloads, WS events, or search indexes).
+  joined sessions — never the tenant-wide collection broadcast. To keep that true even
+  though chat writes emit generic `record.changed` (QueryEngine path → flows/search/audit),
+  `RealtimeBridge` SKIPS `chat-*` collections and the WS `subscribe` action rejects them
+  (chat.join is the only socket channel for chat). Message bodies never leave the
+  authorized HTTP path (not in NATS chat payloads, WS events, or search indexes).
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

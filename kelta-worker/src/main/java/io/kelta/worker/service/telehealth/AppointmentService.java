@@ -9,6 +9,7 @@ import io.kelta.worker.service.email.DefaultEmailService;
 import io.kelta.worker.service.email.EmailAttachment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -51,6 +52,10 @@ public class AppointmentService {
     private final CollectionRegistry collectionRegistry;
     private final SlotService slotService;
     private final VisitTokenService visitTokenService;
+    // Nullable: the DefaultEmailService bean only exists when
+    // kelta.email.enabled=true (EmailConfig @ConditionalOnProperty). Injected
+    // via ObjectProvider so the context still starts with email disabled —
+    // appointment emails are then skipped, matching ScheduledJobExecutorService.
     private final DefaultEmailService emailService;
     private final EmailRepository emailRepository;
     private final String workerPublicBaseUrl;
@@ -60,7 +65,7 @@ public class AppointmentService {
                               CollectionRegistry collectionRegistry,
                               SlotService slotService,
                               VisitTokenService visitTokenService,
-                              DefaultEmailService emailService,
+                              ObjectProvider<DefaultEmailService> emailServiceProvider,
                               EmailRepository emailRepository,
                               @Value("${kelta.external-base-url:}") String externalBaseUrl) {
         this.jdbcTemplate = jdbcTemplate;
@@ -68,7 +73,7 @@ public class AppointmentService {
         this.collectionRegistry = collectionRegistry;
         this.slotService = slotService;
         this.visitTokenService = visitTokenService;
-        this.emailService = emailService;
+        this.emailService = emailServiceProvider.getIfAvailable();
         this.emailRepository = emailRepository;
         this.workerPublicBaseUrl = externalBaseUrl;
     }
@@ -202,6 +207,9 @@ public class AppointmentService {
     // ------------------------------------------------------------- Emails
 
     void sendConfirmation(String tenantId, Map<String, Object> appointment) {
+        if (emailService == null) {
+            return; // email disabled for this deployment
+        }
         String appointmentId = String.valueOf(appointment.get("id"));
         Instant start = Instant.parse(String.valueOf(appointment.get("scheduledStart")));
         Instant end = Instant.parse(String.valueOf(appointment.get("scheduledEnd")));
@@ -231,6 +239,9 @@ public class AppointmentService {
     /** Shared by the reminder sweep — template send with the visit link, no attachment. */
     public void sendTemplate(String tenantId, Map<String, Object> appointment,
                              String templateKey, String sourceOverride) {
+        if (emailService == null) {
+            return; // email disabled for this deployment
+        }
         Recipient recipient = recipient(tenantId, String.valueOf(appointment.get("portalUserId")));
         if (recipient == null) {
             return;

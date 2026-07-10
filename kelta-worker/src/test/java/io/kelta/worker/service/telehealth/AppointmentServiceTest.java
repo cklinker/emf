@@ -57,9 +57,13 @@ class AppointmentServiceTest {
         when(visitTokenService.sign(anyString(), anyString(), anyString(), any()))
                 .thenReturn("signed-visit-token");
         emailService = mock(DefaultEmailService.class);
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<DefaultEmailService> emailProvider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(emailProvider.getIfAvailable()).thenReturn(emailService);
         emailRepository = mock(EmailRepository.class);
         service = new AppointmentService(jdbcTemplate, queryEngine, registry, slotService,
-                visitTokenService, emailService, emailRepository, "https://app.example.com");
+                visitTokenService, emailProvider, emailRepository, "https://app.example.com");
     }
 
     private void stubUserType(String userId, String type) {

@@ -420,6 +420,57 @@ class CerbosAuthorizationServiceTest {
     }
 
     @Nested
+    @DisplayName("Collection-wide record access (record-invariant short-circuit)")
+    class CollectionWideRecordAccess {
+
+        @Test
+        @DisplayName("ALLOW is cached per (tenant, profile, collection, action)")
+        void allowIsCached() {
+            when(cerbosClient.check(any(Principal.class), any(Resource.class), eq("read")))
+                    .thenReturn(fieldCheckResult);
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+
+            assertThat(service.checkCollectionWideRecordAccess(
+                    "user@test.com", "profile-1", "tenant-1", "contacts", "read")).isTrue();
+            assertThat(service.checkCollectionWideRecordAccess(
+                    "user@test.com", "profile-1", "tenant-1", "contacts", "read")).isTrue();
+
+            verify(cerbosClient, times(1)).check(any(), any(), eq("read"));
+        }
+
+        @Test
+        @DisplayName("DENY is returned but never cached (could be a fail-closed artifact)")
+        void denyIsNotCached() {
+            when(cerbosClient.check(any(Principal.class), any(Resource.class), eq("read")))
+                    .thenReturn(fieldCheckResult);
+            when(fieldCheckResult.isAllowed("read")).thenReturn(false);
+
+            assertThat(service.checkCollectionWideRecordAccess(
+                    "user@test.com", "profile-1", "tenant-1", "contacts", "read")).isFalse();
+            assertThat(service.checkCollectionWideRecordAccess(
+                    "user@test.com", "profile-1", "tenant-1", "contacts", "read")).isFalse();
+
+            verify(cerbosClient, times(2)).check(any(), any(), eq("read"));
+        }
+
+        @Test
+        @DisplayName("evictForTenant clears the cached collection-wide decisions")
+        void evictionClearsCache() {
+            when(cerbosClient.check(any(Principal.class), any(Resource.class), eq("read")))
+                    .thenReturn(fieldCheckResult);
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+
+            service.checkCollectionWideRecordAccess(
+                    "user@test.com", "profile-1", "tenant-1", "contacts", "read");
+            service.evictForTenant("tenant-1");
+            service.checkCollectionWideRecordAccess(
+                    "user@test.com", "profile-1", "tenant-1", "contacts", "read");
+
+            verify(cerbosClient, times(2)).check(any(), any(), eq("read"));
+        }
+    }
+
+    @Nested
     @DisplayName("Collection (object-level) access")
     class CollectionAccess {
 

@@ -24,13 +24,17 @@ class CerbosRecordAuthorizationAdviceTest {
     @Mock private CerbosAuthorizationService authzService;
     @Mock private CerbosPermissionResolver permissionResolver;
     @Mock private RecordShareAccessService recordShareAccessService;
+    @Mock private io.kelta.worker.service.RecordRuleIndex recordRuleIndex;
 
     private CerbosRecordAuthorizationAdvice advice;
 
     @BeforeEach
     void setUp() {
+        // Default: collection has record-variant rules → the batch path (the
+        // pre-short-circuit behavior every existing test was written against).
+        lenient().when(recordRuleIndex.hasRecordVariantRules(any(), any())).thenReturn(true);
         advice = new CerbosRecordAuthorizationAdvice(
-                authzService, permissionResolver, recordShareAccessService, true);
+                authzService, permissionResolver, recordShareAccessService, recordRuleIndex, true);
     }
 
     private ServletServerHttpRequest createRequest(String path) {
@@ -310,8 +314,50 @@ class CerbosRecordAuthorizationAdviceTest {
     @DisplayName("Should skip when permissions disabled")
     void shouldDoNothingWhenDisabled() {
         var disabledAdvice = new CerbosRecordAuthorizationAdvice(
-                authzService, permissionResolver, recordShareAccessService, false);
+                authzService, permissionResolver, recordShareAccessService, recordRuleIndex, false);
         assertThat(disabledAdvice.supports(null, null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("collections without record-variant rules use one collection-wide check, not the batch")
+    void shortCircuitsWithoutVariantRules() {
+        var request = createRequest("/api/contacts");
+        when(recordRuleIndex.hasRecordVariantRules("tenant-1", "contacts")).thenReturn(false);
+        when(authzService.checkCollectionWideRecordAccess(
+                "user@example.com", "profile-1", "tenant-1", "contacts", "read")).thenReturn(true);
+
+        Map<String, Object> body = Map.of("data", List.of(
+                Map.of("id", "1"), Map.of("id", "2"), Map.of("id", "3")));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) advice.beforeBodyWrite(
+                body, null, MediaType.APPLICATION_JSON, null, request, null);
+
+        assertThat((List<?>) result.get("data")).hasSize(3);
+        verify(authzService, never()).batchCheckRecordAccess(any(), any(), any(), any(), anyList(), any());
+    }
+
+    @Test
+    @DisplayName("collection-wide deny filters everything but record shares still widen")
+    void shortCircuitDenyStillWidensViaShares() {
+        var request = createRequest("/api/contacts");
+        when(recordRuleIndex.hasRecordVariantRules("tenant-1", "contacts")).thenReturn(false);
+        when(authzService.checkCollectionWideRecordAccess(
+                "user@example.com", "profile-1", "tenant-1", "contacts", "read")).thenReturn(false);
+        when(recordShareAccessService.widen(eq("user@example.com"), eq("contacts"), anySet(), eq("read")))
+                .thenReturn(Set.of("2"));
+
+        Map<String, Object> body = Map.of("data", List.of(
+                Map.of("id", "1"), Map.of("id", "2")));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) advice.beforeBodyWrite(
+                body, null, MediaType.APPLICATION_JSON, null, request, null);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> data = (List<Map<String, Object>>) result.get("data");
+        assertThat(data).extracting(r -> r.get("id")).containsExactly("2");
+        verify(authzService, never()).batchCheckRecordAccess(any(), any(), any(), any(), anyList(), any());
     }
 
     @Test

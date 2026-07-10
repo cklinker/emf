@@ -2,6 +2,7 @@ package io.kelta.worker.interceptor;
 
 import io.kelta.worker.service.CerbosAuthorizationService;
 import io.kelta.worker.service.CerbosPermissionResolver;
+import io.kelta.worker.service.RecordRuleIndex;
 import io.kelta.worker.service.RecordShareAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -37,16 +38,19 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
     private final CerbosAuthorizationService authzService;
     private final CerbosPermissionResolver permissionResolver;
     private final RecordShareAccessService recordShareAccessService;
+    private final RecordRuleIndex recordRuleIndex;
     private final boolean permissionsEnabled;
 
     public CerbosRecordAuthorizationAdvice(
             CerbosAuthorizationService authzService,
             CerbosPermissionResolver permissionResolver,
             RecordShareAccessService recordShareAccessService,
+            RecordRuleIndex recordRuleIndex,
             @Value("${kelta.gateway.security.permissions-enabled:true}") boolean permissionsEnabled) {
         this.authzService = authzService;
         this.permissionResolver = permissionResolver;
         this.recordShareAccessService = recordShareAccessService;
+        this.recordRuleIndex = recordRuleIndex;
         this.permissionsEnabled = permissionsEnabled;
     }
 
@@ -102,8 +106,25 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
                 }
             }
 
-            Set<String> allowedIds = new HashSet<>(authzService.batchCheckRecordAccess(
-                    email, profileId, tenantId, collectionId, typedRecords, action));
+            Set<String> allowedIds;
+            if (recordRuleIndex.hasRecordVariantRules(tenantId, collectionId)) {
+                allowedIds = new HashSet<>(authzService.batchCheckRecordAccess(
+                        email, profileId, tenantId, collectionId, typedRecords, action));
+            } else {
+                // No record-variant rules: the record policy decides identically for
+                // every record, so one cached collection-wide check covers the page
+                // and Cerbos never sees the record payloads.
+                allowedIds = new HashSet<>();
+                if (authzService.checkCollectionWideRecordAccess(
+                        email, profileId, tenantId, collectionId, action)) {
+                    for (Map<String, Object> record : typedRecords) {
+                        String id = (String) record.get("id");
+                        if (id != null) {
+                            allowedIds.add(id);
+                        }
+                    }
+                }
+            }
 
             // Manual record shares may widen access to records the profile denied
             Set<String> deniedIds = typedRecords.stream()
@@ -150,6 +171,16 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
         String recordId = (String) record.get("id");
         if (recordId == null) {
             return true;
+        }
+
+        if (!recordRuleIndex.hasRecordVariantRules(tenantId, collectionId)) {
+            if (authzService.checkCollectionWideRecordAccess(
+                    email, profileId, tenantId, collectionId, action)) {
+                return true;
+            }
+            return !recordShareAccessService
+                    .widen(email, collectionId, Set.of(recordId), action)
+                    .isEmpty();
         }
 
         Map<String, Object> attributes = new LinkedHashMap<>();

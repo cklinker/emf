@@ -37,7 +37,8 @@ class NatsSubscriptionConfigTest {
                 mock(CustomDomainCacheInvalidationListener.class),
                 mock(LayoutCacheInvalidationListener.class),
                 mock(IpAllowlistCacheInvalidationListener.class),
-                mock(io.kelta.gateway.websocket.PresenceService.class));
+                mock(io.kelta.gateway.websocket.PresenceService.class),
+                mock(io.kelta.gateway.listener.ChatMessageBridge.class));
     }
 
     @Test
@@ -70,6 +71,7 @@ class NatsSubscriptionConfigTest {
         assertThat(captor.getAllValues())
                 .extracting(EventSubscription::name)
                 .contains("gateway-realtime", "gateway-record-routes",
-                        "gateway-config", "gateway-config-assignment", "gateway-presence");
+                        "gateway-config", "gateway-config-assignment", "gateway-presence",
+                        "gateway-chat-messages", "gateway-chat-conversations");
     }
 }

@@ -39,7 +39,11 @@ public final class SecurityAuditLogger {
         PAT_REVOKED,
         DELEGATED_ADMIN_ACTION,
         DELEGATED_SCOPE_CHANGED,
-        PORTAL_USER_INVITED
+        PORTAL_USER_INVITED,
+        CHAT_CONVERSATION_OPENED,
+        CHAT_CONVERSATION_ASSIGNED,
+        CHAT_CONVERSATION_CLOSED,
+        CHAT_ACCESS_DENIED
     }
 
     /**

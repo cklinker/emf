@@ -16,8 +16,12 @@ class SecurityAuditLoggerTest {
 
         @Test
         void shouldHaveAllExpectedEventTypes() {
-            assertEquals(20, SecurityAuditLogger.EventType.values().length);
+            assertEquals(24, SecurityAuditLogger.EventType.values().length);
             assertNotNull(SecurityAuditLogger.EventType.valueOf("PORTAL_USER_INVITED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("CHAT_CONVERSATION_OPENED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("CHAT_CONVERSATION_ASSIGNED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("CHAT_CONVERSATION_CLOSED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("CHAT_ACCESS_DENIED"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("PASSWORD_CHANGED"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("DELEGATED_ADMIN_ACTION"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("DELEGATED_SCOPE_CHANGED"));

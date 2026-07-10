@@ -1,6 +1,7 @@
 package io.kelta.gateway.config;
 
 import io.kelta.gateway.listener.CerbosCacheInvalidationListener;
+import io.kelta.gateway.listener.ChatMessageBridge;
 import io.kelta.gateway.listener.ConfigEventListener;
 import io.kelta.gateway.listener.CustomDomainCacheInvalidationListener;
 import io.kelta.gateway.listener.IpAllowlistCacheInvalidationListener;
@@ -33,6 +34,7 @@ public class NatsSubscriptionConfig {
     private final LayoutCacheInvalidationListener layoutCacheInvalidationListener;
     private final IpAllowlistCacheInvalidationListener ipAllowlistCacheInvalidationListener;
     private final io.kelta.gateway.websocket.PresenceService presenceService;
+    private final ChatMessageBridge chatMessageBridge;
 
     public NatsSubscriptionConfig(NatsSubscriptionManager subscriptionManager,
                                    RealtimeBridge realtimeBridge,
@@ -42,7 +44,8 @@ public class NatsSubscriptionConfig {
                                    CustomDomainCacheInvalidationListener customDomainCacheInvalidationListener,
                                    LayoutCacheInvalidationListener layoutCacheInvalidationListener,
                                    IpAllowlistCacheInvalidationListener ipAllowlistCacheInvalidationListener,
-                                   io.kelta.gateway.websocket.PresenceService presenceService) {
+                                   io.kelta.gateway.websocket.PresenceService presenceService,
+                                   ChatMessageBridge chatMessageBridge) {
         this.subscriptionManager = subscriptionManager;
         this.realtimeBridge = realtimeBridge;
         this.systemCollectionRouteListener = systemCollectionRouteListener;
@@ -52,6 +55,7 @@ public class NatsSubscriptionConfig {
         this.layoutCacheInvalidationListener = layoutCacheInvalidationListener;
         this.ipAllowlistCacheInvalidationListener = ipAllowlistCacheInvalidationListener;
         this.presenceService = presenceService;
+        this.chatMessageBridge = chatMessageBridge;
     }
 
     @EventListener(ApplicationStartedEvent.class)
@@ -97,5 +101,15 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.broadcast(
                 "gateway-presence", "kelta.presence.*",
                 presenceService::onPresenceEvent));
+
+        // Chat events (telehealth slice 2): BROADCAST — each pod fans to its own
+        // conversation-joined sockets. Ids/state only, never message bodies.
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-chat-messages", "kelta.chat.message.>",
+                chatMessageBridge::onChatMessage));
+
+        subscriptionManager.register(EventSubscription.broadcast(
+                "gateway-chat-conversations", "kelta.chat.conversation.>",
+                chatMessageBridge::onConversationChanged));
     }
 }

@@ -161,6 +161,40 @@ Platform-managed metadata (not a user collection) — e.g. `feature_announcement
 
 ---
 
+## 7. Add a conversation-scoped realtime event family
+
+For socket events that must reach only an authorized subset of a tenant's sessions (chat is
+the reference; per-record channels would follow the same shape). The tenant-wide
+`record.changed` broadcast is NOT this — use it only when every tenant subscriber may see
+the event.
+
+1. **Payload + subject** (worker): a payload class in `runtime-events` carrying **ids/state
+   only — never content**; publish from a `BeforeSaveHook` `afterCreate/afterUpdate` via
+   `PlatformEventPublisher` to `kelta.<domain>.<kind>.<tenantId>.<scopeId>`
+   (reference: `listener/ChatMessageHook.java`). Register the hook as a `@Bean` in
+   `FlowConfig` via `hookRegistry.register(hook)`. Add the subject to the CLAUDE.md
+   Messaging table.
+2. **Membership check** (worker): an `/internal/<domain>/...` endpoint answering "may this
+   user join this scope?" (reference: `controller/InternalChatController.java` — tenant as
+   an explicit param, matches user id OR email).
+3. **Gateway join actions**: extend `RealtimeWebSocketHandler.handleMessage` with
+   `<domain>.join`/`<domain>.leave`; verify via a reactive, fail-closed, ~30s-cached
+   `WebClient` client (reference: `websocket/ChatMembershipClient.java` — NEVER block the
+   event loop; apply the result in `.subscribe()`), then track the session in a dedicated
+   routing index on `SubscriptionManager` with its own per-session cap.
+4. **Bridge**: a `listener/<Domain>Bridge` consuming the subject family (BROADCAST
+   subscription in gateway `NatsSubscriptionConfig` — every pod fans to its own sockets)
+   and fanning to `getConversationSubscribers`-style lookups only
+   (reference: `listener/ChatMessageBridge.java`).
+5. **Client rule**: events are invalidation signals; content is refetched over the
+   authorized HTTP path (`conventions.md` → Conversation-scoped socket events).
+
+**Tests**: hook publish + validation unit tests; routing-index + bridge fanout gateway
+tests; a harness scenario over the real HTTP path.
+**Docs**: CLAUDE.md Messaging table, `architecture.md`, `conventions.md`, [`status.md`](status.md).
+
+---
+
 These recipes assume the conventions in [`conventions.md`](conventions.md) and the rules in
 [`../../CLAUDE.md`](../../CLAUDE.md). When you complete one, update the docs it names — that's
 how the next agent gets a correct recipe.

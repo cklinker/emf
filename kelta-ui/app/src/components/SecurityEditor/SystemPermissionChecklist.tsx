@@ -120,6 +120,12 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: 'Create and manage public list views',
       },
       {
+        name: 'MANAGE_CHAT',
+        label: 'Manage Chat',
+        description:
+          'Supervisor chat access: all conversations, queue management, cross-assignment',
+      },
+      {
         name: 'MANAGE_DATA',
         label: 'Manage Data',
         description: 'Import, export, and mass update records',

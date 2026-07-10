@@ -50,6 +50,15 @@ public class RealtimeBridge {
             String changeType = (String) payload.get("changeType");
             Object data = payload.get("data");
 
+            // Chat collections are conversation-scoped (telehealth slice 2): their
+            // record.changed events still feed flows/search/audit worker-side, but
+            // the tenant-wide realtime fanout would hand message bodies to ANY
+            // tenant subscriber. ChatMessageBridge (membership-checked chat.join)
+            // is the only socket path for chat — skip them here entirely.
+            if (collectionName != null && collectionName.startsWith("chat-")) {
+                return;
+            }
+
             // Collections with masking-configured fields: the bridge fans one event
             // out to every tenant subscriber and cannot apply per-user field
             // security, so record data is suppressed — clients refetch through the

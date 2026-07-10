@@ -63,6 +63,26 @@ class RealtimeBridgeTest {
         }
     }
 
+    @Test
+    @DisplayName("chat-* collections never fan out on the tenant-wide channel (bodies stay off the socket)")
+    void chatCollectionsAreSkipped() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("collectionName", "chat-messages");
+        payload.put("recordId", "m1");
+        payload.put("changeType", "CREATED");
+        payload.put("data", Map.of("body", "PRIVATE MESSAGE BODY"));
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("tenantId", TENANT_ID);
+        event.put("payload", payload);
+
+        bridge.onRecordChanged(toJson(event));
+
+        // Conversation-scoped fanout is ChatMessageBridge's job (membership-checked
+        // chat.join); the tenant-wide realtime channel must stay silent for chat.
+        verify(subscriptionManager, never()).getSubscribers(any(), any());
+        verifyNoInteractions(webSocketHandler);
+    }
+
     private String recordChangedEvent(Boolean containsMaskedFields) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("collectionName", COLLECTION);

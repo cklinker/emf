@@ -283,6 +283,27 @@ public class FlowConfig {
         return hook;
     }
 
+    @Bean
+    public io.kelta.worker.listener.ChatMessageHook chatMessageHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher,
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+        io.kelta.worker.listener.ChatMessageHook hook =
+                new io.kelta.worker.listener.ChatMessageHook(eventPublisher, jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public io.kelta.worker.listener.ChatConversationHook chatConversationHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.ChatConversationHook hook =
+                new io.kelta.worker.listener.ChatConversationHook(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     /**
      * Runs tenant-defined record-event scripts (record-scripts system collection) through the
      * sandboxed GraalVM ScriptExecutor on record writes (unified record experience, slice 7).

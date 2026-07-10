@@ -347,6 +347,7 @@ for removal ("inline the current value"). Findings:
 - Hardcoded `emf_control_plane` DB name in `SupersetDatabaseUserService.java` (line 78) — env-driven via `kelta.worker.superset.database-name` default; cleanup is cosmetic.
 - Potential N+1 in `SearchIndexService.java` during reindex (per-collection queries) — harmless under normal load; matters at >1k collections.
 - **Email templates have two parallel lookup axes** — `EmailRepository.findTemplateByKey` resolves by the stable `template_key` column (V133 seeded eight `user.*` defaults); `findTemplateByName` resolves by the human-friendly `name` column (V141 seeded `password_reset`, `user_invite`, `welcome`). Both implement the same tenant-override → `'system'`-sentinel fallback, so callers picking the "wrong" axis still work but may land on a different seed row than intended. Pick one canonical axis once the calling code settles, and drop the unused seed set.
+- **Chat message-table growth (telehealth slice 2).** `chat_message` lives in the shared public schema and accrues per-message rows across all tenants; indexes cover the hot paths (`(tenant_id, conversation_id, sent_at)`) but there is no purge yet — the durable mitigation is telehealth slice 7's archive-then-purge (live rows deleted only after the encounter archive exists). Partition only if real volume demands it. Related accepted window: the gateway's chat-membership cache (30s, fail-closed) means a just-removed participant can receive **id-only** events for up to 30s — message bodies never ride the socket.
 
 ## Fragile Areas
 

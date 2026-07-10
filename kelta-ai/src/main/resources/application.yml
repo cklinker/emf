@@ -38,7 +38,7 @@ kelta:
   ai:
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
-      default-model: ${AI_DEFAULT_MODEL:claude-sonnet-4-20250514}
+      default-model: ${AI_DEFAULT_MODEL:claude-sonnet-5}
       default-max-tokens: ${AI_DEFAULT_MAX_TOKENS:32768}
       default-temperature: ${AI_DEFAULT_TEMPERATURE:0.7}
     worker-service-url: ${WORKER_SERVICE_URL:http://localhost:8080}

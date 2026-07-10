@@ -26,12 +26,20 @@ public class SubscriptionManager {
 
     static final int MAX_SUBSCRIPTIONS_PER_SESSION = 50;
     static final int MAX_CONNECTIONS_PER_TENANT = 100;
+    /** Conversation joins are tracked separately from collection subs (telehealth slice 2). */
+    static final int MAX_CONVERSATIONS_PER_SESSION = 20;
 
     // sessionId → set of "tenantId:collectionName" keys
     private final Map<String, Set<String>> sessionSubscriptions = new ConcurrentHashMap<>();
 
     // "tenantId:collectionName" → set of sessions
     private final Map<String, Set<WebSocketSession>> routingIndex = new ConcurrentHashMap<>();
+
+    // sessionId → set of "tenantId:conversationId" keys (chat)
+    private final Map<String, Set<String>> sessionConversations = new ConcurrentHashMap<>();
+
+    // "tenantId:conversationId" → set of sessions (chat)
+    private final Map<String, Set<WebSocketSession>> conversationIndex = new ConcurrentHashMap<>();
 
     // tenantId → connection count
     private final Map<String, AtomicInteger> tenantConnectionCount = new ConcurrentHashMap<>();
@@ -51,7 +59,47 @@ public class SubscriptionManager {
         count.incrementAndGet();
         sessionTenants.put(session.getId(), tenantId);
         sessionSubscriptions.put(session.getId(), ConcurrentHashMap.newKeySet());
+        sessionConversations.put(session.getId(), ConcurrentHashMap.newKeySet());
         return true;
+    }
+
+    /**
+     * Join a conversation's routing set (membership already verified by the
+     * caller). Returns false when the per-session conversation cap is hit or
+     * the session is unregistered.
+     */
+    public boolean joinConversation(WebSocketSession session, String tenantId, String conversationId) {
+        Set<String> joined = sessionConversations.get(session.getId());
+        if (joined == null) return false;
+        if (joined.size() >= MAX_CONVERSATIONS_PER_SESSION) {
+            log.warn("Conversation-join limit reached for session {}: {}", session.getId(), joined.size());
+            return false;
+        }
+        String key = tenantId + ":" + conversationId;
+        joined.add(key);
+        conversationIndex.computeIfAbsent(key, k -> new CopyOnWriteArraySet<>()).add(session);
+        return true;
+    }
+
+    public void leaveConversation(WebSocketSession session, String tenantId, String conversationId) {
+        String key = tenantId + ":" + conversationId;
+        Set<String> joined = sessionConversations.get(session.getId());
+        if (joined != null) {
+            joined.remove(key);
+        }
+        Set<WebSocketSession> sessions = conversationIndex.get(key);
+        if (sessions != null) {
+            sessions.remove(session);
+            if (sessions.isEmpty()) {
+                conversationIndex.remove(key);
+            }
+        }
+    }
+
+    /** Sessions joined to a conversation (chat bridge fanout). */
+    public Set<WebSocketSession> getConversationSubscribers(String tenantId, String conversationId) {
+        Set<WebSocketSession> sessions = conversationIndex.get(tenantId + ":" + conversationId);
+        return sessions != null ? Set.copyOf(sessions) : Set.of();
     }
 
     /**
@@ -108,6 +156,19 @@ public class SubscriptionManager {
                     sessions.remove(session);
                     if (sessions.isEmpty()) {
                         routingIndex.remove(key);
+                    }
+                }
+            }
+        }
+
+        Set<String> joined = sessionConversations.remove(sessionId);
+        if (joined != null) {
+            for (String key : joined) {
+                Set<WebSocketSession> sessions = conversationIndex.get(key);
+                if (sessions != null) {
+                    sessions.remove(session);
+                    if (sessions.isEmpty()) {
+                        conversationIndex.remove(key);
                     }
                 }
             }

@@ -37,13 +37,16 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
     private final SubscriptionManager subscriptionManager;
     private final DynamicReactiveJwtDecoder jwtDecoder;
     private final PresenceService presenceService;
+    private final ChatMembershipClient chatMembershipClient;
 
     public RealtimeWebSocketHandler(SubscriptionManager subscriptionManager,
                                      DynamicReactiveJwtDecoder jwtDecoder,
-                                     PresenceService presenceService) {
+                                     PresenceService presenceService,
+                                     ChatMembershipClient chatMembershipClient) {
         this.subscriptionManager = subscriptionManager;
         this.jwtDecoder = jwtDecoder;
         this.presenceService = presenceService;
+        this.chatMembershipClient = chatMembershipClient;
     }
 
     @Override
@@ -128,6 +131,7 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
             String action = payload.get("action");
             String collection = payload.get("collection");
             String resource = payload.get("resource");
+            String conversationId = payload.get("conversationId");
 
             if (action == null) {
                 sendMessage(session, Map.of("action", "error", "message", "Missing action"));
@@ -140,6 +144,10 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
             }
             if (action.startsWith("presence.") && (resource == null || resource.isBlank())) {
                 sendMessage(session, Map.of("action", "error", "message", "Missing resource"));
+                return;
+            }
+            if (action.startsWith("chat.") && (conversationId == null || conversationId.isBlank())) {
+                sendMessage(session, Map.of("action", "error", "message", "Missing conversationId"));
                 return;
             }
 
@@ -164,12 +172,48 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
                     }
                 }
                 case "presence.leave" -> presenceService.leave(session, tenantId, resource);
+                case "chat.join" -> handleChatJoin(session, tenantId, conversationId);
+                case "chat.leave" -> subscriptionManager.leaveConversation(session, tenantId, conversationId);
                 default -> sendMessage(session, Map.of("action", "error", "message", "Unknown action: " + action));
             }
         } catch (Exception e) {
             log.warn("Failed to parse WebSocket message: {}", e.getMessage());
             sendMessage(session, Map.of("action", "error", "message", "Invalid message format"));
         }
+    }
+
+    /**
+     * Verifies conversation membership against the worker (reactive, fail-closed)
+     * before adding the session to the conversation routing set (telehealth
+     * slice 2). The membership call must not block the event loop — the result
+     * is applied asynchronously and confirmed with {@code chat.joined} /
+     * {@code error} messages.
+     */
+    private void handleChatJoin(WebSocketSession session, String tenantId, String conversationId) {
+        // Prefer the email identity (matches platform_user lookup); the auth-code
+        // flow's sub claim is an email anyway, direct-login's is the user UUID —
+        // the worker matches either.
+        String identity = (String) session.getAttributes().getOrDefault("userEmail",
+                session.getAttributes().get("userId"));
+        chatMembershipClient.isMember(tenantId, conversationId, identity)
+                .subscribe(member -> {
+                    if (!Boolean.TRUE.equals(member)) {
+                        securityLog.warn("security_event=CHAT_JOIN_DENIED user={} tenant={} conversation={}",
+                                identity, tenantId, conversationId);
+                        sendMessage(session, Map.of("action", "error",
+                                "message", "Not a conversation participant",
+                                "conversationId", conversationId));
+                        return;
+                    }
+                    if (subscriptionManager.joinConversation(session, tenantId, conversationId)) {
+                        sendMessage(session, Map.of("action", "chat.joined",
+                                "conversationId", conversationId));
+                    } else {
+                        sendMessage(session, Map.of("action", "error",
+                                "message", "Conversation join limit reached",
+                                "conversationId", conversationId));
+                    }
+                });
     }
 
     /**

@@ -108,6 +108,19 @@ consumers therefore NEVER write pushed `data` into caches — on `record.changed
 the matching React Query keys (`src/realtime/invalidation.ts` is the canonical mapping) and
 let the refetch go through the authorized JSON:API path where per-viewer authz applies.
 
+### Conversation-scoped socket events (chat)
+
+Chat events do NOT use the tenant-wide collection broadcast — that would leak conversation
+activity across patients. The socket gains `chat.join`/`chat.leave` actions: the gateway
+verifies membership against the worker (`ChatMembershipClient` → `/internal/chat/...`,
+30s-cached, fail-closed) before adding the session to a per-conversation routing set
+(`SubscriptionManager`, 20 joins/session), and `ChatMessageBridge` fans
+`kelta.chat.message.*`/`kelta.chat.conversation.*` only to joined sessions. Event payloads
+carry ids/state ONLY — never message bodies — so the invalidation-only client rule holds:
+on `chat.message`, refetch over `/api/chat/**` where participant authz applies. Any future
+event family with sub-collection scoping (e.g. per-record) follows this pattern (recipe in
+`playbooks.md` §7).
+
 ### Per-user UI preferences
 
 Persist per-user UI state (saved views, favorites, panel layouts) ONLY through

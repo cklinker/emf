@@ -104,6 +104,12 @@ public final class SystemCollectionDefinitions {
         definitions.add(campaignRecipients());
         definitions.add(emailSuppressions());
 
+        // Chat (telehealth slice 2)
+        definitions.add(chatQueues());
+        definitions.add(chatConversations());
+        definitions.add(chatMessages());
+        definitions.add(chatParticipants());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -224,6 +230,81 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredString("name", 255))
             .addField(FieldDefinition.text("description"))
             .addField(FieldDefinition.bool("isSystem").withColumnName("is_system").withDefault(false))
+            .build();
+    }
+
+    // ------------------------------------------------------------------
+    // Chat (telehealth slice 2, specs/telehealth/2-chat-backend.md).
+    // Message bodies are deliberately excluded from search/embedding
+    // indexes and from realtime data push — content is served only over
+    // the authorized /api/chat/** path (participant-checked in-controller).
+    // ------------------------------------------------------------------
+
+    public static CollectionDefinition chatQueues() {
+        return systemBuilder("chat-queues", "Chat Queues", "chat_queue")
+            .displayFieldName("name")
+            .addField(FieldDefinition.requiredString("name", 100))
+            .addField(FieldDefinition.text("description"))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .build();
+    }
+
+    public static CollectionDefinition chatConversations() {
+        return systemBuilder("chat-conversations", "Chat Conversations", "chat_conversation")
+            .displayFieldName("subject")
+            .addImmutableField("origin")
+            .addField(FieldDefinition.lookup("queueId", "chat-queues", "Queue")
+                .withColumnName("queue_id"))
+            .addField(FieldDefinition.string("subject", 200))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("OPEN")
+                .withEnumValues(List.of("OPEN", "ASSIGNED", "CLOSED", "ARCHIVED")))
+            .addField(FieldDefinition.requiredString("origin", 20)
+                .withDefault("INTERNAL")
+                .withEnumValues(List.of("PORTAL", "INTERNAL")))
+            .addField(FieldDefinition.lookup("assignedTo", "users", "Assigned To")
+                .withColumnName("assigned_to"))
+            .addField(FieldDefinition.string("contextRecordId", 36)
+                .withColumnName("context_record_id"))
+            .addField(FieldDefinition.datetime("lastMessageAt").withColumnName("last_message_at"))
+            .addField(FieldDefinition.datetime("closedAt").withColumnName("closed_at"))
+            .build();
+    }
+
+    public static CollectionDefinition chatMessages() {
+        return systemBuilder("chat-messages", "Chat Messages", "chat_message")
+            .displayFieldName("id")
+            .addImmutableField("conversationId")
+            .addImmutableField("senderId")
+            .addImmutableField("senderType")
+            .addField(FieldDefinition.masterDetail("conversationId", "chat-conversations", "Conversation")
+                .withColumnName("conversation_id"))
+            .addField(FieldDefinition.lookup("senderId", "users", "Sender")
+                .withColumnName("sender_id"))
+            .addField(FieldDefinition.requiredString("senderType", 20)
+                .withColumnName("sender_type")
+                .withEnumValues(List.of("INTERNAL", "PORTAL", "SYSTEM")))
+            .addField(FieldDefinition.requiredString("kind", 20)
+                .withDefault("TEXT")
+                .withEnumValues(List.of("TEXT", "SYSTEM", "ATTACHMENT")))
+            .addField(FieldDefinition.requiredText("body"))
+            .addField(FieldDefinition.datetime("sentAt").withColumnName("sent_at"))
+            .build();
+    }
+
+    public static CollectionDefinition chatParticipants() {
+        return systemBuilder("chat-participants", "Chat Participants", "chat_participant")
+            .displayFieldName("id")
+            .addImmutableField("conversationId")
+            .addImmutableField("userId")
+            .addField(FieldDefinition.masterDetail("conversationId", "chat-conversations", "Conversation")
+                .withColumnName("conversation_id"))
+            .addField(FieldDefinition.lookup("userId", "users", "User")
+                .withColumnName("user_id"))
+            .addField(FieldDefinition.requiredString("role", 20)
+                .withEnumValues(List.of("AGENT", "PORTAL")))
+            .addField(FieldDefinition.datetime("joinedAt").withColumnName("joined_at"))
+            .addField(FieldDefinition.datetime("lastReadAt").withColumnName("last_read_at"))
             .build();
     }
 

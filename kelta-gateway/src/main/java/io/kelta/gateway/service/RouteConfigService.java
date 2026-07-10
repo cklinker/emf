@@ -195,6 +195,8 @@ public class RouteConfigService {
                 {"setup-audit-entries", "/api/setup-audit-entries/**", "setup-audit-entries"},
                 {"field-history", "/api/field-history/**", "field-history"},
                 {"collection-versions", "/api/collection-versions/**", "collection-versions"},
+                // Chat (telehealth slice 2) — controller enforces participant authz
+                {"chat", "/api/chat/**", "chat"},
                 // Automation & integration
                 {"flows", "/api/flows/**", "flows"},
                 {"approval-processes", "/api/approval-processes/**", "approval-processes"},

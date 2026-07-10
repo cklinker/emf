@@ -143,6 +143,20 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   (API_ACCESS only) and enforces the `maxPortalUsers` governor; re-posting an existing portal
   email re-issues the invite link. Record-level access for portal users is granted per record via
   `ParticipantShareSupport` → `record_share` (the existing Cerbos share-widening path).
+- **Chat** (telehealth slice 2, V168): `/api/chat/**` is a static route — ALL authz is
+  in-controller (`ChatController`): participant membership for reads/sends (actor fail-closed
+  from gateway-stamped `X-User-Id` → `UserIdResolver` + `X-User-Type`; body-supplied sender
+  ignored), INTERNAL-only queue views/claims, `MANAGE_CHAT` for `view=all` + cross-assignment.
+  The four chat system collections deliberately carry NO object-permission rows, so the
+  generic JSON:API routes admit only `VIEW_ALL_DATA`/`MODIFY_ALL_DATA` holders — and
+  `ChatMessageHook` re-validates writes on that path too (participant sender, open
+  conversation, messages immutable). Writes go through `QueryEngine` (hooks +
+  record.changed fire); the hooks publish ids-only `kelta.chat.message/conversation.*`
+  events. WebSocket: `chat.join` is verified against `/internal/chat/.../members`
+  (reactive `ChatMembershipClient`, 30s cache, fail-closed) before the session enters the
+  per-conversation routing index (20 joins/session); `ChatMessageBridge` fans only to
+  joined sessions — never the tenant-wide collection broadcast. Message bodies never leave
+  the authorized HTTP path (not in NATS payloads, WS events, or search indexes).
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

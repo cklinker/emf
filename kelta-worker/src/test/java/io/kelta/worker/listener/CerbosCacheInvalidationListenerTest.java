@@ -2,6 +2,7 @@ package io.kelta.worker.listener;
 
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.worker.service.CerbosAuthorizationService;
+import io.kelta.worker.service.RecordRuleIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,19 +19,23 @@ class CerbosCacheInvalidationListenerTest {
     @Mock
     private CerbosAuthorizationService authzService;
 
+    @Mock
+    private RecordRuleIndex recordRuleIndex;
+
     private CerbosCacheInvalidationListener listener;
 
     @BeforeEach
     void setUp() {
-        listener = new CerbosCacheInvalidationListener(authzService, new ObjectMapper());
+        listener = new CerbosCacheInvalidationListener(authzService, recordRuleIndex, new ObjectMapper());
     }
 
     @Test
-    @DisplayName("Should evict field cache for tenant on policy changed event")
+    @DisplayName("Should evict authz caches and rule index for tenant on policy changed event")
     void evictsOnPolicyChange() {
         String message = "{\"tenantId\":\"tenant-1\",\"syncedAt\":\"2026-03-22T10:00:00Z\"}";
         listener.handlePolicyChanged(message);
         verify(authzService).evictForTenant("tenant-1");
+        verify(recordRuleIndex).evictTenant("tenant-1");
     }
 
     @Test
@@ -39,6 +44,7 @@ class CerbosCacheInvalidationListenerTest {
         String message = "{\"syncedAt\":\"2026-03-22T10:00:00Z\"}";
         listener.handlePolicyChanged(message);
         verify(authzService, never()).evictForTenant(any());
+        verify(recordRuleIndex, never()).evictTenant(any());
     }
 
     @Test
@@ -46,5 +52,6 @@ class CerbosCacheInvalidationListenerTest {
     void handlesMalformedJson() {
         listener.handlePolicyChanged("not json");
         verify(authzService, never()).evictForTenant(any());
+        verify(recordRuleIndex, never()).evictTenant(any());
     }
 }

@@ -91,6 +91,12 @@ public class CerbosAuthorizationService {
     // unmask but allows read.
     private final Cache<String, FieldAccessEntry> fieldAccessCache;
 
+    // Collection-wide record decisions: key = "tenantId:profileId:collectionRef:action".
+    // Only consulted for collections WITHOUT record-variant custom rules (RecordRuleIndex),
+    // where the record policy's outcome is identical for every record. ALLOW only — a deny
+    // is never cached because it may be a fail-closed artifact (timeout/breaker).
+    private final Cache<String, Boolean> collectionRecordAccessCache;
+
     // Metrics
     private final Counter cacheHits;
     private final Counter cacheMisses;
@@ -115,6 +121,11 @@ public class CerbosAuthorizationService {
                 .maximumSize(CACHE_MAX_SIZE)
                 .expireAfterWrite(CACHE_TTL)
                 .recordStats()
+                .build();
+
+        this.collectionRecordAccessCache = Caffeine.newBuilder()
+                .maximumSize(CACHE_MAX_SIZE)
+                .expireAfterWrite(CACHE_TTL)
                 .build();
 
         this.cacheHits = Counter.builder("cerbos.cache.hits")
@@ -380,6 +391,32 @@ public class CerbosAuthorizationService {
     }
 
     /**
+     * Collection-wide record decision for collections whose record policy is
+     * record-invariant (no enabled custom rules — see {@link RecordRuleIndex}).
+     * One sentinel Cerbos check stands in for the whole page; ALLOW results are
+     * cached per (tenant, profile, collection, action) until the policy-changed
+     * event evicts them. DENY is returned but never cached — it may be a
+     * fail-closed artifact of a timeout or an open circuit breaker, and a real
+     * deny re-checks in one cheap call per page.
+     */
+    public boolean checkCollectionWideRecordAccess(String email, String profileId, String tenantId,
+                                                    String collectionRef, String action) {
+        String cacheKey = tenantId + ":" + profileId + ":" + collectionRef + ":" + action;
+        Boolean cached = collectionRecordAccessCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            cacheHits.increment();
+            return cached;
+        }
+        cacheMisses.increment();
+        boolean allowed = checkRecordAccess(email, profileId, tenantId,
+                collectionRef, "__collection_wide__", Map.of(), action);
+        if (allowed) {
+            collectionRecordAccessCache.put(cacheKey, Boolean.TRUE);
+        }
+        return allowed;
+    }
+
+    /**
      * Batch-checks record access for multiple records in a single Cerbos gRPC call.
      * NOT cached because record checks depend on record attributes (ABAC/CEL rules).
      *
@@ -488,9 +525,14 @@ public class CerbosAuthorizationService {
                 .filter(key -> key.startsWith(tenantId + ":"))
                 .peek(fieldAccessCache::invalidate)
                 .count();
-        if (evicted > 0) {
-            cacheEvictions.increment(evicted);
-            log.info("Evicted {} cached field access entries for tenant {}", evicted, tenantId);
+        long recordEvicted = collectionRecordAccessCache.asMap().keySet().stream()
+                .filter(key -> key.startsWith(tenantId + ":"))
+                .peek(collectionRecordAccessCache::invalidate)
+                .count();
+        if (evicted + recordEvicted > 0) {
+            cacheEvictions.increment(evicted + recordEvicted);
+            log.info("Evicted {} field + {} collection-wide record cache entries for tenant {}",
+                    evicted, recordEvicted, tenantId);
         }
     }
 
@@ -509,22 +551,27 @@ public class CerbosAuthorizationService {
             return;
         }
         String prefix = tenantId + ":";
+        java.util.function.Predicate<String> matchesCollection = key -> {
+            if (!key.startsWith(prefix)) {
+                return false;
+            }
+            // key = tenantId:profileId:collectionRef:action — match the collection
+            // segment positionally so every action's entry is evicted.
+            String[] parts = key.split(":", -1);
+            return parts.length >= 4 && parts[2].equals(collectionId);
+        };
         long evicted = fieldAccessCache.asMap().keySet().stream()
-                .filter(key -> {
-                    if (!key.startsWith(prefix)) {
-                        return false;
-                    }
-                    // key = tenantId:profileId:collectionId:action — match the collection
-                    // segment positionally so every action's entry is evicted.
-                    String[] parts = key.split(":", -1);
-                    return parts.length >= 4 && parts[2].equals(collectionId);
-                })
+                .filter(matchesCollection)
                 .peek(fieldAccessCache::invalidate)
                 .count();
-        if (evicted > 0) {
-            cacheEvictions.increment(evicted);
-            log.info("Evicted {} cached field access entries for tenant={} collection={}",
-                    evicted, tenantId, collectionId);
+        long recordEvicted = collectionRecordAccessCache.asMap().keySet().stream()
+                .filter(matchesCollection)
+                .peek(collectionRecordAccessCache::invalidate)
+                .count();
+        if (evicted + recordEvicted > 0) {
+            cacheEvictions.increment(evicted + recordEvicted);
+            log.info("Evicted {} field + {} collection-wide record cache entries for tenant={} collection={}",
+                    evicted, recordEvicted, tenantId, collectionId);
         }
     }
 

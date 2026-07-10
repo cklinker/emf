@@ -190,6 +190,27 @@ an audit feed.
 
 (No open bugs from the original audit. See Resolved → Bugs.)
 
+**FIXED (fix/cerbos-record-check-shortcircuit) — per-record Cerbos batch checks ran (with
+full record payloads) even for collections with no record-level rules; a read burst could
+open the circuit breaker (found 2026-07-10, in production, after #1223).** The generated
+`record` policy has only three rule kinds (`CerbosPolicyGenerator#generateRecordPolicy`):
+per-collection CRUD mirrors of object permissions, VIEW_ALL/MODIFY_ALL overrides, and custom
+rules — only custom rules can reference record data. Yet `CerbosRecordAuthorizationAdvice`
+batch-checked every page with every record attribute (rich-text HTML included); on the
+homelab PDP each 50-resource CheckResources took 0.5–1.4s, so 7 concurrent collection reads
+(a static-site build) queued past the 2s timeout → chunks failed closed → 3 misses opened the
+breaker → 10s of tenant-wide empty pages. Now: `RecordRuleIndex` (new, cached per tenant,
+NATS policy-changed eviction alongside the field cache) reports whether a collection has ANY
+enabled custom rule (conservative: CEL-bearing or not, unresolvable collection refs mark ALL
+collections variant, lookup failure falls back to the batch); without variant rules the
+advice replaces the batch with ONE `checkCollectionWideRecordAccess` sentinel check whose
+ALLOW is cached per (tenant, profile, collection, action) — DENY is never cached because it
+may be a fail-closed timeout/breaker artifact. Record-share widening unchanged. Caveat (same
+as #1179): the harness Cerbos is allow-all, so real deny behavior is only verifiable on a
+live stack — unit tests cover the path selection, caching, eviction and conservatism.
+Deferred follow-ups: attribute slimming for the remaining batch path (send only CEL-referenced
+attrs) and breaker tuning (client-load timeouts vs connectivity errors).
+
 **FIXED (fix/unique-constraint-migration) — field `unique` flag toggles never reached the
 physical schema, and unique-violation 409s named the wrong field (found 2026-07-10 operating
 the student-incentives tenant).** (1) `SchemaMigrationEngine.migrateSchema` diffed added/

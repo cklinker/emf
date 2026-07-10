@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -316,6 +317,105 @@ class CerbosAuthorizationServiceTest {
                     "user@test.com", "profile-1", "tenant-1", "col-1", List.of(), "read");
             assertThat(result).isEmpty();
             verifyNoInteractions(cerbosClient);
+        }
+    }
+
+    @Nested
+    @DisplayName("Batch chunking (Cerbos 50-resource request limit)")
+    class BatchChunking {
+
+        private List<java.util.Map<String, Object>> records(int count) {
+            List<java.util.Map<String, Object>> records = new java.util.ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                records.add(java.util.Map.of("id", "rec-" + i, "attributes", java.util.Map.of()));
+            }
+            return records;
+        }
+
+        @Test
+        @DisplayName("record check over 50 records splits into multiple Cerbos calls and allows all")
+        void recordCheckChunksLargePages() {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check()).thenReturn(batchResult);
+            when(batchResult.find(anyString())).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+
+            java.util.Set<String> allowed = service.batchCheckRecordAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", records(82), "read");
+
+            // 82 records → 50 + 32; a single 82-resource call is rejected by the
+            // Cerbos server (INVALID_ARGUMENT over its 50-resource request limit).
+            assertThat(allowed).hasSize(82);
+            verify(cerbosClient, times(2)).batch(any());
+        }
+
+        @Test
+        @DisplayName("a failed record chunk is denied without blanking the other chunks")
+        void failedRecordChunkDegradesPartially() {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check())
+                    .thenReturn(batchResult)
+                    .thenThrow(new RuntimeException("cerbos unavailable"));
+            when(batchResult.find(anyString())).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+
+            java.util.Set<String> allowed = service.batchCheckRecordAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", records(82), "read");
+
+            // First chunk (records 0-49) allowed; failed second chunk fail-closed.
+            assertThat(allowed).hasSize(50);
+            assertThat(allowed).contains("rec-0", "rec-49").doesNotContain("rec-50", "rec-81");
+        }
+
+        @Test
+        @DisplayName("field check over 50 fields splits into multiple Cerbos calls and caches the union")
+        void fieldCheckChunksLargeFieldSets() {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check()).thenReturn(batchResult);
+            when(batchResult.find(anyString())).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+
+            List<String> fields = new java.util.ArrayList<>();
+            for (int i = 0; i < 120; i++) {
+                fields.add("field-" + i);
+            }
+
+            List<String> result = service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            assertThat(result).hasSize(120);
+            verify(cerbosClient, times(3)).batch(any());
+
+            // Second call is fully served from the cache — no further Cerbos calls.
+            List<String> cached = service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            assertThat(cached).hasSize(120);
+            verify(cerbosClient, times(3)).batch(any());
+        }
+
+        @Test
+        @DisplayName("a failed field chunk denies everything and skips the cache write")
+        void failedFieldChunkDeniesAllAndDoesNotCache() {
+            when(cerbosClient.batch(any(Principal.class))).thenReturn(batchRequest);
+            when(batchRequest.check()).thenThrow(new RuntimeException("cerbos unavailable"));
+
+            List<String> fields = new java.util.ArrayList<>();
+            for (int i = 0; i < 60; i++) {
+                fields.add("field-" + i);
+            }
+
+            List<String> result = service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            assertThat(result).isEmpty();
+
+            // No cache entry was written: the retry goes back to Cerbos.
+            // doReturn: re-stubbing check() via when() would invoke the throwing stub.
+            doReturn(batchResult).when(batchRequest).check();
+            when(batchResult.find(anyString())).thenReturn(Optional.of(fieldCheckResult));
+            when(fieldCheckResult.isAllowed("read")).thenReturn(true);
+
+            List<String> retry = service.batchCheckFieldAccess(
+                    "user@test.com", "profile-1", "tenant-1", "col-1", fields, "read");
+            assertThat(retry).hasSize(60);
         }
     }
 

@@ -64,7 +64,7 @@ public class ListApprovalsTool implements UserTool {
                                 pageNumber.toString(), StandardCharsets.UTF_8));
                     }
 
-                    String path = "/api/approvalInstances"
+                    String path = "/api/approval-instances"
                             + (parts.isEmpty() ? "" : "?" + String.join("&", parts));
                     try {
                         return McpErrorMapper.toResult(gateway.get(path));

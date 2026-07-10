@@ -37,7 +37,7 @@ public class UpdateLayoutTool implements AdminTool {
         Tool tool = Tool.builder()
                 .name("update_layout")
                 .title("Update Layout")
-                .description("Update a page layout's metadata (name, default flag, record type). PATCHes /api/pageLayouts/{id}. To restructure sections or fields, use delete_layout + create_layout — full section replacement isn't supported in a single tool call.")
+                .description("Update a page layout's metadata (name, default flag, record type). PATCHes /api/page-layouts/{id}. To restructure sections or fields, use delete_layout + create_layout — full section replacement isn't supported in a single tool call.")
                 .inputSchema(Schemas.object(properties, List.of("id")))
                 .annotations(ToolHints.write(true, true))
                 .build();
@@ -62,7 +62,7 @@ public class UpdateLayoutTool implements AdminTool {
                             "type", "pageLayouts",
                             "id", id.toString(),
                             "attributes", attrs));
-                    String path = "/api/pageLayouts/" + URLEncoder.encode(id.toString(), StandardCharsets.UTF_8);
+                    String path = "/api/page-layouts/" + URLEncoder.encode(id.toString(), StandardCharsets.UTF_8);
                     try {
                         return McpErrorMapper.toResult(gateway.patch(path, body));
                     } catch (RuntimeException e) {

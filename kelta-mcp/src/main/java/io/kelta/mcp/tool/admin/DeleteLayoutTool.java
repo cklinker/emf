@@ -34,7 +34,7 @@ public class DeleteLayoutTool implements AdminTool {
         Tool tool = Tool.builder()
                 .name("delete_layout")
                 .title("Delete Layout")
-                .description("Delete a page layout and (cascade) its sections and field assignments. Wraps DELETE /api/pageLayouts/{id}. Does NOT delete the underlying field definitions on the collection.")
+                .description("Delete a page layout and (cascade) its sections and field assignments. Wraps DELETE /api/page-layouts/{id}. Does NOT delete the underlying field definitions on the collection.")
                 .inputSchema(Schemas.object(properties, List.of("id")))
                 .annotations(ToolHints.write(true, true))
                 .build();
@@ -51,7 +51,7 @@ public class DeleteLayoutTool implements AdminTool {
                                 .content(List.of(new TextContent("Argument \"id\" is required.")))
                                 .build();
                     }
-                    String path = "/api/pageLayouts/" + URLEncoder.encode(id.toString(), StandardCharsets.UTF_8);
+                    String path = "/api/page-layouts/" + URLEncoder.encode(id.toString(), StandardCharsets.UTF_8);
                     try {
                         GatewayHttpClient.Response response = gateway.delete(path);
                         if (response.isSuccess()) {

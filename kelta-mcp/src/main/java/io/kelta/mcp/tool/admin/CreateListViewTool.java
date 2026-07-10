@@ -11,17 +11,32 @@ import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Creates a record in the {@code list-views} system collection.
+ *
+ * <p>Maps the friendly args onto the worker's actual shape: {@code columns}
+ * is a JSON array (from the {@code displayedFields} CSV), the filter object
+ * becomes the {@code filters} array, and {@code filters} is ALWAYS sent —
+ * the system collection's declared default is unusable (string {@code "[]"}
+ * on a JSON field), so omitting it fails validation. (This tool previously
+ * posted to a non-existent {@code /api/listViews} path with pass-through
+ * attribute names the worker never understood.)
+ */
 @Component
 public class CreateListViewTool implements AdminTool {
 
     private final GatewayHttpClient gateway;
+    private final AdminLookups lookups;
 
     public CreateListViewTool(GatewayHttpClient gateway) {
         this.gateway = gateway;
+        this.lookups = new AdminLookups(gateway);
     }
 
     @Override
@@ -33,13 +48,14 @@ public class CreateListViewTool implements AdminTool {
                 "Comma-separated field names to show as columns, in display order."));
         properties.put("filter", Schemas.freeObject(
                 "Optional saved-filter expression in JSON:API filter shape, e.g. {\"status\":{\"EQ\":\"OPEN\"}}."));
-        properties.put("sort", Schemas.string("Default sort, e.g. \"-createdAt\"."));
+        properties.put("sort", Schemas.string("Default sort field, '-' prefix for descending, e.g. \"-createdAt\"."));
         properties.put("isDefault", Schemas.bool("Whether this is the default list view.", false));
+        properties.put("visibility", Schemas.string("PRIVATE (default) or PUBLIC."));
 
         Tool tool = Tool.builder()
                 .name("create_listview")
                 .title("Create List View")
-                .description("Create a saved list view (column set + filter + sort) for a collection. Wraps POST /api/listViews.")
+                .description("Create a saved list view (column set + filter + sort) for a collection. Wraps POST /api/list-views.")
                 .inputSchema(Schemas.object(properties, List.of("collectionName", "name", "displayedFields")))
                 .annotations(ToolHints.write(false, false))
                 .build();
@@ -55,30 +71,72 @@ public class CreateListViewTool implements AdminTool {
                     if (cn == null || cn.toString().isBlank()
                             || name == null || name.toString().isBlank()
                             || df == null || df.toString().isBlank()) {
-                        return CallToolResult.builder()
-                                .isError(true)
-                                .content(List.of(new TextContent(
-                                        "Arguments \"collectionName\", \"name\", and \"displayedFields\" are required.")))
-                                .build();
+                        return error("Arguments \"collectionName\", \"name\", and \"displayedFields\" are required.");
                     }
 
+                    String collectionId = lookups.collectionIdByName(cn.toString());
+                    if (collectionId == null) {
+                        return error("Collection \"" + cn + "\" not found.");
+                    }
+
+                    List<String> columns = Arrays.stream(df.toString().split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .toList();
+
                     Map<String, Object> attrs = new LinkedHashMap<>();
-                    attrs.put("collectionName", cn.toString());
+                    attrs.put("collectionId", collectionId);
                     attrs.put("name", name.toString());
-                    attrs.put("displayedFields", df.toString());
-                    if (args.get("filter") instanceof Map<?, ?> f) attrs.put("filter", f);
-                    if (args.get("sort") instanceof String s && !s.isBlank()) attrs.put("sort", s);
-                    if (args.get("isDefault") instanceof Boolean b) attrs.put("isDefault", b);
+                    attrs.put("columns", columns);
+                    attrs.put("isDefault", args.get("isDefault") instanceof Boolean b ? b : Boolean.FALSE);
+                    // Always sent: the declared default ("[]" as a STRING on a JSON
+                    // field) fails the worker's own type validation when omitted.
+                    attrs.put("filters", toFilters(args.get("filter")));
+                    if (args.get("visibility") instanceof String v && !v.isBlank()) {
+                        attrs.put("visibility", v);
+                    }
+                    if (args.get("sort") instanceof String s && !s.isBlank()) {
+                        String first = s.split(",")[0].trim();
+                        boolean desc = first.startsWith("-");
+                        attrs.put("sortField", desc ? first.substring(1) : first);
+                        attrs.put("sortDirection", desc ? "DESC" : "ASC");
+                    }
 
                     Map<String, Object> body = Map.of("data", Map.of(
-                            "type", "listViews",
+                            "type", "list-views",
                             "attributes", attrs));
                     try {
-                        return McpErrorMapper.toResult(gateway.post("/api/listViews", body));
+                        return McpErrorMapper.toResult(gateway.post("/api/list-views", body));
                     } catch (RuntimeException e) {
                         return McpErrorMapper.fromException(e);
                     }
                 })
+                .build();
+    }
+
+    /** {"status":{"EQ":"OPEN"}} → [{"field":"status","operator":"EQ","value":"OPEN"}]. */
+    private static List<Map<String, Object>> toFilters(Object filterArg) {
+        List<Map<String, Object>> filters = new ArrayList<>();
+        if (filterArg instanceof Map<?, ?> filterMap) {
+            for (Map.Entry<?, ?> fieldEntry : filterMap.entrySet()) {
+                if (fieldEntry.getValue() instanceof Map<?, ?> ops) {
+                    for (Map.Entry<?, ?> op : ops.entrySet()) {
+                        Map<String, Object> filter = new LinkedHashMap<>();
+                        filter.put("field", String.valueOf(fieldEntry.getKey()));
+                        filter.put("operator", String.valueOf(op.getKey()));
+                        filter.put("value", op.getValue());
+                        filters.add(filter);
+                    }
+                }
+            }
+        }
+        return filters;
+    }
+
+    private static CallToolResult error(String message) {
+        return CallToolResult.builder()
+                .isError(true)
+                .content(List.of(new TextContent(message)))
                 .build();
     }
 }

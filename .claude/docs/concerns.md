@@ -190,6 +190,32 @@ an audit feed.
 
 (No open bugs from the original audit. See Resolved → Bugs.)
 
+**FIXED (fix/mcp-admin-tooling-gaps) — kelta-mcp admin tooling batch (7 defects found building a tenant end-to-end over MCP, 2026-07-10).**
+(1) `FieldBodyBuilder.extractFirstId` substring-scanned for the first `"id"` after `"data"` and
+returned `relationships.createdBy.data.id` — the acting *user's* UUID — because worker responses
+serialize `relationships` before the record's `id`; every `add_field`-by-name and
+`create_collection` inline field posted `collectionId=<user-uuid>` → 400 (collections silently
+created with ZERO fields). Now Jackson-parsed in `AdminLookups`.
+(2) `resolveNativeType` rejected most `FieldType` values (TEXT, CURRENCY, URL, EMAIL, PHONE, …);
+now every enum name passes verbatim + friendly aliases added.
+(3) MCP wrote `fieldTypeConfig.picklistSourceId` but the admin UI resolves
+`fieldTypeConfig.globalPicklistId` (`usePicklistOptions`), and never set `referenceTarget` on
+lookups — MCP-created fields showed no picklist binding / no target collection in the UI. The
+canonical shape is the UI's; the builder now writes `globalPicklistId` + `referenceTarget`.
+(4)–(6) `create_validation_rule` / `create_listview` / `create_layout` posted camelCase paths
+(`/api/validationRules`, `/api/listViews`, `/api/pageLayouts|layoutSections|layoutFields`) that
+404 against the kebab-case system-collection routes, with attribute shapes the worker never
+understood; `create_validation_rule` also documented INVERTED semantics (worker field is
+`errorConditionFormula` — record rejected when TRUE; legacy `expression` args are negated).
+`update_collection` gained `displayFieldName`→`displayFieldId` resolution.
+(7) Worker: JSON-typed system-field defaults declared as strings (`list-views.filters "[]"`,
+`dashboard-components.config "{}"`, `flow-executions.variables "{}"`) are injected verbatim on
+create and fail their own type validation — all converted to JSON values, and
+`SystemCollectionJsonDefaultsTest` now rejects any new string default on a JSON field. Validation
+error envelopes rendered as `{"errors":[{}]}` (bean members dropped at serialization on the
+deployed worker); `GlobalExceptionHandler` now emits plain maps (`JsonApiError.toMap()`), which
+serialize reliably under any mapper config — never build error bodies from the bean directly.
+
 **FIXED (PR #1174) — record-policy `collectionId` was UUID-keyed but checked by name.**
 `CerbosPolicyGenerator.generateRecordPolicy` emitted `R.attr.collectionId == "<UUID>"` (from
 `profile_object_permission.collection_id` + `collection.id`, both UUIDs), but

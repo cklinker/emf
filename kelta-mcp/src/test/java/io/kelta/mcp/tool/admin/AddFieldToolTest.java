@@ -167,7 +167,9 @@ class AddFieldToolTest {
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
                 .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("PICKLIST")))
                 .withRequestBody(matchingJsonPath("$.data.attributes.fieldTypeConfig.picklistSourceType", equalTo("GLOBAL")))
-                .withRequestBody(matchingJsonPath("$.data.attributes.fieldTypeConfig.picklistSourceId", equalTo(picklistId))));
+                // canonical key the admin UI resolves — a field written without it
+                // renders with no picklist binding in the field editor
+                .withRequestBody(matchingJsonPath("$.data.attributes.fieldTypeConfig.globalPicklistId", equalTo(picklistId))));
     }
 
     @Test
@@ -382,5 +384,90 @@ class AddFieldToolTest {
 
         wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
                 .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("STRING"))));
+    }
+
+    @Test
+    void resolvesCollectionIdFromRealisticLookupResponse() {
+        // Regression: worker responses serialize relationships (whose
+        // createdBy/updatedBy carry the USER's UUID) before the record's own
+        // id. The old substring scan grabbed that user id, so every
+        // add_field-by-name posted collectionId=<user-uuid> and got a 400.
+        wm.stubFor(get(urlEqualTo("/api/collections?filter[name][eq]=projects"))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"metadata\":{\"totalCount\":1},\"data\":[{"
+                        + "\"relationships\":{\"updatedBy\":{\"data\":{\"id\":\"99999999-9999-9999-9999-999999999999\",\"type\":\"users\"}},"
+                        + "\"createdBy\":{\"data\":{\"id\":\"99999999-9999-9999-9999-999999999999\",\"type\":\"users\"}}},"
+                        + "\"attributes\":{\"name\":\"projects\"},"
+                        + "\"id\":\"" + COLLECTION_ID + "\",\"type\":\"collections\"}]}")));
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "summary",
+                        "type", "string"), null));
+
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.collectionId", equalTo(COLLECTION_ID))));
+    }
+
+    @Test
+    void mapsExpandedAliasesAndPassesEnumNamesVerbatim() {
+        stubCollectionLookup();
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "budget",
+                        "type", "currency"), null));
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("CURRENCY"))));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "homepage",
+                        "type", "url"), null));
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("URL"))));
+
+        // exact enum names pass through verbatim (previously rejected)
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "notes",
+                        "type", "TEXT"), null));
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.name", equalTo("notes")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.type", equalTo("TEXT"))));
+    }
+
+    @Test
+    void referenceSetsReferenceTargetFromResolvedName() {
+        stubCollectionLookup();
+        String targetId = "33333333-3333-3333-3333-333333333333";
+        wm.stubFor(get(urlEqualTo("/api/collections/" + targetId))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"data\":{\"relationships\":{\"updatedBy\":{\"data\":{\"id\":\"u1\",\"type\":\"users\"}}},"
+                        + "\"attributes\":{\"name\":\"accounts\"},"
+                        + "\"id\":\"" + targetId + "\",\"type\":\"collections\"}}")));
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "account",
+                        "type", "lookup",
+                        "referenceCollectionId", targetId), null));
+
+        // The admin UI displays referenceTarget — without it a relationship
+        // field shows no target collection.
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.referenceTarget", equalTo("accounts")))
+                .withRequestBody(matchingJsonPath("$.data.relationships.referenceCollectionId.data.id", equalTo(targetId))));
     }
 }

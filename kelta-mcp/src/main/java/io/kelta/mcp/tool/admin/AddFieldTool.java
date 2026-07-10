@@ -40,7 +40,11 @@ public class AddFieldTool implements AdminTool {
                 + "text|string→STRING, longText→STRING, number|integer→INTEGER, decimal|double→DOUBLE, "
                 + "long→LONG, boolean→BOOLEAN, date→DATE, datetime→DATETIME, "
                 + "picklist→PICKLIST, multiPicklist→MULTI_PICKLIST, "
-                + "reference|lookup→LOOKUP, json→JSON. Uppercase enum values are also accepted."));
+                + "reference|lookup→LOOKUP, masterDetail→MASTER_DETAIL, json→JSON, "
+                + "currency→CURRENCY, percent→PERCENT, url→URL, email→EMAIL, phone→PHONE, "
+                + "autoNumber→AUTO_NUMBER, externalId→EXTERNAL_ID, encrypted→ENCRYPTED, "
+                + "geolocation→GEOLOCATION, array→ARRAY, richText→RICH_TEXT, vector→VECTOR. "
+                + "Every uppercase FieldType enum name is also accepted verbatim."));
         properties.put("required", Schemas.bool("Whether the field is required (default false).", false));
         properties.put("unique", Schemas.bool("Whether values must be unique (default false). Sent as uniqueConstraint.", false));
         properties.put("indexed", Schemas.bool("Whether the column has a database index (default false).", false));

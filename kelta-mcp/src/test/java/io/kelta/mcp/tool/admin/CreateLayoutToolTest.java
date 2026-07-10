@@ -17,12 +17,22 @@ import java.util.Map;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * The tool targets the worker's kebab-case system-collection routes with the
+ * real attribute shapes: page-layouts get a resolved {@code collectionId},
+ * layout-sections a {@code layoutId} + {@code heading}, and layout-fields a
+ * {@code sectionId} + {@code fieldId} resolved from the entry's fieldName.
+ * (The previous camelCase paths — /api/pageLayouts etc. — 404 on the worker.)
+ */
 class CreateLayoutToolTest {
+
+    private static final String COLLECTION_ID = "11111111-1111-1111-1111-111111111111";
 
     private WireMockServer wm;
     private CreateLayoutTool tool;
@@ -44,6 +54,19 @@ class CreateLayoutToolTest {
         wm.stop();
     }
 
+    private void stubCollectionAndFields() {
+        wm.stubFor(get(urlEqualTo("/api/collections?filter[name][eq]=projects"))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"data\":[{\"type\":\"collections\",\"id\":\"" + COLLECTION_ID + "\"}]}")));
+        wm.stubFor(get(urlEqualTo("/api/fields?filter[collectionId][EQ]=" + COLLECTION_ID + "&page[size]=200"))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"data\":["
+                        + "{\"id\":\"fid-name\",\"type\":\"fields\",\"attributes\":{\"name\":\"name\"}},"
+                        + "{\"id\":\"fid-owner\",\"type\":\"fields\",\"attributes\":{\"name\":\"owner\"}},"
+                        + "{\"id\":\"fid-stage\",\"type\":\"fields\",\"attributes\":{\"name\":\"stage\"}}"
+                        + "]}")));
+    }
+
     @Test
     void rejectsWithoutNameOrCollection() {
         CallToolResult r1 = tool.toSpecification().callHandler().apply(
@@ -61,13 +84,14 @@ class CreateLayoutToolTest {
 
     @Test
     void createsLayoutSectionsAndFieldsInOrder() {
-        wm.stubFor(post(urlEqualTo("/api/pageLayouts"))
+        stubCollectionAndFields();
+        wm.stubFor(post(urlEqualTo("/api/page-layouts"))
                 .willReturn(aResponse().withStatus(201).withBody(
-                        "{\"data\":{\"id\":\"L1\",\"type\":\"pageLayouts\"}}")));
-        wm.stubFor(post(urlEqualTo("/api/layoutSections"))
+                        "{\"data\":{\"id\":\"L1\",\"type\":\"page-layouts\"}}")));
+        wm.stubFor(post(urlEqualTo("/api/layout-sections"))
                 .willReturn(aResponse().withStatus(201).withBody(
-                        "{\"data\":{\"id\":\"S1\",\"type\":\"layoutSections\"}}")));
-        wm.stubFor(post(urlEqualTo("/api/layoutFields"))
+                        "{\"data\":{\"id\":\"S1\",\"type\":\"layout-sections\"}}")));
+        wm.stubFor(post(urlEqualTo("/api/layout-fields"))
                 .willReturn(aResponse().withStatus(201).withBody(
                         "{\"data\":{\"id\":\"F1\"}}")));
 
@@ -84,23 +108,51 @@ class CreateLayoutToolTest {
                                         "fields", List.of(Map.of("fieldName", "stage"))))), null));
 
         assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
-        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/pageLayouts"))
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/page-layouts"))
                 .withHeader("Authorization", equalTo("Bearer klt_layout_test"))
+                .withRequestBody(matchingJsonPath("$.data.type", equalTo("page-layouts")))
                 .withRequestBody(matchingJsonPath("$.data.attributes.name", equalTo("ProjectsMain")))
-                .withRequestBody(matchingJsonPath("$.data.attributes.collectionName", equalTo("projects"))));
-        wm.verify(2, WireMock.postRequestedFor(urlEqualTo("/api/layoutSections")));
-        wm.verify(3, WireMock.postRequestedFor(urlEqualTo("/api/layoutFields")));
-        // sortOrder defaulting + child references
-        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/layoutSections"))
-                .withRequestBody(matchingJsonPath("$.data.attributes.sectionName", equalTo("Status")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.collectionId", equalTo(COLLECTION_ID)))
+                .withRequestBody(matchingJsonPath("$.data.attributes.layoutType", equalTo("DETAIL"))));
+        wm.verify(2, WireMock.postRequestedFor(urlEqualTo("/api/layout-sections")));
+        wm.verify(3, WireMock.postRequestedFor(urlEqualTo("/api/layout-fields")));
+        // sortOrder defaulting, heading mapping + child references
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/layout-sections"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.layoutId", equalTo("L1")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.heading", equalTo("Status")))
                 .withRequestBody(matchingJsonPath("$.data.attributes.sortOrder", equalTo("1"))));
-        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/layoutFields"))
-                .withRequestBody(matchingJsonPath("$.data.attributes.layoutSectionId", equalTo("S1"))));
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/layout-fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.sectionId", equalTo("S1")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.fieldId", equalTo("fid-stage"))));
+    }
+
+    @Test
+    void reportsUnknownFieldNamesInsteadOfPosting() {
+        stubCollectionAndFields();
+        wm.stubFor(post(urlEqualTo("/api/page-layouts"))
+                .willReturn(aResponse().withStatus(201).withBody(
+                        "{\"data\":{\"id\":\"L1\"}}")));
+        wm.stubFor(post(urlEqualTo("/api/layout-sections"))
+                .willReturn(aResponse().withStatus(201).withBody(
+                        "{\"data\":{\"id\":\"S1\"}}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("create_layout", Map.of(
+                        "name", "L",
+                        "collectionName", "projects",
+                        "sections", List.of(Map.of("sectionName", "S",
+                                "fields", List.of(Map.of("fieldName", "doesNotExist"))))), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        assertThat(((io.modelcontextprotocol.spec.McpSchema.TextContent) result.content().get(0)).text())
+                .contains("field not found on collection");
+        wm.verify(0, WireMock.postRequestedFor(urlEqualTo("/api/layout-fields")));
     }
 
     @Test
     void shortCircuitsWhenLayoutCreationFails() {
-        wm.stubFor(post(urlEqualTo("/api/pageLayouts"))
+        stubCollectionAndFields();
+        wm.stubFor(post(urlEqualTo("/api/page-layouts"))
                 .willReturn(aResponse().withStatus(409).withBody("{}")));
 
         CallToolResult result = tool.toSpecification().callHandler().apply(
@@ -108,10 +160,10 @@ class CreateLayoutToolTest {
                         "name", "L",
                         "collectionName", "projects",
                         "sections", List.of(Map.of("sectionName", "S",
-                                "fields", List.of(Map.of("fieldName", "x"))))), null));
+                                "fields", List.of(Map.of("fieldName", "name"))))), null));
 
         assertThat(result.isError()).isEqualTo(Boolean.TRUE);
-        wm.verify(0, WireMock.postRequestedFor(urlEqualTo("/api/layoutSections")));
-        wm.verify(0, WireMock.postRequestedFor(urlEqualTo("/api/layoutFields")));
+        wm.verify(0, WireMock.postRequestedFor(urlEqualTo("/api/layout-sections")));
+        wm.verify(0, WireMock.postRequestedFor(urlEqualTo("/api/layout-fields")));
     }
 }

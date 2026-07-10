@@ -1,9 +1,8 @@
 package io.kelta.mcp.tool.admin;
 
 import io.kelta.mcp.client.GatewayHttpClient;
+import io.kelta.runtime.model.FieldType;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -14,16 +13,23 @@ import java.util.regex.Pattern;
  * worker's {@code POST /api/fields} endpoint expects. Shared by {@link AddFieldTool}
  * and {@link CreateCollectionTool} so both go through the same alias mapping
  * and per-type payload assembly.
+ *
+ * <p>Field-type config is written in the shape the admin UI reads
+ * ({@code fieldTypeConfig.globalPicklistId} — see kelta-ui's
+ * {@code usePicklistOptions.resolvePicklistSource}), and lookup fields carry a
+ * {@code referenceTarget} attribute (target collection <em>name</em>) alongside
+ * the {@code referenceCollectionId} relationship, because the UI displays the
+ * name, not the relationship.
  */
 final class FieldBodyBuilder {
 
     static final Pattern UUID_PATTERN = Pattern.compile(
             "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
-    private final GatewayHttpClient gateway;
+    private final AdminLookups lookups;
 
     FieldBodyBuilder(GatewayHttpClient gateway) {
-        this.gateway = gateway;
+        this.lookups = new AdminLookups(gateway);
     }
 
     /** Builds the body, or returns a {@link Result} carrying a user-readable error. */
@@ -94,33 +100,17 @@ final class FieldBodyBuilder {
             if (UUID_PATTERN.matcher(cn).matches()) {
                 return cn;
             }
-            return lookupCollectionIdByName(cn);
+            return lookups.collectionIdByName(cn);
         }
         return null;
     }
 
-    String lookupCollectionIdByName(String collectionName) {
-        String path = "/api/collections?filter[name][eq]="
-                + URLEncoder.encode(collectionName, StandardCharsets.UTF_8);
-        GatewayHttpClient.Response res = gateway.get(path);
-        if (!res.isSuccess() || res.body() == null) {
-            return null;
-        }
-        return extractFirstId(res.body());
-    }
-
+    /**
+     * The id of the first resource in a JSON:API body. Kept as the shared
+     * entry point for tools that parse create/list responses.
+     */
     static String extractFirstId(String json) {
-        if (json == null) return null;
-        int dataIdx = json.indexOf("\"data\"");
-        if (dataIdx < 0) return null;
-        int idIdx = json.indexOf("\"id\"", dataIdx);
-        if (idIdx < 0) return null;
-        int openQuote = json.indexOf('"', idIdx + 4);
-        if (openQuote < 0) return null;
-        int closeQuote = json.indexOf('"', openQuote + 1);
-        if (closeQuote < 0) return null;
-        String value = json.substring(openQuote + 1, closeQuote);
-        return value.isBlank() ? null : value;
+        return AdminLookups.firstResourceId(json);
     }
 
     private String applyPicklistConfig(Map<String, Object> args, Map<String, Object> attrs) {
@@ -134,7 +124,13 @@ final class FieldBodyBuilder {
         }
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("picklistSourceType", sourceType);
-        config.put("picklistSourceId", picklistSourceId);
+        if ("GLOBAL".equals(sourceType)) {
+            // Canonical key the admin UI resolves (usePicklistOptions): a field
+            // written without it renders with NO picklist binding in the UI.
+            config.put("globalPicklistId", picklistSourceId);
+        } else {
+            config.put("picklistSourceId", picklistSourceId);
+        }
         attrs.put("fieldTypeConfig", config);
         return null;
     }
@@ -210,13 +206,27 @@ final class FieldBodyBuilder {
                                               Map<String, Object> attrs,
                                               Map<String, Object> relationships) {
         String targetId = null;
+        String targetName = null;
         if (args.get("referenceCollectionId") instanceof String s && !s.isBlank()) {
             targetId = s;
         } else if (args.get("referenceCollection") instanceof String s && !s.isBlank()) {
-            targetId = UUID_PATTERN.matcher(s).matches() ? s : lookupCollectionIdByName(s);
+            if (UUID_PATTERN.matcher(s).matches()) {
+                targetId = s;
+            } else {
+                targetName = s;
+                targetId = lookups.collectionIdByName(s);
+            }
         }
         if (targetId == null) {
             return "reference/lookup fields require \"referenceCollectionId\" (UUID of the target collection) or a resolvable \"referenceCollection\" name.";
+        }
+        if (targetName == null) {
+            targetName = lookups.collectionNameById(targetId);
+        }
+        if (targetName != null && !targetName.isBlank()) {
+            // The admin UI displays referenceTarget (the collection NAME) on
+            // relationship fields; without it the field shows no target.
+            attrs.put("referenceTarget", targetName);
         }
 
         if (args.get("relationshipName") instanceof String rn && !rn.isBlank()) {
@@ -241,13 +251,21 @@ final class FieldBodyBuilder {
 
     /**
      * Maps an MCP-friendly type alias to the native uppercase {@code FieldType}
-     * enum value the worker accepts. Returns null for unknown aliases.
+     * enum value the worker accepts. Any exact enum name (e.g. {@code CURRENCY},
+     * {@code TEXT}, {@code GEOLOCATION}) passes through verbatim; friendly
+     * camelCase/lowercase aliases cover the common types. Returns null for
+     * unknown inputs.
+     *
+     * <p>Note: {@code text}/{@code longText} intentionally map to {@code STRING}
+     * — the admin UI has no renderer for the {@code TEXT} type, and both map to
+     * the same Postgres column type. Pass {@code TEXT} explicitly if you really
+     * want the native type.
      */
     static String resolveNativeType(String alias) {
         if (alias == null) return null;
         String trimmed = alias.trim();
         if (trimmed.isEmpty()) return null;
-        return switch (trimmed) {
+        String mapped = switch (trimmed) {
             case "text", "string", "String", "STRING" -> "STRING";
             case "longText", "longtext", "long_text" -> "STRING";
             case "number", "integer", "Integer", "INTEGER" -> "INTEGER";
@@ -264,8 +282,27 @@ final class FieldBodyBuilder {
             case "json", "Json", "JSON" -> "JSON";
             case "richText", "rich_text", "RichText", "RICH_TEXT" -> "RICH_TEXT";
             case "vector", "Vector", "VECTOR" -> "VECTOR";
+            case "currency", "Currency" -> "CURRENCY";
+            case "percent", "Percent" -> "PERCENT";
+            case "url", "Url" -> "URL";
+            case "email", "Email" -> "EMAIL";
+            case "phone", "Phone" -> "PHONE";
+            case "autoNumber", "auto_number", "autonumber" -> "AUTO_NUMBER";
+            case "externalId", "external_id" -> "EXTERNAL_ID";
+            case "encrypted", "Encrypted" -> "ENCRYPTED";
+            case "geolocation", "Geolocation" -> "GEOLOCATION";
+            case "array", "Array" -> "ARRAY";
             default -> null;
         };
+        if (mapped != null) {
+            return mapped;
+        }
+        // Any exact FieldType enum name passes through (CURRENCY, TEXT, PERCENT, ...).
+        try {
+            return FieldType.valueOf(trimmed).name();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     record Result(Map<String, Object> body, String errorMessage) {

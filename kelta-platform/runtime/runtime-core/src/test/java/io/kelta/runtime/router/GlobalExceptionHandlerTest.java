@@ -1,6 +1,5 @@
 package io.kelta.runtime.router;
 
-import io.kelta.jsonapi.JsonApiError;
 import io.kelta.runtime.query.InvalidQueryException;
 import io.kelta.runtime.storage.UniqueConstraintViolationException;
 import io.kelta.runtime.validation.RecordValidationException;
@@ -44,6 +43,11 @@ import static org.mockito.Mockito.when;
  * Verifies the JSON:API 4xx error envelope: every response body has a non-empty
  * {@code errors[]} array, and each error object carries {@code status}, {@code code},
  * and {@code detail} so clients can distinguish failure classes without trial-and-error.
+ *
+ * <p>Error objects are plain maps ({@code JsonApiError.toMap()}), asserted here as maps
+ * — the same shape that goes over the wire. Bean-typed bodies serialized to
+ * {@code {"errors":[{}]}} on the deployed worker, so the envelope's serialized form is
+ * itself under test (see {@link #errorEnvelope_serializesWithAllMembers()}).
  */
 @SuppressWarnings("unchecked")
 class GlobalExceptionHandlerTest {
@@ -55,6 +59,26 @@ class GlobalExceptionHandlerTest {
     void setUp() {
         handler = new GlobalExceptionHandler();
         request = new MockHttpServletRequest("POST", "/api/widgets");
+    }
+
+    private static List<Map<String, Object>> errors(ResponseEntity<Map<String, Object>> response) {
+        return (List<Map<String, Object>>) response.getBody().get("errors");
+    }
+
+    private static Map<String, Object> firstError(ResponseEntity<Map<String, Object>> response) {
+        return errors(response).get(0);
+    }
+
+    private static String str(Map<String, Object> error, String member) {
+        return (String) error.get(member);
+    }
+
+    private static Map<String, Object> source(Map<String, Object> error) {
+        return (Map<String, Object>) error.get("source");
+    }
+
+    private static Map<String, Object> meta(Map<String, Object> error) {
+        return (Map<String, Object>) error.get("meta");
     }
 
     @Test
@@ -73,16 +97,16 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleMethodArgumentNotValid(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        List<JsonApiError> errors = (List<JsonApiError>) response.getBody().get("errors");
+        List<Map<String, Object>> errors = errors(response);
         assertThat(errors).hasSize(2);
-        for (JsonApiError e : errors) {
-            assertThat(e.getStatus()).isEqualTo("400");
-            assertThat(e.getCode()).isEqualTo("VALIDATION_FAILED");
-            assertThat(e.getDetail()).isNotBlank();
-            assertThat(e.getSource()).containsKey("pointer");
+        for (Map<String, Object> e : errors) {
+            assertThat(str(e, "status")).isEqualTo("400");
+            assertThat(str(e, "code")).isEqualTo("VALIDATION_FAILED");
+            assertThat(str(e, "detail")).isNotBlank();
+            assertThat(source(e)).containsKey("pointer");
         }
-        assertThat(errors.get(0).getSource().get("pointer")).isEqualTo("/data/attributes/name");
-        assertThat(errors.get(1).getSource().get("pointer")).isEqualTo("/data/attributes/size");
+        assertThat(source(errors.get(0)).get("pointer")).isEqualTo("/data/attributes/name");
+        assertThat(source(errors.get(1)).get("pointer")).isEqualTo("/data/attributes/size");
     }
 
     @Test
@@ -100,13 +124,13 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleConstraintViolation(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        List<JsonApiError> errors = (List<JsonApiError>) response.getBody().get("errors");
+        List<Map<String, Object>> errors = errors(response);
         assertThat(errors).hasSize(1);
-        JsonApiError e = errors.get(0);
-        assertThat(e.getStatus()).isEqualTo("400");
-        assertThat(e.getCode()).isEqualTo("VALIDATION_FAILED");
-        assertThat(e.getDetail()).isEqualTo("must be greater than 0");
-        assertThat(e.getSource()).containsEntry("parameter", "limit");
+        Map<String, Object> e = errors.get(0);
+        assertThat(str(e, "status")).isEqualTo("400");
+        assertThat(str(e, "code")).isEqualTo("VALIDATION_FAILED");
+        assertThat(str(e, "detail")).isEqualTo("must be greater than 0");
+        assertThat(source(e)).containsEntry("parameter", "limit");
     }
 
     @Test
@@ -122,14 +146,14 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleHttpMessageNotReadable(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        List<JsonApiError> errors = (List<JsonApiError>) response.getBody().get("errors");
+        List<Map<String, Object>> errors = errors(response);
         assertThat(errors).hasSize(1);
-        JsonApiError e = errors.get(0);
-        assertThat(e.getStatus()).isEqualTo("400");
-        assertThat(e.getCode()).isEqualTo("INVALID_PAYLOAD");
-        assertThat(e.getTitle()).isEqualTo("Bad Request");
-        assertThat(e.getDetail()).contains("could not be parsed");
-        assertThat(e.getMeta()).containsEntry("path", "/api/widgets");
+        Map<String, Object> e = errors.get(0);
+        assertThat(str(e, "status")).isEqualTo("400");
+        assertThat(str(e, "code")).isEqualTo("INVALID_PAYLOAD");
+        assertThat(str(e, "title")).isEqualTo("Bad Request");
+        assertThat(str(e, "detail")).contains("could not be parsed");
+        assertThat(meta(e)).containsEntry("path", "/api/widgets");
     }
 
     @Test
@@ -140,11 +164,11 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleMissingParameter(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("400");
-        assertThat(e.getCode()).isEqualTo("MISSING_PARAMETER");
-        assertThat(e.getDetail()).isEqualTo("Required parameter 'filter' is missing");
-        assertThat(e.getSource()).containsEntry("parameter", "filter");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("400");
+        assertThat(str(e, "code")).isEqualTo("MISSING_PARAMETER");
+        assertThat(str(e, "detail")).isEqualTo("Required parameter 'filter' is missing");
+        assertThat(source(e)).containsEntry("parameter", "filter");
     }
 
     @Test
@@ -155,11 +179,11 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleTypeMismatch(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("400");
-        assertThat(e.getCode()).isEqualTo("INVALID_PARAMETER");
-        assertThat(e.getDetail()).contains("'id'").contains("Long");
-        assertThat(e.getSource()).containsEntry("parameter", "id");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("400");
+        assertThat(str(e, "code")).isEqualTo("INVALID_PARAMETER");
+        assertThat(str(e, "detail")).contains("'id'").contains("Long");
+        assertThat(source(e)).containsEntry("parameter", "id");
     }
 
     @Test
@@ -172,11 +196,11 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleNotFound(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("404");
-        assertThat(e.getCode()).isEqualTo("NOT_FOUND");
-        assertThat(e.getTitle()).isEqualTo("Not Found");
-        assertThat(e.getDetail()).contains("GET").contains("/api/missing");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("404");
+        assertThat(str(e, "code")).isEqualTo("NOT_FOUND");
+        assertThat(str(e, "title")).isEqualTo("Not Found");
+        assertThat(str(e, "detail")).contains("GET").contains("/api/missing");
     }
 
     @Test
@@ -189,9 +213,9 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleNotFound(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("404");
-        assertThat(e.getCode()).isEqualTo("NOT_FOUND");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("404");
+        assertThat(str(e, "code")).isEqualTo("NOT_FOUND");
     }
 
     @Test
@@ -202,10 +226,10 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleMethodNotAllowed(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("405");
-        assertThat(e.getCode()).isEqualTo("METHOD_NOT_ALLOWED");
-        assertThat(e.getDetail()).contains("DELETE");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("405");
+        assertThat(str(e, "code")).isEqualTo("METHOD_NOT_ALLOWED");
+        assertThat(str(e, "detail")).contains("DELETE");
     }
 
     @Test
@@ -217,10 +241,10 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleUnsupportedMediaType(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("415");
-        assertThat(e.getCode()).isEqualTo("UNSUPPORTED_MEDIA_TYPE");
-        assertThat(e.getDetail()).contains("text/plain");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("415");
+        assertThat(str(e, "code")).isEqualTo("UNSUPPORTED_MEDIA_TYPE");
+        assertThat(str(e, "detail")).contains("text/plain");
     }
 
     @Test
@@ -230,10 +254,10 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<Map<String, Object>> response = handler.handleResponseStatus(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("409");
-        assertThat(e.getCode()).isEqualTo("CONFLICT");
-        assertThat(e.getDetail()).isEqualTo("Widget already exists");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("409");
+        assertThat(str(e, "code")).isEqualTo("CONFLICT");
+        assertThat(str(e, "detail")).isEqualTo("Widget already exists");
     }
 
     @Test
@@ -246,17 +270,17 @@ class GlobalExceptionHandlerTest {
                 handler.handleValidationException(new ValidationException(result), request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        List<JsonApiError> errors = (List<JsonApiError>) response.getBody().get("errors");
+        List<Map<String, Object>> errors = errors(response);
         assertThat(errors).hasSize(2);
-        for (JsonApiError e : errors) {
-            assertThat(e.getStatus()).isEqualTo("400");
-            assertThat(e.getCode()).isNotBlank();
-            assertThat(e.getDetail()).isNotBlank();
-            assertThat(e.getSource()).containsKey("pointer");
+        for (Map<String, Object> e : errors) {
+            assertThat(str(e, "status")).isEqualTo("400");
+            assertThat(str(e, "code")).isNotBlank();
+            assertThat(str(e, "detail")).isNotBlank();
+            assertThat(source(e)).containsKey("pointer");
         }
-        assertThat(errors.get(0).getSource().get("pointer")).isEqualTo("/data/attributes/email");
-        assertThat(errors.get(0).getCode()).isEqualTo("PATTERN");
-        assertThat(errors.get(1).getCode()).isEqualTo("nullable");
+        assertThat(source(errors.get(0)).get("pointer")).isEqualTo("/data/attributes/email");
+        assertThat(str(errors.get(0), "code")).isEqualTo("PATTERN");
+        assertThat(str(errors.get(1), "code")).isEqualTo("nullable");
     }
 
     @Test
@@ -269,13 +293,13 @@ class GlobalExceptionHandlerTest {
                 handler.handleRecordValidationException(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        List<JsonApiError> errors = (List<JsonApiError>) response.getBody().get("errors");
+        List<Map<String, Object>> errors = errors(response);
         assertThat(errors).hasSize(1);
-        JsonApiError e = errors.get(0);
-        assertThat(e.getStatus()).isEqualTo("422");
-        assertThat(e.getCode()).isEqualTo("VALIDATION_RULE_FAILED");
-        assertThat(e.getDetail()).isEqualTo("Year must be between 1888 and 2031");
-        assertThat(e.getSource()).containsEntry("pointer", "/data/attributes/year");
+        Map<String, Object> e = errors.get(0);
+        assertThat(str(e, "status")).isEqualTo("422");
+        assertThat(str(e, "code")).isEqualTo("VALIDATION_RULE_FAILED");
+        assertThat(str(e, "detail")).isEqualTo("Year must be between 1888 and 2031");
+        assertThat(source(e)).containsEntry("pointer", "/data/attributes/year");
     }
 
     @Test
@@ -287,8 +311,8 @@ class GlobalExceptionHandlerTest {
                 handler.handleRecordValidationException(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getSource()).containsEntry("pointer", "/data/attributes/cross_field_rule");
+        Map<String, Object> e = firstError(response);
+        assertThat(source(e)).containsEntry("pointer", "/data/attributes/cross_field_rule");
     }
 
     @Test
@@ -299,11 +323,11 @@ class GlobalExceptionHandlerTest {
                 handler.handleInvalidQueryException(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("400");
-        assertThat(e.getCode()).isEqualTo("INVALID_QUERY");
-        assertThat(e.getDetail()).isEqualTo("unknown sort field");
-        assertThat(e.getSource()).containsEntry("pointer", "/data/attributes/sort");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("400");
+        assertThat(str(e, "code")).isEqualTo("INVALID_QUERY");
+        assertThat(str(e, "detail")).isEqualTo("unknown sort field");
+        assertThat(source(e)).containsEntry("pointer", "/data/attributes/sort");
     }
 
     @Test
@@ -315,11 +339,11 @@ class GlobalExceptionHandlerTest {
                 handler.handleUniqueConstraintViolation(ex, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("409");
-        assertThat(e.getCode()).isEqualTo("UNIQUE_VIOLATION");
-        assertThat(e.getDetail()).isNotBlank();
-        assertThat(e.getSource()).containsEntry("pointer", "/data/attributes/name");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("409");
+        assertThat(str(e, "code")).isEqualTo("UNIQUE_VIOLATION");
+        assertThat(str(e, "detail")).isNotBlank();
+        assertThat(source(e)).containsEntry("pointer", "/data/attributes/name");
     }
 
     @Test
@@ -328,11 +352,31 @@ class GlobalExceptionHandlerTest {
                 handler.handleGenericException(new RuntimeException("secret stack trace"), request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        JsonApiError e = ((List<JsonApiError>) response.getBody().get("errors")).get(0);
-        assertThat(e.getStatus()).isEqualTo("500");
-        assertThat(e.getCode()).isEqualTo("INTERNAL_ERROR");
+        Map<String, Object> e = firstError(response);
+        assertThat(str(e, "status")).isEqualTo("500");
+        assertThat(str(e, "code")).isEqualTo("INTERNAL_ERROR");
         // detail must not leak the original exception message
-        assertThat(e.getDetail()).doesNotContain("secret stack trace");
+        assertThat(str(e, "detail")).doesNotContain("secret stack trace");
+    }
+
+    @Test
+    void errorEnvelope_serializesWithAllMembers() {
+        // Regression: the deployed worker returned {"errors":[{}]} — the bean
+        // members were dropped at serialization time. The envelope is maps now,
+        // so any mapper must produce the full JSON:API error object.
+        ValidationResult result = ValidationResult.failure(List.of(
+                new io.kelta.runtime.validation.FieldError("filters", "Invalid type, expected JSON", "type")));
+
+        ResponseEntity<Map<String, Object>> response =
+                handler.handleValidationException(new ValidationException(result), request);
+
+        String json = new tools.jackson.databind.ObjectMapper().writeValueAsString(response.getBody());
+        assertThat(json)
+                .contains("\"status\":\"400\"")
+                .contains("\"code\":\"type\"")
+                .contains("\"detail\":\"Invalid type, expected JSON\"")
+                .contains("\"pointer\":\"/data/attributes/filters\"")
+                .doesNotContain("{}");
     }
 
     static class Sample {

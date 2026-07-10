@@ -6,6 +6,7 @@ import io.kelta.runtime.model.FieldType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -71,7 +72,8 @@ public class SchemaMigrationEngine {
         ADD_COLUMN,
         DEPRECATE_COLUMN,
         ALTER_COLUMN_TYPE,
-        DROP_COLUMN
+        DROP_COLUMN,
+        ALTER_UNIQUE
     }
     
     private static final String MIGRATIONS_TABLE = "kelta_migrations";
@@ -282,8 +284,112 @@ public class SchemaMigrationEngine {
             executeMigration(migration);
         }
 
+        // Detect unique-flag toggles. These need a live constraint-catalog lookup
+        // (legacy constraints carry Postgres default names like <table>_<column>_key),
+        // so they are applied directly rather than as precomputed MigrationActions —
+        // and after the loop above, so a just-added or just-retyped column exists.
+        int uniqueToggles = 0;
+        for (FieldDefinition newField : newDefinition.fields()) {
+            FieldDefinition oldField = oldDefinition.getField(newField.name());
+            if (oldField == null || !newField.type().hasPhysicalColumn()) {
+                continue;
+            }
+            if (oldField.unique() != newField.unique()) {
+                applyUniqueToggle(newDefinition, newField, tableRef, newField.unique());
+                uniqueToggles++;
+            }
+        }
+
         log.info("Schema migration completed for collection '{}': {} changes applied",
-            newDefinition.name(), migrations.size());
+            newDefinition.name(), migrations.size() + uniqueToggles);
+    }
+
+    /**
+     * Adds or drops the single-column UNIQUE constraint backing a field's
+     * {@code unique} flag.
+     *
+     * <p>Dropping resolves the actual constraint name(s) from the catalog instead of
+     * guessing: constraints created inline by {@code CREATE TABLE ... UNIQUE} carry the
+     * Postgres default name ({@code <table>_<column>_key}), while ones added by this
+     * method are named {@code uniq_<table>_<column>}. Only single-column UNIQUE
+     * constraints on exactly this column are touched — composite uniques (which are
+     * separate {@code uniq_*} <em>indexes</em> managed by
+     * {@code CompositeUniqueConstraintService}) and the {@code EXTERNAL_ID} unique
+     * index are unaffected. Adding is idempotent: if any single-column UNIQUE
+     * constraint already covers the column (including a legacy-named one), nothing
+     * is done — NATS collection-changed events may reach a pod more than once.
+     */
+    private void applyUniqueToggle(CollectionDefinition definition, FieldDefinition field,
+                                    TableRef tableRef, boolean makeUnique) {
+        String columnName = sanitizeIdentifier(resolvePhysicalColumnName(definition, field));
+        List<String> existing = findSingleColumnUniqueConstraints(tableRef, columnName);
+
+        if (makeUnique) {
+            if (!existing.isEmpty()) {
+                log.info("Unique constraint already present for '{}.{}' ({}), skipping add",
+                    definition.name(), field.name(), existing);
+                return;
+            }
+            String sql = "ALTER TABLE " + tableRef.toSql()
+                + " ADD CONSTRAINT " + uniqueConstraintName(tableRef.tableName(), columnName)
+                + " UNIQUE (" + columnName + ")";
+            try {
+                jdbcTemplate.execute(sql);
+            } catch (DataAccessException e) {
+                throw new StorageException("Failed to add unique constraint for field '"
+                    + field.name() + "' on collection '" + definition.name()
+                    + "' (existing duplicate values block the constraint?)", e);
+            }
+            recordMigration(definition.name(), MigrationType.ALTER_UNIQUE, sql);
+            log.info("Added unique constraint on '{}.{}'", definition.name(), field.name());
+            return;
+        }
+
+        if (existing.isEmpty()) {
+            log.info("No single-column unique constraint found for '{}.{}', nothing to drop",
+                definition.name(), field.name());
+            return;
+        }
+        for (String constraintName : existing) {
+            String sql = "ALTER TABLE " + tableRef.toSql()
+                + " DROP CONSTRAINT \"" + constraintName + "\"";
+            try {
+                jdbcTemplate.execute(sql);
+            } catch (DataAccessException e) {
+                throw new StorageException("Failed to drop unique constraint '" + constraintName
+                    + "' for field '" + field.name() + "' on collection '" + definition.name() + "'", e);
+            }
+            recordMigration(definition.name(), MigrationType.ALTER_UNIQUE, sql);
+        }
+        log.info("Dropped unique constraint(s) {} on '{}.{}'", existing, definition.name(), field.name());
+    }
+
+    /**
+     * Returns the names of UNIQUE constraints that cover exactly (and only) the given
+     * column. {@code LOWER(...)} on both sides keeps the lookup portable between
+     * Postgres (unquoted identifiers fold to lowercase) and H2 (fold to uppercase).
+     */
+    private List<String> findSingleColumnUniqueConstraints(TableRef tableRef, String columnName) {
+        String sql = """
+                SELECT tc.constraint_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.constraint_column_usage ccu
+                  ON ccu.constraint_name = tc.constraint_name
+                 AND ccu.constraint_schema = tc.constraint_schema
+                WHERE tc.constraint_type = 'UNIQUE'
+                  AND LOWER(tc.table_schema) = LOWER(?)
+                  AND LOWER(tc.table_name) = LOWER(?)
+                GROUP BY tc.constraint_name
+                HAVING COUNT(*) = 1 AND LOWER(MIN(ccu.column_name)) = LOWER(?)
+                """;
+        return jdbcTemplate.queryForList(sql, String.class,
+            tableRef.schema(), tableRef.tableName(), columnName);
+    }
+
+    /** {@code uniq_<table>_<column>}, hyphen-safe and bounded to Postgres's 63-char limit. */
+    private String uniqueConstraintName(String tableName, String columnName) {
+        String name = "uniq_" + PhysicalTableStorageAdapter.identifierPart(tableName) + "_" + columnName;
+        return name.length() > 63 ? name.substring(0, 63) : name;
     }
     
     /**

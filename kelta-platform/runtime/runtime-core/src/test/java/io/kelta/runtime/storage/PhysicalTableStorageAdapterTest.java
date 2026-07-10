@@ -1013,4 +1013,51 @@ class PhysicalTableStorageAdapterTest {
             });
         }
     }
+
+    @Nested
+    @DisplayName("Unique-violation column extraction")
+    class UniqueViolationColumnExtraction {
+
+        private org.springframework.dao.DuplicateKeyException pgStyle(String detail) {
+            // The Postgres driver surfaces the detail inside the nested SQLException
+            // message; Spring wraps it in DuplicateKeyException.
+            return new org.springframework.dao.DuplicateKeyException("duplicate key",
+                new java.sql.SQLException("ERROR: duplicate key value violates unique constraint "
+                    + "\"uniq_incentive_programs_country_slug\"\n  Detail: " + detail));
+        }
+
+        @Test
+        @DisplayName("parses a composite key detail into its column list")
+        void parsesCompositeColumns() {
+            List<String> columns = PhysicalTableStorageAdapter.extractViolatedColumns(
+                pgStyle("Key (country, slug)=(25c26833, erasmus-plus) already exists."));
+            assertEquals(List.of("country", "slug"), columns);
+        }
+
+        @Test
+        @DisplayName("parses a single-column key detail")
+        void parsesSingleColumn() {
+            List<String> columns = PhysicalTableStorageAdapter.extractViolatedColumns(
+                pgStyle("Key (slug)=(erasmus-plus) already exists."));
+            assertEquals(List.of("slug"), columns);
+        }
+
+        @Test
+        @DisplayName("unquotes quoted column identifiers")
+        void unquotesQuotedColumns() {
+            List<String> columns = PhysicalTableStorageAdapter.extractViolatedColumns(
+                pgStyle("Key (\"userId\", \"tenantId\")=(u1, t1) already exists."));
+            assertEquals(List.of("userId", "tenantId"), columns);
+        }
+
+        @Test
+        @DisplayName("returns empty for messages without a Key detail (H2 format)")
+        void emptyWithoutDetail() {
+            org.springframework.dao.DuplicateKeyException h2Style =
+                new org.springframework.dao.DuplicateKeyException("duplicate key",
+                    new java.sql.SQLException("Unique index or primary key violation: "
+                        + "\"PUBLIC.CONSTRAINT_INDEX_4 ON PUBLIC.T(SLUG) VALUES ('x')\""));
+            assertTrue(PhysicalTableStorageAdapter.extractViolatedColumns(h2Style).isEmpty());
+        }
+    }
 }

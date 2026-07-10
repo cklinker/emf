@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
@@ -994,6 +995,100 @@ class SchemaMigrationEngineTest {
             assertThrows(IncompatibleSchemaChangeException.class, () ->
                     migrationEngine.migrateSchemaDestructive(
                             oldDef, newDef, TableRef.publicSchema("toggles"), false));
+        }
+    }
+
+    @Nested
+    @DisplayName("Unique flag toggle migrations")
+    class UniqueFlagToggleTests {
+
+        private static final String TABLE = "unique_toggle_items";
+
+        private CollectionDefinition withUnique(boolean unique) {
+            return createCollection(TABLE, List.of(
+                new FieldDefinition("slug", FieldType.STRING, true, false, unique,
+                    null, null, null, null, null),
+                new FieldDefinition("country", FieldType.STRING, true, false, false,
+                    null, null, null, null, null)));
+        }
+
+        private void insertRow(String id, String country, String slug) {
+            jdbcTemplate.update("INSERT INTO " + TABLE
+                + " (id, created_at, updated_at, country, slug) VALUES (?, NOW(), NOW(), ?, ?)",
+                id, country, slug);
+        }
+
+        private int alterUniqueHistoryCount() {
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM kelta_migrations WHERE collection_name = '" + TABLE
+                    + "' AND migration_type = 'ALTER_UNIQUE'", Integer.class);
+            return count == null ? 0 : count;
+        }
+
+        @BeforeEach
+        void createTable() {
+            // Column-level UNIQUE mirrors what initializeCollection emits — the
+            // database-default-named constraint shape the drop path must resolve
+            // from the catalog (it cannot guess the name).
+            jdbcTemplate.execute("DROP TABLE IF EXISTS " + TABLE);
+            jdbcTemplate.execute("CREATE TABLE " + TABLE + " ("
+                + "id VARCHAR(36) PRIMARY KEY, "
+                + "created_at TIMESTAMP NOT NULL, "
+                + "updated_at TIMESTAMP NOT NULL, "
+                + "country TEXT, "
+                + "slug TEXT UNIQUE)");
+            insertRow("a", "nl", "erasmus-plus");
+        }
+
+        @Test
+        @DisplayName("unique true -> false drops the default-named constraint; duplicates then insert")
+        void dropUniqueAllowsDuplicates() {
+            assertThrows(DataAccessException.class, () -> insertRow("b", "de", "erasmus-plus"));
+
+            migrationEngine.migrateSchema(withUnique(true), withUnique(false));
+
+            insertRow("b", "de", "erasmus-plus");
+            Integer rows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + TABLE + " WHERE slug = 'erasmus-plus'", Integer.class);
+            assertEquals(2, rows);
+            assertEquals(1, alterUniqueHistoryCount());
+        }
+
+        @Test
+        @DisplayName("unique false -> true re-adds a uniq_-named constraint that rejects duplicates")
+        void addUniqueRejectsDuplicates() {
+            migrationEngine.migrateSchema(withUnique(true), withUnique(false));
+            migrationEngine.migrateSchema(withUnique(false), withUnique(true));
+
+            assertThrows(DataAccessException.class, () -> insertRow("b", "de", "erasmus-plus"));
+            assertEquals(2, alterUniqueHistoryCount());
+        }
+
+        @Test
+        @DisplayName("adding when a constraint already covers the column is a no-op (event redelivery)")
+        void addIsIdempotent() {
+            // The CREATE TABLE constraint is still in place; a false -> true toggle
+            // must detect it (whatever its name) and skip the ADD.
+            migrationEngine.migrateSchema(withUnique(false), withUnique(true));
+
+            assertEquals(0, alterUniqueHistoryCount());
+            assertThrows(DataAccessException.class, () -> insertRow("b", "de", "erasmus-plus"));
+        }
+
+        @Test
+        @DisplayName("composite uniq_ indexes on the same column survive a single-column drop")
+        void compositeIndexUntouched() {
+            // The production scenario: single-column unique OFF, composite
+            // (country, slug) uniqueness stays enforced by its separate index.
+            jdbcTemplate.execute("CREATE UNIQUE INDEX uniq_unique_toggle_items_country_slug ON "
+                + TABLE + " (country, slug)");
+
+            migrationEngine.migrateSchema(withUnique(true), withUnique(false));
+
+            // Same slug in another country: now allowed.
+            insertRow("b", "de", "erasmus-plus");
+            // Same (country, slug) pair: still rejected by the composite index.
+            assertThrows(DataAccessException.class, () -> insertRow("c", "de", "erasmus-plus"));
         }
     }
 }

@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1519,6 +1520,23 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      */
     private String detectUniqueViolationField(CollectionDefinition definition, Map<String, Object> data,
             DuplicateKeyException e) {
+        // Best source: the Postgres error detail names the violated columns exactly —
+        // "Key (country, slug)=(..., erasmus-plus) already exists." Map the physical
+        // columns back to field names so the client learns the real field set, for
+        // composite constraints and for single columns alike (including stale indexes
+        // whose field no longer carries unique=true in metadata).
+        List<String> violatedColumns = extractViolatedColumns(e);
+        if (!violatedColumns.isEmpty()) {
+            Map<String, String> fieldByColumn = new LinkedHashMap<>();
+            for (FieldDefinition field : definition.fields()) {
+                fieldByColumn.put(getColumnName(definition, field), field.name());
+            }
+            fieldByColumn.putIfAbsent("id", "id");
+            return violatedColumns.stream()
+                    .map(column -> fieldByColumn.getOrDefault(column, column))
+                    .collect(Collectors.joining(", "));
+        }
+
         // Composite unique indexes created by CompositeUniqueConstraintService use the
         // "uniq_<table>_<col1>_<col2>" naming convention — surface that instead of
         // pretending the duplicate belongs to a single field.
@@ -1542,6 +1560,42 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
 
         return "unknown";
+    }
+
+    private static final java.util.regex.Pattern DUPLICATE_KEY_DETAIL =
+            java.util.regex.Pattern.compile("Key \\((.+?)\\)=");
+
+    /**
+     * Pulls the violated column list out of a Postgres duplicate-key error detail
+     * ({@code Key (col1, col2)=(v1, v2) already exists.}). Returns an empty list when
+     * the driver message carries no such detail (e.g. H2's message format), in which
+     * case callers fall back to name- and probe-based detection.
+     */
+    static List<String> extractViolatedColumns(DuplicateKeyException e) {
+        Throwable cause = e;
+        while (cause != null) {
+            String msg = cause.getMessage();
+            if (msg != null) {
+                var matcher = DUPLICATE_KEY_DETAIL.matcher(msg);
+                if (matcher.find()) {
+                    List<String> columns = new ArrayList<>();
+                    for (String part : matcher.group(1).split(",")) {
+                        String column = part.trim();
+                        if (column.length() > 1 && column.startsWith("\"") && column.endsWith("\"")) {
+                            column = column.substring(1, column.length() - 1);
+                        }
+                        if (!column.isEmpty()) {
+                            columns.add(column);
+                        }
+                    }
+                    if (!columns.isEmpty()) {
+                        return columns;
+                    }
+                }
+            }
+            cause = cause.getCause();
+        }
+        return List.of();
     }
 
     /**

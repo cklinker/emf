@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiClient } from '../services/apiClient'
+import { useApi } from '../context/ApiContext'
 import { useRealtimeClient } from '../realtime/RealtimeProvider'
 
 /**
@@ -51,6 +51,7 @@ export function useConversations(
   view: ChatView,
   options?: { queueId?: string; status?: string; enabled?: boolean }
 ) {
+  const { apiClient } = useApi()
   const params = new URLSearchParams({ view })
   if (options?.queueId) params.set('queueId', options.queueId)
   if (options?.status) params.set('status', options.status)
@@ -81,6 +82,7 @@ export function useUnreadChatCount(enabled = true): number {
  * chat.leave. New chat.message events invalidate this query (provider).
  */
 export function useChatMessages(conversationId: string | null) {
+  const { apiClient } = useApi()
   const client = useRealtimeClient()
   const queryClient = useQueryClient()
 
@@ -111,12 +113,13 @@ export function useChatMessages(conversationId: string | null) {
       .catch(() => {
         // Best-effort: an offline/failed receipt only delays the unread clear.
       })
-  }, [conversationId, newestId, queryClient])
+  }, [apiClient, conversationId, newestId, queryClient])
 
   return query
 }
 
 export function useSendChatMessage(conversationId: string | null) {
+  const { apiClient } = useApi()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: string) =>
@@ -129,6 +132,7 @@ export function useSendChatMessage(conversationId: string | null) {
 }
 
 export function useStartConversation() {
+  const { apiClient } = useApi()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: { queueId?: string; subject?: string; contextRecordId?: string }) =>
@@ -140,6 +144,7 @@ export function useStartConversation() {
 }
 
 export function useConversationActions(conversationId: string | null) {
+  const { apiClient } = useApi()
   const queryClient = useQueryClient()
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['chat-conversations'] })

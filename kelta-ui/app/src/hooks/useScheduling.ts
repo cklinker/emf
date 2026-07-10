@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiClient } from '../services/apiClient'
+import { useApi } from '../context/ApiContext'
 
 /**
  * Scheduling hooks (telehealth slice 4) over /api/telehealth (plain JSON,
@@ -32,6 +32,7 @@ export interface Appointment {
 const APPOINTMENTS_POLL_MS = 60_000
 
 export function useProviders(enabled = true) {
+  const { apiClient } = useApi()
   return useQuery({
     queryKey: ['telehealth-providers'],
     queryFn: async () => {
@@ -44,6 +45,7 @@ export function useProviders(enabled = true) {
 }
 
 export function useSlots(providerId: string | null, fromIso: string, toIso: string, duration = 30) {
+  const { apiClient } = useApi()
   return useQuery({
     queryKey: ['telehealth-slots', providerId, fromIso, toIso, duration],
     queryFn: async () => {
@@ -61,6 +63,7 @@ export function useSlots(providerId: string | null, fromIso: string, toIso: stri
 }
 
 export function useAppointments(view: 'mine' | 'provider', enabled = true) {
+  const { apiClient } = useApi()
   return useQuery({
     queryKey: ['telehealth-appointments', view],
     queryFn: async () => {
@@ -75,6 +78,7 @@ export function useAppointments(view: 'mine' | 'provider', enabled = true) {
 }
 
 export function useBookAppointment() {
+  const { apiClient } = useApi()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: {
@@ -93,6 +97,7 @@ export function useBookAppointment() {
 }
 
 export function useAppointmentActions() {
+  const { apiClient } = useApi()
   const queryClient = useQueryClient()
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['telehealth-appointments'] })

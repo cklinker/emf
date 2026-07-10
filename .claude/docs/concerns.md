@@ -216,6 +216,20 @@ error envelopes rendered as `{"errors":[{}]}` (bean members dropped at serializa
 deployed worker); `GlobalExceptionHandler` now emits plain maps (`JsonApiError.toMap()`), which
 serialize reliably under any mapper config — never build error bodies from the bean directly.
 
+**FIXED (fix/hyphen-collection-refresh) — kebab-case collection names broke generated SQL identifier names.**
+`PhysicalTableStorageAdapter.sanitizeIdentifier` (strict `[a-zA-Z0-9_]`) was fed raw
+collection names when building generated index/constraint *names* (`idx_`/`hnsw_`/`fk_` in
+`initializeCollection`, `uniq_` in `CompositeUniqueConstraintService.buildIndexName`) and the
+FK *target table* reference. Collection names are conventionally kebab-case, so on any
+hyphen-named collection: every NATS-triggered `CollectionLifecycleManager.refreshCollection`
+threw `Invalid identifier: <name>` (multi-pod config refresh silently failing — surfaced once
+the #1214–#1216 NATS reliability sweep made event delivery actually work), field DELETE
+returned 500, and composite unique constraints could not be created at all. Fix:
+`identifierPart()` maps hyphens→underscores for generated *names* only; table *references*
+keep the raw name via `TableRef` quoting. Watch-out for future DDL: never pass a collection
+name into `sanitizeIdentifier` directly — names go through `identifierPart`, references
+through `TableRef`.
+
 **FIXED (PR #1174) — record-policy `collectionId` was UUID-keyed but checked by name.**
 `CerbosPolicyGenerator.generateRecordPolicy` emitted `R.attr.collectionId == "<UUID>"` (from
 `profile_object_permission.collection_id` + `collection.id`, both UUIDs), but

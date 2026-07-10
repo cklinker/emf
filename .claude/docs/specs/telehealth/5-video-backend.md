@@ -27,7 +27,9 @@ Delivers video-session lifecycle on self-hosted LiveKit:
   no-show detection), and emit audit events.
 - **Recording (optional)**: per-tenant flag + per-visit consent (captured in slice 6); room
   composite egress → tenant-prefixed S3 → `egress_ended` webhook attaches the file as an
-  attachment record on the appointment; retention via the attachment lifecycle.
+  attachment record on the appointment; retention/purge of recordings is governed by the
+  slice-7 encounter archive (`retentionUntil`/`legalHold`), and session `ENDED` also
+  triggers the slice-7 session-summary archive once that slice lands.
 - Sessions auto-created for CONFIRMED appointments at booking or first-join (implementation
   decides; spec default: lazily at first token request).
 

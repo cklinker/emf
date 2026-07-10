@@ -31,10 +31,12 @@ Read this parent first; every child references it.
 | 4 — Scheduling & visit links | `4-scheduling.md` | backend + FE (appointments, slots, reminders) |
 | 5 — Video backend (LiveKit) | `5-video-backend.md` | **backend + infra, security** |
 | 6 — Video UI & visit experience | `6-video-ui.md` | FE (join, waiting room, consent) |
+| 7 — Archival & retention (chats + calls) | `7-archival-retention.md` | backend + FE (encounter record, retention/purge) |
 
-**Dependency order (hard edges): 1 → 2 → 3, and 1 → 4 → 5 → 6.** Chat (2–3) and scheduling
-(4) are independent tracks after slice 1. Slice 6 also consumes the chat widget from 3 for
-in-call chat, but degrades gracefully without it.
+**Dependency order (hard edges): 1 → 2 → 3, and 1 → 4 → 5 → 6; 7 follows 2 and 5.** Chat
+(2–3) and scheduling (4) are independent tracks after slice 1. Slice 6 also consumes the
+chat widget from 3 for in-call chat, but degrades gracefully without it. Slice 7's UI
+touches (Archived tab, encounter-record card) land on the slice 3/6 surfaces.
 
 ## Context
 
@@ -115,6 +117,13 @@ tenant isolation, auditability, and deny-by-default portal access preserved thro
   mirrors the `ai-tokens-monthly` Redis pattern) and `maxPortalUsers` (enforced at
   invite/create — closing the known "gov_users tracked but not enforced" gap for the portal
   population).
+- **Archive-then-purge, never delete-first.** Every closed chat and ended video call
+  becomes an immutable **encounter record** (slice 7): a versioned, hashed JSON transcript
+  /session-summary artifact (+ PDF render) in S3, indexed by a `telehealth-archives`
+  system collection row carrying `retentionUntil` + `legalHold`. Tenant-configured
+  retention (telemedicine default 7 years) drives a purge sweep that skips legal holds;
+  live chat rows may be purged only *after* archival — which is also the growth mitigation
+  for the shared message tables. ARCHIVED conversations are read-only.
 - **Compliance posture for telemedicine.** Every conversation/session access emits
   `SecurityAuditLogger` events (OpenSearch); recording is **off by default**, per-tenant
   opt-in, with explicit in-call consent capture stored on the session record; media is
@@ -158,7 +167,7 @@ Use these — do not rebuild.
 
 ```
 kelta.chat.message.<tenantId>.<conversationId>       chat message created (ids + sender + kind; NO body text)
-kelta.chat.conversation.<tenantId>.<conversationId>  conversation lifecycle (OPENED|ASSIGNED|CLOSED)
+kelta.chat.conversation.<tenantId>.<conversationId>  conversation lifecycle (OPENED|ASSIGNED|CLOSED|ARCHIVED)
 kelta.video.session.<tenantId>.<sessionId>           video session lifecycle (CREATED|ACTIVE|ENDED|RECORDING_READY)
 ```
 
@@ -173,7 +182,7 @@ send  {"action":"chat.leave","conversationId":"<uuid>"}
 recv  {"action":"chat.joined","conversationId":"…"} | {"action":"error","message":"…"}
 recv  {"event":"chat.message","conversationId":"…","messageId":"…","senderId":"…",
        "kind":"TEXT|SYSTEM|ATTACHMENT","timestamp":"…"}            (no body — invalidation signal)
-recv  {"event":"chat.conversation","conversationId":"…","status":"OPEN|ASSIGNED|CLOSED",…}
+recv  {"event":"chat.conversation","conversationId":"…","status":"OPEN|ASSIGNED|CLOSED|ARCHIVED",…}
 ```
 
 Presence reuses the existing `presence.join` with resource conventions
@@ -193,6 +202,10 @@ POST /api/telehealth/sessions/{id}/token           mint LiveKit access token (me
 GET  /api/telehealth/visits/{signedToken}          visit-link landing (public path, HMAC)
 POST /api/telehealth/webhooks/livekit              LiveKit webhook (public path, signature-verified)
 POST /api/auth/portal/request-link | /exchange     magic-link login (kelta-auth, rate-limited)
+POST /api/telehealth/archives                      archive-now {sourceType, sourceId} (staff)
+GET  /api/telehealth/archives[/{id}]               encounter records (staff; portal sees own; downloads audited)
+POST /api/telehealth/archives/{id}/legal-hold      MANAGE_DATA only
+GET|PUT /api/telehealth/retention-settings         MANAGE_DATA only
 ```
 
 Generic JSON:API on the chat/telehealth system collections remains available to staff
@@ -234,7 +247,9 @@ issuers already supported by `DynamicReactiveJwtDecoder`).
   full-text/embedding indexes by default.
 - **Audit.** New `SecurityAuditLogger` event types: `PORTAL_LINK_REQUESTED`, `PORTAL_LOGIN`,
   `CHAT_CONVERSATION_OPENED/ASSIGNED/CLOSED`, `CHAT_ACCESS_DENIED`,
-  `VIDEO_TOKEN_ISSUED`, `VIDEO_SESSION_STARTED/ENDED`, `RECORDING_CONSENT_CAPTURED`.
+  `VIDEO_TOKEN_ISSUED`, `VIDEO_SESSION_STARTED/ENDED`, `RECORDING_CONSENT_CAPTURED`,
+  `ARCHIVE_CREATED`, `ARCHIVE_ACCESSED`, `ARCHIVE_PURGED`, `LEGAL_HOLD_CHANGED`,
+  `RETENTION_SETTINGS_CHANGED`.
 - **JWT on the WS query param** (existing design) applies to portal sockets too — never log
   upgrade URLs.
 

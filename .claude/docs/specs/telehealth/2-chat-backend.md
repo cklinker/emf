@@ -39,8 +39,9 @@ WS   recv {"event":"chat.message","conversationId":"…","messageId":"…","send
 Collection shapes (system collections; JSON:API names as listed):
 
 - `chat-queues`: name, description, active.
-- `chat-conversations`: queueId (lookup), subject, status `OPEN|ASSIGNED|CLOSED`, origin
-  `PORTAL|INTERNAL`, assignedTo (user), contextRecordId?, lastMessageAt, closedAt.
+- `chat-conversations`: queueId (lookup), subject, status `OPEN|ASSIGNED|CLOSED|ARCHIVED`
+  (ARCHIVED transitions + read-only guard land in slice 7), origin `PORTAL|INTERNAL`,
+  assignedTo (user), contextRecordId?, lastMessageAt, closedAt.
 - `chat-messages`: conversationId (master-detail), senderId, senderType `INTERNAL|PORTAL`,
   kind `TEXT|SYSTEM|ATTACHMENT`, body (rich text), sentAt. Excluded from full-text/embedding
   indexes; excluded from generic realtime `data` push.
@@ -94,9 +95,10 @@ TODO); `status.md` row update.
 
 ## 8. Risks & open questions
 
-- **Message-table growth** in the shared public schema — indexes above + a retention policy
-  (per-tenant `chatRetentionDays`, scheduled purge job) tracked in `concerns.md`; partition
-  only if real volume demands it.
+- **Message-table growth** in the shared public schema — indexes above; the durable
+  mitigation is slice 7's archive-then-purge (live message rows purged only after the
+  encounter is archived — never a bare retention delete). Tracked in `concerns.md`;
+  partition only if real volume demands it.
 - Membership cache (30s) means a just-removed participant may receive id-only events briefly
   — acceptable (no bodies on the wire); document it.
 - `MANAGE_CHAT` naming vs a finer `chat-agent` concept: v1 keeps profile-based simplicity

@@ -226,4 +226,20 @@ class CompositeUniqueConstraintServiceTest {
             assertNull(PhysicalTableStorageAdapter.extractCompositeConstraintName(ex));
         }
     }
+
+    @Nested
+    @DisplayName("Kebab-case collection names")
+    class KebabCaseNames {
+
+        @Test
+        @DisplayName("buildIndexName normalizes hyphens instead of throwing")
+        void buildIndexNameNormalizesHyphens() {
+            // Regression: composite unique constraints on kebab-case collections
+            // (program-translations, faq-translations, ...) failed with
+            // "Invalid identifier: program-translations".
+            String name = CompositeUniqueConstraintService.buildIndexName(
+                    "program-translations", List.of("program", "locale"));
+            assertEquals("uniq_program_translations_program_locale", name);
+        }
+    }
 }

@@ -183,7 +183,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             // Unique index for EXTERNAL_ID
             if (field.type() == FieldType.EXTERNAL_ID) {
                 String idxName = buildBoundedIdentifier(
-                        "idx_", sanitizeIdentifier(getBaseTableName(definition)),
+                        "idx_", identifierPart(getBaseTableName(definition)),
                         sanitizeIdentifier(columnName));
                 postCreateStatements.add(
                     "CREATE UNIQUE INDEX IF NOT EXISTS " + idxName
@@ -196,7 +196,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             // lookup. Idempotent (IF NOT EXISTS), so re-initialization is safe.
             if (field.type() == FieldType.VECTOR) {
                 String idxName = buildBoundedIdentifier(
-                        "hnsw_", sanitizeIdentifier(getBaseTableName(definition)),
+                        "hnsw_", identifierPart(getBaseTableName(definition)),
                         sanitizeIdentifier(columnName));
                 postCreateStatements.add(buildHnswIndexStatement(idxName, qualifiedName, columnName));
             }
@@ -205,14 +205,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             if ((field.type() == FieldType.LOOKUP || field.type() == FieldType.MASTER_DETAIL)
                     && field.referenceConfig() != null) {
                 String baseName = getBaseTableName(definition);
-                String targetTableName = sanitizeIdentifier(field.referenceConfig().targetCollection());
+                // Raw name: kebab-case targets are legal — TableRef validates and
+                // quotes the reference. Only the generated fk NAME must be strict.
+                String targetTableName = field.referenceConfig().targetCollection();
                 // Target table is in the same schema as the source table
                 TableRef targetRef = tableRef.isPublicSchema()
                         ? TableRef.publicSchema(targetTableName)
                         : TableRef.tenantSchema(tableRef.schema(), targetTableName);
                 String targetCol = sanitizeIdentifier(field.referenceConfig().targetField());
                 String fkName = buildBoundedIdentifier(
-                        "fk_", sanitizeIdentifier(baseName), sanitizeIdentifier(columnName));
+                        "fk_", identifierPart(baseName), sanitizeIdentifier(columnName));
                 String onDelete = field.type() == FieldType.MASTER_DETAIL
                         ? "ON DELETE CASCADE" : "ON DELETE SET NULL";
 
@@ -877,6 +879,21 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             throw new IllegalArgumentException("Invalid identifier: " + identifier);
         }
         return identifier;
+    }
+
+    /**
+     * Builds an identifier <em>part</em> for a generated index/constraint name from a
+     * logical name that may legally contain hyphens (kebab-case collection names like
+     * {@code program-translations}). Hyphens become underscores before strict
+     * sanitization — generated names are embedded unquoted in DDL, so they must be
+     * strictly alphanumeric, while the table itself keeps its hyphenated name via
+     * {@link TableRef} quoting. Never use this for a table or column <em>reference</em>.
+     */
+    static String identifierPart(String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Identifier cannot be null or blank");
+        }
+        return sanitizeIdentifier(name.replace('-', '_'));
     }
 
     /** PostgreSQL's identifier length limit. Longer names are silently truncated. */

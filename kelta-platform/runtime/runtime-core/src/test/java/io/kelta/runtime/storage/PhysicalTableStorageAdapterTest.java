@@ -962,4 +962,55 @@ class PhysicalTableStorageAdapterTest {
             assertEquals(4.19, ((Number) result.get("avg_price")).doubleValue(), 0.001);
         }
     }
+
+    @Nested
+    @DisplayName("Kebab-case collection names")
+    class KebabCaseCollectionNames {
+
+        @Test
+        @DisplayName("identifierPart maps hyphens to underscores and stays strict otherwise")
+        void identifierPartMapsHyphens() {
+            assertEquals("program_translations",
+                    PhysicalTableStorageAdapter.identifierPart("program-translations"));
+            assertEquals("plain", PhysicalTableStorageAdapter.identifierPart("plain"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> PhysicalTableStorageAdapter.identifierPart("bad;name"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> PhysicalTableStorageAdapter.identifierPart("  "));
+        }
+
+        @Test
+        @DisplayName("initializeCollection handles a kebab-case tenant collection with a generated index name")
+        void kebabCollectionInitializes() {
+            // Regression: generated index/constraint NAMES used to feed the raw
+            // kebab-case collection name into sanitizeIdentifier and threw
+            // "Invalid identifier: program-translations" on every NATS-triggered
+            // refresh. The EXTERNAL_ID field forces an idx_ name through
+            // identifierPart; the FK path shares the same helper (its DO $$
+            // post-create block is Postgres-only, so it is not executed on H2).
+            List<FieldDefinition> fields = List.of(
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("externalRef", FieldType.EXTERNAL_ID, true, false, false, null, null, null, null, null)
+            );
+            CollectionDefinition kebab = new CollectionDefinition(
+                "program-translations",
+                "Program Translations",
+                "kebab-case regression collection",
+                fields,
+                new StorageConfig("program-translations", Map.of()),
+                null,
+                null,
+                1L,
+                Instant.now(),
+                Instant.now()
+            );
+
+            io.kelta.runtime.context.TenantContext.runWithTenant("tenant-1", "kebab-tenant", () -> {
+                assertDoesNotThrow(() -> adapter.initializeCollection(kebab));
+                Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM \"kebab-tenant\".\"program-translations\"", Integer.class);
+                assertEquals(0, count);
+            });
+        }
+    }
 }

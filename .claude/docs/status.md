@@ -87,6 +87,10 @@ ship a change that moves a row.
 
 HA/failover docs (RTO/RPO) · scheduled *backup* (data export itself ships — see ✅).
 
+| Capability | Notes |
+|------------|-------|
+| Telehealth: chat + video + scheduling + portal users | Parent spec `specs/telehealth/README.md` (2026-07-10), slices 1–6: portal identity (magic-link login, `user_type`, participant `record_share` grants) → chat (system collections + conversation-scoped WS routing on the existing `/ws/realtime` socket) → chat console/widget → scheduling (slots, reminders via `DelayActionHandler`, signed visit links) → self-hosted LiveKit video (token mint, webhooks, governor `videoMinutesPerMonth`) → visit UX. Nothing implemented yet — no chat/video code exists in the repo. |
+
 *(Data masking: PR 1 backend core + PR 2 egress/UI/MCP shipped — see the 🟡 Partial table; only v2 contexts [dashboards, system-tier flow/webhook] + post-deploy e2e remain.)*
 *(Delegated administration moved to 🟡 2026-07-05 — scoped user management ships; see the Partial table.)*
 *(Removed 2026-07-04: sandbox environments + metadata promotion → 🟡 shipped as

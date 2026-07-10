@@ -43,7 +43,10 @@ public final class SecurityAuditLogger {
         CHAT_CONVERSATION_OPENED,
         CHAT_CONVERSATION_ASSIGNED,
         CHAT_CONVERSATION_CLOSED,
-        CHAT_ACCESS_DENIED
+        CHAT_ACCESS_DENIED,
+        VIDEO_TOKEN_ISSUED,
+        VIDEO_SESSION_STARTED,
+        VIDEO_SESSION_ENDED
     }
 
     /**

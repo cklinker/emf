@@ -171,6 +171,15 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `GET /api/telehealth/visits/{token}` is an **unauthenticated path** (signed HMAC visit
   token → live-row re-check → fresh single-use portal login token → 302 to the auth
   verify). Reminders: `AppointmentReminderSweep` (atomic UPDATE-claim, multi-pod safe).
+- **Telehealth video** (slice 5, V170): LiveKit trust boundary — media flows client↔SFU
+  directly (never through the gateway); the platform only MINTS room-scoped HS256 tokens
+  (`POST /api/telehealth/{appointments|conversations}/{id}/video-token` — participant +
+  join-window + `telehealthEnabled` + `videoMinutesPerMonth` checks, fail-closed, in
+  `VideoSessionService`) and CONSUMES signed webhooks
+  (`POST /api/telehealth/webhooks/livekit`, unauthenticated path — LiveKit JWT signature +
+  body-digest verified, then idempotent by event id via `livekit_webhook_event`). Rooms are
+  opaque `t_<tenantId>_<uuid>`; one shared SFU across tenants is the accepted v1 trade
+  (tokens isolate rooms). Session lifecycle publishes `kelta.video.session.*` for flows.
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

@@ -277,6 +277,33 @@ portal session. Confirmations additionally attach a hand-rolled **RFC 5545 .ics*
 `AppointmentReminderSweep` (60s poll, atomic UPDATE-claim on `reminder_sent_at`, offset
 `kelta.telehealth.reminders.offset-minutes`, toggle `…reminders.enabled`).
 
+## LiveKit (telehealth slice 5 — video SFU)
+
+Self-hosted, Apache-2.0 WebRTC SFU. **Media never traverses the gateway** — clients connect
+to LiveKit's own host (`wss://livekit.kelta.io` prod via the `livekit` app in homelab-argo;
+`docker compose --profile telehealth` / `make up-telehealth` locally). The worker's only
+integration points:
+
+- **Token minting** (`LiveKitTokenService`, plain nimbus HS256 — no vendor SDK): `iss` =
+  API key, `sub` = platform user id, a `video` claim with room-scoped grants
+  (`roomJoin`/`canPublish`/`canSubscribe` for exactly one room). Config
+  `kelta.telehealth.livekit.{url,api-key,api-secret}` (`KELTA_LIVEKIT_*`; dev defaults +
+  startup warning when unset, matching the compose profile's dev keys). Sessions are
+  created lazily at the first token request (`video-sessions`, one per appointment via a
+  partial unique index; ad-hoc per chat conversation); rooms are opaque
+  `t_<tenantId>_<uuid>` names, so a leaked token can never reach another tenant's room.
+  Enforcement at mint (`VideoSessionService`, fail-closed): appointment/conversation
+  membership, the join window (start−15min…end+60min), the per-tenant `telehealthEnabled`
+  gate, and the `videoMinutesPerMonth` governor (SQL month-sum of ended durations — no
+  counter infra).
+- **Webhooks** (`POST /api/telehealth/webhooks/livekit`, gateway unauthenticated path):
+  LiveKit signs each delivery with a JWT (same API secret) whose `sha256` claim is the raw
+  body digest — `verifyWebhook` checks signature AND digest before parsing. Idempotency:
+  INSERT into `livekit_webhook_event` is the claim (duplicate delivery → skip).
+  `room_started`/`room_finished` drive session status + duration and publish
+  `kelta.video.session.<tenantId>.<sessionId>`; `egress_ended` stamps `recording_key`
+  (attachment/archival wiring lands with slice 7).
+
 ## Mass-email campaigns (V152)
 
 Bulk send on top of the same SMTP path. Three tenant-scoped tables (RLS): `email_campaign`

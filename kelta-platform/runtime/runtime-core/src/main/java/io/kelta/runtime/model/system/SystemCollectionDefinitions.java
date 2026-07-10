@@ -114,6 +114,9 @@ public final class SystemCollectionDefinitions {
         definitions.add(telehealthAvailability());
         definitions.add(telehealthAppointments());
 
+        // Video sessions (telehealth slice 5)
+        definitions.add(videoSessions());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -357,6 +360,29 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("videoSessionId", 36).withColumnName("video_session_id"))
             .addField(FieldDefinition.datetime("reminderSentAt").withColumnName("reminder_sent_at"))
             .addField(FieldDefinition.datetime("cancelledAt").withColumnName("cancelled_at"))
+            .build();
+    }
+
+    /** Video sessions (telehealth slice 5) — lifecycle owned by the LiveKit webhook. */
+    public static CollectionDefinition videoSessions() {
+        return systemBuilder("video-sessions", "Video Sessions", "video_session")
+            .displayFieldName("id")
+            .addImmutableField("roomName")
+            .addField(FieldDefinition.lookup("appointmentId", "telehealth-appointments", "Appointment")
+                .withColumnName("appointment_id"))
+            .addField(FieldDefinition.lookup("conversationId", "chat-conversations", "Conversation")
+                .withColumnName("conversation_id"))
+            .addField(FieldDefinition.requiredString("roomName", 100)
+                .withColumnName("room_name").withUnique(true))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("CREATED")
+                .withEnumValues(List.of("CREATED", "ACTIVE", "ENDED")))
+            .addField(FieldDefinition.datetime("startedAt").withColumnName("started_at"))
+            .addField(FieldDefinition.datetime("endedAt").withColumnName("ended_at"))
+            .addField(FieldDefinition.integer("durationSeconds").withColumnName("duration_seconds"))
+            .addField(FieldDefinition.bool("recordingConsent").withColumnName("recording_consent")
+                .withDefault(false))
+            .addField(FieldDefinition.string("recordingKey", 500).withColumnName("recording_key"))
             .build();
     }
 

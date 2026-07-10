@@ -97,6 +97,19 @@ kelta:
     tracking-secret: ${CAMPAIGN_TRACKING_SECRET:}
   internal:
     token: ${KELTA_INTERNAL_TOKEN:}
+  telehealth:
+    # HMAC secret for emailed visit links — set in every non-dev environment.
+    visit-secret: ${KELTA_TELEHEALTH_VISIT_SECRET:}
+    reminders:
+      enabled: ${TELEHEALTH_REMINDERS_ENABLED:true}
+      offset-minutes: ${TELEHEALTH_REMINDER_OFFSET_MINUTES:60}
+      poll-interval-ms: ${TELEHEALTH_REMINDER_POLL_MS:60000}
+    livekit:
+      # Self-hosted LiveKit SFU (docker-compose --profile telehealth locally;
+      # livekit app in homelab-argo for prod). Dev defaults apply when unset.
+      url: ${KELTA_LIVEKIT_URL:}
+      api-key: ${KELTA_LIVEKIT_API_KEY:}
+      api-secret: ${KELTA_LIVEKIT_API_SECRET:}
   scheduler:
     enabled: ${SCHEDULER_ENABLED:true}
     poll-interval-ms: ${SCHEDULER_POLL_INTERVAL_MS:60000}

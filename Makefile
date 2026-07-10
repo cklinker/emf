@@ -8,8 +8,9 @@
 COMPOSE       := docker compose
 COMPOSE_AI    := docker compose --profile ai
 COMPOSE_FULL  := docker compose --profile ai --profile tools
+COMPOSE_TELE  := docker compose --profile telehealth
 
-.PHONY: setup gen-keys copy-env up up-ai up-full down reset seed rebuild logs debug ps help
+.PHONY: setup gen-keys copy-env up up-ai up-full up-telehealth down reset seed rebuild logs debug ps help
 
 # ─── First-time setup ────────────────────────────────────────────────────────
 
@@ -65,9 +66,13 @@ up-ai: setup
 up-full: setup
 	$(COMPOSE_FULL) up -d
 
+## up-telehealth: start default stack + LiveKit SFU (video visits)
+up-telehealth: setup
+	$(COMPOSE_TELE) up -d
+
 ## down: stop and remove containers (keeps volumes)
 down:
-	$(COMPOSE) --profile ai --profile tools --profile observability down
+	$(COMPOSE) --profile ai --profile tools --profile observability --profile telehealth down
 
 ## reset: wipe everything (volumes included) and start fresh
 reset: down

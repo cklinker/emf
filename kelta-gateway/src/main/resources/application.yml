@@ -104,8 +104,9 @@ kelta:
       # Paths accessible without authentication for ALL HTTP methods.
       # Used for endpoints receiving data from unauthenticated sources (e.g., browser OTEL SDK,
       # campaign open-pixel / click-redirect / unsubscribe links authenticated by HMAC token,
-      # and telehealth visit links authenticated by their signed token).
-      unauthenticated-paths: /otel,/api/webhooks,/scim,/api/track,/api/telehealth/visits
+      # telehealth visit links authenticated by their signed token, and LiveKit webhooks
+      # authenticated by their signed JWT + body digest).
+      unauthenticated-paths: /otel,/api/webhooks,/scim,/api/track,/api/telehealth/visits,/api/telehealth/webhooks
 
 # Actuator configuration for health and metrics
 management:

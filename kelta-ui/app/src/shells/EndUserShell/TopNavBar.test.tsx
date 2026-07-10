@@ -122,3 +122,42 @@ describe('app switcher (apps/nav v2)', () => {
     expect(onAppChange).toHaveBeenCalledWith('support')
   })
 })
+
+describe('submenu groups', () => {
+  const GROUPED: NavTab[] = [
+    { key: '/resources/countries', kind: 'collection', target: 'countries', label: 'Countries' },
+    {
+      key: 'group:faqs',
+      kind: 'group',
+      target: '',
+      label: 'FAQs',
+      children: [
+        { key: '/resources/faqs', kind: 'collection', target: 'faqs', label: 'FAQs' },
+        {
+          key: '/resources/faq-translations',
+          kind: 'collection',
+          target: 'faq-translations',
+          label: 'FAQ Translations',
+        },
+      ],
+    },
+  ]
+
+  it('renders a group as a dropdown of its children', () => {
+    render(<TopNavBar tabs={GROUPED} />)
+    expect(screen.getByTestId('nav-group-FAQs')).toBeInTheDocument()
+    expect(screen.getByTestId('nav-group-item-FAQ Translations')).toBeInTheDocument()
+  })
+
+  it('navigates to a child target when a group entry is clicked', () => {
+    render(<TopNavBar tabs={GROUPED} />)
+    fireEvent.click(screen.getByTestId('nav-group-item-FAQ Translations'))
+    expect(mockNavigate).toHaveBeenCalledWith('/couchpicks/app/o/faq-translations')
+  })
+
+  it('flattens group children into the mobile Collections list', () => {
+    render(<TopNavBar tabs={GROUPED} />)
+    const nav = screen.getByLabelText('Mobile navigation')
+    expect(within(nav).getByText('FAQ Translations')).toBeInTheDocument()
+  })
+})

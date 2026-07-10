@@ -54,20 +54,23 @@ function getCollectionTabs(
 ): Array<{ collectionName: string; label: string }> {
   if (!config?.menus) return []
   const tabs: Array<{ collectionName: string; label: string }> = []
-  for (const menu of config.menus) {
-    if (menu.items) {
-      for (const item of menu.items) {
-        if (item.path?.startsWith('/resources/')) {
-          const collectionName = item.path.replace('/resources/', '').split('/')[0]
-          if (collectionName) {
-            tabs.push({
-              collectionName,
-              label: item.label || collectionName.charAt(0).toUpperCase() + collectionName.slice(1),
-            })
-          }
+  const visit = (items: (typeof config.menus)[number]['items']) => {
+    for (const item of items ?? []) {
+      if (item.path?.startsWith('/resources/')) {
+        const collectionName = item.path.replace('/resources/', '').split('/')[0]
+        if (collectionName) {
+          tabs.push({
+            collectionName,
+            label: item.label || collectionName.charAt(0).toUpperCase() + collectionName.slice(1),
+          })
         }
       }
+      // Submenu groups: collections may nest one level down.
+      if (item.children?.length) visit(item.children)
     }
+  }
+  for (const menu of config.menus) {
+    visit(menu.items)
   }
   return tabs
 }

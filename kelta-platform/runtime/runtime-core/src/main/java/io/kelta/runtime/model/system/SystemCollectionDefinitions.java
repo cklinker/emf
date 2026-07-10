@@ -1403,8 +1403,13 @@ public final class SystemCollectionDefinitions {
             .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("menuId", "ui-menus", "Menu")
                 .withColumnName("menu_id"))
+            // Submenus (V166): a group header is an item with children and no path;
+            // deleting a parent floats its children to the top level (FK SET NULL).
+            .addField(FieldDefinition.lookup("parentId", "ui-menu-items", "Parent Item")
+                .withColumnName("parent_id"))
             .addField(FieldDefinition.requiredString("label", 100))
-            .addField(FieldDefinition.requiredString("path", 200))
+            // Optional since V166: group headers navigate nowhere themselves.
+            .addField(FieldDefinition.string("path", 200))
             .addField(FieldDefinition.string("icon", 100))
             .addField(FieldDefinition.integer("displayOrder")
                 .withColumnName("display_order").withDefault(0)

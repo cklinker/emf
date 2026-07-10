@@ -19,8 +19,26 @@ const REPORT_PATH_RE = /^\/(?:app\/)?reports\/([^/]+)/
 
 /**
  * Map a single menu item to a nav tab, or `null` if its path is not a surfaceable target.
+ * An item with children becomes a `group` tab (a dropdown in the top nav); its own path,
+ * if any, is ignored — group headers organize, they don't navigate. Groups whose children
+ * all fail to map are dropped entirely.
  */
 export function menuItemToTab(item: MenuItemConfig): NavTab | null {
+  if (item.children && item.children.length > 0) {
+    const children = item.children
+      .map((child) => menuItemToTab(child))
+      .filter((tab): tab is NavTab => tab !== null && tab.kind !== 'group')
+    if (children.length === 0) return null
+    return {
+      key: `group:${item.id || item.label}`,
+      kind: 'group',
+      target: '',
+      label: item.label,
+      icon: item.icon,
+      children,
+    }
+  }
+
   const path = item.path
   if (!path) return null
 

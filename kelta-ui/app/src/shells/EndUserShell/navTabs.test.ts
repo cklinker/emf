@@ -154,3 +154,87 @@ describe('resolveActiveMenu (apps/nav v2)', () => {
     expect(resolveActiveMenu([], 'a')).toBeNull()
   })
 })
+
+describe('submenu groups (nested menu items)', () => {
+  it('maps an item with children to a group tab of child tabs', () => {
+    const tab = menuItemToTab({
+      id: 'g1',
+      label: 'Programs',
+      icon: 'award',
+      children: [
+        { id: 'c1', label: 'Incentive Programs', path: '/resources/incentive-programs' },
+        { id: 'c2', label: 'Sources', path: '/resources/sources' },
+      ],
+    })
+    expect(tab).toMatchObject({
+      key: 'group:g1',
+      kind: 'group',
+      label: 'Programs',
+      icon: 'award',
+    })
+    expect(tab?.children).toHaveLength(2)
+    expect(tab?.children?.[0]).toMatchObject({ kind: 'collection', target: 'incentive-programs' })
+  })
+
+  it('ignores the group header path — groups organize, they do not navigate', () => {
+    const tab = menuItemToTab({
+      id: 'g2',
+      label: 'Places',
+      path: '/resources/countries',
+      children: [{ id: 'c1', label: 'Countries', path: '/resources/countries' }],
+    })
+    expect(tab?.kind).toBe('group')
+  })
+
+  it('drops a group whose children all fail to map', () => {
+    expect(
+      menuItemToTab({
+        id: 'g3',
+        label: 'Broken',
+        children: [{ id: 'c1', label: 'External', path: 'https://example.com' }],
+      })
+    ).toBeNull()
+  })
+
+  it('flattens nested groups to one level (child groups are excluded)', () => {
+    const tab = menuItemToTab({
+      id: 'g4',
+      label: 'Outer',
+      children: [
+        { id: 'c1', label: 'Leaf', path: '/resources/faqs' },
+        {
+          id: 'g5',
+          label: 'Inner',
+          children: [{ id: 'c2', label: 'Deep', path: '/resources/sources' }],
+        },
+      ],
+    })
+    expect(tab?.children).toHaveLength(1)
+    expect(tab?.children?.[0]).toMatchObject({ target: 'faqs' })
+  })
+
+  it('buildNavTabs surfaces groups alongside flat tabs', () => {
+    const menus: MenuConfig[] = [
+      {
+        id: 'm1',
+        name: 'app',
+        items: [
+          { id: 'i1', label: 'Countries', path: '/resources/countries' },
+          {
+            id: 'g1',
+            label: 'FAQs',
+            children: [
+              { id: 'i2', label: 'FAQs', path: '/resources/faqs' },
+              { id: 'i3', label: 'FAQ Translations', path: '/resources/faq-translations' },
+            ],
+          },
+        ],
+      },
+    ]
+    const tabs = buildNavTabs(menus)
+    expect(tabs).toHaveLength(2)
+    expect(tabs[0]).toMatchObject({ kind: 'collection', target: 'countries' })
+    expect(tabs[1]).toMatchObject({ kind: 'group', label: 'FAQs' })
+    expect(tabs[1].children).toHaveLength(2)
+  })
+})

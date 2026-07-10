@@ -152,10 +152,38 @@ function unwrapMenusWithItems(body: unknown): Record<string, unknown>[] {
       const orderB = (b.displayOrder as number) ?? 0
       return orderA - orderB
     })
-    menu.items = items
+    menu.items = buildItemTree(items)
   }
 
   return menus
+}
+
+/**
+ * Assemble the submenu tree: items whose `parentId` resolves within the same
+ * menu nest under that parent's `children` (order preserved on both levels
+ * from the sorted input). An unresolvable parentId keeps the item at the top
+ * level. Defensive: if a parentId cycle would swallow every item (no roots
+ * remain), fall back to the flat list rather than rendering an empty menu.
+ */
+export function buildItemTree(items: Record<string, unknown>[]): Record<string, unknown>[] {
+  const byId = new Map(items.map((i) => [i.id as string, i]))
+  const roots: Record<string, unknown>[] = []
+  for (const item of items) {
+    const parentId = item.parentId as string | null | undefined
+    const parent = parentId ? byId.get(parentId) : undefined
+    if (parent && parent !== item) {
+      const children = (parent.children as Record<string, unknown>[] | undefined) ?? []
+      children.push(item)
+      parent.children = children
+    } else {
+      roots.push(item)
+    }
+  }
+  if (roots.length === 0 && items.length > 0) {
+    for (const item of items) delete item.children
+    return items
+  }
+  return roots
 }
 
 /**

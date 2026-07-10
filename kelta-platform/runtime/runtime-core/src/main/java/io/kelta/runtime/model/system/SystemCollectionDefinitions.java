@@ -326,7 +326,10 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.bool("isDefault").withColumnName("is_default"))
             .addField(FieldDefinition.requiredJson("columns"))
             .addField(FieldDefinition.string("filterLogic").withColumnName("filter_logic"))
-            .addField(FieldDefinition.json("filters").withDefault("[]"))
+            // JSON-typed defaults must be JSON values, not strings — a String
+            // default is injected verbatim on create and then fails the field's
+            // own type validation ("filters: Invalid type, expected JSON").
+            .addField(FieldDefinition.json("filters").withDefault(List.of()))
             .addField(FieldDefinition.string("sortField").withColumnName("sort_field"))
             .addField(FieldDefinition.string("sortDirection", 4).withColumnName("sort_direction")
                 .withDefault("ASC"))
@@ -1572,7 +1575,7 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("column_span").withDefault(1))
             .addField(FieldDefinition.integer("rowSpan")
                 .withColumnName("row_span").withDefault(1))
-            .addField(FieldDefinition.json("config").withDefault("{}"))
+            .addField(FieldDefinition.json("config").withDefault(Map.of()))
             .addField(FieldDefinition.requiredInteger("sortOrder")
                 .withColumnName("sort_order"))
             .build();
@@ -1627,7 +1630,7 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("started_by"))
             .addField(FieldDefinition.string("triggerRecordId", 36)
                 .withColumnName("trigger_record_id"))
-            .addField(FieldDefinition.json("variables").withDefault("{}"))
+            .addField(FieldDefinition.json("variables").withDefault(Map.of()))
             .addField(FieldDefinition.string("currentNodeId", 100)
                 .withColumnName("current_node_id"))
             .addField(FieldDefinition.text("errorMessage")

@@ -80,6 +80,27 @@ public class JsonApiError {
         this.meta = meta;
     }
 
+    /**
+     * The error as a plain map (nulls omitted), in JSON:API member order.
+     *
+     * <p>Response bodies are built from these maps rather than the bean itself:
+     * plain maps serialize identically under every converter/mapper
+     * configuration, whereas bean serialization has been observed to drop all
+     * members on the deployed worker ({@code {"errors":[{}]}}), leaving the
+     * real failure reason only in the logs.
+     */
+    public Map<String, Object> toMap() {
+        Map<String, Object> map = new java.util.LinkedHashMap<>();
+        if (id != null) map.put("id", id);
+        if (status != null) map.put("status", status);
+        if (code != null) map.put("code", code);
+        if (title != null) map.put("title", title);
+        if (detail != null) map.put("detail", detail);
+        if (source != null) map.put("source", source);
+        if (meta != null) map.put("meta", meta);
+        return map;
+    }
+
     @Override
     public String toString() {
         return "JsonApiError{" +

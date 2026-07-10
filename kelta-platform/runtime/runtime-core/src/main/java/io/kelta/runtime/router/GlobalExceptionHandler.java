@@ -85,7 +85,7 @@ public class GlobalExceptionHandler {
             errors.add(error);
         }
 
-        return ResponseEntity.badRequest().body(Map.of("errors", errors));
+        return ResponseEntity.badRequest().body(errorBody(errors));
     }
 
     /**
@@ -112,7 +112,7 @@ public class GlobalExceptionHandler {
         }
 
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(Map.of("errors", errors));
+                .body(errorBody(errors));
     }
 
     /**
@@ -142,7 +142,7 @@ public class GlobalExceptionHandler {
             errors.add(error);
         }
 
-        return ResponseEntity.badRequest().body(Map.of("errors", errors));
+        return ResponseEntity.badRequest().body(errorBody(errors));
     }
 
     /**
@@ -162,7 +162,7 @@ public class GlobalExceptionHandler {
         error.setSource(Map.of("pointer", "/data/attributes/" + ex.getFieldName()));
         error.setMeta(Map.of("requestId", requestId));
 
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("errors", List.of(error)));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorBody(error));
     }
 
     /**
@@ -181,7 +181,7 @@ public class GlobalExceptionHandler {
             "This record was modified since you opened it. Reload the latest version and try again.");
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("errors", List.of(error)));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorBody(error));
     }
 
     /**
@@ -201,7 +201,7 @@ public class GlobalExceptionHandler {
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(Map.of("errors", List.of(error)));
+            .body(errorBody(error));
     }
 
     /**
@@ -231,7 +231,7 @@ public class GlobalExceptionHandler {
             errors.add(error);
         }
 
-        return ResponseEntity.badRequest().body(Map.of("errors", errors));
+        return ResponseEntity.badRequest().body(errorBody(errors));
     }
 
     /**
@@ -264,7 +264,7 @@ public class GlobalExceptionHandler {
             errors.add(error);
         }
 
-        return ResponseEntity.badRequest().body(Map.of("errors", errors));
+        return ResponseEntity.badRequest().body(errorBody(errors));
     }
 
     /**
@@ -283,7 +283,7 @@ public class GlobalExceptionHandler {
             "Request body is missing or could not be parsed as JSON");
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
-        return ResponseEntity.badRequest().body(Map.of("errors", List.of(error)));
+        return ResponseEntity.badRequest().body(errorBody(error));
     }
 
     /**
@@ -303,7 +303,7 @@ public class GlobalExceptionHandler {
         error.setSource(Map.of("parameter", ex.getParameterName()));
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
-        return ResponseEntity.badRequest().body(Map.of("errors", List.of(error)));
+        return ResponseEntity.badRequest().body(errorBody(error));
     }
 
     /**
@@ -324,7 +324,7 @@ public class GlobalExceptionHandler {
         error.setSource(Map.of("parameter", ex.getName()));
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
-        return ResponseEntity.badRequest().body(Map.of("errors", List.of(error)));
+        return ResponseEntity.badRequest().body(errorBody(error));
     }
 
     /**
@@ -345,7 +345,7 @@ public class GlobalExceptionHandler {
             "No handler for " + request.getMethod() + " " + path);
         error.setMeta(Map.of("requestId", requestId, "path", path));
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("errors", List.of(error)));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorBody(error));
     }
 
     /**
@@ -365,7 +365,7 @@ public class GlobalExceptionHandler {
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-            .body(Map.of("errors", List.of(error)));
+            .body(errorBody(error));
     }
 
     /**
@@ -387,7 +387,7 @@ public class GlobalExceptionHandler {
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-            .body(Map.of("errors", List.of(error)));
+            .body(errorBody(error));
     }
 
     /**
@@ -412,7 +412,7 @@ public class GlobalExceptionHandler {
             String.valueOf(status.value()), code, status.getReasonPhrase(), detail);
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
-        return ResponseEntity.status(status).body(Map.of("errors", List.of(error)));
+        return ResponseEntity.status(status).body(errorBody(error));
     }
 
     /**
@@ -431,7 +431,7 @@ public class GlobalExceptionHandler {
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(Map.of("errors", List.of(error)));
+            .body(errorBody(error));
     }
 
     /**
@@ -439,5 +439,23 @@ public class GlobalExceptionHandler {
      */
     private String generateRequestId() {
         return UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    /**
+     * Builds the JSON:API error envelope from plain maps ({@link JsonApiError#toMap()}).
+     * Maps serialize identically under every converter configuration; serializing the
+     * bean itself has been observed to produce {@code {"errors":[{}]}} on the deployed
+     * worker, hiding the failure reason from API clients.
+     */
+    private static Map<String, Object> errorBody(List<JsonApiError> errors) {
+        List<Map<String, Object>> mapped = new ArrayList<>(errors.size());
+        for (JsonApiError error : errors) {
+            mapped.add(error.toMap());
+        }
+        return Map.of("errors", mapped);
+    }
+
+    private static Map<String, Object> errorBody(JsonApiError error) {
+        return errorBody(List.of(error));
     }
 }

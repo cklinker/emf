@@ -60,3 +60,45 @@ test.describe("End-User Navigation", () => {
     }
   });
 });
+
+test.describe("Nested menu items (submenus)", () => {
+  test("a parentId item renders inside a dropdown group and navigates", async ({
+    page,
+    dataFactory,
+  }) => {
+    const collection = await dataFactory.createCollection({
+      displayName: "Nav Nested Target",
+    });
+    const collectionName = collection.attributes.name as string;
+
+    // A dedicated default app whose nav carries one group with one child.
+    const menu = await dataFactory.createRecord("ui-menus", {
+      name: `nested-nav-${Date.now()}`,
+      isDefault: true,
+      active: true,
+    });
+    const parent = await dataFactory.createRecord("ui-menu-items", {
+      menuId: menu.id,
+      label: "Nested Group",
+      displayOrder: 1,
+      active: true,
+    });
+    await dataFactory.createRecord("ui-menu-items", {
+      menuId: menu.id,
+      parentId: parent.id,
+      label: "Nested Child",
+      path: `/resources/${collectionName}`,
+      displayOrder: 1,
+      active: true,
+    });
+
+    await page.goto("/default/app/home");
+    await page.waitForLoadState("load");
+
+    const group = page.getByTestId("nav-group-Nested Group");
+    await expect(group).toBeVisible();
+    await group.click();
+    await page.getByTestId("nav-group-item-Nested Child").click();
+    await expect(page).toHaveURL(new RegExp(`/app/o/${collectionName}`));
+  });
+});

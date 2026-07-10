@@ -47,20 +47,23 @@ function getCollectionNames(
 ): Array<{ name: string; label: string }> {
   if (!config?.menus) return []
   const collections: Array<{ name: string; label: string }> = []
-  for (const menu of config.menus) {
-    if (menu.items) {
-      for (const item of menu.items) {
-        if (item.path?.startsWith('/resources/')) {
-          const name = item.path.replace('/resources/', '').split('/')[0]
-          if (name) {
-            collections.push({
-              name,
-              label: item.label || name.charAt(0).toUpperCase() + name.slice(1),
-            })
-          }
+  const visit = (items: (typeof config.menus)[number]['items']) => {
+    for (const item of items ?? []) {
+      if (item.path?.startsWith('/resources/')) {
+        const name = item.path.replace('/resources/', '').split('/')[0]
+        if (name) {
+          collections.push({
+            name,
+            label: item.label || name.charAt(0).toUpperCase() + name.slice(1),
+          })
         }
       }
+      // Submenu groups: collections may nest one level down.
+      if (item.children?.length) visit(item.children)
     }
+  }
+  for (const menu of config.menus) {
+    visit(menu.items)
   }
   return collections
 }

@@ -46,16 +46,18 @@ import type { User } from '@/types/auth'
  * A collection tab routes to `…/o/<target>`; a page tab routes to `…/p/<target>`.
  */
 export interface NavTab {
-  /** Stable, unique key for the tab (the source menu-item path). */
+  /** Stable, unique key for the tab (the source menu-item path, or `group:<id>`). */
   key: string
-  /** What this tab points at. */
-  kind: 'collection' | 'page' | 'dashboard' | 'report'
-  /** Collection API name, page slug, or dashboard/report id per `kind`. */
+  /** What this tab points at. A `group` renders as a dropdown of its children. */
+  kind: 'collection' | 'page' | 'dashboard' | 'report' | 'group'
+  /** Collection API name, page slug, or dashboard/report id per `kind` ('' for groups). */
   target: string
   /** Display label */
   label: string
   /** Lucide icon name (optional) */
   icon?: string
+  /** Child tabs — present only when kind === 'group' (one level of nesting). */
+  children?: NavTab[]
 }
 
 /** One entry in the app switcher (apps/nav v2) — an active ui-menu. */
@@ -148,9 +150,11 @@ export function TopNavBar({
     [navigate, tabPath]
   )
 
-  const collectionTabs = tabs.filter((tab) => tab.kind === 'collection')
-  const pageTabs = tabs.filter((tab) => tab.kind === 'page')
-  const analyticsTabs = tabs.filter((tab) => tab.kind === 'dashboard' || tab.kind === 'report')
+  // Mobile sheet lists leaf targets — groups flatten to their children.
+  const flatTabs = tabs.flatMap((tab) => (tab.kind === 'group' ? (tab.children ?? []) : [tab]))
+  const collectionTabs = flatTabs.filter((tab) => tab.kind === 'collection')
+  const pageTabs = flatTabs.filter((tab) => tab.kind === 'page')
+  const analyticsTabs = flatTabs.filter((tab) => tab.kind === 'dashboard' || tab.kind === 'report')
 
   const handleMobileNavClick = useCallback(
     (path: string) => {
@@ -332,20 +336,50 @@ export function TopNavBar({
         role="navigation"
         aria-label="Object navigation"
       >
-        {tabs.map((tab, index) => (
-          <button
-            key={tab.key}
-            onClick={() => handleTabClick(tab, index)}
-            className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              activeTabIndex === index
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground'
-            }`}
-            aria-current={activeTabIndex === index ? 'page' : undefined}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {tabs.map((tab, index) =>
+          tab.kind === 'group' ? (
+            // Submenu group: a dropdown of child tabs (menu items nested via parentId).
+            <DropdownMenu key={tab.key}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    activeTabIndex === index
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground'
+                  }`}
+                  data-testid={`nav-group-${tab.label}`}
+                >
+                  {tab.label}
+                  <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {(tab.children ?? []).map((child) => (
+                  <DropdownMenuItem
+                    key={child.key}
+                    onClick={() => handleTabClick(child, index)}
+                    data-testid={`nav-group-item-${child.label}`}
+                  >
+                    {child.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <button
+              key={tab.key}
+              onClick={() => handleTabClick(tab, index)}
+              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                activeTabIndex === index
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground'
+              }`}
+              aria-current={activeTabIndex === index ? 'page' : undefined}
+            >
+              {tab.label}
+            </button>
+          )
+        )}
       </nav>
 
       {/* Spacer for mobile */}

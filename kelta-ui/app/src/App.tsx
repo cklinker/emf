@@ -91,6 +91,11 @@ const EndUserAppointmentsPage = React.lazy(() =>
     default: m.AppointmentsPage,
   }))
 )
+const EndUserVisitPage = React.lazy(() =>
+  import('./pages/app/VisitPage/VisitPage').then((m) => ({
+    default: m.VisitPage,
+  }))
+)
 const EndUserObjectDetailPage = React.lazy(() =>
   import('./pages/app/ObjectDetailPage/ObjectDetailPage').then((m) => ({
     default: m.ObjectDetailPage,
@@ -150,6 +155,9 @@ const EmailSettingsPage = React.lazy(() =>
 )
 const MapSettingsPage = React.lazy(() =>
   import('./pages/MapSettingsPage').then((m) => ({ default: m.MapSettingsPage }))
+)
+const TelehealthSettingsPage = React.lazy(() =>
+  import('./pages/TelehealthSettingsPage').then((m) => ({ default: m.TelehealthSettingsPage }))
 )
 const NetworkAccessPage = React.lazy(() =>
   import('./pages/NetworkAccessPage').then((m) => ({ default: m.NetworkAccessPage }))
@@ -1186,6 +1194,19 @@ function TenantRoutes(): React.ReactElement {
           }
         />
 
+        {/* Telehealth retention route — view for admins; retention edits + legal
+            hold gated by MANAGE_DATA inside the page (server enforces the same). */}
+        <Route
+          path="telehealth-settings"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_SETUP">
+                <TelehealthSettingsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
         {/* Network Access route — tenant admins configure the IP allowlist */}
         <Route
           path="network-access"
@@ -1492,6 +1513,14 @@ function TenantRoutes(): React.ReactElement {
             element={
               <React.Suspense fallback={<PageLoader message="Loading..." />}>
                 <EndUserAppointmentsPage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="visits/:appointmentId"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserVisitPage />
               </React.Suspense>
             }
           />

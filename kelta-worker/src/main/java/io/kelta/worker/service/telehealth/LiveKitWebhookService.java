@@ -35,11 +35,14 @@ public class LiveKitWebhookService {
 
     private final JdbcTemplate jdbcTemplate;
     private final PlatformEventPublisher eventPublisher;
+    private final ArchiveService archiveService;
 
     public LiveKitWebhookService(JdbcTemplate jdbcTemplate,
-                                 PlatformEventPublisher eventPublisher) {
+                                 PlatformEventPublisher eventPublisher,
+                                 ArchiveService archiveService) {
         this.jdbcTemplate = jdbcTemplate;
         this.eventPublisher = eventPublisher;
+        this.archiveService = archiveService;
     }
 
     /** Processes one verified webhook body. Unknown rooms/events are ignored. */
@@ -98,6 +101,14 @@ public class LiveKitWebhookService {
                         "livekit", sessionId, tenantId, "success",
                         "durationSeconds=" + duration);
                 publish(tenantId, session, "ENDED", duration);
+                // Auto-archive the ended session (telehealth slice 7). Best-effort:
+                // the webhook must still 200 even if archival fails — the manual
+                // archive-now path and the auto-archive sweep are the backstops.
+                try {
+                    archiveService.archiveVideoSession(tenantId, sessionId);
+                } catch (Exception e) {
+                    log.warn("Auto-archive of ended session {} failed: {}", sessionId, e.getMessage());
+                }
             }
             case "egress_ended" -> {
                 String recordingKey = firstFileResult(event);

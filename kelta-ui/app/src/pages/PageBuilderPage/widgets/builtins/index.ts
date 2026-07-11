@@ -18,6 +18,7 @@ import { linkWidget } from './link'
 import { metricWidget } from './metric'
 import { chatPanelWidget } from './chatPanel'
 import { appointmentSchedulerWidget } from './appointmentScheduler'
+import { videoVisitWidget } from './videoVisit'
 import { registerFormFieldRenderers } from './registerFormFieldRenderers'
 
 let registered = false
@@ -45,6 +46,7 @@ export function registerBuiltinWidgets(): void {
     metricWidget,
     chatPanelWidget,
     appointmentSchedulerWidget,
+    videoVisitWidget,
   ]) {
     widgetRegistry.register(w)
   }

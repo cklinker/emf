@@ -117,6 +117,9 @@ public final class SystemCollectionDefinitions {
         // Video sessions (telehealth slice 5)
         definitions.add(videoSessions());
 
+        // Archival & retention (telehealth slice 7)
+        definitions.add(telehealthArchives());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -383,6 +386,36 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.bool("recordingConsent").withColumnName("recording_consent")
                 .withDefault(false))
             .addField(FieldDefinition.string("recordingKey", 500).withColumnName("recording_key"))
+            .build();
+    }
+
+    /**
+     * Archived encounter records (telehealth slice 7) — one immutable row per
+     * archived source (a closed chat conversation or an ended video session).
+     * The artifact (canonical JSON transcript + PDF render) lives in S3 as
+     * attachments owned by this row; {@code sha256} pins the JSON for tamper
+     * evidence; {@code retentionUntil}/{@code legalHold} drive the purge sweep.
+     */
+    public static CollectionDefinition telehealthArchives() {
+        return systemBuilder("telehealth-archives", "Telehealth Archives", "telehealth_archive")
+            .displayFieldName("id")
+            .addImmutableField("sourceType")
+            .addImmutableField("sourceId")
+            .addField(FieldDefinition.requiredString("sourceType", 20)
+                .withColumnName("source_type")
+                .withEnumValues(List.of("CONVERSATION", "VIDEO_SESSION")))
+            .addField(FieldDefinition.requiredString("sourceId", 36).withColumnName("source_id"))
+            .addField(FieldDefinition.lookup("appointmentId", "telehealth-appointments", "Appointment")
+                .withColumnName("appointment_id"))
+            .addField(FieldDefinition.lookup("portalUserId", "users", "Portal User")
+                .withColumnName("portal_user_id"))
+            .addField(FieldDefinition.json("artifactAttachmentIds").withColumnName("artifact_attachment_ids"))
+            .addField(FieldDefinition.string("sha256", 64))
+            .addField(FieldDefinition.datetime("archivedAt").withColumnName("archived_at"))
+            .addField(FieldDefinition.string("archivedBy", 64).withColumnName("archived_by"))
+            .addField(FieldDefinition.datetime("retentionUntil").withColumnName("retention_until"))
+            .addField(FieldDefinition.bool("legalHold", false).withColumnName("legal_hold"))
+            .addField(FieldDefinition.datetime("purgedAt").withColumnName("purged_at"))
             .build();
     }
 

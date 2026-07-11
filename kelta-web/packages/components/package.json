@@ -11,6 +11,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs",
       "types": "./dist/index.d.ts"
+    },
+    "./video": {
+      "import": "./dist/video.js",
+      "require": "./dist/video.cjs",
+      "types": "./dist/video.d.ts"
     }
   },
   "files": [
@@ -23,9 +28,12 @@
   "peerDependencies": {
     "@kelta/formula": "^0.0.1",
     "@kelta/sdk": "^0.0.1",
+    "@livekit/components-react": "^2.9.0",
+    "@livekit/components-styles": "^1.1.0",
     "@tanstack/react-query": "^5.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "livekit-client": "^2.20.0",
     "lucide-react": "^0.500.0",
     "maplibre-gl": "^4.0.0 || ^5.0.0",
     "radix-ui": "^1.4.0",
@@ -37,12 +45,24 @@
   "peerDependenciesMeta": {
     "maplibre-gl": {
       "optional": true
+    },
+    "@livekit/components-react": {
+      "optional": true
+    },
+    "@livekit/components-styles": {
+      "optional": true
+    },
+    "livekit-client": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@livekit/components-react": "^2.9.23",
+    "@livekit/components-styles": "^1.2.0",
     "@tanstack/react-query": "^5.24.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "livekit-client": "^2.20.1",
     "lucide-react": "^0.563.0",
     "maplibre-gl": "^5.0.0",
     "radix-ui": "^1.4.3",

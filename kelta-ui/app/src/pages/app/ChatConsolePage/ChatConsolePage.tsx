@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, Video, X } from 'lucide-react'
 import {
   ConversationListItem,
   MessageComposer,
@@ -19,8 +19,15 @@ import {
   useStartConversation,
   type ChatView,
 } from '../../../hooks/useChat'
+import { classifyVideoTokenError, useVideoToken, type VideoToken } from '../../../hooks/useVideo'
+import { LazyVideoRoom } from '../VisitPage/LazyVideoRoom'
 import { usePresence } from '../../../realtime/usePresence'
+import { useArchives } from '../../../hooks/useArchives'
+import { ArchivedThreadBanner } from './ArchivedThreadBanner'
 import { cn } from '@/lib/utils'
+
+/** UI tabs: the base chat views plus an Archived status filter (slice 7). */
+type ChatTab = ChatView | 'archived'
 
 /**
  * Staff chat console (telehealth slice 3): inbox (mine / queue / all) +
@@ -35,26 +42,46 @@ export function ChatConsolePage({ testId = 'chat-console' }: { testId?: string }
   const { hasPermission } = useSystemPermissions()
   const canManage = hasPermission('MANAGE_CHAT')
 
-  const [view, setView] = useState<ChatView>('mine')
+  // The 'archived' UI tab is a status filter over the existing views: managers
+  // see the whole tenant's archived threads, others just their own.
+  const [tab, setTab] = useState<ChatTab>('mine')
   const [activeId, setActiveId] = useState<string | null>(null)
+  // In-thread video escalation (telehealth slice 6): a held token swaps the
+  // thread body for the live VideoRoom until the agent leaves.
+  const [videoGrant, setVideoGrant] = useState<VideoToken | null>(null)
 
-  const conversations = useConversations(view)
+  const view: ChatView = tab === 'archived' ? (canManage ? 'all' : 'mine') : tab
+  const conversations = useConversations(
+    view,
+    tab === 'archived' ? { status: 'ARCHIVED' } : undefined
+  )
   const messages = useChatMessages(activeId)
   const send = useSendChatMessage(activeId)
   const { claim, close } = useConversationActions(activeId)
   const startConversation = useStartConversation()
+  const videoToken = useVideoToken()
   const presence = usePresence(activeId ? `chat:${activeId}` : null)
 
   const active = useMemo(
     () => (conversations.data ?? []).find((c) => c.id === activeId) ?? null,
     [conversations.data, activeId]
   )
+  // Archive metadata for the active ARCHIVED conversation (banner + downloads).
+  const archives = useArchives(
+    { sourceType: 'CONVERSATION' },
+    tab === 'archived' || active?.status === 'ARCHIVED'
+  )
+  const activeArchive =
+    active?.status === 'ARCHIVED'
+      ? ((archives.data ?? []).find((a) => a.sourceId === active.id) ?? null)
+      : null
   const othersPresent = presence.filter((user) => user.id !== identity?.userId)
 
-  const tabs: { key: ChatView; label: string; visible: boolean }[] = [
+  const tabs: { key: ChatTab; label: string; visible: boolean }[] = [
     { key: 'mine', label: t('chat.tabMine', 'My conversations'), visible: true },
     { key: 'queue', label: t('chat.tabQueue', 'Queue'), visible: true },
     { key: 'all', label: t('chat.tabAll', 'All'), visible: canManage },
+    { key: 'archived', label: t('chat.statusArchived', 'Archived'), visible: true },
   ]
 
   const statusLabels = {
@@ -100,6 +127,42 @@ export function ChatConsolePage({ testId = 'chat-console' }: { testId?: string }
     )
   }
 
+  const handleStartVideo = () => {
+    if (!activeId) return
+    videoToken.mutate(
+      { kind: 'conversation', id: activeId },
+      {
+        onSuccess: (grant) => setVideoGrant(grant),
+        onError: (err) => {
+          const reason = classifyVideoTokenError(err)
+          const message =
+            reason === 'feature-off'
+              ? t(
+                  'telehealth.visit.errorFeatureOff',
+                  'Video visits are not enabled for this account.'
+                )
+              : reason === 'budget-exhausted'
+                ? t(
+                    'telehealth.visit.errorBudget',
+                    'The video minutes for this account have run out. Please contact support.'
+                  )
+                : reason === 'not-participant'
+                  ? t(
+                      'telehealth.visit.errorNotParticipant',
+                      'You’re not a participant on this visit.'
+                    )
+                  : t(
+                      'telehealth.visit.errorGeneric',
+                      'We couldn’t start the video visit. Please try again.'
+                    )
+          showToast(message, 'error')
+        },
+      }
+    )
+  }
+
+  // The assigned agent (the person who owns the thread) can escalate to video.
+  const isAssignedAgent = active != null && active.assignedTo === identity?.userId
   const canWrite = active != null && active.status !== 'CLOSED' && active.status !== 'ARCHIVED'
 
   return (
@@ -121,22 +184,22 @@ export function ChatConsolePage({ testId = 'chat-console' }: { testId?: string }
         </div>
         <div className="flex border-b border-border" role="tablist">
           {tabs
-            .filter((tab) => tab.visible)
-            .map((tab) => (
+            .filter((item) => item.visible)
+            .map((item) => (
               <button
-                key={tab.key}
+                key={item.key}
                 role="tab"
-                aria-selected={view === tab.key}
-                onClick={() => setView(tab.key)}
+                aria-selected={tab === item.key}
+                onClick={() => setTab(item.key)}
                 className={cn(
                   'flex-1 cursor-pointer border-b-2 px-3 py-2 text-sm',
-                  view === tab.key
+                  tab === item.key
                     ? 'border-primary font-medium text-foreground'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 )}
-                data-testid={`${testId}-tab-${tab.key}`}
+                data-testid={`${testId}-tab-${item.key}`}
               >
-                {tab.label}
+                {item.label}
               </button>
             ))}
         </div>
@@ -198,6 +261,27 @@ export function ChatConsolePage({ testId = 'chat-console' }: { testId?: string }
                 </span>
               </div>
               <div className="flex shrink-0 gap-2">
+                {isAssignedAgent && canWrite && !videoGrant && (
+                  <button
+                    className="flex cursor-pointer items-center gap-1 rounded-md border-none bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    onClick={handleStartVideo}
+                    disabled={videoToken.isPending}
+                    data-testid={`${testId}-start-video`}
+                  >
+                    <Video size={14} />
+                    {t('telehealth.visit.startVideo', 'Start video')}
+                  </button>
+                )}
+                {videoGrant && (
+                  <button
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted"
+                    onClick={() => setVideoGrant(null)}
+                    data-testid={`${testId}-end-video`}
+                  >
+                    <X size={14} />
+                    {t('telehealth.visit.endVideo', 'End video')}
+                  </button>
+                )}
                 {active.status === 'OPEN' && !active.assignedTo && (
                   <button
                     className="cursor-pointer rounded-md border-none bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -220,24 +304,39 @@ export function ChatConsolePage({ testId = 'chat-console' }: { testId?: string }
                 )}
               </div>
             </div>
-            <MessageList
-              messages={(messages.data ?? []) as ChatMessageItem[]}
-              currentUserId={identity?.userId}
-              emptyText={t('chat.emptyThread', 'No messages yet — say hello')}
-              testId={`${testId}-messages`}
-            />
-            {canWrite ? (
-              <MessageComposer
-                onSend={handleSend}
-                placeholder={t('chat.composerPlaceholder', 'Type a message…')}
-                sendLabel={t('chat.send', 'Send')}
-                testId={`${testId}-composer`}
-              />
-            ) : (
-              <div className="border-t border-border bg-muted/40 p-3 text-center text-xs text-muted-foreground">
-                {t('chat.readOnly', 'This conversation is closed')}
+            {activeArchive && <ArchivedThreadBanner archive={activeArchive} />}
+            {videoGrant ? (
+              <div className="flex-1 overflow-hidden p-3" data-testid={`${testId}-video`}>
+                <LazyVideoRoom
+                  serverUrl={videoGrant.url}
+                  token={videoGrant.token}
+                  onLeave={() => setVideoGrant(null)}
+                  onError={(err) => showToast(err.message, 'error')}
+                />
               </div>
+            ) : (
+              <MessageList
+                messages={(messages.data ?? []) as ChatMessageItem[]}
+                currentUserId={identity?.userId}
+                emptyText={t('chat.emptyThread', 'No messages yet — say hello')}
+                testId={`${testId}-messages`}
+              />
             )}
+            {!videoGrant &&
+              (canWrite ? (
+                <MessageComposer
+                  onSend={handleSend}
+                  placeholder={t('chat.composerPlaceholder', 'Type a message…')}
+                  sendLabel={t('chat.send', 'Send')}
+                  testId={`${testId}-composer`}
+                />
+              ) : (
+                <div className="border-t border-border bg-muted/40 p-3 text-center text-xs text-muted-foreground">
+                  {active.status === 'ARCHIVED'
+                    ? t('chat.readOnlyArchived', 'This conversation is archived and read-only')
+                    : t('chat.readOnly', 'This conversation is closed')}
+                </div>
+              ))}
           </>
         )}
       </div>

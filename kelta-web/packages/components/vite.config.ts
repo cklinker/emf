@@ -21,10 +21,16 @@ export default defineConfig({
   ],
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      // Two entries: the main barrel and the `./video` subpath. The video entry
+      // is kept separate (not re-exported from index) so LiveKit stays out of the
+      // base bundle — the app eagerly imports the barrel but lazy-imports `./video`.
+      entry: {
+        index: resolve(__dirname, 'src/index.ts'),
+        video: resolve(__dirname, 'src/video.ts'),
+      },
       name: 'KeltaComponents',
       formats: ['es', 'cjs'],
-      fileName: (format) => `index.${format === 'es' ? 'js' : 'cjs'}`,
+      fileName: (format, entryName) => `${entryName}.${format === 'es' ? 'js' : 'cjs'}`,
     },
     rollupOptions: {
       external: [
@@ -41,6 +47,11 @@ export default defineConfig({
         'class-variance-authority',
         'radix-ui',
         'maplibre-gl',
+        // LiveKit is a peer dep of the `./video` entry — never bundle it into the
+        // components dist. The app declares these directly and code-splits them.
+        '@livekit/components-react',
+        '@livekit/components-styles',
+        'livekit-client',
       ],
       output: {
         globals: {
@@ -57,6 +68,9 @@ export default defineConfig({
           'class-variance-authority': 'cva',
           'radix-ui': 'RadixUI',
           'maplibre-gl': 'maplibregl',
+          '@livekit/components-react': 'LiveKitComponentsReact',
+          '@livekit/components-styles': 'LiveKitComponentsStyles',
+          'livekit-client': 'LivekitClient',
         },
       },
     },

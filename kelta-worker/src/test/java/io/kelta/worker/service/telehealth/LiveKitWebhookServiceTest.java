@@ -24,13 +24,15 @@ class LiveKitWebhookServiceTest {
 
     private JdbcTemplate jdbcTemplate;
     private PlatformEventPublisher eventPublisher;
+    private ArchiveService archiveService;
     private LiveKitWebhookService service;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
         eventPublisher = mock(PlatformEventPublisher.class);
-        service = new LiveKitWebhookService(jdbcTemplate, eventPublisher);
+        archiveService = mock(ArchiveService.class);
+        service = new LiveKitWebhookService(jdbcTemplate, eventPublisher, archiveService);
         // Idempotency claim succeeds by default.
         when(jdbcTemplate.update(contains("livekit_webhook_event"), anyString(), anyString()))
                 .thenReturn(1);
@@ -72,6 +74,23 @@ class LiveKitWebhookServiceTest {
         VideoSessionPayload payload = (VideoSessionPayload) event.getValue().getPayload();
         assertThat(payload.getStatus()).isEqualTo("ENDED");
         assertThat(payload.getDurationSeconds()).isEqualTo(1234);
+        // The ended session is auto-archived (telehealth slice 7).
+        verify(archiveService).archiveVideoSession("t1", "vs-1");
+    }
+
+    @Test
+    @DisplayName("a failing auto-archive never breaks the webhook (best-effort)")
+    void archiveFailureDoesNotBreakWebhook() {
+        stubSession();
+        when(jdbcTemplate.queryForObject(contains("SET status = 'ENDED'"), eq(Integer.class),
+                eq("vs-1"))).thenReturn(42);
+        when(archiveService.archiveVideoSession("t1", "vs-1"))
+                .thenThrow(new RuntimeException("s3 down"));
+
+        // Must not throw.
+        service.process("{\"event\":\"room_finished\",\"id\":\"EV_5\",\"room\":{\"name\":\"t_t1_room\"}}");
+
+        verify(archiveService).archiveVideoSession("t1", "vs-1");
     }
 
     @Test

@@ -4,6 +4,19 @@
 > Conforms to parent §Reuse Map, §Security. Depends on slice 5 (+ slice 3 for in-call
 > chat). Frontend-only.
 
+> **SHIPPED 2026-07-11 (as-built).** `VideoRoom` in `@kelta/components` (LiveKit,
+> lazy-loaded via a dedicated `@kelta/components/video` subpath entry — bundle-split
+> build-verified: 0 livekit refs in the base chunk) + portal `video-visit` widget +
+> `/app/visits/:appointmentId` `VisitPage` (window±grace join gating with live
+> countdown, `usePresence('visit:<appointmentId>')` waiting room, `consentMachine` →
+> member-only `POST /api/telehealth/sessions/{id}/consent` stamping
+> `video-sessions.recordingConsent` + audit `RECORDING_CONSENT_CAPTURED`) + staff
+> Join-visit / chat Start-video. **Deviation:** no per-tenant "records visits" flag
+> exists yet, so the consent screen is **config-driven** (widget `consentTextOverride`
+> / VisitPage `recordingEnabled` prop, default off), not a tenant policy — thread a
+> backend flag into `VisitJoinCard.recordingEnabled` when one lands. Consent POST is
+> best-effort on join (decline still joins unrecorded — default policy).
+
 ## 1. Goal & scope
 
 Delivers the call experience for both personas:

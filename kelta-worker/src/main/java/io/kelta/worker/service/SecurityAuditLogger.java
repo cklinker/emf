@@ -46,7 +46,13 @@ public final class SecurityAuditLogger {
         CHAT_ACCESS_DENIED,
         VIDEO_TOKEN_ISSUED,
         VIDEO_SESSION_STARTED,
-        VIDEO_SESSION_ENDED
+        VIDEO_SESSION_ENDED,
+        RECORDING_CONSENT_CAPTURED,
+        ARCHIVE_CREATED,
+        ARCHIVE_ACCESSED,
+        ARCHIVE_PURGED,
+        LEGAL_HOLD_CHANGED,
+        RETENTION_SETTINGS_CHANGED
     }
 
     /**

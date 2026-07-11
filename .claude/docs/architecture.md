@@ -180,6 +180,17 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   body-digest verified, then idempotent by event id via `livekit_webhook_event`). Rooms are
   opaque `t_<tenantId>_<uuid>`; one shared SFU across tenants is the accepted v1 trade
   (tokens isolate rooms). Session lifecycle publishes `kelta.video.session.*` for flows.
+- **Telehealth archives** (slice 7, V171): `/api/telehealth/archives/**` + `/retention-settings`
+  are static routes — authz **in-controller** (`TelehealthArchiveController`, chat idiom).
+  `POST /archives` and the two GET list/detail endpoints resolve the actor from `X-User-Id`/
+  `X-User-Type`: staff (INTERNAL) see the tenant; a **PORTAL** actor is forced to their own
+  `portal_user_id` (list) and denied on any archive they don't own (detail, 403). Every
+  `GET /archives/{id}` mints short-lived presigned artifact URLs and audits `ARCHIVE_ACCESSED`.
+  `POST /archives/{id}/legal-hold` and `GET|PUT /retention-settings` require the **`MANAGE_DATA`**
+  system permission (same `CerbosPermissionResolver.getProfileId` +
+  `BootstrapRepository.findProfileSystemPermissions` check as bulk-ops), so a delegated admin
+  without it cannot shorten retention or release a hold. The retention *purge* is a background
+  sweep (not an endpoint), DRY-RUN by default — see concerns.md.
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

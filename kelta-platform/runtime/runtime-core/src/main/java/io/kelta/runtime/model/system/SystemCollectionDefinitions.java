@@ -334,8 +334,13 @@ public final class SystemCollectionDefinitions {
                 .withEnumValues(List.of("RULE", "EXCEPTION")))
             .addField(FieldDefinition.integer("weekday"))
             .addField(FieldDefinition.date("exceptionDate").withColumnName("exception_date"))
-            .addField(FieldDefinition.string("startTime", 8).withColumnName("start_time"))
-            .addField(FieldDefinition.string("endTime", 8).withColumnName("end_time"))
+            // Wall-clock "HH:mm" / "HH:mm:ss" strings (varchar(8) columns since
+            // V172); SlotService parses them with LocalTime.parse, so keep the
+            // pattern in lockstep with what java.time accepts.
+            .addField(FieldDefinition.string("startTime", 8).withColumnName("start_time")
+                .withValidation(ValidationRules.forString(null, 8, "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$")))
+            .addField(FieldDefinition.string("endTime", 8).withColumnName("end_time")
+                .withValidation(ValidationRules.forString(null, 8, "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$")))
             .addField(FieldDefinition.requiredString("timezone", 50).withDefault("UTC"))
             .addField(FieldDefinition.bool("closed").withDefault(false))
             .addField(FieldDefinition.bool("active").withDefault(true))

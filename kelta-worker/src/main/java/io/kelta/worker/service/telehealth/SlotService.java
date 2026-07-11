@@ -144,11 +144,20 @@ public class SlotService {
                         rs.getString("kind"),
                         rs.getObject("weekday") == null ? null : rs.getInt("weekday"),
                         rs.getObject("exception_date", LocalDate.class),
-                        rs.getObject("start_time", LocalTime.class),
-                        rs.getObject("end_time", LocalTime.class),
+                        parseTime(rs.getString("start_time")),
+                        parseTime(rs.getString("end_time")),
                         ZoneId.of(rs.getString("timezone")),
                         rs.getBoolean("closed")),
                 tenantId, providerId);
+    }
+
+    /**
+     * start_time/end_time are varchar(8) (V172) holding "HH:mm" or "HH:mm:ss"
+     * wall-clock values — the columns match the STRING(8) field definitions so
+     * the generic JSON:API write path can bind them.
+     */
+    static LocalTime parseTime(String value) {
+        return value == null || value.isBlank() ? null : LocalTime.parse(value);
     }
 
     List<Busy> loadBusy(String tenantId, String providerId, Instant from, Instant to) {

@@ -128,8 +128,58 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `MANAGE_DELEGATED_ADMINS` for scopes) unless a `DelegatedWriteContext` is bound — this is what
   makes the delegated path safe against the generic collection route and `/api/operations`. The
   gateway `IdentityHeaderStripFilter` (order −400) strips client-supplied `X-User-Email`/
-  `X-User-Profile-Id`/`X-User-Profile-Name`/`X-Cerbos-Scope` at the chain head so the worker never
-  trusts a forged identity header on any path.
+  `X-User-Profile-Id`/`X-User-Profile-Name`/`X-Cerbos-Scope`/`X-User-Type` at the chain head so the
+  worker never trusts a forged identity header on any path.
+- **Portal identity** (telehealth slice 1, V167): `platform_user.user_type ∈ INTERNAL|PORTAL`.
+  Portal users are **passwordless** — no `user_credential` row exists (the form-login query
+  inner-joins it, structurally excluding them); their only entry is the magic-link flow on
+  kelta-auth (`/portal/login`, `/portal/login/request`, `/portal/login/verify` — permitAll pages;
+  single-use SHA-256-hashed tokens in `portal_login_token`, 15-min PORTAL_LOGIN / 7-day
+  PORTAL_INVITE, enumeration-safe uniform responses, per-user rate limit). Verified logins get a
+  normal auth session; the JWT carries a `user_type` claim which the gateway re-stamps as
+  `X-User-Type` (`HeaderTransformationFilter`; pre-claim tokens read as INTERNAL).
+  `POST /api/admin/users/portal-invite` (existing `/api/admin/**` static route,
+  `MANAGE_USERS` in-controller) creates the user with the seeded **Portal User** profile
+  (API_ACCESS only) and enforces the `maxPortalUsers` governor; re-posting an existing portal
+  email re-issues the invite link. Record-level access for portal users is granted per record via
+  `ParticipantShareSupport` → `record_share` (the existing Cerbos share-widening path).
+- **Chat** (telehealth slice 2, V168): `/api/chat/**` is a static route — ALL authz is
+  in-controller (`ChatController`): participant membership for reads/sends (actor fail-closed
+  from gateway-stamped `X-User-Id` → `UserIdResolver` + `X-User-Type`; body-supplied sender
+  ignored), INTERNAL-only queue views/claims, `MANAGE_CHAT` for `view=all` + cross-assignment.
+  The four chat system collections deliberately carry NO object-permission rows, so the
+  generic JSON:API routes admit only `VIEW_ALL_DATA`/`MODIFY_ALL_DATA` holders — and
+  `ChatMessageHook` re-validates writes on that path too (participant sender, open
+  conversation, messages immutable). Writes go through `QueryEngine` (hooks +
+  record.changed fire); the hooks publish ids-only `kelta.chat.message/conversation.*`
+  events. WebSocket: `chat.join` is verified against `/internal/chat/.../members`
+  (reactive `ChatMembershipClient`, 30s cache, fail-closed) before the session enters the
+  per-conversation routing index (20 joins/session); `ChatMessageBridge` fans only to
+  joined sessions — never the tenant-wide collection broadcast. To keep that true even
+  though chat writes emit generic `record.changed` (QueryEngine path → flows/search/audit),
+  `RealtimeBridge` SKIPS `chat-*` collections and the WS `subscribe` action rejects them
+  (chat.join is the only socket channel for chat). Message bodies never leave the
+  authorized HTTP path (not in NATS chat payloads, WS events, or search indexes).
+- **Telehealth scheduling** (slice 4, V169): `/api/telehealth/**` is a static route — authz
+  in-controller (`TelehealthController`): portal actors act on themselves (body-supplied
+  `portalUserId` ignored for portal callers), providers on their own appointments,
+  `view=provider` staff-only; user types re-validated server-side. Booking runs under a
+  per-provider `pg_advisory_xact_lock` + `SlotService` re-check in one transaction
+  (race-safe, no DB extensions) and writes via `QueryEngine` (`AppointmentHook` validates
+  the window + grants the portal participant `record_share`). The scheduling collections
+  carry NO object-permission rows (admin-only generic JSON:API), like chat.
+  `GET /api/telehealth/visits/{token}` is an **unauthenticated path** (signed HMAC visit
+  token → live-row re-check → fresh single-use portal login token → 302 to the auth
+  verify). Reminders: `AppointmentReminderSweep` (atomic UPDATE-claim, multi-pod safe).
+- **Telehealth video** (slice 5, V170): LiveKit trust boundary — media flows client↔SFU
+  directly (never through the gateway); the platform only MINTS room-scoped HS256 tokens
+  (`POST /api/telehealth/{appointments|conversations}/{id}/video-token` — participant +
+  join-window + `telehealthEnabled` + `videoMinutesPerMonth` checks, fail-closed, in
+  `VideoSessionService`) and CONSUMES signed webhooks
+  (`POST /api/telehealth/webhooks/livekit`, unauthenticated path — LiveKit JWT signature +
+  body-digest verified, then idempotent by event id via `livekit_webhook_event`). Rooms are
+  opaque `t_<tenantId>_<uuid>`; one shared SFU across tenants is the accepted v1 trade
+  (tokens isolate rooms). Session lifecycle publishes `kelta.video.session.*` for flows.
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

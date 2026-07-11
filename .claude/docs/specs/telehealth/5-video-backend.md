@@ -1,8 +1,33 @@
 # [Slice 5] — Video Backend (LiveKit)
 
-> Child spec of [Telehealth parent](./README.md), to be refined with the implementation.
-> Conforms to parent §Key architecture decisions, §Security, §Deployment. Depends on
-> slice 4 (appointments). **Security-typed PR — never auto-merged.** Backend + infra.
+> Child spec of [Telehealth parent](./README.md) — **SHIPPED 2026-07-10** (V170; infra PR
+> homelab-argo#146). Conforms to parent §Key architecture decisions, §Security,
+> §Deployment. Depends on slice 4. **Security-typed PR — never auto-merged.**
+> Backend + infra.
+>
+> **As-built decisions / deltas from this spec:**
+> - **Token endpoints as-built**: `POST /api/telehealth/appointments/{id}/video-token`
+>   (provider or the appointment's portal user; CONFIRMED only; window
+>   start−15min…end+60min) and `POST /api/telehealth/conversations/{id}/video-token`
+>   (chat participants, ad-hoc escalation) — not `/sessions/{id}/token`; sessions create
+>   lazily at first token request (partial unique index per appointment guards the race).
+> - **Governor = SQL month-sum** of ended `duration_seconds` (no Redis counter) checked at
+>   mint; new keys `telehealthEnabled` (FREE false / PRO+ true) + `videoMinutesPerMonth`
+>   (0 / 3k / 30k / ∞).
+> - **Webhook idempotency = `livekit_webhook_event` insert-as-claim table** (no Redis
+>   dependency). Signature verification = LiveKit JWT (HS256, same API secret) + `sha256`
+>   body-digest claim, both constant-time-checked before parsing.
+> - **Credentials are per-environment properties** (`KELTA_LIVEKIT_URL/API_KEY/API_SECRET`
+>   with dev defaults + startup warning), NOT the tenant credential store — one shared SFU,
+>   platform-owned keys, rooms tenant-namespaced (`t_<tenantId>_<uuid>`).
+> - **`egress_ended` stamps `video_session.recording_key` only** — the
+>   attachment-on-appointment + retention wiring intentionally moves to slice 7 (archival
+>   owns recording lifecycle). Recording START (consent) is slice 6.
+> - **TURN-TLS ships DISABLED** in the homelab-argo app (needs a cert on 443/5349) —
+>   flagged in `concerns.md` as the patient-network release gate. hostNetwork single
+>   replica, UDP 50000–50100.
+> - No gateway socket fanout for video events in this slice — `kelta.video.session.*`
+>   feeds flows; slice 6 decides if the UI needs a push beyond polling.
 
 ## 1. Goal & scope
 

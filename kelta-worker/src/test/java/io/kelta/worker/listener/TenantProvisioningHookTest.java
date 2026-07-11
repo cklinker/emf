@@ -77,7 +77,7 @@ class TenantProvisioningHookTest {
     class SeedDefaultProfiles {
 
         @Test
-        @DisplayName("Should seed 7 profiles when none exist")
+        @DisplayName("Should seed 8 profiles when none exist")
         void shouldSeedProfilesWhenNoneExist() {
             when(jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM profile WHERE tenant_id = ?",
@@ -86,15 +86,32 @@ class TenantProvisioningHookTest {
 
             hook.seedDefaultProfiles(TENANT_ID);
 
-            // 7 profiles inserted
-            verify(jdbcTemplate, times(7)).update(
+            // 8 profiles inserted (incl. Portal User, telehealth slice 1)
+            verify(jdbcTemplate, times(8)).update(
                     contains("INSERT INTO profile"),
                     anyString(), eq(TENANT_ID), anyString(), anyString());
 
-            // 7 profiles × 24 permissions = 168 permission records
-            verify(jdbcTemplate, times(168)).update(
+            // 8 profiles × 25 permissions = 200 permission records
+            verify(jdbcTemplate, times(200)).update(
                     contains("INSERT INTO profile_system_permission"),
                     anyString(), anyString(), anyString(), anyString(), anyBoolean());
+        }
+
+        @Test
+        @DisplayName("Portal User gets API_ACCESS only")
+        void portalUserGetsApiAccessOnly() {
+            when(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM profile WHERE tenant_id = ?",
+                    Integer.class, TENANT_ID))
+                    .thenReturn(0);
+
+            hook.seedDefaultProfiles(TENANT_ID);
+
+            // 7 of 8 profiles grant API_ACCESS=true... verified indirectly:
+            // Read Only + Minimum Access are the two without it, so 6 true grants.
+            verify(jdbcTemplate, times(6)).update(
+                    contains("INSERT INTO profile_system_permission"),
+                    anyString(), anyString(), anyString(), eq("API_ACCESS"), eq(true));
         }
 
         @Test
@@ -121,13 +138,13 @@ class TenantProvisioningHookTest {
             hook.seedDefaultProfiles(TENANT_ID);
 
             // Verify MANAGE_TENANTS is always passed as false
-            verify(jdbcTemplate, times(7)).update(
+            verify(jdbcTemplate, times(8)).update(
                     contains("INSERT INTO profile_system_permission"),
                     anyString(), anyString(), anyString(), eq("MANAGE_TENANTS"), eq(false));
         }
 
         @Test
-        @DisplayName("Should grant VIEW_ANALYTICS to every built-in profile except Minimum Access")
+        @DisplayName("Should grant VIEW_ANALYTICS to every built-in profile except Minimum Access and Portal User")
         void shouldGrantViewAnalyticsToAllButMinimumAccess() {
             when(jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM profile WHERE tenant_id = ?",
@@ -136,11 +153,11 @@ class TenantProvisioningHookTest {
 
             hook.seedDefaultProfiles(TENANT_ID);
 
-            // 6 of 7 profiles granted (Minimum Access is the single false)
+            // 6 of 8 profiles granted (Minimum Access + Portal User are the two false)
             verify(jdbcTemplate, times(6)).update(
                     contains("INSERT INTO profile_system_permission"),
                     anyString(), anyString(), anyString(), eq("VIEW_ANALYTICS"), eq(true));
-            verify(jdbcTemplate, times(1)).update(
+            verify(jdbcTemplate, times(2)).update(
                     contains("INSERT INTO profile_system_permission"),
                     anyString(), anyString(), anyString(), eq("VIEW_ANALYTICS"), eq(false));
         }

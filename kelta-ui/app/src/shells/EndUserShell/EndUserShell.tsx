@@ -22,6 +22,7 @@ import { useConfig } from '@/context/ConfigContext'
 import { useMyIdentity } from '@/hooks/useMyIdentity'
 import { usePreferenceValue } from '@/hooks/usePreferenceStore'
 import { usePendingApprovalsCount } from '@/hooks/useMyApprovals'
+import { useUnreadChatCount } from '@/hooks/useChat'
 import { initPushNotifications } from '@/push/deviceRegistration'
 import { PageLoader } from '@/components/PageLoader'
 import { SkipLinks } from '@/components/SkipLinks'
@@ -35,6 +36,7 @@ export function EndUserShell(): React.ReactElement {
   const { tenantSlug } = useParams<{ tenantSlug: string }>()
   const { identity } = useMyIdentity()
   const { count: pendingApprovals } = usePendingApprovalsCount(identity?.userId)
+  const unreadChats = useUnreadChatCount(!!identity?.userId)
 
   // Register the device's push token when running in the Capacitor native shell.
   // No-op on the web (does not touch any Capacitor code).
@@ -100,8 +102,15 @@ export function EndUserShell(): React.ReactElement {
         user={user}
         onLogout={handleLogout}
         onSearchOpen={() => setSearchOpen(true)}
-        notificationCount={pendingApprovals}
-        onNotificationsOpen={() => navigate(`/${tenantSlug}/app/approvals`)}
+        notificationCount={pendingApprovals + unreadChats}
+        onNotificationsOpen={() =>
+          navigate(
+            // Approvals stay the primary feed; when only chat is unread, land there.
+            pendingApprovals === 0 && unreadChats > 0
+              ? `/${tenantSlug}/app/chat`
+              : `/${tenantSlug}/app/approvals`
+          )
+        }
       />
       <OfflineIndicator />
       <main id="main-content" className="flex-1 overflow-auto" role="main" tabIndex={-1}>

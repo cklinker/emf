@@ -16,7 +16,9 @@ io.kelta.auth/
 ## Key Patterns
 
 ### Models
-- `KeltaUserDetails` — implements Spring `UserDetails`, has 10-param constructor
+- `KeltaUserDetails` — implements Spring `UserDetails`; 11-param constructor (adds `userType`
+  INTERNAL|PORTAL) with a 10-param overload defaulting to INTERNAL. Serialized principals
+  round-trip through `KeltaUserDetailsMixin` — grow both together.
 - `KeltaSession` — serializable session data stored in Redis
 - Both are plain classes (not records, not JPA entities)
 
@@ -60,6 +62,7 @@ Standard Spring Security exceptions (`AuthenticationException` hierarchy). No cu
 | User loading | `service/KeltaUserDetailsService.java` |
 | External IdP | `federation/DynamicClientRegistrationRepository.java` |
 | MFA | `service/TotpService.java` + `controller/MfaController.java` |
+| Passwordless magic-link (portal users) | `controller/PortalLoginController.java` + `service/PortalLoginService.java` |
 | Worker HTTP client | `service/WorkerClient.java` |
 
 ## Running Tests

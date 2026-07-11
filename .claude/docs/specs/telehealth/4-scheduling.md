@@ -1,8 +1,40 @@
 # [Slice 4] — Scheduling & Visit Links
 
-> Child spec of [Telehealth parent](./README.md), to be refined with the implementation.
-> Conforms to parent §Shared contracts, §Security. Depends on slice 1 (portal users book /
-> get invited). Backend + FE.
+> Child spec of [Telehealth parent](./README.md) — **SHIPPED 2026-07-10** (V169); as-built
+> notes below. Conforms to parent §Shared contracts, §Security. Depends on slice 1.
+> Backend + FE.
+>
+> **As-built decisions / deltas from this spec:**
+> - **Bookings create as CONFIRMED** (auto-confirm; REQUESTED reserved for future approval
+>   flows). The confirmation email fires immediately with the visit link + `.ics`.
+> - **Overlap enforcement = per-provider `pg_advisory_xact_lock` + slot re-check inside one
+>   transaction** — NOT a btree_gist exclusion constraint (the standalone prod Postgres
+>   carries no extra extensions). The service also re-verifies the requested time against
+>   `SlotService` under the lock, so a client can never book an unoffered time.
+> - **Reminders are a platform-owned sweep** (`AppointmentReminderSweep`, @Scheduled 60s,
+>   atomic UPDATE-claim on `reminder_sent_at` — multi-pod safe, fires once, drops rather
+>   than double-sends on crash) instead of seeded per-tenant flows. Tenants can still layer
+>   flows on record.changed. Offset configurable: `kelta.telehealth.reminders.offset-minutes`
+>   (60 default).
+> - **Visit links**: stateless HMAC token (`VisitTokenService`,
+>   `kelta.telehealth.visit-secret` — DEV default with a startup warning; set
+>   `KELTA_TELEHEALTH_VISIT_SECRET` in prod) bound to (tenant, appointment, portalUser, exp
+>   = scheduledEnd+1h), multi-use until exp; `GET /api/telehealth/visits/{token}` (gateway
+>   unauthenticated path) re-checks the LIVE appointment row (cancelled kills the link),
+>   mints a fresh single-use 15-min portal login token, and 302s into the kelta-auth
+>   verify — one click from email to an authenticated `/app` session. Slice 6 adds the
+>   `next`-page landing.
+> - **Availability model**: RULE rows (weekday 0=Sun..6=Sat, start/end LOCAL time, per-row
+>   timezone — wall-clock stable across DST) + EXCEPTION rows (closed date, or an additive
+>   window for a date). Managed via the admin-only generic JSON:API for now (no authoring
+>   UI in this slice).
+> - **Staff surface is a minimal `/app/appointments` list** (provider view, complete /
+>   no-show / cancel) — the CalendarMonthView integration and richer visit UX land with
+>   slice 6.
+> - New endpoint beyond spec: `GET /api/telehealth/providers` (users with active
+>   availability) feeding the widget's provider select. Slot range capped at 62 days.
+> - Widget props as-built: `providerId` (optional fixed), `visitType`, `durationMinutes`
+>   (15/30/45/60).
 
 ## 1. Goal & scope
 

@@ -11,7 +11,11 @@ export class UsersListPage extends BasePage {
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
     this.container = this.testId("users-page");
-    this.createButton = this.container.locator("header").getByRole("button");
+    // Name the button — the header also holds "Invite Portal User" (telehealth
+    // slice 1), so a bare getByRole("button") matches two and is ambiguous.
+    this.createButton = this.container
+      .locator("header")
+      .getByRole("button", { name: /create user/i });
     this.userTable = this.container.locator("table");
     this.searchInput = this.container.locator('input[type="text"]');
     this.statusFilter = this.container.locator("select");

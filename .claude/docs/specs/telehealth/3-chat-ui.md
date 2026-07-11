@@ -1,7 +1,31 @@
 # [Slice 3] — Chat UI: Internal Console + Portal Widget
 
-> Child spec of [Telehealth parent](./README.md), to be refined with the implementation.
-> Conforms to parent §Reuse Map, §Security. Depends on slice 2. Frontend-only.
+> Child spec of [Telehealth parent](./README.md) — **SHIPPED 2026-07-10**; as-built notes
+> below. Conforms to parent §Reuse Map, §Security. Depends on slice 2.
+> Frontend-mostly (one small worker addition).
+>
+> **As-built decisions / deltas from this spec:**
+> - **`myLastReadAt` added to the conversation-list API** (worker `ChatService`) — the
+>   client computes unread as `lastMessageAt > myLastReadAt`; the bell aggregates
+>   approvals + unread chats (lands on approvals when both, chat when only chat).
+> - **Liveness is hybrid:** joined conversations get socket invalidations
+>   (`chat.join` per open thread, ref-counted in `RealtimeClient`); everything else —
+>   crucially, NEW conversations for agents who haven't joined them — rides a **30s poll**
+>   on the conversation lists, because conversation events only reach joined sockets by
+>   design. Documented follow-up: a tenant-wide id-only "conversation opened" ping.
+> - **Slice-2 privacy fix landed with this work**: generic `record.changed` for `chat-*`
+>   collections is now skipped by `RealtimeBridge` and rejected by the WS `subscribe`
+>   action (bodies were reaching tenant-wide subscribers) — committed onto the slice-2 PR.
+> - **Widget category is `data`** (no new `engagement` category — palette union untouched);
+>   type `chat-panel`, props `welcomeText`/`subject`/`queueId` (queue picker deferred).
+> - **Composer attachments deferred** (spec listed them): the attachment flow binds files
+>   to records post-create and needs a upload affordance + kind=ATTACHMENT plumbing —
+>   punted to a chat-polish follow-up, tracked in §8.
+> - **Offline sends are NOT outbox-queued** (recon: the outbox requires explicit
+>   `engine.queue()` opt-in; nothing automatic). Instead the composer **keeps the draft**
+>   on a failed send and surfaces the error toast — retry is manual. Outbox integration is
+>   a follow-up.
+> - Chat FE types live in `hooks/useChat.ts` (no separate `types/chat.ts`).
 
 ## 1. Goal & scope
 

@@ -35,6 +35,7 @@ public class IdentityHeaderStripFilter implements GlobalFilter, Ordered {
             "X-Cerbos-Scope",
             "X-Forwarded-User",
             "X-User-Id",
+            "X-User-Type",
             "X-Forwarded-Groups",
             "X-Forwarded-Roles");
 

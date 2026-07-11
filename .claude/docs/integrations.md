@@ -246,6 +246,64 @@ route `/api/email/**`) — stored-template-only, `MANAGE_EMAIL_TEMPLATES`-gated,
 per-tenant rate-limited; backs the `send_email` UI Quick Action. See
 `architecture.md` → *Transactional send endpoint*.
 
+## Portal magic-link login (telehealth slice 1)
+
+Passwordless sign-in for external `user_type=PORTAL` users. kelta-auth serves the pages
+(`/portal/login` → request form, `/portal/login/verify?token=` → consume + session) and
+stores only SHA-256 hashes in `portal_login_token` (V167, RLS): purpose `PORTAL_LOGIN`
+(15 min, max 3 outstanding per user per window) or `PORTAL_INVITE` (7 days, written by the
+worker's `PortalUserService` with the invite). Consumption is an atomic conditional
+`UPDATE … RETURNING`; responses are uniform ("check your email") to prevent account
+enumeration. Emails ride the standard template path — system templates `portal.invite` and
+`portal.login-link` (tenant-overridable by key), sent via `WorkerClient.sendTemplateEmail`
+(auth → worker internal) or `EmailService.sendByKey` (worker). After verify, the user is
+redirected to `{ui-base-url}/{tenantSlug}/app`; the app's OIDC redirect then completes
+silently against the authenticated session. MFA/TOTP is not interposed — link possession is
+the factor, and portal users cannot reach enrollment surfaces.
+
+## Telehealth visit links + calendar invites (slice 4)
+
+Appointment emails (`appointment.confirmed`/`.reminder`/`.cancelled`, system templates
+V169) carry a **visit link**: a stateless HMAC token (`VisitTokenService`, secret
+`kelta.telehealth.visit-secret` / `KELTA_TELEHEALTH_VISIT_SECRET` — a DEV default with a
+startup warning applies when unset) binding (tenant, appointment, portalUser, exp =
+scheduledEnd+1h). `GET /api/telehealth/visits/{token}` is a gateway
+**unauthenticated path**: it re-validates against the LIVE appointment row (a cancelled
+appointment kills the link), mints a fresh single-use 15-minute `portal_login_token`, and
+302s into the kelta-auth magic-link verify — one click from email to an authenticated
+portal session. Confirmations additionally attach a hand-rolled **RFC 5545 .ics**
+(`IcsGenerator`, single VEVENT, UTC, METHOD:PUBLISH) via
+`DefaultEmailService.queueEmailWithAttachments`. Reminders come from
+`AppointmentReminderSweep` (60s poll, atomic UPDATE-claim on `reminder_sent_at`, offset
+`kelta.telehealth.reminders.offset-minutes`, toggle `…reminders.enabled`).
+
+## LiveKit (telehealth slice 5 — video SFU)
+
+Self-hosted, Apache-2.0 WebRTC SFU. **Media never traverses the gateway** — clients connect
+to LiveKit's own host (`wss://livekit.kelta.io` prod via the `livekit` app in homelab-argo;
+`docker compose --profile telehealth` / `make up-telehealth` locally). The worker's only
+integration points:
+
+- **Token minting** (`LiveKitTokenService`, plain nimbus HS256 — no vendor SDK): `iss` =
+  API key, `sub` = platform user id, a `video` claim with room-scoped grants
+  (`roomJoin`/`canPublish`/`canSubscribe` for exactly one room). Config
+  `kelta.telehealth.livekit.{url,api-key,api-secret}` (`KELTA_LIVEKIT_*`; dev defaults +
+  startup warning when unset, matching the compose profile's dev keys). Sessions are
+  created lazily at the first token request (`video-sessions`, one per appointment via a
+  partial unique index; ad-hoc per chat conversation); rooms are opaque
+  `t_<tenantId>_<uuid>` names, so a leaked token can never reach another tenant's room.
+  Enforcement at mint (`VideoSessionService`, fail-closed): appointment/conversation
+  membership, the join window (start−15min…end+60min), the per-tenant `telehealthEnabled`
+  gate, and the `videoMinutesPerMonth` governor (SQL month-sum of ended durations — no
+  counter infra).
+- **Webhooks** (`POST /api/telehealth/webhooks/livekit`, gateway unauthenticated path):
+  LiveKit signs each delivery with a JWT (same API secret) whose `sha256` claim is the raw
+  body digest — `verifyWebhook` checks signature AND digest before parsing. Idempotency:
+  INSERT into `livekit_webhook_event` is the claim (duplicate delivery → skip).
+  `room_started`/`room_finished` drive session status + duration and publish
+  `kelta.video.session.<tenantId>.<sessionId>`; `egress_ended` stamps `recording_key`
+  (attachment/archival wiring lands with slice 7).
+
 ## Mass-email campaigns (V152)
 
 Bulk send on top of the same SMTP path. Three tenant-scoped tables (RLS): `email_campaign`

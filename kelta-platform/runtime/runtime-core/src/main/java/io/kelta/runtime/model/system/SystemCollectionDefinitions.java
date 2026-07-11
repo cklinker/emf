@@ -104,6 +104,19 @@ public final class SystemCollectionDefinitions {
         definitions.add(campaignRecipients());
         definitions.add(emailSuppressions());
 
+        // Chat (telehealth slice 2)
+        definitions.add(chatQueues());
+        definitions.add(chatConversations());
+        definitions.add(chatMessages());
+        definitions.add(chatParticipants());
+
+        // Scheduling (telehealth slice 4)
+        definitions.add(telehealthAvailability());
+        definitions.add(telehealthAppointments());
+
+        // Video sessions (telehealth slice 5)
+        definitions.add(videoSessions());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -191,9 +204,14 @@ public final class SystemCollectionDefinitions {
         return systemBuilder("users", "Users", "platform_user")
             .displayFieldName("email")
             .addImmutableField("tenantId")
+            .addImmutableField("userType")
             .addField(FieldDefinition.lookup("tenantId", "tenants", "Tenant")
                 .withColumnName("tenant_id"))
             .addField(FieldDefinition.requiredString("email", 320))
+            .addField(FieldDefinition.requiredString("userType", 20)
+                .withColumnName("user_type")
+                .withDefault("INTERNAL")
+                .withEnumValues(List.of("INTERNAL", "PORTAL")))
             .addField(FieldDefinition.string("username", 100))
             .addField(FieldDefinition.string("firstName", 100).withColumnName("first_name"))
             .addField(FieldDefinition.string("lastName", 100).withColumnName("last_name"))
@@ -219,6 +237,152 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredString("name", 255))
             .addField(FieldDefinition.text("description"))
             .addField(FieldDefinition.bool("isSystem").withColumnName("is_system").withDefault(false))
+            .build();
+    }
+
+    // ------------------------------------------------------------------
+    // Chat (telehealth slice 2, specs/telehealth/2-chat-backend.md).
+    // Message bodies are deliberately excluded from search/embedding
+    // indexes and from realtime data push — content is served only over
+    // the authorized /api/chat/** path (participant-checked in-controller).
+    // ------------------------------------------------------------------
+
+    public static CollectionDefinition chatQueues() {
+        return systemBuilder("chat-queues", "Chat Queues", "chat_queue")
+            .displayFieldName("name")
+            .addField(FieldDefinition.requiredString("name", 100))
+            .addField(FieldDefinition.text("description"))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .build();
+    }
+
+    public static CollectionDefinition chatConversations() {
+        return systemBuilder("chat-conversations", "Chat Conversations", "chat_conversation")
+            .displayFieldName("subject")
+            .addImmutableField("origin")
+            .addField(FieldDefinition.lookup("queueId", "chat-queues", "Queue")
+                .withColumnName("queue_id"))
+            .addField(FieldDefinition.string("subject", 200))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("OPEN")
+                .withEnumValues(List.of("OPEN", "ASSIGNED", "CLOSED", "ARCHIVED")))
+            .addField(FieldDefinition.requiredString("origin", 20)
+                .withDefault("INTERNAL")
+                .withEnumValues(List.of("PORTAL", "INTERNAL")))
+            .addField(FieldDefinition.lookup("assignedTo", "users", "Assigned To")
+                .withColumnName("assigned_to"))
+            .addField(FieldDefinition.string("contextRecordId", 36)
+                .withColumnName("context_record_id"))
+            .addField(FieldDefinition.datetime("lastMessageAt").withColumnName("last_message_at"))
+            .addField(FieldDefinition.datetime("closedAt").withColumnName("closed_at"))
+            .build();
+    }
+
+    public static CollectionDefinition chatMessages() {
+        return systemBuilder("chat-messages", "Chat Messages", "chat_message")
+            .displayFieldName("id")
+            .addImmutableField("conversationId")
+            .addImmutableField("senderId")
+            .addImmutableField("senderType")
+            .addField(FieldDefinition.masterDetail("conversationId", "chat-conversations", "Conversation")
+                .withColumnName("conversation_id"))
+            .addField(FieldDefinition.lookup("senderId", "users", "Sender")
+                .withColumnName("sender_id"))
+            .addField(FieldDefinition.requiredString("senderType", 20)
+                .withColumnName("sender_type")
+                .withEnumValues(List.of("INTERNAL", "PORTAL", "SYSTEM")))
+            .addField(FieldDefinition.requiredString("kind", 20)
+                .withDefault("TEXT")
+                .withEnumValues(List.of("TEXT", "SYSTEM", "ATTACHMENT")))
+            .addField(FieldDefinition.requiredText("body"))
+            .addField(FieldDefinition.datetime("sentAt").withColumnName("sent_at"))
+            .build();
+    }
+
+    public static CollectionDefinition chatParticipants() {
+        return systemBuilder("chat-participants", "Chat Participants", "chat_participant")
+            .displayFieldName("id")
+            .addImmutableField("conversationId")
+            .addImmutableField("userId")
+            .addField(FieldDefinition.masterDetail("conversationId", "chat-conversations", "Conversation")
+                .withColumnName("conversation_id"))
+            .addField(FieldDefinition.lookup("userId", "users", "User")
+                .withColumnName("user_id"))
+            .addField(FieldDefinition.requiredString("role", 20)
+                .withEnumValues(List.of("AGENT", "PORTAL")))
+            .addField(FieldDefinition.datetime("joinedAt").withColumnName("joined_at"))
+            .addField(FieldDefinition.datetime("lastReadAt").withColumnName("last_read_at"))
+            .build();
+    }
+
+    // ------------------------------------------------------------------
+    // Scheduling (telehealth slice 4, specs/telehealth/4-scheduling.md).
+    // Like chat: no object-permission rows are seeded — /api/telehealth/**
+    // (participant/provider-checked in-controller) is the product path.
+    // ------------------------------------------------------------------
+
+    public static CollectionDefinition telehealthAvailability() {
+        return systemBuilder("telehealth-availability", "Telehealth Availability", "telehealth_availability")
+            .displayFieldName("id")
+            .addField(FieldDefinition.lookup("providerId", "users", "Provider")
+                .withColumnName("provider_id"))
+            .addField(FieldDefinition.requiredString("kind", 20)
+                .withDefault("RULE")
+                .withEnumValues(List.of("RULE", "EXCEPTION")))
+            .addField(FieldDefinition.integer("weekday"))
+            .addField(FieldDefinition.date("exceptionDate").withColumnName("exception_date"))
+            .addField(FieldDefinition.string("startTime", 8).withColumnName("start_time"))
+            .addField(FieldDefinition.string("endTime", 8).withColumnName("end_time"))
+            .addField(FieldDefinition.requiredString("timezone", 50).withDefault("UTC"))
+            .addField(FieldDefinition.bool("closed").withDefault(false))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .build();
+    }
+
+    public static CollectionDefinition telehealthAppointments() {
+        return systemBuilder("telehealth-appointments", "Telehealth Appointments", "telehealth_appointment")
+            .displayFieldName("id")
+            .addImmutableField("providerId")
+            .addImmutableField("portalUserId")
+            .addField(FieldDefinition.lookup("providerId", "users", "Provider")
+                .withColumnName("provider_id"))
+            .addField(FieldDefinition.lookup("portalUserId", "users", "Portal User")
+                .withColumnName("portal_user_id"))
+            .addField(FieldDefinition.datetime("scheduledStart").withColumnName("scheduled_start"))
+            .addField(FieldDefinition.datetime("scheduledEnd").withColumnName("scheduled_end"))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("CONFIRMED")
+                .withEnumValues(List.of("REQUESTED", "CONFIRMED", "CANCELLED", "COMPLETED", "NO_SHOW")))
+            .addField(FieldDefinition.string("visitType", 100).withColumnName("visit_type"))
+            .addField(FieldDefinition.string("reason", 500))
+            .addField(FieldDefinition.lookup("conversationId", "chat-conversations", "Conversation")
+                .withColumnName("conversation_id"))
+            .addField(FieldDefinition.string("videoSessionId", 36).withColumnName("video_session_id"))
+            .addField(FieldDefinition.datetime("reminderSentAt").withColumnName("reminder_sent_at"))
+            .addField(FieldDefinition.datetime("cancelledAt").withColumnName("cancelled_at"))
+            .build();
+    }
+
+    /** Video sessions (telehealth slice 5) — lifecycle owned by the LiveKit webhook. */
+    public static CollectionDefinition videoSessions() {
+        return systemBuilder("video-sessions", "Video Sessions", "video_session")
+            .displayFieldName("id")
+            .addImmutableField("roomName")
+            .addField(FieldDefinition.lookup("appointmentId", "telehealth-appointments", "Appointment")
+                .withColumnName("appointment_id"))
+            .addField(FieldDefinition.lookup("conversationId", "chat-conversations", "Conversation")
+                .withColumnName("conversation_id"))
+            .addField(FieldDefinition.requiredString("roomName", 100)
+                .withColumnName("room_name").withUnique(true))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("CREATED")
+                .withEnumValues(List.of("CREATED", "ACTIVE", "ENDED")))
+            .addField(FieldDefinition.datetime("startedAt").withColumnName("started_at"))
+            .addField(FieldDefinition.datetime("endedAt").withColumnName("ended_at"))
+            .addField(FieldDefinition.integer("durationSeconds").withColumnName("duration_seconds"))
+            .addField(FieldDefinition.bool("recordingConsent").withColumnName("recording_consent")
+                .withDefault(false))
+            .addField(FieldDefinition.string("recordingKey", 500).withColumnName("recording_key"))
             .build();
     }
 

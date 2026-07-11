@@ -16,6 +16,8 @@ const PAGE_PATH_RE = /^\/(?:app\/)?p\/([^/]+)/
 /** Matches an analytics menu path: `/dashboards/<id>` or `/reports/<id>` (± `/app` prefix). */
 const DASHBOARD_PATH_RE = /^\/(?:app\/)?dashboards\/([^/]+)/
 const REPORT_PATH_RE = /^\/(?:app\/)?reports\/([^/]+)/
+/** Matches the chat console (telehealth slice 3): `/chat` or `/app/chat`. */
+const CHAT_PATH_RE = /^\/(?:app\/)?chat\/?$/
 
 /**
  * Map a single menu item to a nav tab, or `null` if its path is not a surfaceable target.
@@ -70,6 +72,10 @@ export function menuItemToTab(item: MenuItemConfig): NavTab | null {
   if (reportMatch) {
     const id = reportMatch[1]
     return { key: path, kind: 'report', target: id, label: item.label || id, icon: item.icon }
+  }
+
+  if (CHAT_PATH_RE.test(path)) {
+    return { key: path, kind: 'chat', target: '', label: item.label || 'Chat', icon: item.icon }
   }
 
   return null

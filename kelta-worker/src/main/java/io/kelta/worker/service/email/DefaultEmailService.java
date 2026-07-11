@@ -135,9 +135,10 @@ public class DefaultEmailService implements EmailService {
     /**
      * Replaces {@code ${name}} placeholders in {@code template} with values from {@code vars}.
      * Unknown variables are left untouched so the message is still readable when a caller forgets
-     * a key — and the gap is obvious in QA.
+     * a key — and the gap is obvious in QA. Public so template-resolving callers outside this
+     * package (appointment confirmations with attachments) render the same way.
      */
-    static String substitute(String template, Map<String, Object> vars) {
+    public static String substitute(String template, Map<String, Object> vars) {
         if (template == null) return null;
         Matcher m = VAR_PATTERN.matcher(template);
         StringBuilder out = new StringBuilder();

@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { RealtimeClient, type PresenceUser, type RecordChangedEvent } from './RealtimeClient'
+import {
+  RealtimeClient,
+  type ChatEvent,
+  type PresenceUser,
+  type RecordChangedEvent,
+} from './RealtimeClient'
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
@@ -181,6 +186,71 @@ describe('RealtimeClient', () => {
         }),
       })
       expect(seen).toEqual([])
+    })
+  })
+
+  describe('chat conversations (telehealth slice 3)', () => {
+    function makeChatClient(chatEvents: ChatEvent[]) {
+      return new RealtimeClient({
+        urlFactory: vi.fn(async () => 'wss://x/ws/realtime?token=t'),
+        onEvent: () => {},
+        onChatEvent: (e) => chatEvents.push(e),
+        webSocketFactory: (url) => new FakeWebSocket(url) as unknown as WebSocket,
+        baseReconnectDelayMs: 10,
+      })
+    }
+
+    it('joins once per conversation (ref-counted) and leaves on the last ref', async () => {
+      const client = makeChatClient([])
+      await client.connect()
+      const ws = FakeWebSocket.instances[0]
+      ws.open()
+
+      client.joinConversation('conv-1')
+      client.joinConversation('conv-1')
+      expect(
+        ws.sent.map((s) => JSON.parse(s)).filter((m) => m.action === 'chat.join')
+      ).toHaveLength(1)
+
+      client.leaveConversation('conv-1')
+      expect(
+        ws.sent.map((s) => JSON.parse(s)).filter((m) => m.action === 'chat.leave')
+      ).toHaveLength(0)
+      client.leaveConversation('conv-1')
+      expect(
+        ws.sent.map((s) => JSON.parse(s)).filter((m) => m.action === 'chat.leave')
+      ).toHaveLength(1)
+      client.close()
+    })
+
+    it('re-joins conversations on reconnect and dispatches chat events', async () => {
+      const chatEvents: ChatEvent[] = []
+      const client = makeChatClient(chatEvents)
+      await client.connect()
+      const first = FakeWebSocket.instances[0]
+      first.open()
+      client.joinConversation('conv-9')
+
+      first.onmessage?.({
+        data: JSON.stringify({
+          event: 'chat.message',
+          conversationId: 'conv-9',
+          messageId: 'm1',
+          kind: 'TEXT',
+        }),
+      })
+      expect(chatEvents).toHaveLength(1)
+      expect(chatEvents[0].conversationId).toBe('conv-9')
+
+      first.close() // triggers reconnect
+      await vi.advanceTimersByTimeAsync(50)
+      const second = FakeWebSocket.instances[1]
+      second.open()
+      expect(second.sent.map((m) => JSON.parse(m))).toContainEqual({
+        action: 'chat.join',
+        conversationId: 'conv-9',
+      })
+      client.close()
     })
   })
 })

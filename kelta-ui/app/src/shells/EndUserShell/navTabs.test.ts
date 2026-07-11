@@ -237,4 +237,16 @@ describe('submenu groups (nested menu items)', () => {
     expect(tabs[1]).toMatchObject({ kind: 'group', label: 'FAQs' })
     expect(tabs[1].children).toHaveLength(2)
   })
+
+  it('maps /chat and /app/chat to a chat tab (telehealth slice 3)', () => {
+    expect(menuItemToTab({ id: 'c1', label: 'Support', path: '/chat' })).toMatchObject({
+      kind: 'chat',
+      label: 'Support',
+    })
+    expect(menuItemToTab({ id: 'c2', label: '', path: '/app/chat' })).toMatchObject({
+      kind: 'chat',
+      label: 'Chat',
+    })
+    expect(menuItemToTab({ id: 'c3', label: 'Nope', path: '/chatter' })).toBeNull()
+  })
 })

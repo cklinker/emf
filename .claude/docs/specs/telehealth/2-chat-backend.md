@@ -1,8 +1,26 @@
 # [Slice 2] — Chat Backend
 
-> Child spec of [Telehealth parent](./README.md), to be refined with the implementation.
-> Conforms to parent §Shared contracts, §Security. Depends on slice 1 (portal identity +
-> participant shares). Backend: worker + gateway + runtime.
+> Child spec of [Telehealth parent](./README.md) — **SHIPPED 2026-07-10** (V168); as-built
+> notes below. Conforms to parent §Shared contracts, §Security. Depends on slice 1 (portal
+> identity + participant shares). Backend: worker + gateway + runtime.
+>
+> **As-built decisions:**
+> - **No Cerbos object grants were seeded** for the chat collections — the generic JSON:API
+>   routes therefore admit only `VIEW_ALL_DATA`/`MODIFY_ALL_DATA` (admins), and
+>   `ChatMessageHook` re-validates writes even on that path. `/api/chat/**` is the product
+>   path; this is stricter than the spec's "Cerbos policies for staff profiles" line.
+> - **Writes go through `QueryEngine`** (Delegated-scopes precedent) so hooks +
+>   record.changed fire on every path; reads are direct JDBC; read receipts are direct JDBC
+>   on purpose (no record.changed noise per focus).
+> - Authorization matrix as-built: `view=mine` = participants (portal included);
+>   `view=queue` + claim = INTERNAL users (per-queue membership deferred as planned);
+>   `view=all` + cross-assign = `MANAGE_CHAT` (V168 seeds it granted to System
+>   Administrator only; FE checklist entry added).
+> - Gateway membership check: `GET /internal/chat/conversations/{id}/members?tenantId&user`
+>   (matches platform_user id OR email — the WS JWT `sub` is a UUID on direct-login and an
+>   email on auth-code); reactive `ChatMembershipClient`, 30s Caffeine cache, fail-closed.
+> - `MAX_CONVERSATIONS_PER_SESSION = 20`, tracked separately from the 50-collection budget.
+> - Playbook §7 ("conversation-scoped realtime event family") documents the pattern.
 
 ## 1. Goal & scope
 

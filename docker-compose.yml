@@ -394,6 +394,31 @@ services:
       - kelta-network
 
   # ═══════════════════════════════════════════════════════════════════════════
+  # Telehealth (profile: telehealth) — self-hosted LiveKit SFU for video visits
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  livekit:
+    image: harbor.rzware.com/dockerhub-cache/livekit/livekit-server:latest
+    container_name: kelta-livekit
+    restart: unless-stopped
+    # Dev-mode keys match the worker defaults (kelta.telehealth.livekit.*).
+    command: --dev --bind 0.0.0.0
+    environment:
+      LIVEKIT_KEYS: "devkey: devsecret-devsecret-devsecret-32"
+      # Webhooks feed session lifecycle back into the worker (via the gateway
+      # unauthenticated path, signed with the same key).
+      LIVEKIT_WEBHOOK_URLS: "http://kelta-gateway:8080/api/telehealth/webhooks/livekit"
+      LIVEKIT_WEBHOOK_API_KEY: devkey
+    ports:
+      - "7880:7880"   # HTTP/WebSocket signaling
+      - "7881:7881"   # TCP fallback
+      - "50000-50019:50000-50019/udp"  # RTC media (narrow dev range)
+    networks:
+      - kelta-network
+    profiles:
+      - telehealth
+
+  # ═══════════════════════════════════════════════════════════════════════════
   # Observability (profile: observability)
   # ═══════════════════════════════════════════════════════════════════════════
 

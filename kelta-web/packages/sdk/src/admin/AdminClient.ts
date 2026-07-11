@@ -20,6 +20,8 @@ import type {
   PlatformUser,
   CreatePlatformUserRequest,
   UpdatePlatformUserRequest,
+  PortalInviteRequest,
+  PortalInviteResponse,
   DelegatedAdminSummary,
   DelegatedAdminScope,
   SaveDelegatedAdminScopeRequest,
@@ -524,6 +526,16 @@ export class AdminClient {
     activate: async (id: string): Promise<void> => {
       const body = toJsonApiBody('users', { status: 'ACTIVE' }, id);
       await this.axios.patch(`/api/users/${id}`, body);
+    },
+
+    /**
+     * Creates (or re-invites) an external portal user. The worker forces
+     * user_type=PORTAL + the Portal User profile and emails a single-use
+     * magic sign-in link; portal users have no password.
+     */
+    invitePortal: async (request: PortalInviteRequest): Promise<PortalInviteResponse> => {
+      const response = await this.axios.post('/api/admin/users/portal-invite', request);
+      return response.data as PortalInviteResponse;
     },
 
     getLoginHistory: async (id: string, page = 0, size = 20): Promise<Page<LoginHistoryEntry>> => {

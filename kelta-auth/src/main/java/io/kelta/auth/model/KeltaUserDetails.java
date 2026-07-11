@@ -19,10 +19,19 @@ public class KeltaUserDetails implements UserDetails {
     private final boolean active;
     private final boolean locked;
     private final boolean forceChangePassword;
+    private final String userType;
 
     public KeltaUserDetails(String id, String email, String tenantId, String profileId,
                             String profileName, String displayName, String passwordHash,
                             boolean active, boolean locked, boolean forceChangePassword) {
+        this(id, email, tenantId, profileId, profileName, displayName, passwordHash,
+                active, locked, forceChangePassword, "INTERNAL");
+    }
+
+    public KeltaUserDetails(String id, String email, String tenantId, String profileId,
+                            String profileName, String displayName, String passwordHash,
+                            boolean active, boolean locked, boolean forceChangePassword,
+                            String userType) {
         this.id = id;
         this.email = email;
         this.tenantId = tenantId;
@@ -33,6 +42,7 @@ public class KeltaUserDetails implements UserDetails {
         this.active = active;
         this.locked = locked;
         this.forceChangePassword = forceChangePassword;
+        this.userType = userType;
     }
 
     public String getId() { return id; }
@@ -45,6 +55,8 @@ public class KeltaUserDetails implements UserDetails {
     public boolean isActive() { return active; }
     public boolean isLocked() { return locked; }
     public boolean isForceChangePassword() { return forceChangePassword; }
+    /** INTERNAL or PORTAL; null (pre-userType serialized principals) reads as INTERNAL. */
+    public String getUserType() { return userType == null ? "INTERNAL" : userType; }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -102,3 +102,5 @@ The `chromium` project depends on `auth-setup`, so individual specs start signed
 - **`waitForURL` timeout to `/app`** — the stack is up but `kelta-worker` Flyway migrations didn't finish. Run `docker compose logs kelta-worker | grep -i flyway` to confirm.
 - **Storage state missing** — the `auth-setup` project failed. Run `npx playwright test --project=auth-setup --headed` to debug.
 - **Different admin password** — V102's BCrypt hash is for the literal string `password`. If you changed it on first login locally, either reset via `make reset` (wipes the DB) or update `E2E_TEST_PASSWORD` in `.env.local`.
+
+<!-- ci: baseline flake check 81abfef2 -->

@@ -156,6 +156,9 @@ const EmailSettingsPage = React.lazy(() =>
 const MapSettingsPage = React.lazy(() =>
   import('./pages/MapSettingsPage').then((m) => ({ default: m.MapSettingsPage }))
 )
+const TelehealthSettingsPage = React.lazy(() =>
+  import('./pages/TelehealthSettingsPage').then((m) => ({ default: m.TelehealthSettingsPage }))
+)
 const NetworkAccessPage = React.lazy(() =>
   import('./pages/NetworkAccessPage').then((m) => ({ default: m.NetworkAccessPage }))
 )
@@ -1186,6 +1189,19 @@ function TenantRoutes(): React.ReactElement {
             <AdminPageRoute>
               <RequirePermission permission="MANAGE_TENANTS">
                 <MapSettingsPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Telehealth retention route — view for admins; retention edits + legal
+            hold gated by MANAGE_DATA inside the page (server enforces the same). */}
+        <Route
+          path="telehealth-settings"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="VIEW_SETUP">
+                <TelehealthSettingsPage />
               </RequirePermission>
             </AdminPageRoute>
           }

@@ -4,6 +4,7 @@ import { Loader2, Video } from 'lucide-react'
 import { useI18n } from '@/context/I18nContext'
 import { useAppointments } from '@/hooks/useScheduling'
 import { VisitJoinCard } from './VisitJoinCard'
+import { EncounterRecordCard } from './EncounterRecordCard'
 
 /**
  * Patient/provider video-visit page (telehealth slice 6). Resolves
@@ -64,7 +65,7 @@ export function VisitPage({ testId = 'visit-page' }: { testId?: string }) {
   }
 
   return (
-    <div className="p-6" data-testid={testId}>
+    <div className="flex flex-col gap-4 p-6" data-testid={testId}>
       <VisitJoinCard
         target={{ kind: 'appointment', id: appointment.id }}
         scheduledStart={appointment.scheduledStart}
@@ -72,6 +73,7 @@ export function VisitPage({ testId = 'visit-page' }: { testId?: string }) {
         title={appointment.visitType || t('telehealth.visit.title', 'Video visit')}
         subtitle={appointment.reason || undefined}
       />
+      <EncounterRecordCard appointmentId={appointment.id} />
     </div>
   )
 }

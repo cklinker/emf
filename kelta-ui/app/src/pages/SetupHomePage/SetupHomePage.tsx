@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
   AppWindow,
+  Archive,
   ArrowUpFromLine,
   BarChart3,
   Building2,
@@ -325,6 +326,13 @@ const CATEGORIES: SetupCategory[] = [
         description: 'Install and manage runtime modules',
         icon: Package,
         permission: 'MANAGE_CONNECTED_APPS',
+      },
+      {
+        name: 'Telehealth Retention',
+        path: '/telehealth-settings',
+        description: 'Encounter-record archival, retention, and legal holds',
+        icon: Archive,
+        permission: 'VIEW_SETUP',
       },
     ],
   },

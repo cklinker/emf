@@ -11,13 +11,15 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Declared defaults on JSON-typed system fields must be JSON values (maps or
- * lists), never strings. {@code DefaultQueryEngine} injects the declared
- * default verbatim when the attribute is missing on create, and the field's
- * own type validation then runs on it — a String default like {@code "[]"}
- * makes every create that omits the field fail with
- * "Invalid type, expected JSON" (this is exactly what broke creating a
- * list view without explicit {@code filters}).
+ * Declared defaults on JSON-typed system fields must be JSON containers (maps
+ * or lists), never strings. {@code DefaultQueryEngine} injects the declared
+ * default verbatim when the attribute is missing on create. JSON-typed fields
+ * accept scalar values too (needed for {@code fields.defaultValue}), so a
+ * String default like {@code "[]"} would validate — but it would be stored as
+ * the JSON <em>string</em> {@code "[]"}, not an empty array, silently breaking
+ * every consumer that expects a container (this is exactly what broke creating
+ * a list view without explicit {@code filters}, back when it failed loudly
+ * with "Invalid type, expected JSON").
  */
 class SystemCollectionJsonDefaultsTest {
 

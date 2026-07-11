@@ -165,7 +165,12 @@ public class DefaultValidationEngine implements ValidationEngine {
             case BOOLEAN -> value instanceof Boolean;
             case DATE -> isValidDate(value);
             case DATETIME -> isValidDateTime(value);
-            case JSON, GEOLOCATION -> value instanceof Map || value instanceof List;
+            // JSON accepts any JSON value — objects, arrays, and scalars. Scalars
+            // matter for fields.defaultValue, where a STRING field's default ("en")
+            // arrives as a bare JSON string.
+            case JSON -> value instanceof Map || value instanceof List
+                    || value instanceof String || value instanceof Number || value instanceof Boolean;
+            case GEOLOCATION -> value instanceof Map || value instanceof List;
             case REFERENCE, LOOKUP, MASTER_DETAIL -> value instanceof String;
             case ARRAY, MULTI_PICKLIST -> value instanceof List;
             case AUTO_NUMBER -> value instanceof String || value instanceof Number;

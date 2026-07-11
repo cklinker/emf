@@ -95,6 +95,50 @@ class AddFieldToolTest {
     }
 
     @Test
+    void forwardsStringDefaultValue() {
+        stubCollectionLookup();
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "locale",
+                        "type", "text",
+                        "defaultValue", "en"), null));
+
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.defaultValue", equalTo("en"))));
+    }
+
+    @Test
+    void forwardsBooleanAndNumericDefaultValues() {
+        stubCollectionLookup();
+        wm.stubFor(post(urlEqualTo("/api/fields"))
+                .willReturn(aResponse().withStatus(201).withBody("{}")));
+
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "active",
+                        "type", "boolean",
+                        "defaultValue", true), null));
+        tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("add_field", Map.of(
+                        "collectionName", "projects",
+                        "fieldName", "quantity",
+                        "type", "number",
+                        "defaultValue", 30), null));
+
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.name", equalTo("active")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.defaultValue", equalTo("true"))));
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/fields"))
+                .withRequestBody(matchingJsonPath("$.data.attributes.name", equalTo("quantity")))
+                .withRequestBody(matchingJsonPath("$.data.attributes.defaultValue", equalTo("30"))));
+    }
+
+    @Test
     void translatesUniqueToUniqueConstraint() {
         stubCollectionLookup();
         wm.stubFor(post(urlEqualTo("/api/fields"))

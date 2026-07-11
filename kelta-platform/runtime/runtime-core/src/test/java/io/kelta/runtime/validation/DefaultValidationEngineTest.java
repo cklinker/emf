@@ -304,11 +304,41 @@ class DefaultValidationEngineTest {
             CollectionDefinition definition = createTestCollection(
                 FieldDefinition.json("tags")
             );
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("tags", List.of("tag1", "tag2")), OperationType.CREATE);
-            
+
             assertTrue(result.valid());
+        }
+
+        @Test
+        @DisplayName("Should accept JSON scalar values (string, number, boolean)")
+        void shouldAcceptJsonScalarValues() {
+            CollectionDefinition definition = createTestCollection(
+                FieldDefinition.json("defaultValue")
+            );
+
+            assertTrue(validationEngine.validate(
+                definition, Map.of("defaultValue", "en"), OperationType.CREATE).valid());
+            assertTrue(validationEngine.validate(
+                definition, Map.of("defaultValue", 30), OperationType.CREATE).valid());
+            assertTrue(validationEngine.validate(
+                definition, Map.of("defaultValue", true), OperationType.CREATE).valid());
+        }
+
+        @Test
+        @DisplayName("Should still reject scalar values for GEOLOCATION")
+        void shouldRejectScalarForGeolocation() {
+            CollectionDefinition definition = createTestCollection(
+                new FieldDefinition("position", FieldType.GEOLOCATION, true, false, false,
+                    null, null, null, null, null)
+            );
+
+            ValidationResult result = validationEngine.validate(
+                definition, Map.of("position", "38.7,-9.1"), OperationType.CREATE);
+
+            assertFalse(result.valid());
+            assertEquals("type", result.errors().get(0).constraint());
         }
     }
 

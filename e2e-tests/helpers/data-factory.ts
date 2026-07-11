@@ -29,6 +29,16 @@ const INITIAL_RETRY_DELAY_MS = 2_000;
 /** How long to wait for storage to become ready after collection/field creation */
 const STORAGE_READY_TIMEOUT_MS = 30_000;
 const STORAGE_READY_POLL_MS = 2_000;
+/**
+ * Per-attempt cap for readiness-poll fetches. `fetch` has no default timeout,
+ * so a single connection that hangs during a momentary gateway/worker
+ * saturation spike (many collections created at once) would block the entire
+ * poll loop on ONE request and burn the whole readiness budget — the loop
+ * only re-checks its deadline between awaits. Bounding each attempt lets the
+ * loop actually retry (dozens of attempts across the budget) and ride out a
+ * transient spike instead of failing on the first stalled socket.
+ */
+const READY_FETCH_TIMEOUT_MS = 5_000;
 
 export class DataFactory {
   private createdEntities: Array<{ type: string; id: string }> = [];
@@ -121,6 +131,7 @@ export class DataFactory {
             "Content-Type": "application/vnd.api+json",
             Authorization: `Bearer ${this.currentToken}`,
           },
+          signal: AbortSignal.timeout(READY_FETCH_TIMEOUT_MS),
         });
 
         // 200-level response means the gateway route is registered and storage is ready.
@@ -218,6 +229,7 @@ export class DataFactory {
             "Content-Type": "application/vnd.api+json",
             Authorization: `Bearer ${this.currentToken}`,
           },
+          signal: AbortSignal.timeout(READY_FETCH_TIMEOUT_MS),
         });
         if (response.ok) {
           const body = (await response.json()) as {

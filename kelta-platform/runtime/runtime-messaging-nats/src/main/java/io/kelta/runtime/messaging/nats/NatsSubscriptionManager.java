@@ -55,6 +55,16 @@ public class NatsSubscriptionManager implements DisposableBean {
 
     static final long RETRY_SECONDS = 5;
 
+    /**
+     * Bound redelivery of failing messages. Without a max-deliver cap a message
+     * whose handler always throws is redelivered forever (a poison-message loop
+     * that grinds one consumer and floods logs/DB with the same failure). After
+     * {@code MAX_DELIVER} attempts JetStream stops redelivering the message.
+     * The delayed NAK spaces attempts out instead of hot-looping.
+     */
+    static final long MAX_DELIVER = 5;
+    static final Duration NAK_DELAY = Duration.ofSeconds(2);
+
     private final NatsConnectionManager connectionManager;
     private final ObjectMapper objectMapper;
     private final NatsTracing tracing;
@@ -170,6 +180,7 @@ public class NatsSubscriptionManager implements DisposableBean {
                 .filterSubject(sub.subject())
                 .deliverPolicy(DeliverPolicy.Last)
                 .ackWait(Duration.ofSeconds(30))
+                .maxDeliver(MAX_DELIVER)
                 .build();
 
         PullSubscribeOptions options = PullSubscribeOptions.builder()
@@ -198,9 +209,7 @@ public class NatsSubscriptionManager implements DisposableBean {
                             msg.ack();
                             recordProcessed(sub.name(), start);
                         } catch (Exception e) {
-                            log.error("Error processing message in '{}': {}",
-                                    sub.name(), e.getMessage(), e);
-                            msg.nak();
+                            nakBounded(sub.name(), msg, e);
                             recordFailed(sub.name(), start);
                         }
                     }
@@ -217,6 +226,31 @@ public class NatsSubscriptionManager implements DisposableBean {
                 }
             }
         });
+    }
+
+    /**
+     * NAKs a failed message with a redelivery delay, logging loudly on the final
+     * attempt (after which JetStream stops redelivering it — see {@link #MAX_DELIVER}).
+     */
+    private static void nakBounded(String subName, Message msg, Exception e) {
+        long delivered = deliveredCount(msg);
+        if (delivered >= MAX_DELIVER) {
+            log.error("Error processing message in '{}' on final delivery attempt {}/{} — "
+                            + "message will NOT be redelivered: {}",
+                    subName, delivered, MAX_DELIVER, e.getMessage(), e);
+        } else {
+            log.error("Error processing message in '{}' (attempt {}/{}): {}",
+                    subName, delivered, MAX_DELIVER, e.getMessage(), e);
+        }
+        msg.nakWithDelay(NAK_DELAY);
+    }
+
+    private static long deliveredCount(Message msg) {
+        try {
+            return msg.metaData() != null ? msg.metaData().deliveredCount() : -1;
+        } catch (Exception ignored) {
+            return -1;
+        }
     }
 
     /**
@@ -240,6 +274,7 @@ public class NatsSubscriptionManager implements DisposableBean {
         ConsumerConfiguration cc = ConsumerConfiguration.builder()
                 .deliverPolicy(DeliverPolicy.New)
                 .ackWait(Duration.ofSeconds(30))
+                .maxDeliver(MAX_DELIVER)
                 .build();
 
         PushSubscribeOptions options = PushSubscribeOptions.builder()
@@ -259,9 +294,7 @@ public class NatsSubscriptionManager implements DisposableBean {
                 msg.ack();
                 recordProcessed(sub.name(), start);
             } catch (Exception e) {
-                log.error("Error processing broadcast message in '{}': {}",
-                        sub.name(), e.getMessage(), e);
-                msg.nak();
+                nakBounded(sub.name(), msg, e);
                 recordFailed(sub.name(), start);
             }
         }, false, options);

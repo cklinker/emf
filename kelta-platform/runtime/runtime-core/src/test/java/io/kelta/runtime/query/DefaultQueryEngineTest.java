@@ -1,5 +1,6 @@
 package io.kelta.runtime.query;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
@@ -30,6 +31,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -1242,6 +1244,45 @@ class DefaultQueryEngineTest {
 
             engineWithHooks.delete(testCollection, id);
             assertTrue(afterHookCalled.get(), "After-delete hook should have been called");
+        }
+
+        @Test
+        @DisplayName("Should pass tenant from TenantContext to delete hooks, not the literal 'default'")
+        void shouldPassContextTenantToDeleteHooks() {
+            String contextTenant = UUID.randomUUID().toString();
+            AtomicReference<String> beforeHookTenant = new AtomicReference<>();
+            AtomicReference<String> afterHookTenant = new AtomicReference<>();
+            hookRegistry.register(new BeforeSaveHook() {
+                @Override
+                public String getCollectionName() { return "products"; }
+                @Override
+                public BeforeSaveResult beforeDelete(String id, String tenantId) {
+                    beforeHookTenant.set(tenantId);
+                    return BeforeSaveResult.ok();
+                }
+                @Override
+                public void afterDelete(String id, String tenantId) {
+                    afterHookTenant.set(tenantId);
+                }
+            });
+
+            String id = UUID.randomUUID().toString();
+            // User-collection records carry no tenantId attribute — the engine
+            // must fall back to TenantContext, never the literal "default".
+            Map<String, Object> existingRecord = new HashMap<>(Map.of(
+                "id", id, "name", "Widget", "price", 9.99));
+            when(storageAdapter.getById(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.delete(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(true);
+
+            TenantContext.runWithTenant(contextTenant, () ->
+                engineWithHooks.delete(testCollection, id));
+
+            assertEquals(contextTenant, beforeHookTenant.get(),
+                "Before-delete hook should receive the context tenant");
+            assertEquals(contextTenant, afterHookTenant.get(),
+                "After-delete hook should receive the context tenant");
         }
     }
 

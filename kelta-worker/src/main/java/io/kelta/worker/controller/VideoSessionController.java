@@ -68,6 +68,17 @@ public class VideoSessionController {
         return ResponseEntity.ok(toBody(access));
     }
 
+    /** Records recording consent on a session (telehealth slice 6, member-only). */
+    @PostMapping("/sessions/{id}/consent")
+    public ResponseEntity<Void> consent(HttpServletRequest request,
+                                        @PathVariable String id,
+                                        @RequestBody(required = false) Map<String, Object> body) {
+        String tenantId = requireTenant();
+        boolean accepted = body != null && Boolean.TRUE.equals(body.get("accepted"));
+        videoSessionService.updateRecordingConsent(tenantId, actor(request, tenantId), id, accepted);
+        return ResponseEntity.noContent().build();
+    }
+
     /** UNAUTHENTICATED path — signature + digest verified before processing. */
     @PostMapping("/webhooks/livekit")
     public ResponseEntity<Void> webhook(@RequestHeader(value = "Authorization", required = false)

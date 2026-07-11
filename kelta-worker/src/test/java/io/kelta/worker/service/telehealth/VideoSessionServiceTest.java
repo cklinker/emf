@@ -174,6 +174,46 @@ class VideoSessionServiceTest {
         verify(queryEngine, never()).create(any(), any());
     }
 
+    @Test
+    @DisplayName("records recording consent for a session member and updates the row")
+    void recordsConsent() {
+        when(jdbcTemplate.queryForList(contains("FROM video_session"), eq("vs-1"), eq(TENANT)))
+                .thenReturn(List.of(sessionRow("appt-1", null)));
+        when(jdbcTemplate.queryForList(contains("FROM telehealth_appointment"),
+                eq("appt-1"), eq(TENANT), eq("u-portal"), eq("u-portal")))
+                .thenReturn(List.of(Map.of("ok", 1)));
+
+        service.updateRecordingConsent(TENANT, PORTAL, "vs-1", true);
+
+        verify(queryEngine).update(any(), eq("vs-1"), eq(Map.of("recordingConsent", true)));
+    }
+
+    @Test
+    @DisplayName("consent is member-only and 404s an unknown session")
+    void consentGuards() {
+        when(jdbcTemplate.queryForList(contains("FROM video_session"), eq("nope"), eq(TENANT)))
+                .thenReturn(List.of());
+        assertStatus(() -> service.updateRecordingConsent(TENANT, PORTAL, "nope", true),
+                HttpStatus.NOT_FOUND);
+
+        when(jdbcTemplate.queryForList(contains("FROM video_session"), eq("vs-1"), eq(TENANT)))
+                .thenReturn(List.of(sessionRow("appt-1", null)));
+        when(jdbcTemplate.queryForList(contains("FROM telehealth_appointment"),
+                eq("appt-1"), eq(TENANT), eq("u-stranger"), eq("u-stranger")))
+                .thenReturn(List.of());
+        assertStatus(() -> service.updateRecordingConsent(TENANT, STRANGER, "vs-1", true),
+                HttpStatus.FORBIDDEN);
+        verify(queryEngine, never()).update(any(), anyString(), any());
+    }
+
+    private static Map<String, Object> sessionRow(String appointmentId, String conversationId) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", "vs-1");
+        row.put("appointment_id", appointmentId);
+        row.put("conversation_id", conversationId);
+        return row;
+    }
+
     private void assertStatus(Runnable call, HttpStatus expected) {
         assertThatThrownBy(call::run)
                 .isInstanceOf(ResponseStatusException.class)

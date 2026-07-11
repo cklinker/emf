@@ -109,6 +109,47 @@ public class VideoSessionService {
         return mint(tenantId, actor, session, null);
     }
 
+    /**
+     * Records the actor's recording consent on a session they participate in
+     * (telehealth slice 6). Consent is captured before any egress starts; the
+     * caller must be a member of the session's appointment or conversation.
+     */
+    public void updateRecordingConsent(String tenantId, ChatService.ChatActor actor,
+                                       String sessionId, boolean accepted) {
+        Map<String, Object> session = jdbcTemplate.queryForList(
+                        "SELECT id, appointment_id, conversation_id FROM video_session "
+                                + "WHERE id = ? AND tenant_id = ?",
+                        sessionId, tenantId).stream()
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+
+        if (!isSessionMember(tenantId, actor, session)) {
+            SecurityAuditLogger.log(SecurityAuditLogger.EventType.CHAT_ACCESS_DENIED,
+                    actor.email(), sessionId, tenantId, "failure", "consent — not a participant");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a session participant");
+        }
+
+        queryEngine.update(definition(), sessionId, Map.of("recordingConsent", accepted));
+        SecurityAuditLogger.log(SecurityAuditLogger.EventType.RECORDING_CONSENT_CAPTURED,
+                actor.email(), sessionId, tenantId, "success", "consent=" + accepted);
+    }
+
+    private boolean isSessionMember(String tenantId, ChatService.ChatActor actor,
+                                    Map<String, Object> session) {
+        Object appointmentId = session.get("appointment_id");
+        if (appointmentId != null) {
+            return !jdbcTemplate.queryForList(
+                    "SELECT 1 FROM telehealth_appointment WHERE id = ? AND tenant_id = ? "
+                            + "AND (provider_id = ? OR portal_user_id = ?)",
+                    appointmentId, tenantId, actor.userId(), actor.userId()).isEmpty();
+        }
+        Object conversationId = session.get("conversation_id");
+        if (conversationId != null) {
+            return chatService.isMember(tenantId, String.valueOf(conversationId), actor.userId());
+        }
+        return false;
+    }
+
     // ------------------------------------------------------------- Internals
 
     private VideoAccess mint(String tenantId, ChatService.ChatActor actor,

@@ -1,7 +1,9 @@
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock, Video } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useI18n } from '../../../context/I18nContext'
 import { useToast } from '../../../components/Toast'
 import { useAppointmentActions, useAppointments } from '../../../hooks/useScheduling'
+import { canJoin } from '../VisitPage/visitWindow'
 import { cn } from '@/lib/utils'
 
 /**
@@ -13,6 +15,8 @@ import { cn } from '@/lib/utils'
 export function AppointmentsPage({ testId = 'appointments-page' }: { testId?: string }) {
   const { t, formatDate } = useI18n()
   const { showToast } = useToast()
+  const navigate = useNavigate()
+  const { tenantSlug } = useParams<{ tenantSlug: string }>()
   const appointments = useAppointments('provider')
   const { cancel, complete } = useAppointmentActions()
 
@@ -47,6 +51,13 @@ export function AppointmentsPage({ testId = 'appointments-page' }: { testId?: st
         ) : (
           (appointments.data ?? []).map((appointment) => {
             const active = appointment.status === 'CONFIRMED' || appointment.status === 'REQUESTED'
+            // A confirmed visit inside its window (± grace) can be joined for video.
+            const joinable =
+              appointment.status === 'CONFIRMED' &&
+              canJoin({
+                start: new Date(appointment.scheduledStart),
+                end: new Date(appointment.scheduledEnd),
+              })
             return (
               <div
                 key={appointment.id}
@@ -76,6 +87,16 @@ export function AppointmentsPage({ testId = 'appointments-page' }: { testId?: st
                   >
                     {appointment.status}
                   </span>
+                  {joinable && (
+                    <button
+                      className="flex cursor-pointer items-center gap-1 rounded-md border-none bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                      onClick={() => navigate(`/${tenantSlug}/app/visits/${appointment.id}`)}
+                      data-testid={`${testId}-join-${appointment.id}`}
+                    >
+                      <Video size={12} />
+                      {t('telehealth.visit.joinVisit', 'Join visit')}
+                    </button>
+                  )}
                   {active && (
                     <>
                       <button

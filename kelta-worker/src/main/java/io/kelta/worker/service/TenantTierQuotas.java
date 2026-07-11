@@ -49,6 +49,12 @@ public final class TenantTierQuotas {
     public static final String KEY_TELEHEALTH_ENABLED = "telehealthEnabled";
     /** Video minutes per calendar month, summed from ended session durations. */
     public static final String KEY_VIDEO_MINUTES_PER_MONTH = "videoMinutesPerMonth";
+    /** Telehealth (slice 7): auto-archive a CLOSED conversation this many days after close. */
+    public static final String KEY_ARCHIVE_AFTER_DAYS = "archiveAfterDays";
+    /** Telehealth (slice 7): retention window; {@code retentionUntil = archivedAt + years}. */
+    public static final String KEY_RETENTION_YEARS = "retentionYears";
+    /** Telehealth (slice 7): purge live chat_message rows this many days after archival. */
+    public static final String KEY_PURGE_LIVE_AFTER_DAYS = "purgeLiveAfterDays";
 
     private TenantTierQuotas() {}
 
@@ -70,6 +76,9 @@ public final class TenantTierQuotas {
                 q.put(KEY_MAX_PORTAL_USERS, 25);
                 q.put(KEY_TELEHEALTH_ENABLED, false);
                 q.put(KEY_VIDEO_MINUTES_PER_MONTH, 0);
+                q.put(KEY_ARCHIVE_AFTER_DAYS, 30);
+                q.put(KEY_RETENTION_YEARS, 7);
+                q.put(KEY_PURGE_LIVE_AFTER_DAYS, 90);
             }
             case PROFESSIONAL -> {
                 q.put(KEY_API_CALLS_PER_DAY, 100_000);
@@ -85,6 +94,9 @@ public final class TenantTierQuotas {
                 q.put(KEY_MAX_PORTAL_USERS, 1_000);
                 q.put(KEY_TELEHEALTH_ENABLED, true);
                 q.put(KEY_VIDEO_MINUTES_PER_MONTH, 3_000);
+                q.put(KEY_ARCHIVE_AFTER_DAYS, 30);
+                q.put(KEY_RETENTION_YEARS, 7);
+                q.put(KEY_PURGE_LIVE_AFTER_DAYS, 90);
             }
             case ENTERPRISE -> {
                 q.put(KEY_API_CALLS_PER_DAY, 1_000_000);
@@ -100,6 +112,9 @@ public final class TenantTierQuotas {
                 q.put(KEY_MAX_PORTAL_USERS, 10_000);
                 q.put(KEY_TELEHEALTH_ENABLED, true);
                 q.put(KEY_VIDEO_MINUTES_PER_MONTH, 30_000);
+                q.put(KEY_ARCHIVE_AFTER_DAYS, 30);
+                q.put(KEY_RETENTION_YEARS, 7);
+                q.put(KEY_PURGE_LIVE_AFTER_DAYS, 90);
             }
             case UNLIMITED -> {
                 q.put(KEY_API_CALLS_PER_DAY, Integer.MAX_VALUE);
@@ -115,6 +130,11 @@ public final class TenantTierQuotas {
                 q.put(KEY_MAX_PORTAL_USERS, Integer.MAX_VALUE);
                 q.put(KEY_TELEHEALTH_ENABLED, true);
                 q.put(KEY_VIDEO_MINUTES_PER_MONTH, Integer.MAX_VALUE);
+                // Retention is a compliance policy, not a resource budget: even
+                // UNLIMITED tenants keep concrete archive/retain/purge windows.
+                q.put(KEY_ARCHIVE_AFTER_DAYS, 30);
+                q.put(KEY_RETENTION_YEARS, 7);
+                q.put(KEY_PURGE_LIVE_AFTER_DAYS, 90);
             }
         }
         return q;

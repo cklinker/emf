@@ -301,8 +301,47 @@ integration points:
   body digest — `verifyWebhook` checks signature AND digest before parsing. Idempotency:
   INSERT into `livekit_webhook_event` is the claim (duplicate delivery → skip).
   `room_started`/`room_finished` drive session status + duration and publish
-  `kelta.video.session.<tenantId>.<sessionId>`; `egress_ended` stamps `recording_key`
-  (attachment/archival wiring lands with slice 7).
+  `kelta.video.session.<tenantId>.<sessionId>`; `egress_ended` stamps `recording_key`.
+  On `room_finished` (after stamping ended_at/duration) the worker calls
+  `ArchiveService.archiveVideoSession` **best-effort** (try/catch-log — never fails the
+  webhook; the manual archive-now path and the auto-archive sweep are the backstops).
+
+## Telehealth encounter archival (slice 7 — S3 artifact layout)
+
+`ArchiveService` turns a CLOSED chat conversation or an ENDED video session into an
+immutable **encounter record** (`telehealth-archives` collection, one row per
+`(sourceType, sourceId)` via a unique index). Reuses the attachment lifecycle above — no new
+storage integration.
+
+- **Artifacts.** Two S3 objects per archive, written via `S3StorageService.uploadObject` and
+  recorded as `file_attachment` rows **OWNED by the archive row**
+  (`collection_id='telehealth-archives'`, `record_id=<archiveId>`):
+  1. **Canonical JSON** (`schemaVersion: 1`) — conversation: subject, ordered participants,
+     ORDERED messages, an attachment **manifest** (attachment id + `storage_key` + filename +
+     content-type; the objects are RETAINED in place, not copied), and status history
+     (`closedAt`/`archivedAt`); video: session metadata, duration, consent, `recording_key`.
+  2. **PDF render** via `PdfTableWriter` (chat: Timestamp/Sender/Message; video: Field/Value)
+     — a convenience render; the JSON is canonical.
+- **Storage key.** `{tenantId}/telehealth-archives/{archiveId}/{attachmentUuid}/{fileName}` —
+  same shape as `AttachmentUploadController`.
+- **Tamper evidence.** The archive row stores the **SHA-256 of the JSON bytes**. The JSON is
+  emitted by a self-contained serializer that **sorts object keys** (minimal whitespace,
+  RFC-8259 escaping), so identical encounter content hashes identically regardless of Jackson
+  version or map iteration order — the SHA-256 is reproducible.
+- **Attachment pinning.** When a conversation is archived its message attachments are
+  **re-parented** to the archive row (`UPDATE file_attachment SET collection_id=…, record_id=…`)
+  so (a) the later live-message purge can't delete what the transcript manifest references and
+  (b) deleting the archive later cascades them via `AttachmentCleanupHook` (which matches by
+  `record_id`).
+- **Access.** `GET /api/telehealth/archives/{id}` returns short-lived (15-min) presigned
+  download URLs for each artifact; every download is audited (`ARCHIVE_ACCESSED`). Portal
+  participants get a `record_share` on the archive row and see only their own.
+- **Retention & purge.** `retentionUntil = archivedAt + retentionYears` (tenant setting via
+  `tenant.limits`; default 7). `RetentionPurgeSweep` (`@Scheduled`) is **DRY-RUN by default**
+  (`kelta.telehealth.retention.purge-dry-run:true`) — see concerns.md before arming. When
+  armed it deletes the artifact + linked recording S3 objects and stamps `purged_at` (the row
+  is kept as a tombstone), skipping legal-hold rows; recording keys stored as `s3://bucket/…`
+  URIs are normalized to the object path before delete.
 
 ## Mass-email campaigns (V152)
 

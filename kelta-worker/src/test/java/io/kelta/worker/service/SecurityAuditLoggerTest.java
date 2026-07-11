@@ -16,7 +16,13 @@ class SecurityAuditLoggerTest {
 
         @Test
         void shouldHaveAllExpectedEventTypes() {
-            assertEquals(27, SecurityAuditLogger.EventType.values().length);
+            assertEquals(33, SecurityAuditLogger.EventType.values().length);
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("RECORDING_CONSENT_CAPTURED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("ARCHIVE_CREATED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("ARCHIVE_ACCESSED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("ARCHIVE_PURGED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("LEGAL_HOLD_CHANGED"));
+            assertNotNull(SecurityAuditLogger.EventType.valueOf("RETENTION_SETTINGS_CHANGED"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("VIDEO_TOKEN_ISSUED"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("VIDEO_SESSION_STARTED"));
             assertNotNull(SecurityAuditLogger.EventType.valueOf("VIDEO_SESSION_ENDED"));

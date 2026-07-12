@@ -208,10 +208,18 @@ public class DefaultValidationEngine implements ValidationEngine {
     }
     
     /**
-     * Validates a date value (ISO-8601 format string or LocalDate).
+     * Validates a date value.
+     *
+     * <p>Accepts {@code LocalDate}, an ISO date string ({@code 2026-07-12}),
+     * {@code java.util.Date}/{@code java.sql.Date} (JDBC read-back), and an ISO
+     * datetime string at midnight ({@code 2026-07-12T00:00:00.000Z}) — a DATE
+     * column reads back as a midnight datetime through the JSON layer, so this
+     * canonical stored form must validate as a DATE. (The primary fix validates
+     * only the patch on update; this keeps any other merged-validation path from
+     * regressing.)
      */
     private boolean isValidDate(Object value) {
-        if (value instanceof LocalDate) {
+        if (value instanceof LocalDate || value instanceof java.util.Date) {
             return true;
         }
         if (value instanceof String str) {
@@ -219,7 +227,18 @@ public class DefaultValidationEngine implements ValidationEngine {
                 LocalDate.parse(str);
                 return true;
             } catch (DateTimeParseException e) {
-                return false;
+                // Fall through to the datetime-at-midnight form below.
+            }
+            try {
+                java.time.Instant.parse(str); // e.g. 2026-07-12T00:00:00.000Z
+                return true;
+            } catch (DateTimeParseException e) {
+                try {
+                    LocalDateTime.parse(str); // e.g. 2026-07-12T00:00:00
+                    return true;
+                } catch (DateTimeParseException e2) {
+                    return false;
+                }
             }
         }
         return false;

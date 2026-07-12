@@ -238,11 +238,26 @@ class DefaultValidationEngineTest {
             CollectionDefinition definition = createTestCollection(
                 FieldDefinition.date("birthDate")
             );
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("birthDate", "2024-01-15"), OperationType.CREATE);
-            
+
             assertTrue(result.valid());
+        }
+
+        @Test
+        @DisplayName("Should accept a DATE column's stored read-back form (midnight datetime + java.util.Date)")
+        void shouldAcceptStoredDateReadBackForms() {
+            CollectionDefinition definition = createTestCollection(FieldDefinition.date("issueDate"));
+
+            // ISO datetime at midnight — how a DATE column reads back through the JSON layer.
+            assertTrue(validationEngine.validate(
+                definition, Map.of("issueDate", "2026-07-12T00:00:00.000Z"), OperationType.UPDATE).valid());
+            assertTrue(validationEngine.validate(
+                definition, Map.of("issueDate", "2026-07-12T00:00:00"), OperationType.UPDATE).valid());
+            // JDBC read-back type.
+            assertTrue(validationEngine.validate(
+                definition, Map.of("issueDate", java.sql.Date.valueOf("2026-07-12")), OperationType.UPDATE).valid());
         }
 
         @Test

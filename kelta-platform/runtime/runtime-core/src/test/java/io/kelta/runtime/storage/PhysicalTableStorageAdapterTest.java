@@ -1080,4 +1080,57 @@ class PhysicalTableStorageAdapterTest {
             assertTrue(PhysicalTableStorageAdapter.extractViolatedColumns(h2Style).isEmpty());
         }
     }
+
+    @Nested
+    @DisplayName("Delete blocked by a restricting foreign key (SQL state 23503)")
+    class DeleteForeignKeyConflict {
+
+        private PhysicalTableStorageAdapter adapterWithFailingJdbc(RuntimeException toThrow) {
+            JdbcTemplate failing = org.mockito.Mockito.mock(JdbcTemplate.class);
+            org.mockito.Mockito.when(failing.update(org.mockito.ArgumentMatchers.anyString(),
+                    org.mockito.ArgumentMatchers.<Object>any())).thenThrow(toThrow);
+            return new PhysicalTableStorageAdapter(failing, migrationEngine,
+                    new tools.jackson.databind.ObjectMapper());
+        }
+
+        @Test
+        @DisplayName("maps a Postgres 23503 to ReferencedRecordConflictException (409), not a 500 StorageException")
+        void fkViolationBecomesConflict() {
+            // Regression: DELETE /api/fields/{id} 500'd when layout_field rows still
+            // referenced the field — the 23503 was swallowed into StorageException.
+            RuntimeException fk = new org.springframework.dao.DataIntegrityViolationException(
+                    "delete violates foreign key",
+                    new java.sql.SQLException(
+                            "update or delete on table \"field\" violates foreign key constraint "
+                            + "\"layout_field_field_id_fkey\" on table \"layout_field\"", "23503"));
+
+            ReferencedRecordConflictException ex = assertThrows(
+                    ReferencedRecordConflictException.class,
+                    () -> adapterWithFailingJdbc(fk).delete(testCollection, "rec-1"));
+            assertEquals("test_products", ex.getCollectionName());
+            assertEquals("rec-1", ex.getRecordId());
+        }
+
+        @Test
+        @DisplayName("other data-access failures still surface as StorageException")
+        void nonFkFailuresStayStorageException() {
+            RuntimeException down = new org.springframework.dao.DataAccessResourceFailureException(
+                    "connection refused");
+            StorageException ex = assertThrows(StorageException.class,
+                    () -> adapterWithFailingJdbc(down).delete(testCollection, "rec-1"));
+            assertFalse(ex instanceof ReferencedRecordConflictException);
+        }
+
+        @Test
+        @DisplayName("detection walks the cause chain and matches only SQL state 23503")
+        void detectionMatrix() {
+            assertTrue(PhysicalTableStorageAdapter.isForeignKeyViolation(
+                    new RuntimeException(new RuntimeException(
+                            new java.sql.SQLException("fk", "23503")))));
+            assertFalse(PhysicalTableStorageAdapter.isForeignKeyViolation(
+                    new java.sql.SQLException("unique", "23505")));
+            assertFalse(PhysicalTableStorageAdapter.isForeignKeyViolation(
+                    new RuntimeException("no sql cause")));
+        }
+    }
 }

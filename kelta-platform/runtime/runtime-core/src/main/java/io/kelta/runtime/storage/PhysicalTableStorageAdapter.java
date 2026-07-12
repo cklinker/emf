@@ -691,8 +691,25 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             }
             return rowsAffected > 0;
         } catch (DataAccessException e) {
+            if (isForeignKeyViolation(e)) {
+                throw new ReferencedRecordConflictException(definition.name(), id, e);
+            }
             throw new StorageException("Failed to delete record from collection: " + definition.name(), e);
         }
+    }
+
+    /**
+     * True when the failure is a Postgres foreign-key violation (SQL state
+     * 23503) — a restricting reference, not a storage fault. Callers translate
+     * it to 409 instead of 500.
+     */
+    static boolean isForeignKeyViolation(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.sql.SQLException sql && "23503".equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

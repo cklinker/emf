@@ -169,4 +169,24 @@ class PortalUserServiceTest {
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
                         .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR));
     }
+
+    @Test
+    @DisplayName("invite links land on the tenant's portalAuth.inviteRedirectUri when configured")
+    void inviteUsesConfiguredRedirect() {
+        stubNoExistingUser();
+        stubPortalCount(0);
+        stubPortalProfile();
+        stubTenantName();
+        when(jdbcTemplate.queryForList(contains("portalAuth,inviteRedirectUri"),
+                eq(String.class), eq(TENANT)))
+                .thenReturn(List.of("https://portal.example.com/auth/callback"));
+
+        var result = service.invitePortalUser(TENANT, "admin-1", "pat@example.com", "Pat", "Doe");
+
+        ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+        verify(emailService).sendByKey(eq(TENANT), eq("pat@example.com"), eq("portal.invite"),
+                vars.capture(), eq("PORTAL_INVITE"), eq(result.userId()));
+        assertThat((String) vars.getValue().get("actionUrl"))
+                .startsWith("https://portal.example.com/auth/callback?token=");
+    }
 }

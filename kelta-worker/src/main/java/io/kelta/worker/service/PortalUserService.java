@@ -142,9 +142,22 @@ public class PortalUserService {
         String tenantName = jdbcTemplate.queryForList(
                         "SELECT name FROM tenant WHERE id = ?", String.class, tenantId).stream()
                 .findFirst().orElse("Kelta");
-        String base = authBaseUrl.endsWith("/")
-                ? authBaseUrl.substring(0, authBaseUrl.length() - 1) : authBaseUrl;
-        String actionUrl = base + "/portal/login/verify?token=" + rawToken;
+        // Headless portals (slice 8) can point invite links at their own
+        // allowlisted landing page; default stays the kelta-auth verify page.
+        String inviteRedirect = jdbcTemplate.queryForList(
+                        "SELECT settings#>>'{portalAuth,inviteRedirectUri}' FROM tenant WHERE id = ?",
+                        String.class, tenantId).stream()
+                .filter(v -> v != null && !v.isBlank())
+                .findFirst().orElse(null);
+        String linkBase;
+        if (inviteRedirect != null) {
+            linkBase = inviteRedirect;
+        } else {
+            String base = authBaseUrl.endsWith("/")
+                    ? authBaseUrl.substring(0, authBaseUrl.length() - 1) : authBaseUrl;
+            linkBase = base + "/portal/login/verify";
+        }
+        String actionUrl = linkBase + (linkBase.contains("?") ? "&" : "?") + "token=" + rawToken;
 
         emailService.sendByKey(tenantId, email, "portal.invite",
                 Map.of(

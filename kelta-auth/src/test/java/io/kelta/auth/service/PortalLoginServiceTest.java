@@ -156,4 +156,32 @@ class PortalLoginServiceTest {
         assertThat(service.resolveTenantUuid("ghost")).isEmpty();
         assertThat(service.resolveTenantUuid(null)).isEmpty();
     }
+
+    @Test
+    @DisplayName("requestLink appends the token with & when the link base already has a query")
+    void requestLinkQueryAwareTokenAppend() {
+        stubPortalUser();
+        stubRecentTokenCount(0);
+
+        service.requestLink(TENANT, "pat@example.com", "https://portal.example.com/cb?src=email");
+
+        ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
+        verify(workerClient).sendTemplateEmail(eq(TENANT), eq("pat@example.com"),
+                eq("portal.login-link"), vars.capture(), eq("PORTAL_LOGIN"), eq("u1"));
+        assertThat((String) vars.getValue().get("actionUrl"))
+                .startsWith("https://portal.example.com/cb?src=email&token=");
+    }
+
+    @Test
+    @DisplayName("portalRedirectUris reads the tenant allowlist and is empty for blank tenants")
+    void portalRedirectUrisReadsAllowlist() {
+        when(jdbcTemplate.queryForList(contains("portalAuth,redirectUris"),
+                eq(String.class), eq(TENANT)))
+                .thenReturn(List.of("https://portal.example.com/cb"));
+
+        assertThat(service.portalRedirectUris(TENANT))
+                .containsExactly("https://portal.example.com/cb");
+        assertThat(service.portalRedirectUris(null)).isEmpty();
+        assertThat(service.portalRedirectUris("")).isEmpty();
+    }
 }

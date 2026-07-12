@@ -116,12 +116,29 @@ public class PortalLoginService {
                 UUID.randomUUID().toString(), tenantId, userId, sha256(rawToken),
                 Timestamp.from(Instant.now().plus(LOGIN_LINK_EXPIRY)));
 
-        String actionUrl = verifyBaseUrl + "?token=" + rawToken;
+        String actionUrl = verifyBaseUrl
+                + (verifyBaseUrl.contains("?") ? "&" : "?") + "token=" + rawToken;
         boolean queued = workerClient.sendTemplateEmail(tenantId, normalizedEmail, "portal.login-link",
                 Map.of("tenantName", tenantName, "actionUrl", actionUrl, "expiresIn", "15 minutes"),
                 "PORTAL_LOGIN", userId);
         audit.info("security_event=PORTAL_LINK_REQUESTED actor={} target={} tenant={} result={}",
                 normalizedEmail, userId, tenantId, queued ? "success" : "failure");
+    }
+
+    /**
+     * The tenant's allowlisted headless landing URLs
+     * ({@code tenant.settings.portalAuth.redirectUris}, slice 8). Read
+     * per-request — no cache, so no cross-pod invalidation to keep consistent.
+     * Empty when the tenant is unknown or nothing is configured.
+     */
+    public List<String> portalRedirectUris(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return List.of();
+        }
+        return jdbcTemplate.queryForList(
+                "SELECT jsonb_array_elements_text(settings#>'{portalAuth,redirectUris}') "
+                        + "FROM tenant WHERE id = ?",
+                String.class, tenantId);
     }
 
     public record PortalVerification(KeltaUserDetails userDetails, String tenantSlug) {}

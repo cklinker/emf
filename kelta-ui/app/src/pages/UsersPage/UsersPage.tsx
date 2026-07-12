@@ -79,8 +79,12 @@ function UserForm({
   onSubmit: (data: CreateUserFormData) => void
   onCancel: () => void
   isSubmitting: boolean
-  /** When set (delegated scoped mode), a profile choice is required and limited to these. */
-  profileOptions?: DelegatedNamedRef[]
+  /**
+   * Profile choices — always required (the worker rejects a create without a
+   * profileId). Delegated scoped mode passes the caller's manageable subset;
+   * full-admin mode passes the tenant's profiles.
+   */
+  profileOptions: DelegatedNamedRef[]
 }) {
   const { t } = useI18n()
   const [formData, setFormData] = useState<CreateUserFormData>({
@@ -98,9 +102,9 @@ function UserForm({
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Invalid email'
     if (!formData.firstName.trim()) errs.firstName = 'First name is required'
     if (!formData.lastName.trim()) errs.lastName = 'Last name is required'
-    if (profileOptions && !formData.profileId) errs.profileId = 'Profile is required'
+    if (!formData.profileId) errs.profileId = 'Profile is required'
     return errs
-  }, [formData, profileOptions])
+  }, [formData])
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -196,33 +200,31 @@ function UserForm({
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
           </div>
-          {profileOptions && (
-            <div className="mb-4">
-              <label htmlFor="profileId" className="mb-1 block text-sm font-medium text-foreground">
-                {t('users.profile')} *
-              </label>
-              <select
-                id="profileId"
-                data-testid="create-profile-select"
-                value={formData.profileId}
-                onChange={(e) => setFormData({ ...formData, profileId: e.target.value })}
-                className={cn(
-                  'w-full rounded-md border border-border bg-background px-3 py-2 text-sm',
-                  errors.profileId && 'border-destructive'
-                )}
-              >
-                <option value="">{t('common.select')}</option>
-                {profileOptions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              {errors.profileId && (
-                <span className="mt-1 block text-xs text-destructive">{errors.profileId}</span>
+          <div className="mb-4">
+            <label htmlFor="profileId" className="mb-1 block text-sm font-medium text-foreground">
+              {t('users.profile')} *
+            </label>
+            <select
+              id="profileId"
+              data-testid="create-profile-select"
+              value={formData.profileId}
+              onChange={(e) => setFormData({ ...formData, profileId: e.target.value })}
+              className={cn(
+                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm',
+                errors.profileId && 'border-destructive'
               )}
-            </div>
-          )}
+            >
+              <option value="">{t('common.select')}</option>
+              {profileOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            {errors.profileId && (
+              <span className="mt-1 block text-xs text-destructive">{errors.profileId}</span>
+            )}
+          </div>
           <div className="mt-6 flex justify-end gap-2">
             <button
               type="button"
@@ -401,6 +403,19 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
   // Delegated scoped mode: caller lacks MANAGE_USERS but is listed in an active
   // delegated-admin scope. All data flows through /api/admin/delegated/* then.
   const scoped = !hasPermission('MANAGE_USERS') && isDelegated
+
+  // The create form always requires a profile (the worker rejects a create
+  // without a profileId): scoped mode offers the caller's manageable subset,
+  // full-admin mode offers the tenant's profiles.
+  const { data: allProfiles } = useQuery({
+    queryKey: ['profiles'],
+    queryFn: () =>
+      keltaClient.admin.profiles.list() as unknown as Promise<{ id: string; name: string }[]>,
+    enabled: !scoped,
+  })
+  const createProfileOptions: DelegatedNamedRef[] = scoped
+    ? (summary?.manageableProfiles ?? [])
+    : (allProfiles ?? []).map((p) => ({ id: p.id, name: p.name }))
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editUser, setEditUser] = useState<PlatformUser | null>(null)
@@ -756,7 +771,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
           onSubmit={(formData) => createMutation.mutate(formData)}
           onCancel={() => setIsFormOpen(false)}
           isSubmitting={createMutation.isPending}
-          profileOptions={scoped ? (summary?.manageableProfiles ?? []) : undefined}
+          profileOptions={createProfileOptions}
         />
       )}
 

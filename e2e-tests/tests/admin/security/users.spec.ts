@@ -66,4 +66,32 @@ test.describe("Users", () => {
     ]);
     expect(found).toBe(true);
   });
+
+  test("create dialog requires a profile choice", async ({ page }) => {
+    const hasCreate = await usersPage.createButton
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+    if (!hasCreate) return;
+
+    await usersPage.createButton.click();
+
+    // The profile selector must be present and populated with the tenant's
+    // profiles (creating a user without a profileId is a worker-side 400).
+    const profileSelect = page.getByTestId("create-profile-select");
+    await expect(profileSelect).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(async () => profileSelect.locator("option").count(), {
+        timeout: 10_000,
+      })
+      .toBeGreaterThan(1);
+
+    // Submitting without a profile is blocked client-side.
+    await page.getByLabel(/Email/).fill("e2e-profile-check@example.com");
+    await page.getByLabel(/First Name/).fill("E2e");
+    await page.getByLabel(/Last Name/).fill("Check");
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await expect(page.getByText("Profile is required")).toBeVisible();
+
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  });
 });

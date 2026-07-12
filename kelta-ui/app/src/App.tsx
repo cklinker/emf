@@ -91,6 +91,11 @@ const EndUserAppointmentsPage = React.lazy(() =>
     default: m.AppointmentsPage,
   }))
 )
+const EndUserProviderAvailabilityPage = React.lazy(() =>
+  import('./pages/ProviderAvailabilityPage/ProviderAvailabilityPage').then((m) => ({
+    default: m.ProviderAvailabilityPage,
+  }))
+)
 const EndUserVisitPage = React.lazy(() =>
   import('./pages/app/VisitPage/VisitPage').then((m) => ({
     default: m.VisitPage,
@@ -1513,6 +1518,14 @@ function TenantRoutes(): React.ReactElement {
             element={
               <React.Suspense fallback={<PageLoader message="Loading..." />}>
                 <EndUserAppointmentsPage />
+              </React.Suspense>
+            }
+          />
+          <Route
+            path="provider-availability"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserProviderAvailabilityPage />
               </React.Suspense>
             }
           />

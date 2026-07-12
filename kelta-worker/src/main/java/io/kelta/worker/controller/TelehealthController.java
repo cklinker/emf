@@ -5,6 +5,7 @@ import io.kelta.runtime.router.UserIdResolver;
 import io.kelta.worker.service.ChatService;
 import io.kelta.worker.service.PortalTokens;
 import io.kelta.worker.service.telehealth.AppointmentService;
+import io.kelta.worker.service.telehealth.AvailabilityService;
 import io.kelta.worker.service.telehealth.SlotService;
 import io.kelta.worker.service.telehealth.VisitTokenService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -50,6 +52,7 @@ public class TelehealthController {
 
     private final AppointmentService appointmentService;
     private final SlotService slotService;
+    private final AvailabilityService availabilityService;
     private final VisitTokenService visitTokenService;
     private final UserIdResolver userIdResolver;
     private final JdbcTemplate jdbcTemplate;
@@ -57,12 +60,14 @@ public class TelehealthController {
 
     public TelehealthController(AppointmentService appointmentService,
                                 SlotService slotService,
+                                AvailabilityService availabilityService,
                                 VisitTokenService visitTokenService,
                                 UserIdResolver userIdResolver,
                                 JdbcTemplate jdbcTemplate,
                                 @Value("${kelta.auth.issuer-uri:}") String authBaseUrl) {
         this.appointmentService = appointmentService;
         this.slotService = slotService;
+        this.availabilityService = availabilityService;
         this.visitTokenService = visitTokenService;
         this.userIdResolver = userIdResolver;
         this.jdbcTemplate = jdbcTemplate;
@@ -97,6 +102,30 @@ public class TelehealthController {
         return ResponseEntity.ok(Map.of("data", slots.stream()
                 .map(slot -> Map.of("start", slot.start().toString(), "end", slot.end().toString()))
                 .toList()));
+    }
+
+    /** The signed-in provider's own weekly schedule + date exceptions. */
+    @GetMapping("/availability/me")
+    public ResponseEntity<Map<String, Object>> myAvailability(HttpServletRequest request) {
+        String tenantId = requireTenant();
+        ChatService.ChatActor actor = actor(request, tenantId);
+        requireInternal(actor);
+        return ResponseEntity.ok(availabilityService.getForProvider(tenantId, actor.userId()));
+    }
+
+    /**
+     * Replaces the signed-in provider's schedule. The provider id is taken from
+     * the authenticated identity, never the body — a provider can only edit
+     * their own availability.
+     */
+    @PutMapping("/availability/me")
+    public ResponseEntity<Map<String, Object>> replaceMyAvailability(HttpServletRequest request,
+                                                                     @RequestBody Map<String, Object> body) {
+        String tenantId = requireTenant();
+        ChatService.ChatActor actor = actor(request, tenantId);
+        requireInternal(actor);
+        return ResponseEntity.ok(
+                availabilityService.replaceForProvider(tenantId, actor.userId(), actor.email(), body));
     }
 
     @PostMapping("/appointments")
@@ -192,6 +221,13 @@ public class TelehealthController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No tenant context");
         }
         return tenantId;
+    }
+
+    /** Availability authoring is for staff/providers (INTERNAL), never portal users. */
+    private void requireInternal(ChatService.ChatActor actor) {
+        if (actor.isPortal()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Availability is provider-only");
+        }
     }
 
     private Instant parseInstant(String value) {

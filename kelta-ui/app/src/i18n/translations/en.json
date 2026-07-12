@@ -2264,5 +2264,27 @@
     "add": "Add",
     "empty": "No overrides for this locale yet.",
     "duplicate": "That key already has a value for this locale"
+  },
+  "availability": {
+    "title": "My availability",
+    "subtitle": "Patients can book you during these hours ({{timezone}}).",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "saved": "Availability saved",
+    "saveFailed": "Could not save availability",
+    "loadFailed": "Could not load availability",
+    "weekly": "Weekly hours",
+    "weeklyHelp": "Set the hours you see patients each day. Leave a day empty to mark it unavailable.",
+    "closed": "Unavailable",
+    "start": "Start",
+    "end": "End",
+    "remove": "Remove",
+    "addHours": "Add hours",
+    "exceptions": "Date exceptions",
+    "exceptionsHelp": "Close specific dates (holidays, leave) or add one-off hours.",
+    "noExceptions": "No date exceptions.",
+    "closedAllDay": "Closed all day",
+    "date": "Date",
+    "addException": "Add exception"
   }
 }

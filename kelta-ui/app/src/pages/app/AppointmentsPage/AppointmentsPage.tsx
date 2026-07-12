@@ -1,4 +1,4 @@
-import { CalendarClock, Video } from 'lucide-react'
+import { CalendarClock, Settings2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useI18n } from '../../../context/I18nContext'
 import { useToast } from '../../../components/Toast'
@@ -32,11 +32,21 @@ export function AppointmentsPage({ testId = 'appointments-page' }: { testId?: st
 
   return (
     <div className="mx-auto max-w-[900px] p-6" data-testid={testId}>
-      <header className="mb-6 flex items-center gap-3">
-        <CalendarClock size={20} />
-        <h1 className="m-0 text-2xl font-semibold">
-          {t('scheduling.myScheduleTitle', 'My Appointments')}
-        </h1>
+      <header className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <CalendarClock size={20} />
+          <h1 className="m-0 text-2xl font-semibold">
+            {t('scheduling.myScheduleTitle', 'My Appointments')}
+          </h1>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate(`/${tenantSlug}/app/provider-availability`)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-primary/10"
+        >
+          <Settings2 size={16} />
+          {t('availability.title', 'My availability')}
+        </button>
       </header>
 
       <div className="overflow-hidden rounded-[10px] border border-border bg-card">

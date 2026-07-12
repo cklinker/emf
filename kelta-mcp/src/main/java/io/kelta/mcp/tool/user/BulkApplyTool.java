@@ -32,7 +32,9 @@ public class BulkApplyTool implements UserTool {
         opSchema.put("type", "object");
         opSchema.put("description",
                 "One operation. {\"op\":\"add\"|\"update\"|\"remove\", \"type\":\"<collection>\", "
-                + "\"id\":\"<id>\" (required for update/remove), \"attributes\":{...} (for add/update), "
+                + "\"id\":\"<id>\" (required for update/remove; a \"lid\" from an earlier add works too), "
+                + "\"lid\":\"<local-id>\" (optional on add — lets later operations reference the new record), "
+                + "\"attributes\":{...} (for add/update), "
                 + "\"relationships\":{...} (optional for add/update)}");
         opSchema.put("additionalProperties", true);
 
@@ -48,7 +50,7 @@ public class BulkApplyTool implements UserTool {
         Tool tool = Tool.builder()
                 .name("bulk_apply")
                 .title("Bulk Apply")
-                .description("Apply multiple record changes atomically via /api/_atomic. All operations succeed together or none do. Use this for multi-record changes that must roll back as a unit (e.g. moving line items between orders, rewiring relationships).")
+                .description("Apply multiple record changes atomically via POST /api/operations (JSON:API Atomic Operations). All operations succeed together or none do. Use this for multi-record changes that must roll back as a unit (e.g. moving line items between orders, rewiring relationships).")
                 .inputSchema(Schemas.object(properties, List.of("operations")))
                 .annotations(ToolHints.write(true, false))
                 .build();
@@ -62,6 +64,7 @@ public class BulkApplyTool implements UserTool {
                     if (!(opsObj instanceof List<?> ops) || ops.isEmpty()) {
                         return error("Argument \"operations\" must be a non-empty array.");
                     }
+                    List<Map<String, Object>> jsonApiOps = new java.util.ArrayList<>(ops.size());
                     for (int i = 0; i < ops.size(); i++) {
                         Object o = ops.get(i);
                         if (!(o instanceof Map<?, ?> op)) {
@@ -75,19 +78,57 @@ public class BulkApplyTool implements UserTool {
                             return error("operations[" + i + "].type (collection name) is required.");
                         }
                         if (("update".equals(opName.toString()) || "remove".equals(opName.toString()))
-                                && op.get("id") == null) {
-                            return error("operations[" + i + "].id is required for update/remove.");
+                                && op.get("id") == null && op.get("lid") == null) {
+                            return error("operations[" + i + "].id (or lid) is required for update/remove.");
                         }
+                        jsonApiOps.add(toJsonApiOperation(opName.toString(), op));
                     }
 
-                    Map<String, Object> body = Map.of("atomic:operations", ops);
+                    Map<String, Object> body = Map.of("atomic:operations", jsonApiOps);
                     try {
-                        return McpErrorMapper.toResult(gateway.post("/api/_atomic", body));
+                        return McpErrorMapper.toResult(gateway.post("/api/operations", body));
                     } catch (RuntimeException e) {
                         return McpErrorMapper.fromException(e);
                     }
                 })
                 .build();
+    }
+
+    /**
+     * Translates the tool's flat operation shape ({@code op/type/id/lid/attributes/
+     * relationships}) into a JSON:API Atomic Operations entry — {@code add} carries a
+     * {@code data} resource; {@code update}/{@code remove} address the target via
+     * {@code ref} (id or a lid minted by an earlier add in the same batch).
+     */
+    private static Map<String, Object> toJsonApiOperation(String opName, Map<?, ?> op) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("op", opName);
+
+        if ("remove".equals(opName)) {
+            out.put("ref", ref(op));
+            return out;
+        }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("type", op.get("type"));
+        if (op.get("id") != null) data.put("id", op.get("id"));
+        if (op.get("lid") != null) data.put("lid", op.get("lid"));
+        if (op.get("attributes") != null) data.put("attributes", op.get("attributes"));
+        if (op.get("relationships") != null) data.put("relationships", op.get("relationships"));
+
+        if ("update".equals(opName)) {
+            out.put("ref", ref(op));
+        }
+        out.put("data", data);
+        return out;
+    }
+
+    private static Map<String, Object> ref(Map<?, ?> op) {
+        Map<String, Object> ref = new LinkedHashMap<>();
+        ref.put("type", op.get("type"));
+        if (op.get("id") != null) ref.put("id", op.get("id"));
+        else ref.put("lid", op.get("lid"));
+        return ref;
     }
 
     private static CallToolResult error(String message) {

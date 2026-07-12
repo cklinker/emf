@@ -74,13 +74,16 @@ class BulkApplyToolTest {
     }
 
     @Test
-    void postsAtomicOperationsBundle() {
-        wm.stubFor(post(urlEqualTo("/api/_atomic"))
+    void postsJsonApiAtomicOperationsToOperationsEndpoint() {
+        // Regression: the tool used to POST /api/_atomic (a path nothing serves — 404
+        // at the gateway) with flat operation objects the worker would reject. It must
+        // target /api/operations with JSON:API Atomic Operations envelopes (data/ref).
+        wm.stubFor(post(urlEqualTo("/api/operations"))
                 .willReturn(aResponse().withStatus(200).withBody("{\"atomic:results\":[]}")));
 
         CallToolResult result = tool.toSpecification().callHandler().apply(
                 null, new CallToolRequest("bulk_apply", Map.of("operations", List.of(
-                        Map.of("op", "add", "type", "accounts",
+                        Map.of("op", "add", "type", "accounts", "lid", "new-1",
                                 "attributes", Map.of("name", "Acme")),
                         Map.of("op", "update", "type", "accounts", "id", "a2",
                                 "attributes", Map.of("name", "Updated")),
@@ -88,10 +91,37 @@ class BulkApplyToolTest {
                 )), null));
 
         assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
-        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/_atomic"))
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/operations"))
                 .withHeader("Authorization", equalTo("Bearer klt_bulk_test"))
+                // add: data resource with type/lid/attributes
                 .withRequestBody(matchingJsonPath("$.['atomic:operations'][0].op", equalTo("add")))
-                .withRequestBody(matchingJsonPath("$.['atomic:operations'][1].op", equalTo("update")))
-                .withRequestBody(matchingJsonPath("$.['atomic:operations'][2].op", equalTo("remove"))));
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][0].data.type", equalTo("accounts")))
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][0].data.lid", equalTo("new-1")))
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][0].data.attributes.name", equalTo("Acme")))
+                // update: ref addresses the target, data carries the changes
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][1].ref.type", equalTo("accounts")))
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][1].ref.id", equalTo("a2")))
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][1].data.attributes.name", equalTo("Updated")))
+                // remove: ref only
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][2].op", equalTo("remove")))
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][2].ref.id", equalTo("a3"))));
+    }
+
+    @Test
+    void updateByLidFromEarlierAddIsAccepted() {
+        wm.stubFor(post(urlEqualTo("/api/operations"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"atomic:results\":[]}")));
+
+        CallToolResult result = tool.toSpecification().callHandler().apply(
+                null, new CallToolRequest("bulk_apply", Map.of("operations", List.of(
+                        Map.of("op", "add", "type", "accounts", "lid", "new-1",
+                                "attributes", Map.of("name", "Acme")),
+                        Map.of("op", "update", "type", "accounts", "lid", "new-1",
+                                "attributes", Map.of("name", "Renamed"))
+                )), null));
+
+        assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+        wm.verify(WireMock.postRequestedFor(urlEqualTo("/api/operations"))
+                .withRequestBody(matchingJsonPath("$.['atomic:operations'][1].ref.lid", equalTo("new-1"))));
     }
 }

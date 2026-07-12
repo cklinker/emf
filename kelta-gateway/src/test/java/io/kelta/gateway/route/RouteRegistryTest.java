@@ -362,6 +362,34 @@ class RouteRegistryTest {
         assertTrue(finalSize > 0); // Should have some routes remaining
     }
     
+    @Test
+    void wildcardMatchRequiresSegmentBoundary() {
+        // Regression: /api/inventory/** must not shadow /api/inventory-items —
+        // a raw startsWith authorized hyphenated sibling collections against
+        // the wrong route's collection (found via cross-tenant name overlap).
+        registry.addRoute(createRoute("inventory", "/api/inventory/**"));
+        registry.addRoute(createRoute("inventory-items", "/api/inventory-items/**"));
+
+        assertEquals("inventory-items",
+            registry.findByPath("/api/inventory-items").orElseThrow().getId());
+        assertEquals("inventory-items",
+            registry.findByPath("/api/inventory-items/123").orElseThrow().getId());
+        assertEquals("inventory",
+            registry.findByPath("/api/inventory").orElseThrow().getId());
+        assertEquals("inventory",
+            registry.findByPath("/api/inventory/123").orElseThrow().getId());
+    }
+
+    @Test
+    void singleSegmentWildcardRequiresSegmentBoundary() {
+        registry.addRoute(createRoute("inventory", "/api/inventory/*"));
+
+        assertTrue(registry.findByPath("/api/inventory/123").isPresent());
+        assertFalse(registry.findByPath("/api/inventory-items").isPresent());
+        assertFalse(registry.findByPath("/api/inventory-items/123").isPresent());
+        assertFalse(registry.findByPath("/api/inventory/1/2").isPresent());
+    }
+
     private RouteDefinition createRoute(String id, String path) {
         return new RouteDefinition(
             id,

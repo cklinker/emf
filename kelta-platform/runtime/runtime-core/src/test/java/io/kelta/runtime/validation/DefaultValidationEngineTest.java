@@ -658,6 +658,28 @@ class DefaultValidationEngineTest {
         }
 
         @Test
+        @DisplayName("excludeId parameter reaches the uniqueness check when the data map has no id (patch-only update)")
+        void excludeIdParameterReachesUniquenessCheck() {
+            FieldDefinition field = new FieldDefinition(
+                "name", FieldType.STRING, false, false, true, null, null, null, null, null
+            );
+            CollectionDefinition definition = createTestCollection(field);
+
+            // Re-sending the record's own unique value in a patch (no "id" key,
+            // like a metadata-promotion upsert) must exclude the record itself
+            // via the explicit excludeId parameter — the interface default used
+            // to drop it, and self-exclusion silently relied on a merged map.
+            when(storageAdapter.isUnique(eq(definition), eq("name"), eq("sbxcustomers"), eq("rec-1")))
+                .thenReturn(true);
+
+            ValidationResult result = validationEngine.validate(
+                definition, Map.of("name", "sbxcustomers"), OperationType.UPDATE, "rec-1");
+
+            assertTrue(result.valid());
+            verify(storageAdapter).isUnique(eq(definition), eq("name"), eq("sbxcustomers"), eq("rec-1"));
+        }
+
+        @Test
         @DisplayName("Should exclude current record ID when checking uniqueness on UPDATE")
         void shouldExcludeCurrentRecordIdOnUpdate() {
             FieldDefinition field = new FieldDefinition(

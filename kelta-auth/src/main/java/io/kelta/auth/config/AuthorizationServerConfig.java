@@ -137,6 +137,8 @@ public class AuthorizationServerConfig {
                                 "/portal/login",
                                 "/portal/login/request",
                                 "/portal/login/verify",
+                                "/portal/api/login/request",
+                                "/portal/api/login/verify",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/auth/session",
@@ -204,7 +206,8 @@ public class AuthorizationServerConfig {
                         })
                 )
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/auth/session", "/auth/direct-login")
+                        .ignoringRequestMatchers("/auth/session", "/auth/direct-login",
+                                "/portal/api/login/request", "/portal/api/login/verify")
                 );
 
         // Enable federated OAuth2 login only when federation is configured

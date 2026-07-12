@@ -32,6 +32,7 @@ Read this parent first; every child references it.
 | 5 — Video backend (LiveKit) | `5-video-backend.md` | **backend + infra, security** |
 | 6 — Video UI & visit experience | `6-video-ui.md` | FE (join, waiting room, consent) |
 | 7 — Archival & retention (chats + calls) | `7-archival-retention.md` | backend + FE (encounter record, retention/purge) |
+| 8 — Headless portal auth (JSON magic-link + redirect allowlist) | `8-portal-auth-headless.md` | **backend + auth, security** |
 
 **Dependency order (hard edges): 1 → 2 → 3, and 1 → 4 → 5 → 6; 7 follows 2 and 5.** Chat
 (2–3) and scheduling (4) are independent tracks after slice 1. Slice 6 also consumes the

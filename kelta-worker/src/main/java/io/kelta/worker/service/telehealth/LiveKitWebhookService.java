@@ -29,6 +29,8 @@ import java.util.Map;
 public class LiveKitWebhookService {
 
     static final String SUBJECT_PREFIX = "kelta.video.session.";
+    static final String TRIGGER_SUBJECT_PREFIX = "kelta.trigger.";
+    static final String TRIGGER_TOPIC = "video.session";
 
     private static final Logger log = LoggerFactory.getLogger(LiveKitWebhookService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -150,6 +152,12 @@ public class LiveKitWebhookService {
         PlatformEvent<VideoSessionPayload> event =
                 EventFactory.createEvent("kelta.video.session", payload);
         eventPublisher.publish(SUBJECT_PREFIX + tenantId + "." + sessionId, event);
+
+        // Bridge onto the flow-trigger namespace so NATS_TRIGGERED flows with
+        // trigger topic "video.session" fire (the documented post-visit
+        // follow-up contract). The trigger listener hands the message body to
+        // the flow as $.input, so flows read $.input.payload.status etc.
+        eventPublisher.publish(TRIGGER_SUBJECT_PREFIX + tenantId + "." + TRIGGER_TOPIC, event);
     }
 
     private static String firstFileResult(JsonNode event) {

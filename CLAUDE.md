@@ -216,7 +216,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 | `kelta.config.promotion.executed.<tenantId>.<promotionId>` | Metadata promotion executed/failed/rolled back |
 | `kelta.chat.message.<tenantId>.<conversationId>` | Chat message created (telehealth slice 2) — ids/sender/kind ONLY, never the body; gateway `ChatMessageBridge` fans to conversation-joined sockets (membership-checked `chat.join`) as an invalidation signal |
 | `kelta.chat.conversation.<tenantId>.<conversationId>` | Chat conversation lifecycle (OPEN\|ASSIGNED\|CLOSED\|ARCHIVED) — ids/state only; same conversation-scoped fanout |
-| `kelta.video.session.<tenantId>.<sessionId>` | Video session lifecycle (ACTIVE\|ENDED + durationSeconds, telehealth slice 5) — published by the verified LiveKit webhook; ids/state only. Feeds NATS_TRIGGERED flows (post-visit follow-up) |
+| `kelta.video.session.<tenantId>.<sessionId>` | Video session lifecycle (ACTIVE\|ENDED + durationSeconds, telehealth slice 5) — published by the verified LiveKit webhook; ids/state only. The same envelope is bridged onto `kelta.trigger.<tenantId>.video.session`, so NATS_TRIGGERED flows with topic `video.session` fire (post-visit follow-up; flows read `$.input.payload.*`) |
 | `kelta.record.changed.<tenantId>.<collection>` | Record CRUD (flows, search index, webhooks, realtime, cross-pod system-collection cache eviction). Payload `containsMaskedFields=true` ⇒ realtime bridge omits record data |
 | `kelta.trigger.<tenantId>.<topic>` | External flow trigger — starts active `NATS_TRIGGERED` flows whose trigger-config `topic` matches (KELTA_TRIGGERS stream, queue-group consumed; body = arbitrary JSON, not a `PlatformEvent`) |
 

@@ -133,6 +133,20 @@ class CerbosRecordAuthorizationAdviceTest {
     }
 
     @Test
+    @DisplayName("Should skip /api/telehealth paths — access enforced in-controller (2026-07-12: record check emptied portal appointment lists)")
+    void shouldSkipTelehealthPaths() {
+        var request = createRequest("/api/telehealth/appointments");
+        Map<String, Object> body = Map.of("view", "mine", "data", List.of(
+                Map.of("id", "appt-1", "portalUserId", "portal-1", "status", "CONFIRMED")));
+
+        Object result = advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON, null, request, null);
+
+        assertThat(result).isSameAs(body);
+        verify(authzService, never()).batchCheckRecordAccess(any(), any(), any(), any(), anyList(), any());
+        verify(authzService, never()).checkCollectionWideRecordAccess(any(), any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("Should skip /api/api-specs paths")
     void shouldSkipApiSpecsPaths() {
         var request = createRequest("/api/api-specs/library");

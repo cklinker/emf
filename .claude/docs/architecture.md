@@ -90,7 +90,7 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
     record to non-`VIEW_ALL_DATA` profiles (they'd see empty lists everywhere).
 - **Static routes** (`/api/admin/**`, `/api/me/**`, `/api/_search/**`, `/api/metrics/**`,
   `/api/operations`): `RouteAuthorizationFilter` **skips** ids starting `static-` — they get only
-  the blanket `API_ACCESS` system-permission check. The worker advices **exclude** `/api/admin/`.
+  the blanket `API_ACCESS` system-permission check. The worker advices **exclude** `/api/admin/` — and the record-level advice also excludes `/api/telehealth/` (those controllers scope access per participant themselves; the generic record check emptied portal users' appointment lists, fixed 2026-07-12).
   So a new `/api/admin/...` endpoint is, by default, reachable by **any** authenticated user with
   API access. To put a *specific* permission on it, **enforce it inside the controller/service**
   (see "Worker-side system-permission check" below — inject `CerbosPermissionResolver` and

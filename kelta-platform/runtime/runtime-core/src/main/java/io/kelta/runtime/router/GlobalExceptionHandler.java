@@ -2,6 +2,7 @@ package io.kelta.runtime.router;
 
 import io.kelta.jsonapi.JsonApiError;
 import io.kelta.runtime.query.InvalidQueryException;
+import io.kelta.runtime.storage.ReferencedRecordConflictException;
 import io.kelta.runtime.storage.StaleWriteException;
 import io.kelta.runtime.storage.StorageException;
 import io.kelta.runtime.storage.UniqueConstraintViolationException;
@@ -179,6 +180,26 @@ public class GlobalExceptionHandler {
         JsonApiError error = new JsonApiError(
             "409", "STALE_WRITE", "Conflict",
             "This record was modified since you opened it. Reload the latest version and try again.");
+        error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorBody(error));
+    }
+
+    /**
+     * Handles deletes rejected by a restricting foreign key (SQL state 23503).
+     * Returns 409 Conflict — the record is still referenced, which is a client
+     * situation to resolve, not a server fault.
+     */
+    @ExceptionHandler(ReferencedRecordConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleReferencedRecordConflict(
+            ReferencedRecordConflictException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Referenced-record delete conflict [requestId={}]: {}", requestId, ex.getMessage());
+
+        JsonApiError error = new JsonApiError(
+            "409", "REFERENCED_RECORD", "Conflict",
+            ex.getMessage());
         error.setMeta(Map.of("requestId", requestId, "path", request.getRequestURI()));
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorBody(error));

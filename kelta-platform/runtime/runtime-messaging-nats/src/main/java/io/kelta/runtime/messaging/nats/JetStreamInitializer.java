@@ -56,6 +56,20 @@ public class JetStreamInitializer {
             ensureStream(jsm, "KELTA_PRESENCE",
                     List.of("kelta.presence.>"),
                     Duration.ofMinutes(1));
+            // Telehealth video session lifecycle (slice 5): kelta.video.session
+            // .<tenantId>.<sessionId> — ACTIVE/ENDED, fed to NATS_TRIGGERED
+            // post-visit flows. Without this stream the publish gets no ack and
+            // fails (CancellationException) — the subject matched no stream.
+            ensureStream(jsm, "KELTA_VIDEO_SESSION",
+                    List.of("kelta.video.session.>"),
+                    Duration.ofHours(24));
+            // Telehealth chat (slice 2): kelta.chat.message.* and
+            // kelta.chat.conversation.* — realtime fan-out to WebSocket sockets
+            // via the gateway ChatMessageBridge. Same missing-stream gap: the
+            // gateway's push consumer got [SUB-90007] No matching streams.
+            ensureStream(jsm, "KELTA_CHAT",
+                    List.of("kelta.chat.message.>", "kelta.chat.conversation.>"),
+                    Duration.ofHours(24));
         } catch (Exception e) {
             log.error("Failed to initialize JetStream streams: {}", e.getMessage(), e);
         }

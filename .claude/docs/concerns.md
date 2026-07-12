@@ -419,6 +419,25 @@ for removal ("inline the current value"). Findings:
   *before/independent of* the bootstrap fetch), so a future missed DTO degrades (loses only dynamic
   collection routes) instead of taking the entire API offline — but the reflect-config entry is still
   required for the bootstrap to fully load.
+- **The worker is ALSO a GraalVM native image — every `PlatformEvent` payload it serializes to NATS
+  MUST be in `reflect-config.json`, exactly like the gateway bootstrap rule above.** Found 2026-07-11
+  driving a live telehealth video call: the worker published `kelta.video.session.*` with `"payload":{}`
+  (and would do the same for `kelta.chat.*` and `credential/domain/feature.changed`) because
+  `VideoSessionPayload`, `ChatMessagePayload`, `ChatConversationPayload`, `CredentialChangedPayload`,
+  `DomainChangedPayload`, `FeatureChangedPayload` were never added to
+  `kelta-worker/.../META-INF/native-image/io.kelta/kelta-worker/reflect-config.json`. In the JVM/tests
+  this is invisible (reflection is free); the native image can't introspect the getters → Jackson emits
+  an empty bean, so consumers (e.g. NATS_TRIGGERED post-visit flows) get no data. `EventPayloadReflectConfigTest`
+  now fails CI if any `io.kelta.runtime.event.*Payload` is unregistered. **Rule: a new event payload
+  gets a reflect-config entry in BOTH `kelta-worker` and `kelta-gateway` in the same PR.**
+- **Every new `kelta.*` NATS subject namespace needs its own JetStream stream in `JetStreamInitializer`.**
+  `NatsEventPublisher` always JetStream-publishes and awaits an ack; a subject matched by no stream never
+  acks → `CancellationException: response not registered in time` and the event is dropped (publish is
+  best-effort — the error is logged, never thrown). `ensureStream` is add-if-absent — it does **not**
+  `updateStream`, so you cannot bolt a subject onto an existing stream; it needs its own `ensureStream(...)`
+  call. Telehealth slices 2 (chat) + 5 (video) added subjects without streams → chat realtime was fully
+  broken on prod (gateway push consumer looped `[SUB-90007] No matching streams`) and video lifecycle
+  events failed to publish, until `KELTA_CHAT` + `KELTA_VIDEO_SESSION` were added (2026-07-11).
 - Multiple BOM version overrides in worker POM increase transitive conflict risk (`kelta-worker/pom.xml`). Audit on every Spring Boot bump.
 - **pgvector required for VECTOR fields / semantic search.** `PhysicalTableStorageAdapter.initializeCollection` runs `CREATE EXTENSION IF NOT EXISTS vector` lazily — only when a collection actually has a VECTOR field — and throws an actionable `StorageException` if it can't. Local dev + CI use the `pgvector/pgvector:pg15` image (docker-compose + `KeltaStack` Testcontainers). **The standalone prod Postgres at `192.168.0.5` is plain `postgres:15` and must have the pgvector extension installed** (the `.so` available + the worker's DB role allowed to `CREATE EXTENSION`, or an admin pre-creates it) before any tenant defines a VECTOR field; otherwise that collection's table creation fails with the guidance above. Collections without VECTOR fields are unaffected.
 - **Stale `spring-kafka` dependency retired** (Phase 0): `runtime-core/pom.xml` previously declared `spring-kafka`, `spring-kafka-test`, and `testcontainers-kafka` despite the platform using NATS JetStream exclusively. Removed; the misnamed `KafkaRecordEventPublisher` was renamed to `NatsRecordEventPublisher`. The stale event-bus comments and docs that mislabeled NATS as the previous broker have since been corrected to NATS across the codebase.

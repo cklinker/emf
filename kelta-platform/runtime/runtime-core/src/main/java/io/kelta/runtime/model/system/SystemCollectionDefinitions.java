@@ -528,9 +528,10 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.bool("isDefault").withColumnName("is_default"))
             .addField(FieldDefinition.requiredJson("columns"))
             .addField(FieldDefinition.string("filterLogic").withColumnName("filter_logic"))
-            // JSON-typed defaults must be JSON values, not strings — a String
-            // default is injected verbatim on create and then fails the field's
-            // own type validation ("filters: Invalid type, expected JSON").
+            // JSON-typed defaults must be JSON containers, not strings — a String
+            // default is injected verbatim on create and stored as a JSON string
+            // ("[]"), not an array, breaking every consumer of the field
+            // (guarded by SystemCollectionJsonDefaultsTest).
             .addField(FieldDefinition.json("filters").withDefault(List.of()))
             .addField(FieldDefinition.string("sortField").withColumnName("sort_field"))
             .addField(FieldDefinition.string("sortDirection", 4).withColumnName("sort_direction")

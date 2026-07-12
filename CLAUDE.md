@@ -189,6 +189,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 - ❌ Fork a new shared table/filter/form component → ✅ reuse/extend `@kelta/components`.
 - ❌ Read a flow input as `$.<key>` → ✅ `$.input.<key>` (manual/MCP/HTTP double-wraps).
 - ❌ Reintroduce Kafka → messaging is NATS JetStream only.
+- ❌ Add a new `kelta.*` NATS subject without a JetStream stream in `JetStreamInitializer` **and** a native `reflect-config.json` entry for its payload in worker+gateway → ✅ else the publish no-acks (`CancellationException`, event dropped) or the payload serializes `{}` on the native image (`concerns.md` → Dependency Risks).
 - ❌ Leave docs stale → update them in the same PR (Rule 6).
 
 ---
@@ -222,6 +223,14 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 Envelope: `PlatformEvent<T>` (`eventId`, `eventType`, `tenantId`, `correlationId`, `userId`,
 `timestamp`, `payload`). Subscriptions registered in each service's `NatsSubscriptionConfig`.
 Kafka is fully removed — do not reintroduce.
+
+**JetStream streams** (provisioned in `runtime-messaging-nats/.../JetStreamInitializer.java`, add-if-absent):
+`KELTA_RECORDS` (`kelta.record.changed.>`) · `KELTA_CONFIG` (`kelta.config/cerbos/worker/data.>`) ·
+`KELTA_TRIGGERS` (`kelta.trigger.>`) · `KELTA_PRESENCE` (`kelta.presence.>`) ·
+`KELTA_VIDEO_SESSION` (`kelta.video.session.>`) · `KELTA_CHAT` (`kelta.chat.message/conversation.>`).
+A new subject namespace needs its **own** `ensureStream(...)` (an existing stream's subjects can't be
+extended — it's add-if-absent), and the payload must be in each **native** service's `reflect-config.json`,
+or the publish no-acks and the event is dropped / serializes `{}`. See `concerns.md` → Dependency Risks.
 
 ---
 

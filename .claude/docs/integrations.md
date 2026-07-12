@@ -50,6 +50,7 @@ Files attach to any record via the `attachments` system collection (backed by `f
 Event envelope: `PlatformEvent<T>` with `eventId`, `eventType`, `tenantId`, `correlationId`, `timestamp`, `payload`
 Publishing: `PlatformEventPublisher` (transport-agnostic interface; the NATS impl is `NatsEventPublisher` in `runtime-messaging-nats`. The former Kafka publisher was removed in Phase 0 — do not reintroduce Kafka.)
 Subscriptions: `NatsSubscriptionConfig` registration. Delivery-mode rule: **broadcast** when the handler mutates per-pod state (caches, route registries, local WebSocket sessions — every gateway subscription qualifies, fixed 2026-07-08 after queue groups left other pods' realtime subscribers silent); **queue group** only for load-balanced work executed once per event (flows, search indexing)
+Redelivery: consumers are created with `maxDeliver=5`; a failing handler NAKs with a 2s delay (`NatsSubscriptionManager.nakBounded`), and after the fifth delivery JetStream stops redelivering (logged at ERROR as a dropped poison message). Handlers must stay idempotent across ≤5 deliveries; anything that must never be lost needs its own persistence, not infinite redelivery.
 Location: `kelta-platform/runtime/runtime-events/src/main/java/io/kelta/runtime/event/`
 
 ## Monitoring & Observability

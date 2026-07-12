@@ -118,6 +118,68 @@ class NatsSubscriptionManagerTest {
     }
 
     @Test
+    @DisplayName("consumer-config drift is healed in place and the subscribe retried (2026-07-12 outage)")
+    void healsConsumerConfigDrift() throws Exception {
+        JetStream jetStream = mock(JetStream.class);
+        io.nats.client.JetStreamManagement jsm = mock(io.nats.client.JetStreamManagement.class);
+        JetStreamSubscription jsSub = mock(JetStreamSubscription.class);
+        when(connectionManager.jetStream()).thenReturn(jetStream);
+        when(connectionManager.jetStreamManagement()).thenReturn(jsm);
+        when(jetStream.subscribe(anyString(), any(io.nats.client.PullSubscribeOptions.class)))
+                .thenThrow(new IllegalArgumentException(
+                        "[SUB-90016] Existing consumer cannot be modified. Changed fields: [maxDeliver]"))
+                .thenReturn(jsSub);
+        when(jsm.getStreamNames("kelta.record.changed.>")).thenReturn(List.of("KELTA_RECORDS"));
+        // The pull loop races the assertion on a virtual thread — lenient, it
+        // may or may not fetch before destroy().
+        org.mockito.Mockito.lenient()
+                .when(jsSub.fetch(org.mockito.ArgumentMatchers.anyInt(), any()))
+                .thenReturn(List.of());
+
+        EventSubscription sub = EventSubscription.queueGroup(
+                "worker-flows", "kelta.record.changed.>", "worker-flows", msg -> { });
+
+        assertThat(subscriptionManager.tryStartSubscription(sub, true)).isTrue();
+
+        var ccCaptor = org.mockito.ArgumentCaptor.forClass(io.nats.client.api.ConsumerConfiguration.class);
+        verify(jsm).addOrUpdateConsumer(org.mockito.ArgumentMatchers.eq("KELTA_RECORDS"), ccCaptor.capture());
+        assertThat(ccCaptor.getValue().getDurable()).isEqualTo("worker-flows");
+        assertThat(ccCaptor.getValue().getMaxDeliver()).isEqualTo(NatsSubscriptionManager.MAX_DELIVER);
+        verify(jetStream, org.mockito.Mockito.times(2))
+                .subscribe(anyString(), any(io.nats.client.PullSubscribeOptions.class));
+
+        subscriptionManager.destroy();
+    }
+
+    @Test
+    @DisplayName("non-drift subscribe failures are not healed — normal retry handles them")
+    void nonDriftFailuresAreNotHealed() throws Exception {
+        JetStream jetStream = mock(JetStream.class);
+        when(connectionManager.jetStream()).thenReturn(jetStream);
+        when(jetStream.subscribe(anyString(), any(io.nats.client.PullSubscribeOptions.class)))
+                .thenThrow(new IllegalStateException("NATS not reachable"));
+
+        EventSubscription sub = EventSubscription.queueGroup(
+                "worker-flows", "kelta.record.changed.>", "worker-flows", msg -> { });
+
+        assertThat(subscriptionManager.tryStartSubscription(sub, true)).isFalse();
+        verify(connectionManager, org.mockito.Mockito.never()).jetStreamManagement();
+    }
+
+    @Test
+    @DisplayName("drift detection matches the jnats SUB-90016 message shape only")
+    void driftDetection() {
+        assertThat(NatsSubscriptionManager.isConsumerConfigDrift(new IllegalArgumentException(
+                "[SUB-90016] Existing consumer cannot be modified. Changed fields: [maxDeliver]"))).isTrue();
+        assertThat(NatsSubscriptionManager.isConsumerConfigDrift(new IllegalArgumentException(
+                "existing Consumer Cannot Be Modified"))).isTrue();
+        assertThat(NatsSubscriptionManager.isConsumerConfigDrift(
+                new IllegalStateException("NATS not connected"))).isFalse();
+        assertThat(NatsSubscriptionManager.isConsumerConfigDrift(
+                new RuntimeException((String) null))).isFalse();
+    }
+
+    @Test
     @DisplayName("counters segregate by subscription tag")
     void countersSegregateBySubscription() {
         long start = System.nanoTime();

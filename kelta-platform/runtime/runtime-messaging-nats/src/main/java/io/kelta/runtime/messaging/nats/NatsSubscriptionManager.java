@@ -9,6 +9,7 @@ import io.micrometer.core.instrument.Timer;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
+import io.nats.client.JetStreamManagement;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
 import io.nats.client.PullSubscribeOptions;
@@ -187,15 +188,25 @@ public class NatsSubscriptionManager implements DisposableBean {
                 .configuration(cc)
                 .build();
 
-        JetStreamSubscription jsSub = js.subscribe(sub.subject(), options);
-        activeSubscriptions.add(jsSub);
-        registerForLagPolling(sub.name(), jsSub);
+        JetStreamSubscription jsSub;
+        try {
+            jsSub = js.subscribe(sub.subject(), options);
+        } catch (Exception e) {
+            if (!isConsumerConfigDrift(e)) {
+                throw e;
+            }
+            healConsumerConfigDrift(sub, cc, e);
+            jsSub = js.subscribe(sub.subject(), options);
+        }
+        final JetStreamSubscription attached = jsSub;
+        activeSubscriptions.add(attached);
+        registerForLagPolling(sub.name(), attached);
 
         pullExecutor.submit(() -> {
             log.info("Pull consumer '{}' started on subject '{}'", sub.name(), sub.subject());
             while (running) {
                 try {
-                    List<Message> messages = jsSub.fetch(10, Duration.ofSeconds(1));
+                    List<Message> messages = attached.fetch(10, Duration.ofSeconds(1));
                     for (Message msg : messages) {
                         long start = System.nanoTime();
                         try (NatsTracing.Scope ignored = tracing.extractAndOpen(msg.getHeaders())) {
@@ -226,6 +237,46 @@ public class NatsSubscriptionManager implements DisposableBean {
                 }
             }
         });
+    }
+
+    /**
+     * True when a subscribe failed because the durable consumer already exists
+     * on the server with a different configuration. jnats pre-checks the
+     * requested config against the existing durable and rejects the bind with
+     * {@code [SUB-90016] Existing consumer cannot be modified} — a state a
+     * rolling upgrade reaches whenever a release changes any consumer setting
+     * (maxDeliver, ackWait, …), because the durable on the server keeps the
+     * old config. Retrying the same subscribe can never succeed.
+     */
+    static boolean isConsumerConfigDrift(Exception e) {
+        String msg = e.getMessage();
+        if (msg == null) {
+            return false;
+        }
+        return msg.contains("SUB-90016")
+                || msg.toLowerCase(java.util.Locale.ROOT).contains("consumer cannot be modified");
+    }
+
+    /**
+     * Self-heals consumer-config drift: updates the existing durable's config
+     * in place via {@code addOrUpdateConsumer} — which preserves the delivery
+     * cursor, so the pending backlog is delivered instead of dropped (delete +
+     * recreate would lose the cursor) — then the caller re-subscribes.
+     * The 2026-07-12 rollout outage (all six worker subscriptions down ~30 min
+     * after MAX_DELIVER was introduced) is the incident this guards against.
+     */
+    private void healConsumerConfigDrift(EventSubscription sub, ConsumerConfiguration cc,
+                                         Exception cause) throws Exception {
+        JetStreamManagement jsm = connectionManager.jetStreamManagement();
+        List<String> streams = jsm.getStreamNames(sub.subject());
+        if (streams == null || streams.isEmpty()) {
+            throw cause;
+        }
+        String stream = streams.get(0);
+        log.warn("Durable consumer '{}' on '{}' has drifted server-side config ({}) — "
+                        + "updating it in place on stream '{}' (delivery cursor preserved) and re-attaching",
+                sub.name(), sub.subject(), cause.getMessage(), stream);
+        jsm.addOrUpdateConsumer(stream, cc);
     }
 
     /**

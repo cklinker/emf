@@ -17,7 +17,6 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -50,7 +49,7 @@ class TelehealthSchedulingScenarioTest extends ScenarioBase {
                 .retrieve().toEntity(Map.class);
         String portalUserId = (String) invited.getBody().get("userId");
 
-        // The admin user acts as the provider — find their id and seed a rule
+        // The admin user acts as the provider — find their id, then seed a rule
         // covering tomorrow's weekday, 09:00–17:00 UTC.
         LocalDate tomorrow = LocalDate.now(ZoneOffset.UTC).plusDays(1);
         int weekday = tomorrow.getDayOfWeek() == DayOfWeek.SUNDAY ? 0
@@ -66,17 +65,28 @@ class TelehealthSchedulingScenarioTest extends ScenarioBase {
                     providerId = rs.getString("id");
                 }
             }
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO telehealth_availability (id, tenant_id, provider_id, kind, weekday, "
-                            + "start_time, end_time, timezone, closed, active, created_at, updated_at) "
-                            + "VALUES (?, ?, ?, 'RULE', ?, '09:00', '17:00', 'UTC', false, true, NOW(), NOW())")) {
-                ps.setString(1, UUID.randomUUID().toString());
-                ps.setString(2, tenantId);
-                ps.setString(3, providerId);
-                ps.setInt(4, weekday);
-                ps.executeUpdate();
-            }
         }
+
+        // Seed the rule through the generic JSON:API route — the spec-designated
+        // management path for availability. Regression for the V169 TIME-column
+        // mismatch that failed every write here with a varchar/time bind error
+        // (fixed by V172 + the STRING(8) field defs).
+        Map<String, Object> ruleBody = Map.of("data", Map.of(
+                "type", "telehealth-availability",
+                "attributes", Map.of(
+                        "providerId", providerId,
+                        "kind", "RULE",
+                        "weekday", weekday,
+                        "startTime", "09:00",
+                        "endTime", "17:00",
+                        "timezone", "UTC",
+                        "active", true)));
+        ResponseEntity<Map> rule = gatewayClientWithToken(token)
+                .post().uri("/" + slug + "/api/telehealth-availability")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ruleBody)
+                .retrieve().toEntity(Map.class);
+        assertThat(rule.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         // Slots for tomorrow are offered.
         Instant from = tomorrow.atStartOfDay(ZoneOffset.UTC).toInstant();

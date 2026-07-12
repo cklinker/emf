@@ -117,4 +117,13 @@ class SlotServiceTest {
         assertThat(SlotService.computeSlots(List.of(), List.of(), from, from.minusSeconds(1), 30, from))
                 .isEmpty();
     }
+
+    @Test
+    @DisplayName("parseTime: varchar(8) column values in both HH:mm and HH:mm:ss forms")
+    void parseTimeHandlesStoredForms() {
+        assertThat(SlotService.parseTime("09:00")).isEqualTo(LocalTime.of(9, 0));
+        assertThat(SlotService.parseTime("17:00:00")).isEqualTo(LocalTime.of(17, 0));
+        assertThat(SlotService.parseTime(null)).isNull();
+        assertThat(SlotService.parseTime("")).isNull();
+    }
 }

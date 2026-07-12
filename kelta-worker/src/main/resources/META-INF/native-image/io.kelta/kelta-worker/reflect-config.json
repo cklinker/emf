@@ -6,6 +6,36 @@
     ]
   },
   {
+    "name": "io.kelta.jsonapi.AtomicOperation",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.kelta.jsonapi.AtomicOperation$ResourceRef",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.kelta.jsonapi.AtomicOperation$ResourceData",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.kelta.jsonapi.AtomicResult",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.kelta.jsonapi.AtomicResult$ResourceObject",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "io.kelta.runtime.event.PlatformEvent",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,

@@ -651,7 +651,8 @@ docs updated in-PR. Estimates are focused working days.
 | ✅ | Stretch: invoice PDFs | atlantico-web | done | pdf-lib, ownership-gated download — see §9.6 |
 | ✅ | Stretch: intake forms | tenant, atlantico-web | done | Per-service pre-visit questionnaire — see §21 |
 | ✅ | Stretch: native video-visit embed | atlantico-web | done | In-portal LiveKit join — see §22 |
-| — | Stretch backlog | | | MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
+| ✅ | Stretch: Svix instant revalidation | atlantico-web, svix | done | Record change → webhook → ISR bust — see §23 |
+| — | Stretch backlog | | | MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing, availability self-service UI |
 
 **Total ≈ 14 focused days.** Dependencies: P1 blocks P7 auth; P3 needs P2; P5 blocks P7/P8 payment paths; P6 can start parallel to P2–P5.
 
@@ -782,4 +783,38 @@ of the platform's generic visit page.
 
 Deployed `main-2cf226c` (homelab-argo #167). Deps: `livekit-client`,
 `@livekit/components-react`/`-styles` (pure JS — alpine-standalone safe).
+
+---
+
+## 23. Svix instant catalog revalidation (stretch — DELIVERED 2026-07-12)
+
+Catalog edits (a price, a service, a provider) show on the public site in
+**~2 s** instead of waiting out the 5-minute ISR window.
+
+- **No platform change** — the worker already bridges `kelta.record.changed.>`
+  → Svix (`RecordWebhookPublisher`, event `record.created|updated`, payload
+  `{collectionName, recordId, data, …}`, channel = collection name).
+- **Consumer** (`atlantico-web`): `client.ts` tags every catalog read with its
+  collection name (`next.tags`); `POST /api/revalidate` verifies the Svix
+  signature (`svix` pkg) and calls `revalidateTag` for the changed collection.
+  `revalidate.ts` is a pure `collection → tags` map (catalog-guarded) with
+  fan-out — a `price-list-entries` change also busts `services` + `products`.
+  4 unit tests. Signing secret ships as a SealedSecret (`kubeseal --raw`).
+- **Tenant Svix endpoint** → the atlantico-web service, subscribed to catalog
+  channels (services, products, price-list-entries, providers,
+  product-categories, provider-services).
+- **Infra gotcha (important):** Svix's default **SSRF guard blocks private
+  targets**, and in this homelab *every* target is private (public LB
+  192.168.x via hairpin, ClusterIP 10.x) → all delivery failed with
+  `response_code=0`. Fix: `SVIX_WHITELIST_SUBNETS: '["10.0.0.0/8","192.168.0.0/16"]'`
+  (JSON array — Svix wants a sequence) on the shared svix config, and point the
+  endpoint at the **in-cluster** service URL
+  (`http://atlantico-web.atlantico-web.svc/api/revalidate`). This relaxes a
+  security control fleet-wide, so it ships as a **non-auto-merged** PR
+  (homelab-argo #169).
+- Verified live: a price edit reflected on the public page in **~2 s**, Svix
+  delivery attempts returning **200**; forged-signature POST → **401**;
+  valid signed POST → **200** `{revalidated:[…]}`.
+
+Deployed `main-7a328c6` (atlantico-web #23). Dep: `svix`.
 

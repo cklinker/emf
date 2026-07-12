@@ -46,7 +46,7 @@ class LiveKitWebhookServiceTest {
     }
 
     @Test
-    @DisplayName("room_started marks the session ACTIVE and publishes on the tenant/session subject")
+    @DisplayName("room_started marks the session ACTIVE and publishes lifecycle + trigger subjects")
     void roomStarted() {
         stubSession();
         service.process("{\"event\":\"room_started\",\"id\":\"EV_1\",\"room\":{\"name\":\"t_t1_room\"}}");
@@ -54,9 +54,11 @@ class LiveKitWebhookServiceTest {
         verify(jdbcTemplate).update(contains("SET status = 'ACTIVE'"), eq("vs-1"));
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<PlatformEvent> event = ArgumentCaptor.forClass(PlatformEvent.class);
-        verify(eventPublisher).publish(subject.capture(), event.capture());
-        assertThat(subject.getValue()).isEqualTo("kelta.video.session.t1.vs-1");
-        assertThat(((VideoSessionPayload) event.getValue().getPayload()).getStatus())
+        verify(eventPublisher, times(2)).publish(subject.capture(), event.capture());
+        assertThat(subject.getAllValues()).containsExactly(
+                "kelta.video.session.t1.vs-1",
+                "kelta.trigger.t1.video.session");
+        assertThat(((VideoSessionPayload) event.getAllValues().get(0).getPayload()).getStatus())
                 .isEqualTo("ACTIVE");
     }
 
@@ -70,12 +72,31 @@ class LiveKitWebhookServiceTest {
         service.process("{\"event\":\"room_finished\",\"id\":\"EV_2\",\"room\":{\"name\":\"t_t1_room\"}}");
 
         ArgumentCaptor<PlatformEvent> event = ArgumentCaptor.forClass(PlatformEvent.class);
-        verify(eventPublisher).publish(anyString(), event.capture());
-        VideoSessionPayload payload = (VideoSessionPayload) event.getValue().getPayload();
+        verify(eventPublisher, times(2)).publish(anyString(), event.capture());
+        VideoSessionPayload payload = (VideoSessionPayload) event.getAllValues().get(0).getPayload();
         assertThat(payload.getStatus()).isEqualTo("ENDED");
         assertThat(payload.getDurationSeconds()).isEqualTo(1234);
         // The ended session is auto-archived (telehealth slice 7).
         verify(archiveService).archiveVideoSession("t1", "vs-1");
+    }
+
+    @Test
+    @DisplayName("lifecycle events bridge onto kelta.trigger.<tenant>.video.session for NATS_TRIGGERED flows")
+    void bridgesToFlowTriggerNamespace() {
+        stubSession();
+        when(jdbcTemplate.queryForObject(contains("SET status = 'ENDED'"), eq(Integer.class),
+                eq("vs-1"))).thenReturn(60);
+
+        service.process("{\"event\":\"room_finished\",\"id\":\"EV_6\",\"room\":{\"name\":\"t_t1_room\"}}");
+
+        ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<PlatformEvent> event = ArgumentCaptor.forClass(PlatformEvent.class);
+        verify(eventPublisher, times(2)).publish(subject.capture(), event.capture());
+        assertThat(subject.getAllValues().get(1)).isEqualTo("kelta.trigger.t1.video.session");
+        // Same envelope on both subjects — flows read $.input.payload.*.
+        VideoSessionPayload bridged = (VideoSessionPayload) event.getAllValues().get(1).getPayload();
+        assertThat(bridged.getStatus()).isEqualTo("ENDED");
+        assertThat(bridged.getAppointmentId()).isEqualTo("appt-1");
     }
 
     @Test

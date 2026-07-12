@@ -142,6 +142,12 @@ the tenant token). `NatsTriggerFlowListener` consumes the namespace as a queue g
 (`trigger.type = "NATS_MESSAGE"`, with `subject` + `topic`; a non-JSON body arrives as
 `{ "raw": "<text>" }`). The body is arbitrary publisher JSON — not a `PlatformEvent`.
 
+One platform publisher does use the namespace: the LiveKit webhook bridges every
+video-session lifecycle event onto `kelta.trigger.<tenantId>.video.session` (same
+`PlatformEvent<VideoSessionPayload>` envelope as `kelta.video.session.*`), so a
+NATS_TRIGGERED flow with trigger topic `video.session` reads
+`$.input.payload.{sessionId,appointmentId,conversationId,status,durationSeconds}`.
+
 ### Wait states — persistence and resume
 
 A Wait with `Seconds` ≤ 10 sleeps in-process. Longer, timestamp-based

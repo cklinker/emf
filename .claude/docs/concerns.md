@@ -524,6 +524,7 @@ Regression guard: `TenantAwareDataSourceTest` asserts tenant connections use tra
 
 ### Bugs (all addressed)
 
+- **`/api/operations` 500 on the native worker (2026-07-12)** — `AtomicOperationExecutor` maps request maps into the `io.kelta.jsonapi.AtomicOperation`/`AtomicResult` records reflectively, but none of the jsonapi records were in the worker `reflect-config.json`, so every atomic-operations call failed with `MissingReflectionRegistrationError` on the native image only (JVM/CI green — same invisible-on-CI class as the NATS payload gaps). All five records (`AtomicOperation` + `ResourceRef`/`ResourceData`, `AtomicResult` + `ResourceObject`) are now registered.
 - **Federated users stuck PENDING_ACTIVATION** — `FederatedUserMapper.lookupProfileId` (line 199) calls `WorkerClient.findProfileByName` against `/internal/profile/by-name`.
 - **Password reset sends no email** — `PasswordController.sendPasswordResetEmail` (line 212) calls `WorkerClient.sendTemplateEmail` with the `user.password_reset` template.
 - **Unhandled EmptyResultDataAccessException** — `PasswordController.changePassword` (line 82) catches `EmptyResultDataAccessException` and returns the generic 400 to prevent username enumeration.

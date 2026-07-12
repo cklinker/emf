@@ -462,9 +462,12 @@ integrate InvoiceXpress / Moloni / Vendus via an HTTP-callout flow at `invoice I
 
 ### 9.6 Invoice rendering
 
-v1: portal HTML invoice page with print stylesheet (per-locale). PDF generation +
-email attachment = Phase 8 stretch (platform flow email has no attachments; would be a BFF
-render → attachment upload → link email).
+v1: portal HTML invoice page with print stylesheet (per-locale). **PDF DELIVERED
+(2026-07-12, atlantico-web #16):** branded A4 PDF via pdf-lib (no headless browser),
+ownership-gated `GET /api/invoices/[id]/pdf` (streams from the session — invoices are PII,
+never a public URL), Download-PDF button on the invoice page + list, F3/F6 emails link there.
+True email *attachment* stays out (flow EMAIL_ALERT has none) — the account-download path
+covers the intent.
 
 ---
 
@@ -645,7 +648,8 @@ docs updated in-PR. Estimates are focused working days.
 | **8** | Store checkout + fulfillment: cart/checkout/Stripe (incl. Multibanco), reservations, digital downloads, pickup/ship mails; deploy to K8s | atlantico-web, homelab-argo | 2d | E2E: ship + pickup + digital orders; site live at atlantico.rzware.com |
 | **9** | Content & polish: translation fill (fr/de/es/uk), seed script, Playwright e2e pack, demo script, docs | atlantico-web, tenant | 1.5d | Demo runbook executes clean start-to-finish |
 | ✅ | Stretch: service-credits | tenant, atlantico-web | done | Session packs grant + redeem — see §20 |
-| — | Stretch backlog | | | native LiveKit embed, intake forms, MB WAY (ifthenpay), invoice PDFs, certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
+| ✅ | Stretch: invoice PDFs | atlantico-web | done | pdf-lib, ownership-gated download — see §9.6 |
+| — | Stretch backlog | | | native LiveKit embed, intake forms, MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
 
 **Total ≈ 14 focused days.** Dependencies: P1 blocks P7 auth; P3 needs P2; P5 blocks P7/P8 payment paths; P6 can start parallel to P2–P5.
 

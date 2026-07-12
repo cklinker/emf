@@ -652,7 +652,8 @@ docs updated in-PR. Estimates are focused working days.
 | ✅ | Stretch: intake forms | tenant, atlantico-web | done | Per-service pre-visit questionnaire — see §21 |
 | ✅ | Stretch: native video-visit embed | atlantico-web | done | In-portal LiveKit join — see §22 |
 | ✅ | Stretch: Svix instant revalidation | atlantico-web, svix | done | Record change → webhook → ISR bust — see §23 |
-| — | Stretch backlog | | | MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing, availability self-service UI |
+| ✅ | Stretch: provider self-service availability | kelta-worker, kelta-ui | done | Providers edit own schedule — see §24 |
+| — | Stretch backlog | | | MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing |
 
 **Total ≈ 14 focused days.** Dependencies: P1 blocks P7 auth; P3 needs P2; P5 blocks P7/P8 payment paths; P6 can start parallel to P2–P5.
 
@@ -817,4 +818,32 @@ Catalog edits (a price, a service, a provider) show on the public site in
   valid signed POST → **200** `{revalidated:[…]}`.
 
 Deployed `main-7a328c6` (atlantico-web #23). Dep: `svix`.
+
+---
+
+## 24. Provider self-service availability (stretch — DELIVERED 2026-07-12)
+
+Providers manage their own weekly schedule + date exceptions in the staff app,
+instead of the practice manager editing raw `telehealth-availability` rows via
+admin JSON:API (the §16 "later platform idea"). A **platform** feature (kelta
+worker + kelta-ui) — every telehealth tenant gets it, not just this sample.
+
+- **Scoped endpoint** (`kelta-worker`, `TelehealthController` +
+  `AvailabilityService`): `GET/PUT /api/telehealth/availability/me`. The
+  provider id is the authenticated user (`actor.userId()`), never the body — a
+  provider can only edit their own schedule; portal users are 403'd. `PUT` is a
+  transactional validate-all-then-replace (weekday 0–6, `HH:mm` times with
+  end>start, ISO exception dates, valid timezone). `SlotService` reads
+  availability live per request, so no cache/NATS broadcast is needed. Map
+  in/out — no new native-reflection types. 7 unit tests (`AvailabilityServiceTest`).
+- **Editor page** (`kelta-ui`, `ProviderAvailabilityPage`, route
+  `/app/provider-availability`): a weekly grid (windows per weekday, add/remove)
+  + a date-exceptions list (whole-day closures or one-off windows), localized
+  weekday names via `Intl` (no hardcoded day translations), save → toast +
+  refetch. Reached from a **"My availability"** link on the staff Appointments
+  page. i18n en + pt-PT; 3 unit tests. (kelta-ui has no typecheck in its prod
+  image — `tsc -b && vite build` was run locally; the changed files are type-clean.)
+- Skip-gated `provider-availability.spec.ts` (telehealth e2e precedent).
+
+Deployed via the platform image pipeline (kelta-worker native + kelta-ui).
 

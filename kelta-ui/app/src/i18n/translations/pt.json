@@ -1471,5 +1471,27 @@
     "lightMode": "Claro",
     "darkMode": "Escuro",
     "systemMode": "Sistema"
+  },
+  "availability": {
+    "title": "A minha disponibilidade",
+    "subtitle": "Os utentes podem marcar consultas nestes horários ({{timezone}}).",
+    "save": "Guardar alterações",
+    "saving": "A guardar…",
+    "saved": "Disponibilidade guardada",
+    "saveFailed": "Não foi possível guardar a disponibilidade",
+    "loadFailed": "Não foi possível carregar a disponibilidade",
+    "weekly": "Horário semanal",
+    "weeklyHelp": "Defina os horários em que atende utentes. Deixe um dia vazio para indicar indisponível.",
+    "closed": "Indisponível",
+    "start": "Início",
+    "end": "Fim",
+    "remove": "Remover",
+    "addHours": "Adicionar horário",
+    "exceptions": "Exceções de datas",
+    "exceptionsHelp": "Feche datas específicas (feriados, férias) ou adicione horários pontuais.",
+    "noExceptions": "Sem exceções de datas.",
+    "closedAllDay": "Fechado o dia todo",
+    "date": "Data",
+    "addException": "Adicionar exceção"
   }
 }

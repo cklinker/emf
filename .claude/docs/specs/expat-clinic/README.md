@@ -649,7 +649,8 @@ docs updated in-PR. Estimates are focused working days.
 | **9** | Content & polish: translation fill (fr/de/es/uk), seed script, Playwright e2e pack, demo script, docs | atlantico-web, tenant | 1.5d | Demo runbook executes clean start-to-finish |
 | ✅ | Stretch: service-credits | tenant, atlantico-web | done | Session packs grant + redeem — see §20 |
 | ✅ | Stretch: invoice PDFs | atlantico-web | done | pdf-lib, ownership-gated download — see §9.6 |
-| — | Stretch backlog | | | native LiveKit embed, intake forms, MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
+| ✅ | Stretch: intake forms | tenant, atlantico-web | done | Per-service pre-visit questionnaire — see §21 |
+| — | Stretch backlog | | | native LiveKit embed, MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
 
 **Total ≈ 14 focused days.** Dependencies: P1 blocks P7 auth; P3 needs P2; P5 blocks P7/P8 payment paths; P6 can start parallel to P2–P5.
 
@@ -725,4 +726,27 @@ of the placeholder "team activates manually" copy.
   "buy once, book N sessions".
 - Verified E2E live: buy PACK-THERAPY-5 -> 5 credits -> book PSYCH_50 ->
   covered (0 charged, no session invoice) -> 4 left.
+
+---
+
+## 21. Pre-visit intake forms (stretch — DELIVERED 2026-07-12)
+
+Services flagged `requiresIntake` (psychology, relocation package) collect a
+dynamic questionnaire before the visit.
+
+- **Collections**: `intake-forms` (serviceId unique lookup, `questions` JSON —
+  each `{key,label,type: text|longtext|boolean|choice, options?, required}`,
+  titleI18n, active) and `intake-responses` (clientId/serviceId lookups,
+  appointmentDetailId, answers JSON, submittedAt). BFF single writer.
+- **BFF** (`intake.ts`): `getFormForService`, `intakeContext` (ownership via
+  appointment-details), `submitIntake` with `missingRequired` validation
+  (422 + missing keys), upsert one response per appointment,
+  `submittedDetailIds` for gating. Routes `GET/POST /api/intake`.
+- **UI**: dynamic form page `/account/appointments/[detailsId]/intake`
+  (renders each question type); appointments list shows "Complete your intake
+  form →" or "Intake complete ✓"; booking wizard success screen reminds when
+  the booked service needs intake. Seeded psychology + relocation forms; i18n ×6.
+- Verified E2E: book PSYCH_50 → GET form (6 questions) → submit-invalid 422
+  (missing required) → submit-valid 200 → response persisted → gating flips to
+  complete; edit re-opens prefilled.
 

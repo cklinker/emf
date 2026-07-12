@@ -1399,4 +1399,32 @@ class DefaultQueryEngineTest {
         }
     }
 
+    @Nested
+    @DisplayName("Auto-number sequence naming")
+    class AutoNumberSequenceNaming {
+
+        @Test
+        @DisplayName("kebab-case collection names map to valid Postgres identifiers")
+        void kebabCaseCollectionName() {
+            // Regression: seq_credit-notes_creditNoteNumber failed AutoNumberService's
+            // identifier check and the record silently saved with a null number.
+            assertEquals("seq_credit_notes_creditNoteNumber",
+                    DefaultQueryEngine.autoNumberSequenceName("credit-notes", "creditNoteNumber"));
+        }
+
+        @Test
+        @DisplayName("plain names are unchanged")
+        void plainName() {
+            assertEquals("seq_orders_orderNumber",
+                    DefaultQueryEngine.autoNumberSequenceName("orders", "orderNumber"));
+        }
+
+        @Test
+        @DisplayName("any non-identifier character is mapped to underscore")
+        void otherSpecialCharacters() {
+            assertEquals("seq_a_b_c_n_1",
+                    DefaultQueryEngine.autoNumberSequenceName("a-b.c", "n 1"));
+        }
+    }
+
 }

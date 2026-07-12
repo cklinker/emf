@@ -644,7 +644,8 @@ docs updated in-PR. Estimates are focused working days.
 | **7** | Portal auth + booking + account: register/login (slice from P1), booking wizard, prepaid Stripe path (checkout, webhook, F3), cancel, account pages, invoice HTML+pay, postpaid pay | atlantico-web (+tenant flows F1/F7/F10/F11) | 3d | E2E: prepaid online booking → pay → visit link joins video; postpaid → complete → invoice → pay |
 | **8** | Store checkout + fulfillment: cart/checkout/Stripe (incl. Multibanco), reservations, digital downloads, pickup/ship mails; deploy to K8s | atlantico-web, homelab-argo | 2d | E2E: ship + pickup + digital orders; site live at atlantico.rzware.com |
 | **9** | Content & polish: translation fill (fr/de/es/uk), seed script, Playwright e2e pack, demo script, docs | atlantico-web, tenant | 1.5d | Demo runbook executes clean start-to-finish |
-| — | Stretch backlog | | | service-credits packs, native LiveKit embed, intake forms, MB WAY (ifthenpay), invoice PDFs, certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
+| ✅ | Stretch: service-credits | tenant, atlantico-web | done | Session packs grant + redeem — see §20 |
+| — | Stretch backlog | | | native LiveKit embed, intake forms, MB WAY (ifthenpay), invoice PDFs, certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
 
 **Total ≈ 14 focused days.** Dependencies: P1 blocks P7 auth; P3 needs P2; P5 blocks P7/P8 payment paths; P6 can start parallel to P2–P5.
 
@@ -697,3 +698,27 @@ sync, resolver negative cache, DATE patch validation, route prefix shadowing
 (security), atomic-ops native reflection, auth→worker internal email token.
 Deviations from this spec are recorded in the memory file
 `project_expat_clinic_tenant.md`; stretch backlog unchanged (§16).
+
+---
+
+## 20. Service credits (stretch — DELIVERED 2026-07-12)
+
+SERVICE products (session packs) now grant redeemable booking credits instead
+of the placeholder "team activates manually" copy.
+
+- **Collection** `service-credits`: clientId, serviceId, purchasedQty, usedQty,
+  status (ACTIVE/USED/EXPIRED), expiresAt (+1y), sourceOrderId. BFF is the
+  single writer; svc-portal-write CRUD, svc-portal-read read.
+- **Grant** (`completeOrderPayment`): one row per SERVICE order-line,
+  purchasedQty = product.creditQty x line qty. Idempotent on sourceOrderId.
+- **Redeem** (`/api/book`): before the payment step, an available credit
+  (ACTIVE, remaining > 0, not expired) is consumed and the appointment
+  companion set to **CREDIT_USED** — a payment status F3/F6 both skip, so the
+  covered session is never re-invoiced (the pack purchase already produced its
+  ORDER invoice). Returns `next: "credited"`.
+- **UI**: booking wizard shows "covered by your package (N left)"; account
+  lists a Session-credits balance with expiry; SERVICE product page shows
+  "buy once, book N sessions".
+- Verified E2E live: buy PACK-THERAPY-5 -> 5 credits -> book PSYCH_50 ->
+  covered (0 charged, no session invoice) -> 4 left.
+

@@ -190,6 +190,30 @@ an audit feed.
 
 (No open bugs from the original audit. See Resolved → Bugs.)
 
+**FIXED (fix/gateway-rate-limiter-fixed-window) — gateway rate limiter never reset its
+window under continuous traffic → tenant-wide self-sustaining 429 lockout; root cause of
+the "storage-ready" e2e flake (found 2026-07-11 from PR #1240's failing run).**
+`RedisRateLimiter` refreshed the window key's TTL on EVERY request ("prevents keys from
+persisting forever"), which turned the 5-minute fixed window into an idle-expiry: the
+counter accumulated across the entire e2e run (~1700 requests ≈ the default 100k/day →
+1735-per-window limit), tripped mid-suite, and then every rejected poll re-incremented the
+counter and re-extended the TTL — permanent lockout until 5 full minutes of silence. In the
+e2e logs this looked like a "worker wedge" (worker+postgres go quiet, tenant-scoped requests
+vanish) but the worker was simply idle: the gateway was rejecting everything upstream, and
+Playwright's serially-run late-alphabet journeys (rollup-summary, validation-rules) inherited
+the exhausted window and burned their 30s readiness budgets on 429s. Same hazard existed in
+production for any steadily-active tenant. Fix: atomic Lua INCR that sets the TTL only when
+the window is new (or a prior EXPIRE was lost), plus Retry-After now reports the real
+remaining window TTL instead of the full window. E2E `data-factory` also fails fast and loud
+on 429 (no more silently sleeping through a multi-minute Retry-After inside a 30s budget).
+Same investigation fixed three latent bugs it surfaced: `DefaultQueryEngine` passed the
+literal `"default"` as tenantId to delete hooks (setup-audit rows for deletes always failed
+their tenant FK — never persisted for real tenants); `FieldQuotaEnforcementHook` counted
+`field WHERE tenant_id = ?` but `field` has no tenant_id column (query always threw, hook
+fail-open → per-collection field quota was never enforced; now JOINs through `collection`);
+and NATS consumers had no `maxDeliver`, so a poison message redelivered forever (now
+maxDeliver=5 with a 2s delayed NAK).
+
 **FIXED (fix/cerbos-record-check-shortcircuit) — per-record Cerbos batch checks ran (with
 full record payloads) even for collections with no record-level rules; a read burst could
 open the circuit breaker (found 2026-07-10, in production, after #1223).** The generated

@@ -75,6 +75,22 @@ class GraalVmScriptExecutorTest {
     }
 
     @Test
+    @DisplayName("JS Date works — its Locale lookup needs native reflection metadata (2026-07-12 outage)")
+    void jsDateBuiltinWorks() {
+        // On the GraalVM native image, `new Date()` reflectively calls
+        // java.util.Locale.getDefault(Locale$Category); without the entries in
+        // kelta-worker's reflect-config.json the script dies with
+        // MissingReflectionRegistrationError — invisible here on the JVM.
+        // This test pins the JVM behavior; the native half is the metadata.
+        ScriptExecutionResult result = executor.execute(
+            new ScriptExecutionRequest(
+                "var d = new Date(1752285000000); d.toISOString().slice(0, 10)", Map.of()));
+
+        assertTrue(result.success(), () -> "script failed: " + result.errorMessage());
+        assertEquals("2025-07-12", result.output().get("result"));
+    }
+
+    @Test
     @DisplayName("Should execute script with object result")
     void shouldExecuteObjectResult() {
         String script = "({ name: 'test', value: 42 })";

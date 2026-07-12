@@ -430,6 +430,17 @@ for removal ("inline the current value"). Findings:
   an empty bean, so consumers (e.g. NATS_TRIGGERED post-visit flows) get no data. `EventPayloadReflectConfigTest`
   now fails CI if any `io.kelta.runtime.event.*Payload` is unregistered. **Rule: a new event payload
   gets a reflect-config entry in BOTH `kelta-worker` and `kelta-gateway` in the same PR.**
+- **Script-engine JS builtins can require host reflection on the native worker.** Found 2026-07-12:
+  any flow `INVOKE_SCRIPT` whose script called `new Date()` died on the native image with
+  `MissingReflectionRegistrationError: java.util.Locale.getDefault(Locale$Category)` — GraalJS
+  resolves the default locale reflectively. Works on the JVM and in every CI test; only the
+  deployed native worker fails, and the flow execution just shows FAILED with the error in
+  `flow_executions.error_message`. `java.util.Locale`/`Locale$Category`/`TimeZone.getDefault`
+  are now registered in `kelta-worker/.../reflect-config.json`. If another JS builtin trips this
+  (e.g. `Intl.*`, `toLocaleString` variants), the `MissingReflectionRegistrationError` message
+  prints the exact JSON entry to add — copy it into the worker reflect-config in the fix PR.
+  Until deployed, scripts can avoid `Date` entirely: pass `${$.record.data.updatedAt}` in
+  `inputPayload` and do string/int calendar math (the F3/F6 billing flows show the pattern).
 - **Every new `kelta.*` NATS subject namespace needs its own JetStream stream in `JetStreamInitializer`.**
   `NatsEventPublisher` always JetStream-publishes and awaits an ack; a subject matched by no stream never
   acks → `CancellationException: response not registered in time` and the event is dropped (publish is

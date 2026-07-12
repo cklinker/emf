@@ -88,5 +88,26 @@
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
+  },
+  {
+    "name": "java.util.Locale",
+    "methods": [
+      { "name": "getDefault", "parameterTypes": [] },
+      { "name": "getDefault", "parameterTypes": ["java.util.Locale$Category"] }
+    ]
+  },
+  {
+    "name": "java.util.Locale$Category",
+    "allDeclaredFields": true,
+    "methods": [
+      { "name": "values", "parameterTypes": [] },
+      { "name": "valueOf", "parameterTypes": ["java.lang.String"] }
+    ]
+  },
+  {
+    "name": "java.util.TimeZone",
+    "methods": [
+      { "name": "getDefault", "parameterTypes": [] }
+    ]
   }
 ]

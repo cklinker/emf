@@ -543,7 +543,7 @@ public class DefaultQueryEngine implements QueryEngine {
         }
         for (FieldDefinition field : definition.fields()) {
             if (field.type() == FieldType.AUTO_NUMBER && !data.containsKey(field.name())) {
-                String seqName = "seq_" + definition.name() + "_" + field.name();
+                String seqName = autoNumberSequenceName(definition.name(), field.name());
                 Map<String, Object> config = field.fieldTypeConfig();
                 String prefix = "";
                 int padding = 6;
@@ -568,6 +568,17 @@ public class DefaultQueryEngine implements QueryEngine {
                 }
             }
         }
+    }
+
+    /**
+     * Builds the Postgres sequence name for an AUTO_NUMBER field. Collection
+     * names are kebab-case ({@code credit-notes}), which is not a valid
+     * Postgres identifier — {@link AutoNumberService} rejects it and the
+     * record would silently save with a null number. Map every non-identifier
+     * character to underscore so the derived name is always valid.
+     */
+    static String autoNumberSequenceName(String collectionName, String fieldName) {
+        return ("seq_" + collectionName + "_" + fieldName).replaceAll("[^a-zA-Z0-9_]", "_");
     }
 
     /**

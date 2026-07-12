@@ -161,17 +161,22 @@ public class RouteRegistry {
         }
 
         if (routePattern.endsWith("/**")) {
+            // Segment boundary is required: /api/inventory/** must NOT match
+            // /api/inventory-items. A raw startsWith lets one collection's
+            // route shadow every hyphenated sibling, so authorization runs
+            // against the wrong collection (deny at best, cross-collection
+            // grant at worst) depending on registry iteration order.
             String prefix = routePattern.substring(0, routePattern.length() - 3);
-            return requestPath.startsWith(prefix);
+            return requestPath.equals(prefix) || requestPath.startsWith(prefix + "/");
         }
 
         if (routePattern.endsWith("/*")) {
             String prefix = routePattern.substring(0, routePattern.length() - 2);
-            if (!requestPath.startsWith(prefix)) {
+            if (!requestPath.startsWith(prefix + "/")) {
                 return false;
             }
-            String remainder = requestPath.substring(prefix.length());
-            return !remainder.isEmpty() && !remainder.substring(1).contains("/");
+            String remainder = requestPath.substring(prefix.length() + 1);
+            return !remainder.isEmpty() && !remainder.contains("/");
         }
 
         return false;

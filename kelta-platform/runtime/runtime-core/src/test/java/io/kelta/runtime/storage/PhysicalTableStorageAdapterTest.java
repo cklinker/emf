@@ -102,6 +102,26 @@ class PhysicalTableStorageAdapterTest {
     }
     
     @Nested
+    @DisplayName("JSON Storage Conversion Tests")
+    class JsonStorageConversionTests {
+
+        @Test
+        @DisplayName("Should render JSON scalars as JSON text for the jsonb bind")
+        void rendersJsonScalarsAsJsonText() {
+            assertEquals("\"en\"", adapter.convertValueForStorage("en", FieldType.JSON));
+            assertEquals("true", adapter.convertValueForStorage(true, FieldType.JSON));
+            assertEquals("30", adapter.convertValueForStorage(30, FieldType.JSON));
+        }
+
+        @Test
+        @DisplayName("Should render JSON objects and arrays as JSON text")
+        void rendersJsonContainersAsJsonText() {
+            assertEquals("{\"a\":1}", adapter.convertValueForStorage(Map.of("a", 1), FieldType.JSON));
+            assertEquals("[1,2]", adapter.convertValueForStorage(List.of(1, 2), FieldType.JSON));
+        }
+    }
+
+    @Nested
     @DisplayName("Table Initialization Tests")
     class InitializationTests {
         

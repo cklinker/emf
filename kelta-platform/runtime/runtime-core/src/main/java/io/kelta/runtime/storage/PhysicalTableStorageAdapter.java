@@ -1221,24 +1221,23 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param type the field type
      * @return the converted value
      */
-    private Object convertValueForStorage(Object value, FieldType type) {
+    Object convertValueForStorage(Object value, FieldType type) { // package-private for tests
         if (value == null) {
             return null;
         }
 
         return switch (type) {
             case JSON, ARRAY -> {
-                // Convert Map/List to JSON string for JSONB storage
-                if (value instanceof Map || value instanceof List) {
-                    try {
-                        tools.jackson.databind.ObjectMapper mapper =
-                            new tools.jackson.databind.ObjectMapper();
-                        yield mapper.writeValueAsString(value);
-                    } catch (Exception e) {
-                        throw new StorageException("Failed to convert value to JSON", e);
-                    }
+                // Render the value as JSON text for the ?::jsonb bind. This must
+                // cover scalars too: a bare string like "en" is not valid JSONB
+                // input, but "\"en\"" is.
+                try {
+                    tools.jackson.databind.ObjectMapper mapper =
+                        new tools.jackson.databind.ObjectMapper();
+                    yield mapper.writeValueAsString(value);
+                } catch (Exception e) {
+                    throw new StorageException("Failed to convert value to JSON", e);
                 }
-                yield value;
             }
             case DATE, DATETIME -> {
                 // Handle Instant conversion

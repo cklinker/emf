@@ -61,7 +61,10 @@ final class FieldBodyBuilder {
         if (args.get("indexed") instanceof Boolean b) attrs.put("indexed", b);
         if (args.get("searchable") instanceof Boolean b) attrs.put("searchable", b);
         if (args.get("description") instanceof String s && !s.isBlank()) attrs.put("description", s);
-        if (args.get("defaultValue") instanceof String s) attrs.put("defaultValue", s);
+        Object dv = args.get("defaultValue");
+        if (dv instanceof String || dv instanceof Boolean || dv instanceof Number) {
+            attrs.put("defaultValue", dv);
+        }
         if (args.get("validation") instanceof Map<?, ?> v) attrs.put("constraints", v);
 
         Map<String, Object> relationships = new LinkedHashMap<>();

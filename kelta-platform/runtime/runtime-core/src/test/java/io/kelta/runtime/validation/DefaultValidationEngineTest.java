@@ -238,11 +238,26 @@ class DefaultValidationEngineTest {
             CollectionDefinition definition = createTestCollection(
                 FieldDefinition.date("birthDate")
             );
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("birthDate", "2024-01-15"), OperationType.CREATE);
-            
+
             assertTrue(result.valid());
+        }
+
+        @Test
+        @DisplayName("Should accept a DATE column's stored read-back form (midnight datetime + java.util.Date)")
+        void shouldAcceptStoredDateReadBackForms() {
+            CollectionDefinition definition = createTestCollection(FieldDefinition.date("issueDate"));
+
+            // ISO datetime at midnight — how a DATE column reads back through the JSON layer.
+            assertTrue(validationEngine.validate(
+                definition, Map.of("issueDate", "2026-07-12T00:00:00.000Z"), OperationType.UPDATE).valid());
+            assertTrue(validationEngine.validate(
+                definition, Map.of("issueDate", "2026-07-12T00:00:00"), OperationType.UPDATE).valid());
+            // JDBC read-back type.
+            assertTrue(validationEngine.validate(
+                definition, Map.of("issueDate", java.sql.Date.valueOf("2026-07-12")), OperationType.UPDATE).valid());
         }
 
         @Test
@@ -640,6 +655,28 @@ class DefaultValidationEngineTest {
                 definition, Map.of("email", "unique@example.com"), OperationType.CREATE);
             
             assertTrue(result.valid());
+        }
+
+        @Test
+        @DisplayName("excludeId parameter reaches the uniqueness check when the data map has no id (patch-only update)")
+        void excludeIdParameterReachesUniquenessCheck() {
+            FieldDefinition field = new FieldDefinition(
+                "name", FieldType.STRING, false, false, true, null, null, null, null, null
+            );
+            CollectionDefinition definition = createTestCollection(field);
+
+            // Re-sending the record's own unique value in a patch (no "id" key,
+            // like a metadata-promotion upsert) must exclude the record itself
+            // via the explicit excludeId parameter — the interface default used
+            // to drop it, and self-exclusion silently relied on a merged map.
+            when(storageAdapter.isUnique(eq(definition), eq("name"), eq("sbxcustomers"), eq("rec-1")))
+                .thenReturn(true);
+
+            ValidationResult result = validationEngine.validate(
+                definition, Map.of("name", "sbxcustomers"), OperationType.UPDATE, "rec-1");
+
+            assertTrue(result.valid());
+            verify(storageAdapter).isUnique(eq(definition), eq("name"), eq("sbxcustomers"), eq("rec-1"));
         }
 
         @Test

@@ -365,19 +365,27 @@ public class DefaultQueryEngine implements QueryEngine {
         // Coerce string values to expected types (e.g., "10" → 10.0 for DOUBLE fields)
         TypeCoercionService.coerce(definition, recordData);
 
-        // Merge with existing data for validation
+        // Merged view of the record (existing + patch) for cross-field custom rules.
         Map<String, Object> mergedData = new HashMap<>(existing.get());
         mergedData.putAll(recordData);
 
-        // Validate data (field-level constraints)
+        // Field-level validation runs against the PATCH, not the merged record.
+        // The engine already skips fields absent from an UPDATE payload; feeding
+        // it the merged record instead makes every field "present" and
+        // re-validates untouched columns against their stored read-back form,
+        // which differs from the accepted input form (a DATE column reads back
+        // as an ISO datetime at midnight and fails the DATE type check). That
+        // rejected any PATCH on a record with a populated DATE field. Validating
+        // only the patch is both correct and matches the partial-update intent.
         if (validationEngine != null) {
-            ValidationResult validation = validationEngine.validate(definition, mergedData, OperationType.UPDATE, id);
+            ValidationResult validation = validationEngine.validate(definition, recordData, OperationType.UPDATE, id);
             if (!validation.valid()) {
                 throw new ValidationException(validation);
             }
         }
 
-        // Evaluate custom validation rules (formula-based) against the merged record
+        // Custom (formula) rules may reference sibling fields, so they still see
+        // the merged record.
         if (customValidationRuleEngine != null) {
             customValidationRuleEngine.evaluate(definition.name(), mergedData, OperationType.UPDATE);
         }

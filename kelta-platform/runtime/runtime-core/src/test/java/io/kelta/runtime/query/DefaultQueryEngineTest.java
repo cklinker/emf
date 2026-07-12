@@ -388,12 +388,79 @@ class DefaultQueryEngineTest {
                 });
             
             Optional<Map<String, Object>> result = queryEngine.update(testCollection, id, updateData);
-            
+
             assertTrue(result.isPresent());
             assertEquals("New Name", result.get().get("name"));
             assertNotNull(result.get().get("updatedAt"));
         }
-        
+
+        @Test
+        @DisplayName("Field validation sees only the patch, not the merged record (2026-07-12: merged DATE re-validation)")
+        void validatesOnlyThePatchNotMergedRecord() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Old Name");
+            existingRecord.put("price", 50.0);
+
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("name", "New Name");
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(validationEngine.validate(eq(testCollection), any(), any(), eq(id)))
+                .thenReturn(io.kelta.runtime.validation.ValidationResult.success());
+            when(storageAdapter.update(eq(testCollection), eq(id), any()))
+                .thenReturn(Optional.of(existingRecord));
+
+            queryEngine.update(testCollection, id, updateData);
+
+            ArgumentCaptor<Map<String, Object>> validated = ArgumentCaptor.forClass(Map.class);
+            verify(validationEngine).validate(eq(testCollection), validated.capture(), any(), eq(id));
+            // Only the patched field reaches validation — untouched stored columns
+            // (whose read-back form may not match their input form) are not re-checked.
+            assertTrue(validated.getValue().containsKey("name"));
+            assertFalse(validated.getValue().containsKey("price"),
+                "merged stored fields must not leak into UPDATE field-validation");
+        }
+
+        @Test
+        @DisplayName("End-to-end: PATCH an unrelated field on a record with a populated DATE succeeds (real validator)")
+        void patchUnrelatedFieldWithStoredDateSucceeds() {
+            CollectionDefinition invoices = new CollectionDefinitionBuilder()
+                .name("invoices")
+                .displayName("Invoices")
+                .addField(new FieldDefinitionBuilder()
+                    .name("status").type(FieldType.STRING).nullable(false).build())
+                .addField(new FieldDefinitionBuilder()
+                    .name("issueDate").type(FieldType.DATE).nullable(true).build())
+                .build();
+
+            DefaultQueryEngine engineRealValidation = new DefaultQueryEngine(
+                storageAdapter, new io.kelta.runtime.validation.DefaultValidationEngine(storageAdapter));
+
+            String id = "inv-1";
+            Map<String, Object> stored = new HashMap<>();
+            stored.put("id", id);
+            stored.put("status", "ISSUED");
+            // DATE column reads back as a midnight datetime through the JSON layer.
+            stored.put("issueDate", "2026-07-12T00:00:00.000Z");
+
+            when(storageAdapter.getById(invoices, id)).thenReturn(Optional.of(stored));
+            when(storageAdapter.update(eq(invoices), eq(id), any()))
+                .thenAnswer(inv -> {
+                    Map<String, Object> merged = new HashMap<>(stored);
+                    merged.putAll(inv.getArgument(2));
+                    return Optional.of(merged);
+                });
+
+            // Before the fix this threw ValidationException (issueDate "expected DATE").
+            Optional<Map<String, Object>> result =
+                engineRealValidation.update(invoices, id, Map.of("status", "PAID"));
+
+            assertTrue(result.isPresent());
+            assertEquals("PAID", result.get().get("status"));
+        }
+
         @Test
         @DisplayName("Should return empty when record not found")
         void shouldReturnEmptyWhenRecordNotFound() {

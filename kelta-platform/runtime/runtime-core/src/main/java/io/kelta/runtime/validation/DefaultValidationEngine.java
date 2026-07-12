@@ -67,19 +67,34 @@ public class DefaultValidationEngine implements ValidationEngine {
     
     @Override
     public ValidationResult validate(CollectionDefinition definition, Map<String, Object> data, OperationType operationType) {
+        return validate(definition, data, operationType, null);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Overridden so {@code excludeId} actually reaches the uniqueness check.
+     * The interface default silently ignores it — self-exclusion on update only
+     * ever worked because callers validated a merged record whose map happened
+     * to carry {@code id}. Update validation now runs against the bare patch
+     * (which has no {@code id} key), so the explicit parameter is load-bearing.
+     */
+    @Override
+    public ValidationResult validate(CollectionDefinition definition, Map<String, Object> data,
+                                     OperationType operationType, String excludeId) {
         Objects.requireNonNull(definition, "definition cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
         Objects.requireNonNull(operationType, "operationType cannot be null");
-        
+
         List<FieldError> errors = new ArrayList<>();
-        
+
         for (FieldDefinition field : definition.fields()) {
-            validateField(definition, field, data, operationType, errors);
+            validateField(definition, field, data, operationType, excludeId, errors);
         }
-        
+
         return errors.isEmpty() ? ValidationResult.success() : ValidationResult.failure(errors);
     }
-    
+
     /**
      * Validates a single field against its definition.
      */
@@ -88,6 +103,7 @@ public class DefaultValidationEngine implements ValidationEngine {
             FieldDefinition field,
             Map<String, Object> data,
             OperationType operationType,
+            String excludeId,
             List<FieldError> errors) {
         
         String fieldName = field.name();
@@ -139,7 +155,7 @@ public class DefaultValidationEngine implements ValidationEngine {
         
         // 6. Unique constraint validation
         if (field.unique()) {
-            validateUnique(definition, field, value, data, errors);
+            validateUnique(definition, field, value, data, excludeId, errors);
         }
         
         // 7. Reference validation
@@ -208,10 +224,18 @@ public class DefaultValidationEngine implements ValidationEngine {
     }
     
     /**
-     * Validates a date value (ISO-8601 format string or LocalDate).
+     * Validates a date value.
+     *
+     * <p>Accepts {@code LocalDate}, an ISO date string ({@code 2026-07-12}),
+     * {@code java.util.Date}/{@code java.sql.Date} (JDBC read-back), and an ISO
+     * datetime string at midnight ({@code 2026-07-12T00:00:00.000Z}) — a DATE
+     * column reads back as a midnight datetime through the JSON layer, so this
+     * canonical stored form must validate as a DATE. (The primary fix validates
+     * only the patch on update; this keeps any other merged-validation path from
+     * regressing.)
      */
     private boolean isValidDate(Object value) {
-        if (value instanceof LocalDate) {
+        if (value instanceof LocalDate || value instanceof java.util.Date) {
             return true;
         }
         if (value instanceof String str) {
@@ -219,7 +243,18 @@ public class DefaultValidationEngine implements ValidationEngine {
                 LocalDate.parse(str);
                 return true;
             } catch (DateTimeParseException e) {
-                return false;
+                // Fall through to the datetime-at-midnight form below.
+            }
+            try {
+                java.time.Instant.parse(str); // e.g. 2026-07-12T00:00:00.000Z
+                return true;
+            } catch (DateTimeParseException e) {
+                try {
+                    LocalDateTime.parse(str); // e.g. 2026-07-12T00:00:00
+                    return true;
+                } catch (DateTimeParseException e2) {
+                    return false;
+                }
             }
         }
         return false;
@@ -331,12 +366,17 @@ public class DefaultValidationEngine implements ValidationEngine {
             FieldDefinition field,
             Object value,
             Map<String, Object> data,
+            String excludeId,
             List<FieldError> errors) {
-        
-        // Get the record ID to exclude from uniqueness check (for updates)
-        String excludeId = data.get("id") != null ? data.get("id").toString() : null;
-        
-        boolean isUnique = storageAdapter.isUnique(definition, field.name(), value, excludeId);
+
+        // Record ID to exclude from the uniqueness check (for updates): the
+        // explicit parameter wins; fall back to an id carried in the data map
+        // (create-with-client-supplied-id, legacy 3-arg callers).
+        String effectiveExcludeId = excludeId != null
+                ? excludeId
+                : (data.get("id") != null ? data.get("id").toString() : null);
+
+        boolean isUnique = storageAdapter.isUnique(definition, field.name(), value, effectiveExcludeId);
         if (!isUnique) {
             errors.add(FieldError.unique(field.name()));
         }

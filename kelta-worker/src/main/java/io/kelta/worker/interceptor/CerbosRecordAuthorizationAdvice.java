@@ -71,9 +71,16 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
         HttpServletRequest httpRequest = servletRequest.getServletRequest();
         String path = httpRequest.getRequestURI();
 
-        // Only apply to collection API paths (user record data, not metadata)
+        // Only apply to collection API paths (user record data, not metadata).
+        // /api/telehealth/** is excluded: those endpoints enforce access in the
+        // controller (portal users are scoped to their own appointments via
+        // view=mine / participant shares, staff via provider ownership), and
+        // their responses are plain maps — not generic record envelopes. Running
+        // the record-level Cerbos check here emptied every portal user's
+        // appointment list, because portal profiles have no record grants
+        // (found 2026-07-12 building the headless portal).
         if (!path.startsWith("/api/") || path.startsWith("/api/admin/") || path.startsWith("/api/me/")
-                || isMetadataPath(path)) {
+                || path.startsWith("/api/telehealth/") || isMetadataPath(path)) {
             return body;
         }
 

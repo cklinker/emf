@@ -650,7 +650,8 @@ docs updated in-PR. Estimates are focused working days.
 | ✅ | Stretch: service-credits | tenant, atlantico-web | done | Session packs grant + redeem — see §20 |
 | ✅ | Stretch: invoice PDFs | atlantico-web | done | pdf-lib, ownership-gated download — see §9.6 |
 | ✅ | Stretch: intake forms | tenant, atlantico-web | done | Per-service pre-visit questionnaire — see §21 |
-| — | Stretch backlog | | | native LiveKit embed, MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
+| ✅ | Stretch: native video-visit embed | atlantico-web | done | In-portal LiveKit join — see §22 |
+| — | Stretch backlog | | | MB WAY (ifthenpay), certified-invoicing callout, insurer direct billing, availability self-service UI, Svix revalidation |
 
 **Total ≈ 14 focused days.** Dependencies: P1 blocks P7 auth; P3 needs P2; P5 blocks P7/P8 payment paths; P6 can start parallel to P2–P5.
 
@@ -749,4 +750,36 @@ dynamic questionnaire before the visit.
 - Verified E2E: book PSYCH_50 → GET form (6 questions) → submit-invalid 422
   (missing required) → submit-valid 200 → response persisted → gating flips to
   complete; edit re-opens prefilled.
+
+Deployed `main-f84bd42`.
+
+---
+
+## 22. Native video-visit embed (stretch — DELIVERED 2026-07-12)
+
+Online visits now join a LiveKit room **inside the portal** (§14.5 v2) instead
+of the platform's generic visit page.
+
+- **Join window** (`visit.ts`, unit-tested): the waiting room opens 15 min before
+  start and the room stays joinable 30 min after end (early/open/ended). This is a
+  deliberate subset of the platform's own gate (15 min early / 60 min late) so the
+  portal's Join CTA never fires outside the platform window (a click always mints).
+- **Token** (`mintVideoToken`, BFF, as the portal user): the platform binds the
+  LiveKit JWT to `portal_user_id` and lazily creates the `video_session`.
+  `POST /api/visit/[detailsId]/token` — session + ownership gated, ONLINE-only.
+- **UI**: `VisitRoom` = pre-join card (camera/mic start on click) -> `LiveKitRoom`
+  + prebuilt `VideoConference` (`@livekit/components-react`); leaving or a dropped
+  connection returns to appointments. The appointments list shows a live pulsing
+  "Join video visit" CTA only inside the window. 6 locales, 6 window unit tests.
+- **Platform contract**: `POST /api/telehealth/appointments/{id}/video-token` ->
+  `{url, token, roomName, sessionId, expiresAt}` (worker `VideoSessionController`;
+  requires status CONFIRMED + within the visit window, else 409).
+- Verified E2E live: magic-link login as the canary patient -> in-window mint
+  returns 200 + `wss://livekit.kelta.io` + a JWT granting roomJoin/publish/
+  subscribe scoped to the appointment room (`sub` = the patient's portalUserId);
+  the pre-join card renders. An out-of-window mint correctly 409s
+  ("Outside the visit window").
+
+Deployed `main-2cf226c` (homelab-argo #167). Deps: `livekit-client`,
+`@livekit/components-react`/`-styles` (pure JS — alpine-standalone safe).
 

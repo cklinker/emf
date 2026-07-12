@@ -438,7 +438,7 @@ public class DefaultQueryEngine implements QueryEngine {
         // Evaluate before-delete hooks — any error vetoes the delete
         if (hasHooks) {
             BeforeSaveResult hookResult = beforeSaveHookRegistry.evaluateBeforeDelete(
-                    definition.name(), id, recordData != null ? extractTenantId(recordData) : "default");
+                    definition.name(), id, extractTenantId(recordData != null ? recordData : Map.of()));
             if (!hookResult.isSuccess()) {
                 throw new ValidationException(ValidationResult.failure(hookResult.getErrors().stream()
                         .map(e -> new FieldError(
@@ -454,7 +454,7 @@ public class DefaultQueryEngine implements QueryEngine {
             logger.debug("Deleted record '{}' from collection '{}'", id, definition.name());
 
             // Invoke after-delete hooks
-            invokeAfterDeleteHooks(definition, id);
+            invokeAfterDeleteHooks(definition, id, recordData);
 
             // Publish record change event with the pre-fetched data
             if (recordData != null) {
@@ -771,11 +771,13 @@ public class DefaultQueryEngine implements QueryEngine {
     /**
      * Invokes after-delete hooks. Failures are logged but do not block the operation.
      */
-    private void invokeAfterDeleteHooks(CollectionDefinition definition, String id) {
+    private void invokeAfterDeleteHooks(CollectionDefinition definition, String id,
+                                         Map<String, Object> recordData) {
         if (beforeSaveHookRegistry == null) {
             return;
         }
-        beforeSaveHookRegistry.invokeAfterDelete(definition.name(), id, "default");
+        beforeSaveHookRegistry.invokeAfterDelete(definition.name(), id,
+                extractTenantId(recordData != null ? recordData : Map.of()));
     }
 
     /**

@@ -26,6 +26,7 @@ import io.kelta.worker.listener.ApprovalProcessConfigHook;
 import io.kelta.worker.listener.ApprovalRecordLockHook;
 import io.kelta.worker.listener.CerbosPolicySyncHook;
 import io.kelta.worker.listener.FieldPermissionSyncHook;
+import io.kelta.worker.listener.ProfilePermissionSyncHook;
 import io.kelta.worker.listener.ApiSpecConfigHook;
 import io.kelta.worker.listener.CredentialEncryptionHook;
 import io.kelta.worker.listener.CredentialEventPublisher;
@@ -415,6 +416,26 @@ public class FlowConfig {
             BeforeSaveHookRegistry hookRegistry,
             CerbosPolicySyncCoalescer syncCoalescer) {
         FieldPermissionSyncHook hook = new FieldPermissionSyncHook(syncCoalescer);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public ProfilePermissionSyncHook objectPermissionSyncHook(
+            BeforeSaveHookRegistry hookRegistry,
+            CerbosPolicySyncCoalescer syncCoalescer) {
+        ProfilePermissionSyncHook hook =
+                new ProfilePermissionSyncHook("profile-object-permissions", syncCoalescer);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public ProfilePermissionSyncHook systemPermissionSyncHook(
+            BeforeSaveHookRegistry hookRegistry,
+            CerbosPolicySyncCoalescer syncCoalescer) {
+        ProfilePermissionSyncHook hook =
+                new ProfilePermissionSyncHook("profile-system-permissions", syncCoalescer);
         hookRegistry.register(hook);
         return hook;
     }

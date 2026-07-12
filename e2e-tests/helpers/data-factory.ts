@@ -39,6 +39,29 @@ const STORAGE_READY_POLL_MS = 2_000;
  * transient spike instead of failing on the first stalled socket.
  */
 const READY_FETCH_TIMEOUT_MS = 5_000;
+/**
+ * Longest Retry-After we are willing to sleep through on a 429. A tenant-window
+ * rate-limit lockout (minutes) can never resolve within a test's budget —
+ * sleeping through it just converts a diagnosable failure into an opaque
+ * timeout. Beyond this cap we fail immediately with an explicit message.
+ */
+const MAX_RATE_LIMIT_WAIT_MS = 15_000;
+
+/** Builds the loud, self-explaining error for a gateway 429. */
+function rateLimitedError(context: string, retryAfterSeconds: number | null): Error {
+  return new Error(
+    `${context}: gateway returned 429 Too Many Requests — the tenant's API ` +
+      `rate-limit window is exhausted (Retry-After: ${retryAfterSeconds ?? "?"}s). ` +
+      `The e2e run is being throttled; this is NOT a storage/readiness problem.`,
+  );
+}
+
+function retryAfterSeconds(response: Response): number | null {
+  const header = response.headers.get("Retry-After");
+  if (!header) return null;
+  const parsed = parseInt(header, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 export class DataFactory {
   private createdEntities: Array<{ type: string; id: string }> = [];
@@ -73,6 +96,15 @@ export class DataFactory {
       ) {
         this.currentToken = await this.api.refreshToken();
         continue;
+      }
+
+      // Fail fast on a rate-limit lockout longer than any sane retry budget —
+      // sleeping through a multi-minute Retry-After only masks the real cause.
+      if (response.status === 429) {
+        const retryAfter = retryAfterSeconds(response);
+        if (retryAfter !== null && retryAfter * 1_000 > MAX_RATE_LIMIT_WAIT_MS) {
+          throw rateLimitedError(`API ${method} ${path}`, retryAfter);
+        }
       }
 
       // Retry on rate limiting (429) and transient server errors (500-503)
@@ -139,7 +171,18 @@ export class DataFactory {
         if (response.ok) {
           return;
         }
-      } catch {
+        // A rate-limit rejection will not clear within this poll's budget and
+        // every further poll only extends the lockout — surface it immediately.
+        if (response.status === 429) {
+          throw rateLimitedError(
+            `waitForStorageReady('${collectionName}')`,
+            retryAfterSeconds(response),
+          );
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("429")) {
+          throw error;
+        }
         // Network error — keep retrying
       }
 
@@ -251,10 +294,18 @@ export class DataFactory {
           } else {
             consecutive = 0;
           }
+        } else if (response.status === 429) {
+          throw rateLimitedError(
+            `waitForFieldVisible('${fieldName}')`,
+            retryAfterSeconds(response),
+          );
         } else {
           consecutive = 0;
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("429")) {
+          throw error;
+        }
         consecutive = 0;
       }
       await new Promise((resolve) =>

@@ -1,18 +1,21 @@
 package io.kelta.gateway.ratelimit;
 
 import io.kelta.gateway.route.RateLimitConfig;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
-import org.springframework.data.redis.core.ReactiveValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.time.Duration;
+import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -22,162 +25,175 @@ class RedisRateLimiterTest {
     @Mock
     private ReactiveRedisTemplate<String, String> redisTemplate;
 
-    @Mock
-    private ReactiveValueOperations<String, String> valueOps;
+    private RedisRateLimiter newLimiter() {
+        return new RedisRateLimiter(redisTemplate);
+    }
 
-    private RedisRateLimiter rateLimiter;
-
-    @BeforeEach
-    void setUp() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        // Every request calls expire to ensure TTL is always set
-        lenient().when(redisTemplate.expire(anyString(), any(Duration.class))).thenReturn(Mono.just(true));
-        rateLimiter = new RedisRateLimiter(redisTemplate);
+    @SuppressWarnings("unchecked")
+    private void givenWindowCount(long count) {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), anyList()))
+            .thenReturn(Flux.just(count));
     }
 
     @Test
     void testFirstRequestInWindow() {
-        // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String expectedKey = "ratelimit:users-collection:user@example.com";
+        givenWindowCount(1L);
 
-        when(valueOps.increment(expectedKey)).thenReturn(Mono.just(1L));
-
-        // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
             .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 9)
             .verifyComplete();
-
-        verify(valueOps).increment(expectedKey);
-        verify(redisTemplate).expire(expectedKey, Duration.ofMinutes(1));
     }
 
     @Test
-    void testSubsequentRequestInWindow() {
-        // Given
+    @SuppressWarnings("unchecked")
+    void testWindowKeyAndTtlPassedToScript() {
+        RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(5));
+        givenWindowCount(1L);
+
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(RateLimitResult::isAllowed)
+            .verifyComplete();
+
+        ArgumentCaptor<List<String>> keysCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<String>> argsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(redisTemplate).execute(any(RedisScript.class), keysCaptor.capture(), argsCaptor.capture());
+        assertThat(keysCaptor.getValue()).containsExactly("ratelimit:users-collection:user@example.com");
+        assertThat(argsCaptor.getValue()).containsExactly("300");
+    }
+
+    @Test
+    void testSubsequentRequestDoesNotRefreshTtl() {
+        // The window TTL is managed inside the atomic script (set only when the
+        // window is new or its TTL was lost). Refreshing it per request would
+        // turn the fixed window into an idle-expiry that never resets under
+        // continuous traffic — the root cause of a tenant-wide 429 lockout.
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String expectedKey = "ratelimit:users-collection:user@example.com";
+        givenWindowCount(5L);
 
-        when(valueOps.increment(expectedKey)).thenReturn(Mono.just(5L));
-
-        // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
             .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 5)
             .verifyComplete();
 
-        verify(valueOps).increment(expectedKey);
-        // TTL is always refreshed
-        verify(redisTemplate).expire(expectedKey, Duration.ofMinutes(1));
+        verify(redisTemplate, never()).expire(anyString(), any(Duration.class));
     }
 
     @Test
-    void testRateLimitExceeded() {
-        // Given
-        RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String expectedKey = "ratelimit:users-collection:user@example.com";
+    void testRateLimitExceededUsesRemainingWindowTtlAsRetryAfter() {
+        RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(5));
+        givenWindowCount(11L);
+        when(redisTemplate.getExpire("ratelimit:users-collection:user@example.com"))
+            .thenReturn(Mono.just(Duration.ofSeconds(37)));
 
-        when(valueOps.increment(expectedKey)).thenReturn(Mono.just(11L));
-
-        // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
             .expectNextMatches(result ->
                 !result.isAllowed() &&
                 result.getRemainingRequests() == 0 &&
-                result.getRetryAfter().equals(Duration.ofMinutes(1)))
+                result.getRetryAfter().equals(Duration.ofSeconds(37)))
             .verifyComplete();
+    }
 
-        verify(valueOps).increment(expectedKey);
+    @Test
+    void testRateLimitExceededFallsBackToWindowDurationWhenTtlMissing() {
+        RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
+        givenWindowCount(11L);
+        when(redisTemplate.getExpire("ratelimit:users-collection:user@example.com"))
+            .thenReturn(Mono.empty());
+
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(result ->
+                !result.isAllowed() && result.getRetryAfter().equals(Duration.ofMinutes(1)))
+            .verifyComplete();
+    }
+
+    @Test
+    void testRateLimitExceededFallsBackToWindowDurationWhenTtlNonPositive() {
+        RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
+        givenWindowCount(11L);
+        when(redisTemplate.getExpire("ratelimit:users-collection:user@example.com"))
+            .thenReturn(Mono.just(Duration.ofSeconds(-1)));
+
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(result ->
+                !result.isAllowed() && result.getRetryAfter().equals(Duration.ofMinutes(1)))
+            .verifyComplete();
     }
 
     @Test
     void testExactlyAtLimit() {
-        // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String expectedKey = "ratelimit:users-collection:user@example.com";
+        givenWindowCount(10L);
 
-        when(valueOps.increment(expectedKey)).thenReturn(Mono.just(10L));
-
-        // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
             .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 0)
             .verifyComplete();
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void testRedisUnavailable() {
-        // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String expectedKey = "ratelimit:users-collection:user@example.com";
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), anyList()))
+            .thenReturn(Flux.error(new RuntimeException("Redis connection failed")));
 
-        when(valueOps.increment(expectedKey))
-            .thenReturn(Mono.error(new RuntimeException("Redis connection failed")));
-
-        // When & Then - should allow request and not throw exception
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+        // Should allow request and not throw exception
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
             .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 10)
             .verifyComplete();
     }
 
     @Test
-    void testDifferentPrincipalsHaveSeparateLimits() {
-        // Given
+    @SuppressWarnings("unchecked")
+    void testDifferentPrincipalsHaveSeparateKeys() {
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String key1 = "ratelimit:users-collection:user1@example.com";
-        String key2 = "ratelimit:users-collection:user2@example.com";
+        givenWindowCount(1L);
 
-        when(valueOps.increment(key1)).thenReturn(Mono.just(1L));
-        when(valueOps.increment(key2)).thenReturn(Mono.just(1L));
-
-        // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user1@example.com", config))
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user1@example.com", config))
+            .expectNextMatches(RateLimitResult::isAllowed)
+            .verifyComplete();
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user2@example.com", config))
             .expectNextMatches(RateLimitResult::isAllowed)
             .verifyComplete();
 
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user2@example.com", config))
-            .expectNextMatches(RateLimitResult::isAllowed)
-            .verifyComplete();
-
-        verify(valueOps).increment(key1);
-        verify(valueOps).increment(key2);
+        ArgumentCaptor<List<String>> keysCaptor = ArgumentCaptor.forClass(List.class);
+        verify(redisTemplate, times(2)).execute(any(RedisScript.class), keysCaptor.capture(), anyList());
+        assertThat(keysCaptor.getAllValues()).containsExactly(
+            List.of("ratelimit:users-collection:user1@example.com"),
+            List.of("ratelimit:users-collection:user2@example.com"));
     }
 
     @Test
-    void testDifferentRoutesHaveSeparateLimits() {
-        // Given
+    @SuppressWarnings("unchecked")
+    void testDifferentRoutesHaveSeparateKeys() {
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String key1 = "ratelimit:users-collection:user@example.com";
-        String key2 = "ratelimit:posts-collection:user@example.com";
+        givenWindowCount(1L);
 
-        when(valueOps.increment(key1)).thenReturn(Mono.just(1L));
-        when(valueOps.increment(key2)).thenReturn(Mono.just(1L));
-
-        // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(RateLimitResult::isAllowed)
+            .verifyComplete();
+        StepVerifier.create(newLimiter().checkRateLimit("posts-collection", "user@example.com", config))
             .expectNextMatches(RateLimitResult::isAllowed)
             .verifyComplete();
 
-        StepVerifier.create(rateLimiter.checkRateLimit("posts-collection", "user@example.com", config))
-            .expectNextMatches(RateLimitResult::isAllowed)
-            .verifyComplete();
-
-        verify(valueOps).increment(key1);
-        verify(valueOps).increment(key2);
+        ArgumentCaptor<List<String>> keysCaptor = ArgumentCaptor.forClass(List.class);
+        verify(redisTemplate, times(2)).execute(any(RedisScript.class), keysCaptor.capture(), anyList());
+        assertThat(keysCaptor.getAllValues()).containsExactly(
+            List.of("ratelimit:users-collection:user@example.com"),
+            List.of("ratelimit:posts-collection:user@example.com"));
     }
 
     @Test
-    void testCustomWindowDuration() {
-        // Given
+    @SuppressWarnings("unchecked")
+    void testCustomWindowDurationPassedAsSeconds() {
         RateLimitConfig config = new RateLimitConfig(100, Duration.ofSeconds(30));
-        String expectedKey = "ratelimit:users-collection:user@example.com";
+        givenWindowCount(1L);
 
-        when(valueOps.increment(expectedKey)).thenReturn(Mono.just(1L));
-        when(redisTemplate.expire(expectedKey, Duration.ofSeconds(30))).thenReturn(Mono.just(true));
-
-        // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+        StepVerifier.create(newLimiter().checkRateLimit("users-collection", "user@example.com", config))
             .expectNextMatches(RateLimitResult::isAllowed)
             .verifyComplete();
 
-        verify(redisTemplate).expire(expectedKey, Duration.ofSeconds(30));
+        ArgumentCaptor<List<String>> argsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(redisTemplate).execute(any(RedisScript.class), anyList(), argsCaptor.capture());
+        assertThat(argsCaptor.getValue()).containsExactly("30");
     }
 }

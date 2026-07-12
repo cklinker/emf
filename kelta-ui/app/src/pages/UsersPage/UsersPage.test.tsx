@@ -32,6 +32,8 @@ vi.mock('../../hooks/useDelegatedAdmin', () => ({
 vi.mock('../../components/Toast', () => ({ useToast: () => ({ showToast: vi.fn() }) }))
 
 const adminUsersList = vi.fn()
+const adminUsersCreate = vi.fn()
+const profilesList = vi.fn()
 const delegatedUsersList = vi.fn()
 const delegatedUsersCreate = vi.fn()
 const delegatedUsersUpdate = vi.fn()
@@ -40,7 +42,13 @@ vi.mock('../../context/ApiContext', () => ({
   useApi: () => ({
     keltaClient: {
       admin: {
-        users: { list: adminUsersList, create: vi.fn(), activate: vi.fn(), deactivate: vi.fn() },
+        users: {
+          list: adminUsersList,
+          create: adminUsersCreate,
+          activate: vi.fn(),
+          deactivate: vi.fn(),
+        },
+        profiles: { list: profilesList },
         delegated: {
           users: {
             list: delegatedUsersList,
@@ -117,6 +125,11 @@ describe('UsersPage', () => {
     mockNavigate.mockClear()
     hasPermission.mockReset()
     adminUsersList.mockReset().mockResolvedValue({ content: [], totalPages: 0 })
+    adminUsersCreate.mockReset().mockResolvedValue(ADMIN_USER)
+    profilesList.mockReset().mockResolvedValue([
+      { id: 'p1', name: 'Standard User' },
+      { id: 'p2', name: 'System Administrator' },
+    ])
     delegatedUsersList.mockReset().mockResolvedValue([])
     delegatedUsersCreate.mockReset().mockResolvedValue(DELEGATED_USER)
   })
@@ -178,6 +191,45 @@ describe('UsersPage', () => {
       expect(await screen.findByText('Full Listed')).toBeInTheDocument()
       // No delegated badge in full-admin mode.
       expect(screen.queryByTestId('delegated-scope-badge')).not.toBeInTheDocument()
+    })
+
+    it("offers the tenant's profiles in the create form", async () => {
+      renderPage()
+      await waitFor(() => expect(profilesList).toHaveBeenCalled())
+
+      fireEvent.click(screen.getByText('Create User'))
+
+      const select = (await screen.findByTestId('create-profile-select')) as HTMLSelectElement
+      await waitFor(() =>
+        expect(Array.from(select.options).map((o) => o.textContent)).toEqual(
+          expect.arrayContaining(['Standard User', 'System Administrator'])
+        )
+      )
+    })
+
+    it('blocks submit until a profile is chosen, then creates with the profileId', async () => {
+      renderPage()
+      await waitFor(() => expect(adminUsersList).toHaveBeenCalled())
+
+      fireEvent.click(screen.getByText('Create User'))
+      fireEvent.change(await screen.findByLabelText(/Email/), {
+        target: { value: 'new@example.com' },
+      })
+      fireEvent.change(screen.getByLabelText(/First Name/), { target: { value: 'New' } })
+      fireEvent.change(screen.getByLabelText(/Last Name/), { target: { value: 'User' } })
+
+      // No profile chosen — the submit is rejected client-side, never hitting the API.
+      fireEvent.click(screen.getByText('Create'))
+      expect(await screen.findByText('Profile is required')).toBeInTheDocument()
+      expect(adminUsersCreate).not.toHaveBeenCalled()
+
+      fireEvent.change(screen.getByTestId('create-profile-select'), { target: { value: 'p2' } })
+      fireEvent.click(screen.getByText('Create'))
+      await waitFor(() =>
+        expect(adminUsersCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ email: 'new@example.com', profileId: 'p2' })
+        )
+      )
     })
   })
 })

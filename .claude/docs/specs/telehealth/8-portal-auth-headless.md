@@ -63,6 +63,9 @@ Stored under `tenant.settings.portalAuth`:
 - `inviteRedirectUri`: when set, `portal.invite` emails (worker
   `PortalUserService`) link there instead of the kelta-auth verify page — the
   external site completes the invite via the same `/portal/api/login/verify`.
+  Visit links (`GET /api/telehealth/visits/{token}`, slice 4) 302 to the same
+  callback with `?token=<raw>&appointmentId=<id>` so headless portals land
+  authenticated on their own visit page instead of the built-in `/app`.
 - Managed via worker **`GET|PUT /api/admin/tenant/portal-auth-settings`**
   (MANAGE_USERS, in-controller gate like the other `/api/admin` endpoints).
   PUT validates: ≤ 10 entries, absolute `https://` URLs (`http://localhost…`

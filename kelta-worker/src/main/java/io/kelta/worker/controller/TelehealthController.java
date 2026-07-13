@@ -40,9 +40,11 @@ import java.util.UUID;
  *
  * <p>{@code GET /visits/{token}} is a PUBLIC (unauthenticated) path: it
  * validates the signed visit token against the live appointment, mints a
- * single-use 15-minute portal login token, and redirects into the kelta-auth
- * magic-link verify — one click from the email into an authenticated portal
- * session.
+ * single-use 15-minute portal login token, and redirects — one click from the
+ * email into an authenticated portal session. Headless portals (slice 8) land
+ * on their allowlisted {@code portalAuth.inviteRedirectUri} with the
+ * appointment id for deep-linking; otherwise the kelta-auth magic-link verify
+ * page signs the user into the built-in end-user app.
  */
 @RestController
 @RequestMapping("/api/telehealth")
@@ -167,7 +169,9 @@ public class TelehealthController {
     /**
      * PUBLIC visit-link landing (gateway unauthenticated path). Stateless HMAC
      * validation + live-appointment re-check, then a fresh single-use portal
-     * login token and a redirect into the auth verify endpoint.
+     * login token and a redirect: a headless portal's allowlisted callback
+     * (with the appointment id, so the portal can deep-link the visit page)
+     * when the tenant configured one, else the auth verify endpoint.
      */
     @GetMapping("/visits/{token}")
     public ResponseEntity<Void> visit(@PathVariable String token) {
@@ -192,10 +196,27 @@ public class TelehealthController {
                 PortalTokens.sha256(rawLogin),
                 Timestamp.from(Instant.now().plus(java.time.Duration.ofMinutes(15))));
 
-        String base = authBaseUrl.endsWith("/") ? authBaseUrl.substring(0, authBaseUrl.length() - 1) : authBaseUrl;
+        // Same headless-portal landing the portal.invite email uses (slice 8):
+        // exchange happens on the portal via POST /portal/api/login/verify. The
+        // built-in verify page would strand these tenants' users on the
+        // platform app, where their portal has no session.
+        String portalRedirect = jdbcTemplate.queryForList(
+                        "SELECT settings#>>'{portalAuth,inviteRedirectUri}' FROM tenant WHERE id = ?",
+                        String.class, claim.tenantId()).stream()
+                .filter(v -> v != null && !v.isBlank())
+                .findFirst().orElse(null);
+        String location;
+        if (portalRedirect != null) {
+            location = portalRedirect + (portalRedirect.contains("?") ? "&" : "?")
+                    + "token=" + rawLogin + "&appointmentId=" + claim.appointmentId();
+        } else {
+            String base = authBaseUrl.endsWith("/")
+                    ? authBaseUrl.substring(0, authBaseUrl.length() - 1) : authBaseUrl;
+            location = base + "/portal/login/verify?token=" + rawLogin;
+        }
         log.debug("Visit link accepted for appointment {}", claim.appointmentId());
         return ResponseEntity.status(HttpStatus.FOUND)
-                .header(HttpHeaders.LOCATION, base + "/portal/login/verify?token=" + rawLogin)
+                .header(HttpHeaders.LOCATION, location)
                 .build();
     }
 

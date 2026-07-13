@@ -21,9 +21,11 @@
 >   `KELTA_TELEHEALTH_VISIT_SECRET` in prod) bound to (tenant, appointment, portalUser, exp
 >   = scheduledEnd+1h), multi-use until exp; `GET /api/telehealth/visits/{token}` (gateway
 >   unauthenticated path) re-checks the LIVE appointment row (cancelled kills the link),
->   mints a fresh single-use 15-min portal login token, and 302s into the kelta-auth
->   verify — one click from email to an authenticated `/app` session. Slice 6 adds the
->   `next`-page landing.
+>   mints a fresh single-use 15-min portal login token, and 302s — to the tenant's
+>   headless `portalAuth.inviteRedirectUri` callback (slice 8) as
+>   `?token=<raw>&appointmentId=<id>` when configured, so the portal exchanges the
+>   token via `POST /portal/api/login/verify` and deep-links its visit page; else
+>   into the kelta-auth verify — one click from email to an authenticated session.
 > - **Availability model**: RULE rows (weekday 0=Sun..6=Sat, start/end LOCAL time, per-row
 >   timezone — wall-clock stable across DST) + EXCEPTION rows (closed date, or an additive
 >   window for a date). Managed via the admin-only generic JSON:API for now (no authoring
@@ -75,7 +77,7 @@ detail shows status timeline, linked conversation, reschedule/cancel actions.
 GET  /api/telehealth/slots?providerId&from&to&duration=30 → {slots:[{start,end}]}   (tenant TZ math server-side)
 POST /api/telehealth/appointments {providerId, start, visitType, reason?}           → 201 (portal: self; staff: any portalUserId)
 POST /api/telehealth/appointments/{id}/cancel|reschedule|complete
-GET  /api/telehealth/visits/{token}                                                 → 302 into portal appointment page
+GET  /api/telehealth/visits/{token}    → 302: headless portal callback (?token&appointmentId) when configured, else kelta-auth verify
 ```
 
 Availability shape: weekday, startTime, endTime, timezone, effectiveFrom/To, plus exception

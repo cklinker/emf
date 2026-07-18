@@ -170,6 +170,7 @@ function parseCollectionsResponse(response: unknown): CollectionSchema[] {
       name: attrs.name as string,
       displayName: (attrs.displayName as string) || (attrs.name as string),
       displayFieldName,
+      trackHistory: !!attrs.trackHistory,
       fields,
     }
   })

@@ -14,6 +14,7 @@ import { FieldSection } from '@/components/detail'
 import type { FieldSectionRenderContext } from '@/components/detail'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { InlineFieldValue } from '@/components/record/InlineFieldValue'
+import { useI18n } from '@/context/I18nContext'
 import type { LayoutSectionDto, LayoutFieldPlacementDto } from '@/hooks/usePageLayout'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
@@ -46,6 +47,11 @@ export interface LayoutFieldSectionsProps {
   editable?: boolean
   /** Persist a single committed field value (partial PATCH). Rejects surface inline. */
   onFieldCommit?: (fieldName: string, value: unknown) => Promise<void>
+  /**
+   * Field names to mark with a "Changed" badge (record-version detail view).
+   * Read-only rendering only — ignored when inline editing is active.
+   */
+  highlightedFields?: Set<string>
 }
 
 /**
@@ -98,6 +104,22 @@ function mapPlacementsToFields(
     .filter((f): f is FieldDefinition => f !== null)
 }
 
+/**
+ * Amber pill marking a field that changed in the viewed record version
+ * (PromotionWizard ChangeActionLabel styling).
+ */
+export function ChangedBadge(): React.ReactElement {
+  const { t } = useI18n()
+  return (
+    <span
+      className="absolute right-0 top-0 inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400"
+      data-testid="version-changed-badge"
+    >
+      {t('history.changedBadge')}
+    </span>
+  )
+}
+
 /** Collect per-placement read-only / required overrides across all sections, keyed by field name. */
 function buildPlacementOverrides(sections: LayoutSectionDto[]): PlacementOverrides {
   const overrides: PlacementOverrides = new Map()
@@ -121,6 +143,7 @@ export function LayoutFieldSections({
   persistKeyPrefix,
   editable,
   onFieldCommit,
+  highlightedFields,
 }: LayoutFieldSectionsProps): React.ReactElement {
   const inlineEditing = !!editable && !!onFieldCommit
   const placementOverrides = useMemo(() => buildPlacementOverrides(sections), [sections])
@@ -185,6 +208,20 @@ export function LayoutFieldSections({
                   masked={maskedFieldSet.has(field.name)}
                   onCommit={onFieldCommit}
                 />
+              ) : highlightedFields?.has(field.name) ? (
+                <div className="relative" data-testid="version-changed-field">
+                  <FieldRenderer
+                    type={field.type}
+                    value={value}
+                    fieldName={field.name}
+                    displayName={field.displayName || field.name}
+                    tenantSlug={tenantSlug}
+                    targetCollection={field.referenceTarget}
+                    displayLabel={displayLabel}
+                    truncate={false}
+                  />
+                  <ChangedBadge />
+                </div>
               ) : (
                 <FieldRenderer
                   type={field.type}

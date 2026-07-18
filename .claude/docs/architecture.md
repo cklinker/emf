@@ -430,6 +430,29 @@ row's referenced collection+field and **drops FLS-denied rows / redacts MASKED o
 values** per requester, fail-closed on an unresolvable collection. The end-user record
 `ActivityTimeline` (`/app/o`) folds these rows into its feed.
 
+**Record versioning (collection-level history)** — when `collection.track_history` is
+true (`CollectionDefinition.trackHistory`, toggled on the collection edit form and
+propagated via the existing `kelta.config.collection.changed.<tenantId>` broadcast),
+`RecordVersionHook` (worker `listener/`, wildcard `BeforeSaveHook`, order 910) writes a
+**full-record snapshot** to `record_version` (V174) on every create/update/delete:
+`snapshot` (jsonb), `changed_fields`, `change_type CREATED|UPDATED|DELETED`, `changed_by`,
+1-based `version_number` per record assigned atomically by
+`RecordVersionRepository`'s `INSERT ... SELECT MAX(version_number)+1` (unique-constraint
+retry on races). Collection-level tracking tracks **all fields** and supersedes per-field
+`field.track_history` (`FieldHistoryHook` skips such collections); a no-op update writes
+no version, and delete keeps the version rows (audit trail; `changed_by` on the DELETED
+version is the last updater, not the deleter — see `concerns.md`). Reads go through the
+`record-versions` read-only **system collection** (`/api/record-versions`, gateway static
+route). Because a version's `snapshot` carries every field value of the referenced
+collection, `RecordVersionSecurityAdvice` (`@Order(21)`) resolves each row's referenced
+collection and **strips unreadable/unknown snapshot keys (and their names from
+`changedFields`) / masks MASKED values**, fail-closed (unresolvable collection or
+non-object snapshot ⇒ row dropped). UI: a **History** tab (shared `DetailTabBar`, both
+`/app/o` and admin `/resources`) lists versions and renders a selected snapshot through
+the **current** page layout read-only with changed-field badges
+(`RecordHistoryTab`/`RecordVersionDetail`); `ActivityTimeline` shows one entry per
+version (author included, click-through via `?tab=__history__&version=N`).
+
 **Pagination contract** — every paginated REST endpoint uses JSON:API
 bracket syntax (`page[number]` / `page[size]`). Parsing lives in
 `runtime-core/.../query/Pagination.fromParams`, which clamps `page[size]`

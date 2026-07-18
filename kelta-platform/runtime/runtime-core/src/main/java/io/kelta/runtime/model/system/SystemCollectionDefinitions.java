@@ -150,6 +150,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(securityAuditLogs());
         definitions.add(setupAuditEntries());
         definitions.add(fieldHistory());
+        definitions.add(recordVersions());
         definitions.add(scriptExecutionLogs());
         definitions.add(flowExecutions());
         definitions.add(jobExecutionLogs());
@@ -439,6 +440,8 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.lookup("displayFieldId", "fields", "Display Field")
                 .withColumnName("display_field_id"))
             .addField(FieldDefinition.json("adapterConfig").withColumnName("adapter_config"))
+            .addField(FieldDefinition.bool("trackHistory").withColumnName("track_history")
+                .withDefault(false))
             .build();
     }
 
@@ -1359,6 +1362,27 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("field_name"))
             .addField(FieldDefinition.json("oldValue").withColumnName("old_value"))
             .addField(FieldDefinition.json("newValue").withColumnName("new_value"))
+            .addField(FieldDefinition.requiredString("changedBy", 36)
+                .withColumnName("changed_by"))
+            .addField(FieldDefinition.datetime("changedAt").withColumnName("changed_at"))
+            .addField(FieldDefinition.requiredString("changeSource", 20)
+                .withColumnName("change_source"))
+            .build();
+    }
+
+    public static CollectionDefinition recordVersions() {
+        return readOnlySystemBuilder("record-versions", "Record Versions", "record_version")
+            .tenantScoped(true)
+            .addField(FieldDefinition.requiredString("collectionId", 36)
+                .withColumnName("collection_id"))
+            .addField(FieldDefinition.requiredString("recordId", 36)
+                .withColumnName("record_id"))
+            .addField(FieldDefinition.requiredInteger("versionNumber")
+                .withColumnName("version_number"))
+            .addField(FieldDefinition.requiredString("changeType", 10)
+                .withColumnName("change_type"))
+            .addField(FieldDefinition.json("snapshot"))
+            .addField(FieldDefinition.json("changedFields").withColumnName("changed_fields"))
             .addField(FieldDefinition.requiredString("changedBy", 36)
                 .withColumnName("changed_by"))
             .addField(FieldDefinition.datetime("changedAt").withColumnName("changed_at"))

@@ -33,6 +33,10 @@ import java.util.Set;
  *                         When set and the referenced field is unique and required,
  *                         GET-by-id requests accept either a UUID or this field's value.
  * @param tenantId The tenant that owns this collection (nullable for system collections).
+ * @param trackHistory Whether every record create/update/delete is captured as a full
+ *                     snapshot in {@code record_version}. When true, all fields are
+ *                     tracked and per-field {@link FieldDefinition#trackHistory()} is
+ *                     superseded for this collection.
  *
  * @since 1.0.0
  */
@@ -53,7 +57,8 @@ public record CollectionDefinition(
     Set<String> immutableFields,
     Map<String, String> columnMapping,
     String displayFieldName,
-    String tenantId
+    String tenantId,
+    boolean trackHistory
 ) {
     /**
      * Compact constructor with validation and defensive copying.
@@ -87,7 +92,7 @@ public record CollectionDefinition(
             long version, Instant createdAt, Instant updatedAt) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
-             false, true, false, Set.of(), Map.of(), null, null);
+             false, true, false, Set.of(), Map.of(), null, null, false);
     }
 
     /**
@@ -102,7 +107,7 @@ public record CollectionDefinition(
             Set<String> immutableFields, Map<String, String> columnMapping) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
-             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null, null);
+             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null, null, false);
     }
 
     /**
@@ -119,7 +124,24 @@ public record CollectionDefinition(
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
              systemCollection, tenantScoped, readOnly, immutableFields, columnMapping,
-             displayFieldName, null);
+             displayFieldName, null, false);
+    }
+
+    /**
+     * Backward-compatible constructor without trackHistory parameter.
+     */
+    public CollectionDefinition(
+            String name, String displayName, String description,
+            List<FieldDefinition> fields, StorageConfig storageConfig,
+            ApiConfig apiConfig, AuthzConfig authzConfig,
+            long version, Instant createdAt, Instant updatedAt,
+            boolean systemCollection, boolean tenantScoped, boolean readOnly,
+            Set<String> immutableFields, Map<String, String> columnMapping,
+            String displayFieldName, String tenantId) {
+        this(name, displayName, description, fields, storageConfig, apiConfig,
+             authzConfig, version, createdAt, updatedAt,
+             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping,
+             displayFieldName, tenantId, false);
     }
 
     /**
@@ -201,7 +223,7 @@ public record CollectionDefinition(
             storageConfig, apiConfig, authzConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
-            immutableFields, columnMapping, displayFieldName, tenantId
+            immutableFields, columnMapping, displayFieldName, tenantId, trackHistory
         );
     }
 
@@ -217,7 +239,7 @@ public record CollectionDefinition(
             storageConfig, apiConfig, authzConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
-            immutableFields, columnMapping, displayFieldName, tenantId
+            immutableFields, columnMapping, displayFieldName, tenantId, trackHistory
         );
     }
 

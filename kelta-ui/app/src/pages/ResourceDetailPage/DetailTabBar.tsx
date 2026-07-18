@@ -36,6 +36,7 @@ const DETAIL_TAB_TRIGGER = 'group/tab data-[state=active]:after:!bg-primary'
 const NOTES_TAB = '__notes__'
 const ATTACHMENTS_TAB = '__attachments__'
 const SYSTEM_TAB = '__system__'
+export const HISTORY_TAB = '__history__'
 
 interface UserDisplay {
   name: string
@@ -73,6 +74,21 @@ export interface DetailTabBarProps {
   /** Refetch the parent record after a related-list mutation (refreshes the
    *  `includedData` path + tab counts). */
   onRelatedChange?: () => void
+  /**
+   * Record-version history panel. The History tab (next to System Information)
+   * renders only when this is provided — pages gate it on the collection's
+   * `trackHistory` flag.
+   */
+  historyContent?: React.ReactNode
+  /**
+   * Controlled active tab. When set (with `onTabChange`), the Tabs become
+   * controlled so pages can deep-link (`?tab=`) — e.g. the activity timeline
+   * jumping to the History tab. When omitted, behavior is unchanged
+   * (uncontrolled with the first related list as default).
+   */
+  activeTab?: string
+  /** Controlled-tab change callback (required when `activeTab` is set). */
+  onTabChange?: (tab: string) => void
 }
 
 function normalizeSortDirection(raw: string | null | undefined): 'asc' | 'desc' {
@@ -193,6 +209,9 @@ export function DetailTabBar({
   getUserDisplay,
   editable = false,
   onRelatedChange,
+  historyContent,
+  activeTab,
+  onTabChange,
 }: DetailTabBarProps): React.ReactElement {
   const { t, formatDate } = useI18n()
   const { showToast } = useToast()
@@ -208,6 +227,18 @@ export function DetailTabBar({
   }, [])
 
   const defaultTab = sortedLists[0]?.id ?? NOTES_TAB
+  // Internal tab state mirrors the old uncontrolled `defaultValue` behavior; a
+  // provided `activeTab` (deep link) wins. Always controlled toward Radix so the
+  // page can switch tabs programmatically without a mode flip.
+  const [internalTab, setInternalTab] = useState<string>(defaultTab)
+  const currentTab = activeTab ?? internalTab
+  const handleTabValueChange = useCallback(
+    (tab: string) => {
+      setInternalTab(tab)
+      onTabChange?.(tab)
+    },
+    [onTabChange]
+  )
 
   const copyId = useCallback(() => {
     void navigator.clipboard
@@ -230,7 +261,7 @@ export function DetailTabBar({
       <h2 id="detail-tabs-heading" className="sr-only">
         Record details
       </h2>
-      <Tabs defaultValue={defaultTab} className="w-full">
+      <Tabs className="w-full" value={currentTab} onValueChange={handleTabValueChange}>
         <div className="-mx-1 overflow-x-auto">
           <TabsList variant="line" className="flex w-max">
             {sortedLists.map((rl) => (
@@ -252,6 +283,15 @@ export function DetailTabBar({
               Attachments
               <TabCountPill count={attachments.length} />
             </TabsTrigger>
+            {historyContent != null && (
+              <TabsTrigger
+                value={HISTORY_TAB}
+                data-testid="detail-tab-history"
+                className={DETAIL_TAB_TRIGGER}
+              >
+                {t('history.tabTitle')}
+              </TabsTrigger>
+            )}
             <TabsTrigger
               value={SYSTEM_TAB}
               data-testid="detail-tab-system"
@@ -295,6 +335,12 @@ export function DetailTabBar({
             onMutate={invalidateRecordContext}
           />
         </TabsContent>
+
+        {historyContent != null && (
+          <TabsContent value={HISTORY_TAB} className="mt-4" data-testid="record-history-panel">
+            {historyContent}
+          </TabsContent>
+        )}
 
         <TabsContent forceMount value={SYSTEM_TAB} className="mt-4">
           <div

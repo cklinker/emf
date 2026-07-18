@@ -134,6 +134,20 @@ class FieldHistoryHookTest {
     }
 
     @Test
+    @DisplayName("skips collections with collection-level trackHistory (RecordVersionHook supersedes)")
+    void skipsCollectionLevelTracking() {
+        CollectionDefinition def = mock(CollectionDefinition.class);
+        when(def.systemCollection()).thenReturn(false);
+        when(def.trackHistory()).thenReturn(true);
+        when(collectionRegistry.get("orders")).thenReturn(def);
+
+        hook.afterUpdate("orders", "rec-1", new HashMap<>(Map.of("status", "DONE")),
+                new HashMap<>(Map.of("status", "NEW")), "tenant-1");
+
+        verify(historyRepository, never()).recordChanges(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("skips system collections")
     void skipsSystemCollection() {
         CollectionDefinition def = mock(CollectionDefinition.class);

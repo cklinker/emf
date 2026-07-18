@@ -1117,7 +1117,9 @@
       "displayNameRequired": "Anzeigename ist erforderlich",
       "displayNameTooLong": "Anzeigename darf maximal 100 Zeichen lang sein",
       "descriptionTooLong": "Beschreibung darf maximal 500 Zeichen lang sein"
-    }
+    },
+    "trackHistory": "Datensatzverlauf verfolgen",
+    "trackHistoryHint": "Erfasst bei jedem Erstellen, Aktualisieren und Löschen eines Datensatzes einen vollständigen Versions-Snapshot. Fügt den Datensatzseiten einen Verlaufs-Tab hinzu."
   },
   "authorizationPanel": {
     "title": "Autorisierung",
@@ -1328,7 +1330,23 @@
     "rejected": "Abgelehnt",
     "recalled": "Zurückgerufen",
     "sharedWith": "Freigegeben für {{id}} ({{level}})",
-    "loading": "Aktivität wird geladen..."
+    "loading": "Aktivität wird geladen...",
+    "versionCreated": "Datensatz erstellt (v{{version}}) — von {{user}}",
+    "versionUpdated": "Datensatz aktualisiert auf v{{version}} — {{count}} Felder geändert: {{fields}} — von {{user}}",
+    "versionDeleted": "Datensatz gelöscht (v{{version}}) — von {{user}}"
+  },
+  "history": {
+    "tabTitle": "Verlauf",
+    "empty": "Noch keine Versionen aufgezeichnet.",
+    "loadError": "Datensatzverlauf konnte nicht geladen werden.",
+    "versionLabel": "Version {{version}}",
+    "changedBadge": "Geändert",
+    "recordCreated": "Datensatz erstellt",
+    "recordUpdated": "Datensatz aktualisiert",
+    "recordDeleted": "Datensatz gelöscht",
+    "fieldsChangedSummary": "{{count}} Felder geändert: {{fields}}",
+    "backToList": "Alle Versionen",
+    "byUser": "von {{user}}"
   },
   "recordActions": {
     "edit": "Bearbeiten",

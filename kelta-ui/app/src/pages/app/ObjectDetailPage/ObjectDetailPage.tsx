@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Loader2,
   AlertCircle,
@@ -54,7 +54,8 @@ import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
-import { DetailTabBar } from '@/pages/ResourceDetailPage/DetailTabBar'
+import { DetailTabBar, HISTORY_TAB } from '@/pages/ResourceDetailPage/DetailTabBar'
+import { RecordHistoryTab } from '@/components/RecordHistory/RecordHistoryTab'
 import { RecordShell } from '@/components/record/RecordShell'
 import { RecordDetailBody } from '@/components/record/RecordDetailBody'
 import { ActivityTimeline } from '@/components/ActivityTimeline/ActivityTimeline'
@@ -256,6 +257,7 @@ export function ObjectDetailPage(): React.ReactElement {
     id: string
   }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { addRecentItem } = useAppContext()
   const { user } = useAuth()
   const { apiClient } = useApi()
@@ -265,6 +267,40 @@ export function ObjectDetailPage(): React.ReactElement {
 
   // Delete confirmation state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  // Tab deep-linking (?tab= / ?version=) — lets the activity timeline jump to
+  // a specific record version on the History tab.
+  const activeTab = searchParams.get('tab') ?? undefined
+  const versionParam = searchParams.get('version')
+  const historyVersion = versionParam != null ? Number(versionParam) : undefined
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('tab', tab)
+          if (tab !== HISTORY_TAB) next.delete('version')
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
+  const openHistoryAtVersion = useCallback(
+    (versionNumber: number) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('tab', HISTORY_TAB)
+          next.set('version', String(versionNumber))
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
 
   // Fetch collection schema
   const {
@@ -903,6 +939,22 @@ export function ObjectDetailPage(): React.ReactElement {
             getUserDisplay={getUserDisplay}
             editable={permissions.canEdit}
             onRelatedChange={refetchRecord}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            historyContent={
+              schema.trackHistory ? (
+                <RecordHistoryTab
+                  collectionId={schema.id}
+                  recordId={recordId}
+                  sections={layout?.sections}
+                  schemaFields={fields}
+                  tenantSlug={tenantSlug}
+                  lookupDisplayMap={lookupDisplayMap}
+                  getUserDisplay={getUserDisplay}
+                  initialVersion={historyVersion}
+                />
+              ) : undefined
+            }
           />
         ) : undefined
       }
@@ -915,6 +967,10 @@ export function ObjectDetailPage(): React.ReactElement {
             recordCreatedAt={(record.createdAt ?? record.created_at) as string | undefined}
             recordUpdatedAt={(record.updatedAt ?? record.updated_at) as string | undefined}
             apiClient={apiClient}
+            historyEnabled={!!schema.trackHistory}
+            schemaFields={fields}
+            getUserDisplay={getUserDisplay}
+            onOpenHistory={openHistoryAtVersion}
           />
         ) : undefined
       }

@@ -14,6 +14,8 @@ export interface Collection {
   description?: string
   active: boolean
   currentVersion: number
+  /** Collection-level record versioning — every record change writes a record_version snapshot */
+  trackHistory?: boolean
   fields?: FieldDefinition[]
   authz?: CollectionAuthz
   createdAt: string

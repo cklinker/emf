@@ -1,20 +1,29 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 import { ActivityTimeline } from './ActivityTimeline'
+import type { ActivityTimelineProps } from './ActivityTimeline'
 import type { ApiClient } from '../../services/apiClient'
 
-// Mock I18n — echo the key so assertions can target stable strings.
+// Mock I18n — echo the key so assertions can target stable strings. Version
+// entry keys (the only ones interpolating a `user` param) append the resolved
+// author/fields so tests can assert getUserDisplay + display-name wiring.
 vi.mock('../../context/I18nContext', () => ({
   useI18n: vi.fn(() => ({
     locale: 'en',
     setLocale: vi.fn(),
-    t: (key: string) => key,
+    t: (key: string, params?: Record<string, string | number> | string) => {
+      if (params && typeof params === 'object' && 'user' in params) {
+        const fields = 'fields' in params ? ` fields=${params.fields}` : ''
+        return `${key} user=${params.user}${fields}`
+      }
+      return key
+    },
   })),
 }))
 
-function renderTimeline(apiClient: Partial<ApiClient>) {
+function renderTimeline(apiClient: Partial<ApiClient>, props: Partial<ActivityTimelineProps> = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     React.createElement(
@@ -26,6 +35,7 @@ function renderTimeline(apiClient: Partial<ApiClient>) {
         recordId: 'rec-1',
         recordCreatedAt: '2026-01-01T00:00:00Z',
         apiClient: apiClient as ApiClient,
+        ...props,
       })
     )
   )
@@ -196,5 +206,105 @@ describe('ActivityTimeline', () => {
     renderTimeline({ getList: getList as unknown as ApiClient['getList'] })
 
     await waitFor(() => expect(screen.getByText('activity.recordCreated')).toBeInTheDocument())
+  })
+
+  describe('record versions (historyEnabled)', () => {
+    const versionRows = [
+      {
+        id: 'ver-1',
+        collectionId: 'col-1',
+        recordId: 'rec-1',
+        versionNumber: 1,
+        changeType: 'CREATED',
+        snapshot: { id: 'rec-1', name: 'Acme' },
+        changedFields: [],
+        changedBy: 'user-1',
+        changedAt: '2026-01-01T00:00:00Z',
+        changeSource: 'UI',
+      },
+      {
+        id: 'ver-2',
+        collectionId: 'col-1',
+        recordId: 'rec-1',
+        versionNumber: 2,
+        changeType: 'UPDATED',
+        snapshot: { id: 'rec-1', name: 'Acme Corp' },
+        changedFields: ['name'],
+        changedBy: 'user-1',
+        changedAt: '2026-01-02T00:00:00Z',
+        changeSource: 'UI',
+      },
+    ]
+
+    const historyProps: Partial<ActivityTimelineProps> = {
+      historyEnabled: true,
+      recordUpdatedAt: '2026-01-02T00:00:00Z',
+      schemaFields: [
+        { id: 'f1', name: 'name', displayName: 'Full Name', type: 'string', required: false },
+      ],
+      getUserDisplay: (userId: string) => (userId === 'user-1' ? { name: 'Jane Doe' } : null),
+      onOpenHistory: vi.fn(),
+    }
+
+    function versionGetList() {
+      return vi.fn((url: string) =>
+        url.startsWith('/api/record-versions') ? Promise.resolve(versionRows) : Promise.resolve([])
+      )
+    }
+
+    it('renders one entry per version with the author and suppresses synthesized entries', async () => {
+      const getList = versionGetList()
+
+      renderTimeline({ getList: getList as unknown as ApiClient['getList'] }, historyProps)
+
+      await waitFor(() =>
+        expect(screen.getByText('activity.versionCreated user=Jane Doe')).toBeInTheDocument()
+      )
+      // Changed fields render as schema display names.
+      expect(
+        screen.getByText('activity.versionUpdated user=Jane Doe fields=Full Name')
+      ).toBeInTheDocument()
+
+      // Synthesized created/updated entries are suppressed — the version feed covers them.
+      expect(screen.queryByText('activity.recordCreated')).not.toBeInTheDocument()
+      expect(screen.queryByText('activity.recordUpdated')).not.toBeInTheDocument()
+
+      expect(getList).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '/api/record-versions?filter[collectionId][eq]=col-1&filter[recordId][eq]=rec-1'
+        )
+      )
+    })
+
+    it('calls onOpenHistory with the version number when a version entry is clicked', async () => {
+      const onOpenHistory = vi.fn()
+      const getList = versionGetList()
+
+      renderTimeline(
+        { getList: getList as unknown as ApiClient['getList'] },
+        { ...historyProps, onOpenHistory }
+      )
+
+      await waitFor(() => expect(screen.getAllByTestId('activity-version-link')).toHaveLength(2))
+
+      // Newest first: the first link is v2.
+      const links = screen.getAllByTestId('activity-version-link')
+      expect(links[0]).toHaveTextContent('activity.versionUpdated')
+      fireEvent.click(links[0])
+
+      expect(onOpenHistory).toHaveBeenCalledWith(2)
+    })
+
+    it('does not fetch record versions and keeps synthesized entries when historyEnabled is off', async () => {
+      const getList = vi.fn(() => Promise.resolve([]))
+
+      renderTimeline({ getList: getList as unknown as ApiClient['getList'] })
+
+      await waitFor(() => expect(screen.getByText('activity.recordCreated')).toBeInTheDocument())
+      const versionCalls = getList.mock.calls.filter((call) =>
+        String(call[0]).startsWith('/api/record-versions')
+      )
+      expect(versionCalls).toHaveLength(0)
+    })
   })
 })

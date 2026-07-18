@@ -371,6 +371,73 @@ export class DataFactory {
   }
 
   /**
+   * Create a default DETAIL page layout with field sections for a collection.
+   *
+   * Mirrors the JSON:API shapes the layout designer and the MCP
+   * `create_layout` tool use: POST /api/page-layouts, then one
+   * POST /api/layout-sections per section and one POST /api/layout-fields per
+   * placement. `usePageLayout` resolves the layout via the
+   * `isDefault=true` + `layoutType=DETAIL` fallback, so no layout assignment
+   * is needed.
+   */
+  async createDetailLayout(
+    collectionId: string,
+    sections: Array<{
+      heading: string;
+      columns?: number;
+      fields: Array<{ fieldId: string }>;
+    }>,
+  ): Promise<{ layoutId: string; sectionIds: string[] }> {
+    const layoutResult = await this.request("POST", "/api/page-layouts", {
+      data: {
+        type: "page-layouts",
+        attributes: {
+          collectionId,
+          name: `E2E layout ${Date.now()}`,
+          layoutType: "DETAIL",
+          isDefault: true,
+        },
+      },
+    });
+    const layoutId = (layoutResult.data as JsonApiResource).id;
+    this.createdEntities.push({ type: "page-layouts", id: layoutId });
+
+    const sectionIds: string[] = [];
+    for (const [sectionIndex, section] of sections.entries()) {
+      const sectionResult = await this.request("POST", "/api/layout-sections", {
+        data: {
+          type: "layout-sections",
+          attributes: {
+            layoutId,
+            heading: section.heading,
+            columns: section.columns ?? 2,
+            sortOrder: sectionIndex,
+            sectionType: "STANDARD",
+          },
+        },
+      });
+      const sectionId = (sectionResult.data as JsonApiResource).id;
+      sectionIds.push(sectionId);
+
+      for (const [fieldIndex, field] of section.fields.entries()) {
+        await this.request("POST", "/api/layout-fields", {
+          data: {
+            type: "layout-fields",
+            attributes: {
+              sectionId,
+              fieldId: field.fieldId,
+              columnNumber: 0,
+              sortOrder: fieldIndex,
+            },
+          },
+        });
+      }
+    }
+
+    return { layoutId, sectionIds };
+  }
+
+  /**
    * Poll GET /api/collections/{id} until the collection is visible (2xx) or timeout.
    *
    * Collection create propagates asynchronously across worker pods via NATS. The

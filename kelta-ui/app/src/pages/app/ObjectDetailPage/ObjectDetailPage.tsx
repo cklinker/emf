@@ -58,6 +58,8 @@ import { DetailTabBar, HISTORY_TAB } from '@/pages/ResourceDetailPage/DetailTabB
 import { RecordHistoryTab } from '@/components/RecordHistory/RecordHistoryTab'
 import { RecordShell } from '@/components/record/RecordShell'
 import { RecordDetailBody } from '@/components/record/RecordDetailBody'
+import { RecordSectionNav, ACTIVITY_ANCHOR_ID } from '@/components/record/RecordSectionNav'
+import { resolveSectionNavItems } from '@/components/LayoutFieldSections/sectionNavItems'
 import { ActivityTimeline } from '@/components/ActivityTimeline/ActivityTimeline'
 import {
   RecordHeader,
@@ -384,6 +386,12 @@ export function ObjectDetailPage(): React.ReactElement {
   // Pass record's recordTypeId for type-specific layout resolution
   const recordTypeId = record?.recordTypeId ? String(record.recordTypeId) : undefined
   const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id, recordTypeId)
+
+  // Left section-nav entries (layout sections only — the fallback body has no anchors)
+  const sectionNavItems = useMemo(
+    () => (layout?.sections ? resolveSectionNavItems(layout.sections, fields) : []),
+    [layout?.sections, fields]
+  )
 
   // Build lookup display map from included resources using centralized collection store
   const lookupDisplayMap = useMemo(() => {
@@ -829,6 +837,14 @@ export function ObjectDetailPage(): React.ReactElement {
           </div>
         ) : undefined
       }
+      sectionNav={
+        record && sectionNavItems.length > 0 ? (
+          <RecordSectionNav
+            items={sectionNavItems}
+            activityAnchorId={schema && recordId ? ACTIVITY_ANCHOR_ID : undefined}
+          />
+        ) : undefined
+      }
       body={
         record ? (
           <div data-testid="field-values" className="space-y-4">
@@ -911,6 +927,24 @@ export function ObjectDetailPage(): React.ReactElement {
                 </>
               }
             />
+            {/* Activity lives in the main column below the field sections (was
+                below the tab bar) so the section nav can jump straight to it. */}
+            {schema && recordId && (
+              <div id={ACTIVITY_ANCHOR_ID} className="scroll-mt-20">
+                <ActivityTimeline
+                  collectionId={schema.id}
+                  collectionName={collectionName ?? ''}
+                  recordId={recordId}
+                  recordCreatedAt={(record.createdAt ?? record.created_at) as string | undefined}
+                  recordUpdatedAt={(record.updatedAt ?? record.updated_at) as string | undefined}
+                  apiClient={apiClient}
+                  historyEnabled={!!schema.trackHistory}
+                  schemaFields={fields}
+                  getUserDisplay={getUserDisplay}
+                  onOpenHistory={openHistoryAtVersion}
+                />
+              </div>
+            )}
           </div>
         ) : null
       }
@@ -955,22 +989,6 @@ export function ObjectDetailPage(): React.ReactElement {
                 />
               ) : undefined
             }
-          />
-        ) : undefined
-      }
-      belowTabs={
-        record && schema && recordId ? (
-          <ActivityTimeline
-            collectionId={schema.id}
-            collectionName={collectionName ?? ''}
-            recordId={recordId}
-            recordCreatedAt={(record.createdAt ?? record.created_at) as string | undefined}
-            recordUpdatedAt={(record.updatedAt ?? record.updated_at) as string | undefined}
-            apiClient={apiClient}
-            historyEnabled={!!schema.trackHistory}
-            schemaFields={fields}
-            getUserDisplay={getUserDisplay}
-            onOpenHistory={openHistoryAtVersion}
           />
         ) : undefined
       }

@@ -1314,6 +1314,9 @@
     "tableLabel": "{{collection}}-Datensätze",
     "created": "Erstellt"
   },
+  "recordNav": {
+    "sections": "Abschnitte"
+  },
   "activity": {
     "title": "Aktivität",
     "noActivity": "Keine Aktivität für diesen Datensatz aufgezeichnet.",

@@ -13,6 +13,8 @@ export class ObjectDetailPage extends BasePage {
   readonly changedBadges: Locator;
   readonly historyBackButton: Locator;
   readonly activityVersionLinks: Locator;
+  readonly sectionNav: Locator;
+  readonly activityTimeline: Locator;
 
   constructor(
     page: Page,
@@ -32,6 +34,13 @@ export class ObjectDetailPage extends BasePage {
     this.changedBadges = this.testId("version-changed-badge");
     this.historyBackButton = this.testId("history-back-button");
     this.activityVersionLinks = this.testId("activity-version-link");
+    this.sectionNav = this.testId("record-section-nav");
+    this.activityTimeline = this.testId("activity-timeline");
+  }
+
+  /** Nav entry for a section anchor id (e.g. `record-activity`). */
+  sectionNavEntry(anchorId: string): Locator {
+    return this.testId(`section-nav-${anchorId}`);
   }
 
   async goto(): Promise<void> {

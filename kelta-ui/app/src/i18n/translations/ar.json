@@ -931,6 +931,9 @@
     "darkMode": "داكن",
     "systemMode": "النظام"
   },
+  "recordNav": {
+    "sections": "الأقسام"
+  },
   "activity": {
     "versionCreated": "تم إنشاء السجل (الإصدار {{version}}) — بواسطة {{user}}",
     "versionUpdated": "تم تحديث السجل إلى الإصدار {{version}} — تم تغيير {{count}} من الحقول: {{fields}} — بواسطة {{user}}",

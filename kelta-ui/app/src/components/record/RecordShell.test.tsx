@@ -58,4 +58,29 @@ describe('RecordShell', () => {
     expect(screen.getByText('body')).toBeInTheDocument()
     expect(screen.queryByText('rail')).toBeNull()
   })
+
+  it('renders the section nav as a left column of the body grid when supplied', () => {
+    render(
+      <RecordShell
+        variant="enduser"
+        body={<div>body</div>}
+        sectionNav={<div>nav</div>}
+        rail={<div>rail</div>}
+      />
+    )
+    const navCell = screen.getByTestId('record-shell-section-nav')
+    expect(navCell).toHaveTextContent('nav')
+    expect(navCell.parentElement).toHaveClass('lg:grid-cols-[230px_minmax(0,1fr)_340px]')
+  })
+
+  it('uses the two-column grid when the section nav is supplied without a rail', () => {
+    render(<RecordShell variant="admin" body={<div>body</div>} sectionNav={<div>nav</div>} />)
+    const navCell = screen.getByTestId('record-shell-section-nav')
+    expect(navCell.parentElement).toHaveClass('lg:grid-cols-[230px_minmax(0,1fr)]')
+  })
+
+  it('omits the section nav cell when no sectionNav slot is supplied', () => {
+    render(<RecordShell variant="enduser" body={<div>body</div>} rail={<div>rail</div>} />)
+    expect(screen.queryByTestId('record-shell-section-nav')).toBeNull()
+  })
 })

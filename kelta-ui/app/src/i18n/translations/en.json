@@ -2015,6 +2015,9 @@
     "tableLabel": "{{collection}} records",
     "created": "Created"
   },
+  "recordNav": {
+    "sections": "Sections"
+  },
   "activity": {
     "title": "Activity",
     "noActivity": "No activity recorded for this record.",

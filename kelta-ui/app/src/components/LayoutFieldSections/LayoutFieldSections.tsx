@@ -14,6 +14,7 @@ import { FieldSection } from '@/components/detail'
 import type { FieldSectionRenderContext } from '@/components/detail'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { InlineFieldValue } from '@/components/record/InlineFieldValue'
+import { sectionAnchorId } from './sectionNavItems'
 import { useI18n } from '@/context/I18nContext'
 import type { LayoutSectionDto, LayoutFieldPlacementDto } from '@/hooks/usePageLayout'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
@@ -182,34 +183,47 @@ export function LayoutFieldSections({
         if (fields.length === 0) return null
 
         return (
-          <FieldSection<FieldDefinition>
-            key={section.id}
-            title={section.heading || 'Details'}
-            fields={fields}
-            record={record}
-            lookupDisplayMap={lookupDisplayMap}
-            defaultCollapsed={section.collapsed}
-            columns={(section.columns as 1 | 2 | 3 | 4) || 2}
-            persistKey={persistKeyPrefix ? `${persistKeyPrefix}.${section.id}` : undefined}
-            renderField={({
-              field,
-              value,
-              displayLabel,
-            }: FieldSectionRenderContext<FieldDefinition>) =>
-              inlineEditing ? (
-                <InlineFieldValue
-                  field={field}
-                  value={value}
-                  displayLabel={displayLabel}
-                  tenantSlug={tenantSlug}
-                  editable
-                  readOnly={placementOverrides.get(field.name)?.readOnly}
-                  required={placementOverrides.get(field.name)?.required}
-                  masked={maskedFieldSet.has(field.name)}
-                  onCommit={onFieldCommit}
-                />
-              ) : highlightedFields?.has(field.name) ? (
-                <div className="relative" data-testid="version-changed-field">
+          <div key={section.id} id={sectionAnchorId(section.id)} className="scroll-mt-20">
+            <FieldSection<FieldDefinition>
+              title={section.heading || 'Details'}
+              fields={fields}
+              record={record}
+              lookupDisplayMap={lookupDisplayMap}
+              defaultCollapsed={section.collapsed}
+              columns={(section.columns as 1 | 2 | 3 | 4) || 2}
+              persistKey={persistKeyPrefix ? `${persistKeyPrefix}.${section.id}` : undefined}
+              renderField={({
+                field,
+                value,
+                displayLabel,
+              }: FieldSectionRenderContext<FieldDefinition>) =>
+                inlineEditing ? (
+                  <InlineFieldValue
+                    field={field}
+                    value={value}
+                    displayLabel={displayLabel}
+                    tenantSlug={tenantSlug}
+                    editable
+                    readOnly={placementOverrides.get(field.name)?.readOnly}
+                    required={placementOverrides.get(field.name)?.required}
+                    masked={maskedFieldSet.has(field.name)}
+                    onCommit={onFieldCommit}
+                  />
+                ) : highlightedFields?.has(field.name) ? (
+                  <div className="relative" data-testid="version-changed-field">
+                    <FieldRenderer
+                      type={field.type}
+                      value={value}
+                      fieldName={field.name}
+                      displayName={field.displayName || field.name}
+                      tenantSlug={tenantSlug}
+                      targetCollection={field.referenceTarget}
+                      displayLabel={displayLabel}
+                      truncate={false}
+                    />
+                    <ChangedBadge />
+                  </div>
+                ) : (
                   <FieldRenderer
                     type={field.type}
                     value={value}
@@ -220,22 +234,10 @@ export function LayoutFieldSections({
                     displayLabel={displayLabel}
                     truncate={false}
                   />
-                  <ChangedBadge />
-                </div>
-              ) : (
-                <FieldRenderer
-                  type={field.type}
-                  value={value}
-                  fieldName={field.name}
-                  displayName={field.displayName || field.name}
-                  tenantSlug={tenantSlug}
-                  targetCollection={field.referenceTarget}
-                  displayLabel={displayLabel}
-                  truncate={false}
-                />
-              )
-            }
-          />
+                )
+              }
+            />
+          </div>
         )
       })}
     </>

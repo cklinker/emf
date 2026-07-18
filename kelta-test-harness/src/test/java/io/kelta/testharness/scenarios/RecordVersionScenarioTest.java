@@ -25,9 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * sequential inserts for the same record must land as versions 1 and 2 under the
  * {@code uq_record_version} unique constraint.
  *
- * <p>Rows are seeded directly (FK to a real seeded collection) so the assertion is
- * deterministic and independent of NATS config-refresh timing. Harness Cerbos is dev
- * allow-all, so the {@code RecordVersionSecurityAdvice} passes snapshots through unfiltered.
+ * <p>Rows are seeded directly against a real (collection, field) pair — the read guard
+ * fail-closed strips snapshot keys that aren't current fields of the referenced collection,
+ * so a made-up field name would come back as an empty snapshot. Harness Cerbos is dev
+ * allow-all, so readable fields pass through unmasked.
  */
 @DisplayName("Record Version Read Scenario")
 class RecordVersionScenarioTest extends ScenarioBase {
@@ -42,15 +43,19 @@ class RecordVersionScenarioTest extends ScenarioBase {
         String recordId = UUID.randomUUID().toString();
 
         try (Connection admin = openDbConnection()) {
-            String collectionId = firstCollectionId(admin, tenantId);
-            assertThat(collectionId).as("ecommerce tenant has a seeded collection").isNotNull();
+            // A real (collection, field) pair: the read guard only keeps snapshot keys that
+            // still exist on the referenced collection, so a bogus field name is stripped.
+            CollectionField target = firstCollectionField(admin, tenantId);
+            assertThat(target).as("ecommerce tenant has a seeded collection field").isNotNull();
+            String collectionId = target.collectionId();
+            String fieldName = target.fieldName();
 
             try {
                 // Two sequential inserts — the INSERT..SELECT MAX+1 numbering must yield 1 then 2.
                 insertVersionRow(admin, tenantId, collectionId, recordId,
-                        "CREATED", "{\"status\": \"NEW\"}", "[\"status\"]");
+                        "CREATED", "{\"" + fieldName + "\": \"NEW\"}", "[\"" + fieldName + "\"]");
                 insertVersionRow(admin, tenantId, collectionId, recordId,
-                        "UPDATED", "{\"status\": \"DONE\"}", "[\"status\"]");
+                        "UPDATED", "{\"" + fieldName + "\": \"DONE\"}", "[\"" + fieldName + "\"]");
 
                 waitForStatus(gatewayClientWithToken(token),
                         "/" + slug + "/api/record-versions?filter[recordId][eq]=" + recordId,
@@ -80,8 +85,8 @@ class RecordVersionScenarioTest extends ScenarioBase {
                 assertThat(v1.get("changeType")).isEqualTo("CREATED");
                 assertThat(v2.get("changeType")).isEqualTo("UPDATED");
                 // JSONB round-trips as parsed JSON values, not raw text.
-                assertThat(v2.get("snapshot")).isEqualTo(Map.of("status", "DONE"));
-                assertThat(v2.get("changedFields")).isEqualTo(List.of("status"));
+                assertThat(v2.get("snapshot")).isEqualTo(Map.of(fieldName, "DONE"));
+                assertThat(v2.get("changedFields")).isEqualTo(List.of(fieldName));
                 assertThat(v2.get("changedBy")).isEqualTo("user-1");
             } finally {
                 deleteVersionRows(admin, recordId);
@@ -93,12 +98,18 @@ class RecordVersionScenarioTest extends ScenarioBase {
         return ((Number) attrs.get("versionNumber")).intValue();
     }
 
-    private String firstCollectionId(Connection conn, String tenantId) throws Exception {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id FROM collection WHERE tenant_id = ? ORDER BY id LIMIT 1")) {
+    private record CollectionField(String collectionId, String fieldName) {}
+
+    private CollectionField firstCollectionField(Connection conn, String tenantId) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT c.id AS cid, f.name AS fname
+                FROM collection c JOIN field f ON f.collection_id = c.id
+                WHERE c.tenant_id = ? AND f.active = true
+                ORDER BY c.id, f.field_order LIMIT 1
+                """)) {
             ps.setString(1, tenantId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getString("id") : null;
+                return rs.next() ? new CollectionField(rs.getString("cid"), rs.getString("fname")) : null;
             }
         }
     }

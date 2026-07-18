@@ -106,7 +106,21 @@ test.describe("Record CRUD", () => {
     page,
     dataFactory,
   }) => {
-    const collectionName = await setupCollection(dataFactory);
+    // Inline editing renders through the layout-driven LayoutFieldSections
+    // path only — a collection without a detail page layout falls back to the
+    // read-only Highlights/Details cards. Seed a one-section layout.
+    const collection = await dataFactory.createCollection();
+    const collectionName = collection.attributes.name as string;
+    const titleField = await dataFactory.addField(collection.id, {
+      name: "title",
+      displayName: "Title",
+      type: "string",
+      required: true,
+    });
+    await dataFactory.waitForStorageReady(collectionName);
+    await dataFactory.createDetailLayout(collection.id, [
+      { heading: "Overview", fields: [{ fieldId: titleField.id }] },
+    ]);
 
     const record = await dataFactory.createRecord(collectionName, {
       title: `Inline Test ${Date.now()}`,

@@ -70,13 +70,13 @@ describe('RecordShell', () => {
     )
     const navCell = screen.getByTestId('record-shell-section-nav')
     expect(navCell).toHaveTextContent('nav')
-    expect(navCell.parentElement).toHaveClass('lg:grid-cols-[230px_minmax(0,1fr)_340px]')
+    expect(navCell.parentElement).toHaveClass('lg:grid-cols-[280px_minmax(0,1fr)_340px]')
   })
 
   it('uses the two-column grid when the section nav is supplied without a rail', () => {
     render(<RecordShell variant="admin" body={<div>body</div>} sectionNav={<div>nav</div>} />)
     const navCell = screen.getByTestId('record-shell-section-nav')
-    expect(navCell.parentElement).toHaveClass('lg:grid-cols-[230px_minmax(0,1fr)]')
+    expect(navCell.parentElement).toHaveClass('lg:grid-cols-[280px_minmax(0,1fr)]')
   })
 
   it('omits the section nav cell when no sectionNav slot is supplied', () => {

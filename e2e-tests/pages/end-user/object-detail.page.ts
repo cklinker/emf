@@ -15,6 +15,7 @@ export class ObjectDetailPage extends BasePage {
   readonly activityVersionLinks: Locator;
   readonly sectionNav: Locator;
   readonly activityTimeline: Locator;
+  readonly sectionNavActivity: Locator;
 
   constructor(
     page: Page,
@@ -36,9 +37,10 @@ export class ObjectDetailPage extends BasePage {
     this.activityVersionLinks = this.testId("activity-version-link");
     this.sectionNav = this.testId("record-section-nav");
     this.activityTimeline = this.testId("activity-timeline");
+    this.sectionNavActivity = this.testId("section-nav-activity");
   }
 
-  /** Nav entry for a section anchor id (e.g. `record-activity`). */
+  /** Nav entry for a section anchor id (e.g. `record-section-<id>`). */
   sectionNavEntry(anchorId: string): Locator {
     return this.testId(`section-nav-${anchorId}`);
   }

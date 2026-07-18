@@ -60,6 +60,7 @@ import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
 import type { PageLayoutDto } from '@/hooks/usePageLayout'
 import type { LookupOption } from '@/components/LookupSelect'
 import type { RecordType } from '@/types/collections'
+import { buildSaveAttributes, computeInitialFormData } from './formData'
 
 /** Picklist value returned from the API (field names match backend schema) */
 interface PicklistValueDto {
@@ -278,13 +279,22 @@ function FormField({
 
   // Textarea fields (rich_text, json)
   if (isTextareaField(field.type)) {
+    // JSON values can arrive as parsed objects/arrays — String() would render "[object Object],…"
+    const textValue =
+      value == null
+        ? ''
+        : typeof value === 'string'
+          ? value
+          : field.type === 'json'
+            ? JSON.stringify(value, null, 2)
+            : String(value)
     return (
       <div className="space-y-2">
         {labelEl}
         <Textarea
           id={fieldId}
           data-testid={fieldId}
-          value={value != null ? String(value) : ''}
+          value={textValue}
           onChange={(e) => onChange(field.name, e.target.value)}
           disabled={isReadOnly}
           rows={field.type === 'json' ? 6 : 4}
@@ -341,51 +351,6 @@ function FormField({
       {errorEl}
     </div>
   )
-}
-
-/**
- * Compute initial form data from record (edit) or field defaults (create).
- * Formats date/datetime values for HTML input compatibility.
- */
-function computeInitialFormData(
-  isNew: boolean,
-  record: Record<string, unknown> | undefined,
-  fields: FieldDefinition[],
-  queryDefaults?: Record<string, string>
-): Record<string, unknown> {
-  if (!isNew && record) {
-    const data: Record<string, unknown> = { ...record }
-    // Format date/datetime values for HTML inputs
-    for (const field of fields) {
-      const value = data[field.name]
-      if (value != null && typeof value === 'string') {
-        if (field.type === 'date') {
-          // HTML date input expects YYYY-MM-DD
-          data[field.name] = value.split('T')[0]
-        } else if (field.type === 'datetime') {
-          // HTML datetime-local input expects YYYY-MM-DDTHH:MM
-          data[field.name] = value.slice(0, 16)
-        }
-      }
-    }
-    return data
-  }
-  const defaults: Record<string, unknown> = {}
-  for (const field of fields) {
-    if (field.type === 'boolean') {
-      defaults[field.name] = false
-    }
-  }
-  // Apply query parameter defaults (e.g. ?order_ref=<id> from related list)
-  if (queryDefaults) {
-    const fieldNames = new Set(fields.map((f) => f.name))
-    for (const [key, value] of Object.entries(queryDefaults)) {
-      if (fieldNames.has(key)) {
-        defaults[key] = value
-      }
-    }
-  }
-  return defaults
 }
 
 interface ObjectFormBodyProps {
@@ -540,12 +505,11 @@ function ObjectFormBody({
       return
     }
 
-    const attributes: Record<string, unknown> = {}
-    for (const field of editableFields) {
-      const value = formData[field.name]
-      if (value !== undefined && value !== '') {
-        attributes[field.name] = value
-      }
+    const { attributes, errors } = buildSaveAttributes(editableFields, formData)
+    if (Object.keys(errors).length > 0) {
+      setFormErrors((prev) => ({ ...prev, ...errors }))
+      showToast('Fix invalid JSON before saving', 'error')
+      return
     }
 
     // Include record type ID if selected

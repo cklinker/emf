@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
@@ -27,7 +27,8 @@ import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTime
 import { useRecordContext } from '../../hooks/useRecordContext'
 import { usePageLayout } from '../../hooks/usePageLayout'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
-import { DetailTabBar } from './DetailTabBar'
+import { DetailTabBar, HISTORY_TAB } from './DetailTabBar'
+import { RecordHistoryTab } from '../../components/RecordHistory/RecordHistoryTab'
 import { RecordShell } from '../../components/record/RecordShell'
 import { RecordDetailBody } from '../../components/record/RecordDetailBody'
 import { unwrapResource, extractIncluded } from '../../utils/jsonapi'
@@ -348,6 +349,40 @@ export function ResourceDetailPage({
 
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+
+  // Tab deep-linking (?tab= / ?version=) — activity timeline → History tab.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get('tab') ?? undefined
+  const versionParam = searchParams.get('version')
+  const historyVersion = versionParam != null ? Number(versionParam) : undefined
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('tab', tab)
+          if (tab !== HISTORY_TAB) next.delete('version')
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
+  const openHistoryAtVersion = useCallback(
+    (versionNumber: number) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('tab', HISTORY_TAB)
+          next.set('version', String(versionNumber))
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
 
   // Share modal state
   const [shareModalOpen, setShareModalOpen] = useState(false)
@@ -1004,6 +1039,22 @@ export function ResourceDetailPage({
           getUserDisplay={getUserDisplay}
           editable
           onRelatedChange={refetchResource}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          historyContent={
+            schema.trackHistory ? (
+              <RecordHistoryTab
+                collectionId={schema.id}
+                recordId={resourceId}
+                sections={layout?.sections}
+                schemaFields={schema.fields}
+                tenantSlug={getTenantSlug()}
+                lookupDisplayMap={lookupDisplayMap}
+                getUserDisplay={getUserDisplay}
+                initialVersion={historyVersion}
+              />
+            ) : undefined
+          }
         />
       }
       belowTabs={
@@ -1014,6 +1065,10 @@ export function ResourceDetailPage({
           recordCreatedAt={(resource.created_at || resource.createdAt) as string | undefined}
           recordUpdatedAt={(resource.updated_at || resource.updatedAt) as string | undefined}
           apiClient={apiClient}
+          historyEnabled={!!schema.trackHistory}
+          schemaFields={schema.fields}
+          getUserDisplay={getUserDisplay}
+          onOpenHistory={openHistoryAtVersion}
         />
       }
       dialogs={

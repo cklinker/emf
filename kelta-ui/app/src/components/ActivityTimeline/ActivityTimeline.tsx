@@ -17,8 +17,10 @@ import React, { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { cn } from '@/lib/utils'
+import { parseRecordVersion } from '@/components/RecordHistory/useRecordVersions'
 
 import type { ApiClient } from '../../services/apiClient'
+import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 
 /**
  * Approval step instance from the control plane
@@ -65,6 +67,7 @@ type TimelineEntryType =
   | 'CREATED'
   | 'UPDATED'
   | 'FIELD_CHANGE'
+  | 'VERSION'
   | 'NOTE'
   | 'ATTACHMENT'
   | 'APPROVAL_SUBMITTED'
@@ -142,6 +145,8 @@ interface TimelineEntry {
   type: TimelineEntryType
   description: string
   timestamp: string
+  /** Set on VERSION entries — click-through target for the History tab. */
+  versionNumber?: number
 }
 
 /**
@@ -160,6 +165,18 @@ export interface ActivityTimelineProps {
   recordUpdatedAt?: string
   /** Authenticated API client instance */
   apiClient: ApiClient
+  /**
+   * Collection-level record versioning is on — fetch record versions and render
+   * one entry per version (suppressing the synthesized created/updated entries,
+   * which the version feed covers with more detail + author).
+   */
+  historyEnabled?: boolean
+  /** Collection schema fields, for changed-field display names on version entries. */
+  schemaFields?: FieldDefinition[]
+  /** Resolve a userId to a display name (version entry author). */
+  getUserDisplay?: (userId: string) => { name: string } | null
+  /** Open the History tab at a version (version entry click-through). */
+  onOpenHistory?: (versionNumber: number) => void
 }
 
 /**
@@ -212,6 +229,7 @@ function getIconClasses(type: TimelineEntryType): string {
     CREATED: 'bg-green-50 text-green-700 border-2 border-green-700',
     UPDATED: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
     FIELD_CHANGE: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
+    VERSION: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
     NOTE: 'bg-purple-50 text-purple-700 border-2 border-purple-700',
     ATTACHMENT: 'bg-teal-50 text-teal-700 border-2 border-teal-700',
     APPROVAL_SUBMITTED: 'bg-amber-50 text-amber-700 border-2 border-amber-700',
@@ -233,6 +251,7 @@ function getIconSymbol(type: TimelineEntryType): string {
     CREATED: '+',
     UPDATED: '~',
     FIELD_CHANGE: '~',
+    VERSION: '~',
     NOTE: '✎',
     ATTACHMENT: '📎',
     APPROVAL_SUBMITTED: '!',
@@ -295,6 +314,10 @@ export function ActivityTimeline({
   recordCreatedAt,
   recordUpdatedAt,
   apiClient,
+  historyEnabled = false,
+  schemaFields,
+  getUserDisplay,
+  onOpenHistory,
 }: ActivityTimelineProps): React.ReactElement {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
@@ -400,6 +423,23 @@ export function ActivityTimeline({
     enabled: !!recordId,
   })
 
+  // Fetch record versions (collection-level tracking). Snapshots arrive already
+  // FLS-filtered by the backend guard; only summary data is rendered here.
+  const { data: recordVersions } = useQuery({
+    queryKey: ['activity-record-versions', collectionId, recordId],
+    queryFn: async () => {
+      try {
+        const result = await apiClient.getList<Parameters<typeof parseRecordVersion>[0]>(
+          `/api/record-versions?filter[collectionId][eq]=${collectionId}&filter[recordId][eq]=${recordId}&page[size]=50`
+        )
+        return (result || []).map(parseRecordVersion)
+      } catch {
+        return []
+      }
+    },
+    enabled: historyEnabled && !!collectionId && !!recordId,
+  })
+
   // Fetch tracked field-value changes for this record. Values arrive already
   // redacted by the backend guard when a field is masked/FLS-restricted.
   const { data: fieldChanges } = useQuery({
@@ -421,8 +461,12 @@ export function ActivityTimeline({
   const entries: TimelineEntry[] = useMemo(() => {
     const allEntries: TimelineEntry[] = []
 
+    // Version entries carry created/updated (plus author + changed fields), so
+    // the client-synthesized entries would be duplicates.
+    const suppressSynthesized = historyEnabled && (recordVersions?.length ?? 0) > 0
+
     // Record creation event
-    if (recordCreatedAt) {
+    if (recordCreatedAt && !suppressSynthesized) {
       allEntries.push({
         id: 'record-created',
         type: 'CREATED',
@@ -432,13 +476,50 @@ export function ActivityTimeline({
     }
 
     // Record update event (only if different from created)
-    if (recordUpdatedAt && recordCreatedAt && recordUpdatedAt !== recordCreatedAt) {
+    if (
+      recordUpdatedAt &&
+      recordCreatedAt &&
+      recordUpdatedAt !== recordCreatedAt &&
+      !suppressSynthesized
+    ) {
       allEntries.push({
         id: 'record-updated',
         type: 'UPDATED',
         description: t('activity.recordUpdated'),
         timestamp: recordUpdatedAt,
       })
+    }
+
+    // Record versions — one entry per version, including the author
+    if (recordVersions) {
+      const displayNames = new Map<string, string>()
+      for (const field of schemaFields ?? []) {
+        displayNames.set(field.name, field.displayName || field.name)
+      }
+      for (const version of recordVersions) {
+        const user = getUserDisplay?.(version.changedBy)?.name ?? version.changedBy
+        let description: string
+        if (version.changeType === 'CREATED') {
+          description = t('activity.versionCreated', { version: version.versionNumber, user })
+        } else if (version.changeType === 'DELETED') {
+          description = t('activity.versionDeleted', { version: version.versionNumber, user })
+        } else {
+          const fields = version.changedFields.map((f) => displayNames.get(f) ?? f).join(', ')
+          description = t('activity.versionUpdated', {
+            version: version.versionNumber,
+            count: version.changedFields.length,
+            fields,
+            user,
+          })
+        }
+        allEntries.push({
+          id: `version-${version.id}`,
+          type: 'VERSION',
+          description,
+          timestamp: version.changedAt,
+          versionNumber: version.versionNumber,
+        })
+      }
     }
 
     // Approval events
@@ -594,6 +675,10 @@ export function ActivityTimeline({
     flowRuns,
     emailLogs,
     fieldChanges,
+    recordVersions,
+    historyEnabled,
+    schemaFields,
+    getUserDisplay,
     t,
   ])
 
@@ -659,9 +744,20 @@ export function ActivityTimeline({
 
               {/* Content */}
               <div className="flex flex-col gap-1 pt-1 min-w-0 flex-1">
-                <p className="m-0 text-sm font-medium text-foreground leading-snug">
-                  {entry.description}
-                </p>
+                {entry.type === 'VERSION' && entry.versionNumber != null && onOpenHistory ? (
+                  <button
+                    type="button"
+                    className="m-0 cursor-pointer border-0 bg-transparent p-0 text-left text-sm font-medium leading-snug text-foreground hover:text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => onOpenHistory(entry.versionNumber!)}
+                    data-testid="activity-version-link"
+                  >
+                    {entry.description}
+                  </button>
+                ) : (
+                  <p className="m-0 text-sm font-medium text-foreground leading-snug">
+                    {entry.description}
+                  </p>
+                )}
                 <p className="m-0 text-xs text-muted-foreground leading-snug">
                   <time dateTime={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</time>
                 </p>

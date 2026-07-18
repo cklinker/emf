@@ -1117,7 +1117,9 @@
       "displayNameRequired": "O nome de exibicao e obrigatorio",
       "displayNameTooLong": "O nome de exibicao deve ter no maximo 100 caracteres",
       "descriptionTooLong": "A descricao deve ter no maximo 500 caracteres"
-    }
+    },
+    "trackHistory": "Rastrear histórico de registros",
+    "trackHistoryHint": "Captura um instantâneo completo de cada criação, atualização e exclusão de registro. Adiciona uma aba Histórico às páginas de registro."
   },
   "authorizationPanel": {
     "title": "Autorizacao",
@@ -1328,7 +1330,23 @@
     "rejected": "Rejeitado",
     "recalled": "Revogado",
     "sharedWith": "Compartilhado com {{id}} ({{level}})",
-    "loading": "Carregando atividade..."
+    "loading": "Carregando atividade...",
+    "versionCreated": "Registro criado (v{{version}}) — por {{user}}",
+    "versionUpdated": "Registro atualizado para v{{version}} — {{count}} campos alterados: {{fields}} — por {{user}}",
+    "versionDeleted": "Registro excluído (v{{version}}) — por {{user}}"
+  },
+  "history": {
+    "tabTitle": "Histórico",
+    "empty": "Nenhuma versão registrada ainda.",
+    "loadError": "Falha ao carregar o histórico do registro.",
+    "versionLabel": "Versão {{version}}",
+    "changedBadge": "Alterado",
+    "recordCreated": "Registro criado",
+    "recordUpdated": "Registro atualizado",
+    "recordDeleted": "Registro excluído",
+    "fieldsChangedSummary": "{{count}} campos alterados: {{fields}}",
+    "backToList": "Todas as versões",
+    "byUser": "por {{user}}"
   },
   "recordActions": {
     "edit": "Editar",

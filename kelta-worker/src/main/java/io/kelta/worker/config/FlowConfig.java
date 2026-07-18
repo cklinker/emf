@@ -734,6 +734,21 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.RecordVersionHook recordVersionHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.repository.RecordVersionRepository recordVersionRepository,
+            CollectionRegistry collectionRegistry,
+            CollectionLifecycleManager lifecycleManager,
+            QueryEngine queryEngine,
+            ObjectMapper objectMapper) {
+        io.kelta.worker.listener.RecordVersionHook hook =
+                new io.kelta.worker.listener.RecordVersionHook(recordVersionRepository, collectionRegistry,
+                        lifecycleManager, queryEngine, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public RecordTypeEnforcementHook recordTypeEnforcementHook(
             BeforeSaveHookRegistry hookRegistry,
             JdbcTemplate jdbcTemplate,

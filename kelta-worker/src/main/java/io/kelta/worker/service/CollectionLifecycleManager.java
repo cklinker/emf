@@ -50,14 +50,14 @@ public class CollectionLifecycleManager {
     private static final String SELECT_COLLECTION_BY_ID = """
             SELECT id, name, display_name, description, active,
                    current_version, system_collection, path, tenant_id, display_field_id,
-                   adapter_config
+                   adapter_config, track_history
             FROM collection WHERE id = ? AND active = true
             """;
 
     private static final String SELECT_COLLECTION_BY_NAME = """
             SELECT id, name, display_name, description, active,
                    current_version, system_collection, path, tenant_id, display_field_id,
-                   adapter_config
+                   adapter_config, track_history
             FROM collection WHERE name = ? AND active = true
             LIMIT 1
             """;
@@ -518,6 +518,9 @@ public class CollectionLifecycleManager {
         if (Boolean.TRUE.equals(systemCollection)) {
             builder.systemCollection(true);
         }
+
+        // Collection-level record versioning toggle
+        builder.trackHistory(Boolean.TRUE.equals(data.get("track_history")));
 
         return builder.build();
     }

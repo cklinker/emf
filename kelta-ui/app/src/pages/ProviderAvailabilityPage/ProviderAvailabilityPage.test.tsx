@@ -25,8 +25,8 @@ function renderPage() {
     React.createElement(
       QueryClientProvider,
       { client: qc },
-      React.createElement(ProviderAvailabilityPage),
-    ),
+      React.createElement(ProviderAvailabilityPage)
+    )
   )
 }
 

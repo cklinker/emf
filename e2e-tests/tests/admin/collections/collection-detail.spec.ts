@@ -1,5 +1,6 @@
 import { test, expect } from "../../../fixtures";
 import { CollectionDetailPage } from "../../../pages/collection-detail.page";
+import { CollectionFormPage } from "../../../pages/collection-form.page";
 
 const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
 
@@ -84,6 +85,39 @@ test.describe("Collection Detail", () => {
     await expect(page).toHaveURL(
       new RegExp(`/${tenantSlug}/collections/${collection.id}/edit`),
     );
+  });
+
+  test("round-trips the track history toggle on the edit form", async ({
+    page,
+    dataFactory,
+  }) => {
+    const collection = await dataFactory.createCollection({
+      displayName: `Track History Test ${Date.now()}`,
+    });
+    await dataFactory.waitForCollectionVisible(collection.id);
+
+    const formPage = new CollectionFormPage(page, tenantSlug);
+    await formPage.goto(collection.id);
+
+    const checkbox = page.getByTestId("collection-track-history-checkbox");
+    await expect(checkbox).toBeVisible();
+    await expect(checkbox).not.toBeChecked();
+
+    // Enable the toggle and save, waiting for the PATCH to complete
+    await checkbox.check();
+    const patchPromise = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === "PATCH" &&
+        resp.url().includes(`/api/collections/${collection.id}`),
+    );
+    await formPage.submit();
+    await patchPromise;
+
+    // Reload the edit form — the persisted toggle comes back checked
+    await formPage.goto(collection.id);
+    await expect(
+      page.getByTestId("collection-track-history-checkbox"),
+    ).toBeChecked();
   });
 
   test("lists fields added to collection", async ({ page, dataFactory }) => {

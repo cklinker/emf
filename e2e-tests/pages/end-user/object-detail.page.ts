@@ -6,6 +6,13 @@ export class ObjectDetailPage extends BasePage {
   readonly deleteButton: Locator;
   readonly fieldValues: Locator;
   readonly relatedRecords: Locator;
+  readonly historyTab: Locator;
+  readonly historyPanel: Locator;
+  readonly versionRows: Locator;
+  readonly versionDetail: Locator;
+  readonly changedBadges: Locator;
+  readonly historyBackButton: Locator;
+  readonly activityVersionLinks: Locator;
 
   constructor(
     page: Page,
@@ -18,6 +25,13 @@ export class ObjectDetailPage extends BasePage {
     this.deleteButton = this.testId("delete-button");
     this.fieldValues = this.testId("field-values");
     this.relatedRecords = this.testId("related-records");
+    this.historyTab = this.testId("detail-tab-history");
+    this.historyPanel = this.testId("record-history-panel");
+    this.versionRows = this.testId("record-version-row");
+    this.versionDetail = this.testId("record-version-detail");
+    this.changedBadges = this.testId("version-changed-badge");
+    this.historyBackButton = this.testId("history-back-button");
+    this.activityVersionLinks = this.testId("activity-version-link");
   }
 
   async goto(): Promise<void> {
@@ -39,5 +53,9 @@ export class ObjectDetailPage extends BasePage {
 
   async getFieldValue(name: string): Promise<string | null> {
     return this.testId(`field-value-${name}`).textContent();
+  }
+
+  async openHistoryTab(): Promise<void> {
+    await this.historyTab.click();
   }
 }

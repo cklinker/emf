@@ -58,6 +58,7 @@ export function ProviderAvailabilityPage(): React.ReactElement {
 
   useEffect(() => {
     if (!data) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTimezone(data.timezone || 'Europe/Lisbon')
     setRules(
       (data.rules ?? []).map((r) => ({
@@ -65,7 +66,7 @@ export function ProviderAvailabilityPage(): React.ReactElement {
         weekday: r.weekday,
         start: hhmm(r.startTime),
         end: hhmm(r.endTime),
-      })),
+      }))
     )
     setExceptions(
       (data.exceptions ?? []).map((e) => ({
@@ -74,7 +75,7 @@ export function ProviderAvailabilityPage(): React.ReactElement {
         closed: e.closed,
         start: hhmm(e.startTime),
         end: hhmm(e.endTime),
-      })),
+      }))
     )
   }, [data])
 
@@ -101,8 +102,8 @@ export function ProviderAvailabilityPage(): React.ReactElement {
       void queryClient.invalidateQueries({ queryKey: ['telehealth-availability-me'] })
     },
     onError: (err: unknown) => {
-      const detail =
-        (err as { response?: { data?: { message?: string; error?: string } } })?.response?.data
+      const detail = (err as { response?: { data?: { message?: string; error?: string } } })
+        ?.response?.data
       showToast(detail?.message || detail?.error || t('availability.saveFailed'), 'error')
     },
   })
@@ -127,7 +128,7 @@ export function ProviderAvailabilityPage(): React.ReactElement {
   const invalid = useMemo(() => {
     const badRule = rules.some((r) => !r.start || !r.end || r.end <= r.start)
     const badException = exceptions.some(
-      (e) => !e.date || (!e.closed && (!e.start || !e.end || e.end <= e.start)),
+      (e) => !e.date || (!e.closed && (!e.start || !e.end || e.end <= e.start))
     )
     return badRule || badException
   }, [rules, exceptions])

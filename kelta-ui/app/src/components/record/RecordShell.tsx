@@ -42,8 +42,9 @@ export interface RecordShellProps {
   /** Main-column body — normally `<RecordDetailBody/>`. */
   body: React.ReactNode
   /**
-   * Optional left section navigator — normally `<RecordSectionNav/>`. Renders
-   * as a sticky left column of the body grid on `lg+`; hidden on smaller
+   * Optional left panel — normally a page-owned sticky wrapper holding
+   * `<RecordSectionNav/>` with the Activity timeline docked beneath it.
+   * Renders as a left column of the body grid on `lg+`; hidden on smaller
    * screens (the main column already reads top-to-bottom there).
    */
   sectionNav?: React.ReactNode
@@ -103,8 +104,8 @@ export function RecordShell({
           // visual-regression baseline stays pixel-stable (admin is single-column).
           'grid grid-cols-1 gap-4',
           !sectionNav && rail && 'lg:grid-cols-[minmax(0,1fr)_340px]',
-          sectionNav && rail && 'lg:grid-cols-[230px_minmax(0,1fr)_340px]',
-          sectionNav && !rail && 'lg:grid-cols-[230px_minmax(0,1fr)]'
+          sectionNav && rail && 'lg:grid-cols-[280px_minmax(0,1fr)_340px]',
+          sectionNav && !rail && 'lg:grid-cols-[280px_minmax(0,1fr)]'
         )}
       >
         {sectionNav && (

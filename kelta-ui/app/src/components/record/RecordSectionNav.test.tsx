@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { RecordSectionNav, ACTIVITY_ANCHOR_ID } from './RecordSectionNav'
+import { RecordSectionNav } from './RecordSectionNav'
 
 // Mock I18n — return the fallback (or key) so assertions target stable strings.
 vi.mock('@/context/I18nContext', () => ({
@@ -29,26 +29,9 @@ describe('RecordSectionNav', () => {
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 
-  it('renders the Activity entry below the sections when an activity anchor is set', () => {
-    render(<RecordSectionNav items={items} activityAnchorId={ACTIVITY_ANCHOR_ID} />)
-    expect(screen.getByTestId(`section-nav-${ACTIVITY_ANCHOR_ID}`)).toBeInTheDocument()
-    expect(screen.getByText('Activity')).toBeInTheDocument()
-  })
-
-  it('omits the Activity entry when no activity anchor is set', () => {
-    render(<RecordSectionNav items={items} />)
-    expect(screen.queryByTestId(`section-nav-${ACTIVITY_ANCHOR_ID}`)).toBeNull()
-  })
-
-  it('renders nothing when there are no items and no activity anchor', () => {
+  it('renders nothing when there are no items', () => {
     const { container } = render(<RecordSectionNav items={[]} />)
     expect(container.firstChild).toBeNull()
-  })
-
-  it('still renders the Activity entry when there are no section items', () => {
-    render(<RecordSectionNav items={[]} activityAnchorId={ACTIVITY_ANCHOR_ID} />)
-    expect(screen.queryByText('Sections')).toBeNull()
-    expect(screen.getByTestId(`section-nav-${ACTIVITY_ANCHOR_ID}`)).toBeInTheDocument()
   })
 
   it('scrolls to the section anchor and marks the entry active on click', () => {

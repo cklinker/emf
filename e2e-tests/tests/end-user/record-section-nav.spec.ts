@@ -7,10 +7,9 @@ const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
  * Left section navigator on the record detail page.
  *
  * Seeds a collection with a two-section DETAIL page layout, then verifies:
- * - the sticky left nav lists each layout section with its field count
- * - the Activity entry sits below the section list and jumps to the
- *   activity timeline, which now renders in the main column below the
- *   field sections (not below the tab bar)
+ * - the sticky left panel lists each layout section with its field count
+ * - the Activity timeline is docked in the left panel below the section
+ *   list (desktop), not in the main column
  * - clicking a section entry scrolls its section into view
  */
 test.describe("Record detail — section nav", () => {
@@ -76,17 +75,14 @@ test.describe("Record detail — section nav", () => {
     await expect(sectionEntries.nth(1)).toContainText("Extra");
     await expect(sectionEntries.nth(1)).toContainText("1");
 
-    // Activity renders in the main column (inside the record body, above the
-    // tab bar) rather than at the bottom of the page
+    // The Activity timeline is docked in the left panel below the section
+    // list; the main-column copy is hidden at desktop widths
+    await expect(
+      detailPage.sectionNavActivity.getByTestId("activity-timeline"),
+    ).toBeVisible();
     await expect(
       detailPage.fieldValues.getByTestId("activity-timeline"),
-    ).toBeVisible();
-
-    // The Activity nav entry sits below the sections and jumps to the timeline
-    const activityEntry = detailPage.sectionNavEntry("record-activity");
-    await expect(activityEntry).toBeVisible();
-    await activityEntry.click();
-    await expect(detailPage.activityTimeline).toBeInViewport();
+    ).toBeHidden();
 
     // Clicking a section entry scrolls that section into view
     await sectionEntries.nth(1).click();

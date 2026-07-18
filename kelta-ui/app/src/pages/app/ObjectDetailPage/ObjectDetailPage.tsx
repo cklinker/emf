@@ -58,7 +58,7 @@ import { DetailTabBar, HISTORY_TAB } from '@/pages/ResourceDetailPage/DetailTabB
 import { RecordHistoryTab } from '@/components/RecordHistory/RecordHistoryTab'
 import { RecordShell } from '@/components/record/RecordShell'
 import { RecordDetailBody } from '@/components/record/RecordDetailBody'
-import { RecordSectionNav, ACTIVITY_ANCHOR_ID } from '@/components/record/RecordSectionNav'
+import { RecordSectionNav } from '@/components/record/RecordSectionNav'
 import { resolveSectionNavItems } from '@/components/LayoutFieldSections/sectionNavItems'
 import { ActivityTimeline } from '@/components/ActivityTimeline/ActivityTimeline'
 import {
@@ -734,6 +734,27 @@ export function ObjectDetailPage(): React.ReactElement {
     </div>
   ) : null
 
+  // One ActivityTimeline element, mounted in two places: docked in the left
+  // panel under the section nav (lg+), and in the main column on smaller
+  // screens or when there is no section nav. React Query dedupes the fetches.
+  const activityTimeline =
+    record && schema && recordId ? (
+      <ActivityTimeline
+        collectionId={schema.id}
+        collectionName={collectionName ?? ''}
+        recordId={recordId}
+        recordCreatedAt={(record.createdAt ?? record.created_at) as string | undefined}
+        recordUpdatedAt={(record.updatedAt ?? record.updated_at) as string | undefined}
+        apiClient={apiClient}
+        historyEnabled={!!schema.trackHistory}
+        schemaFields={fields}
+        getUserDisplay={getUserDisplay}
+        onOpenHistory={openHistoryAtVersion}
+      />
+    ) : null
+
+  const hasSectionNav = !!record && sectionNavItems.length > 0
+
   return (
     <RecordShell
       variant="enduser"
@@ -838,11 +859,15 @@ export function ObjectDetailPage(): React.ReactElement {
         ) : undefined
       }
       sectionNav={
-        record && sectionNavItems.length > 0 ? (
-          <RecordSectionNav
-            items={sectionNavItems}
-            activityAnchorId={schema && recordId ? ACTIVITY_ANCHOR_ID : undefined}
-          />
+        hasSectionNav ? (
+          <div className="sticky top-6 max-h-[calc(100vh-3rem)] space-y-3 overflow-y-auto">
+            <RecordSectionNav items={sectionNavItems} />
+            {activityTimeline && (
+              <div className="border-t border-border pt-3" data-testid="section-nav-activity">
+                {activityTimeline}
+              </div>
+            )}
+          </div>
         ) : undefined
       }
       body={
@@ -927,23 +952,10 @@ export function ObjectDetailPage(): React.ReactElement {
                 </>
               }
             />
-            {/* Activity lives in the main column below the field sections (was
-                below the tab bar) so the section nav can jump straight to it. */}
-            {schema && recordId && (
-              <div id={ACTIVITY_ANCHOR_ID} className="scroll-mt-20">
-                <ActivityTimeline
-                  collectionId={schema.id}
-                  collectionName={collectionName ?? ''}
-                  recordId={recordId}
-                  recordCreatedAt={(record.createdAt ?? record.created_at) as string | undefined}
-                  recordUpdatedAt={(record.updatedAt ?? record.updated_at) as string | undefined}
-                  apiClient={apiClient}
-                  historyEnabled={!!schema.trackHistory}
-                  schemaFields={fields}
-                  getUserDisplay={getUserDisplay}
-                  onOpenHistory={openHistoryAtVersion}
-                />
-              </div>
+            {/* Activity docks in the left panel on lg+ when the section nav is
+                shown; here it covers small screens and no-layout pages. */}
+            {activityTimeline && (
+              <div className={cn(hasSectionNav && 'lg:hidden')}>{activityTimeline}</div>
             )}
           </div>
         ) : null

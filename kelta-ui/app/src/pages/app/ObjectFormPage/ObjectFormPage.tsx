@@ -50,6 +50,7 @@ import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
 import { usePageLayout } from '@/hooks/usePageLayout'
+import { resolvePicklistSource } from '@/hooks/usePicklistOptions'
 import { useToast } from '@/components/Toast'
 import { PluginErrorBoundary } from '@/components/PluginErrorBoundary'
 import { usePlugins } from '@/context/PluginContext'
@@ -836,27 +837,9 @@ export function ObjectFormPage(): React.ReactElement {
       await Promise.all(
         picklistFields.map(async (field) => {
           try {
-            // Resolve the picklist source: global picklist ID from fieldTypeConfig,
-            // falling back to field-level picklist values.
-            let sourceId = field.id
-            let sourceType = 'FIELD'
-            // fieldTypeConfig may arrive as a parsed object (JSONB column) or a
-            // JSON string depending on the serialization path.  Handle both.
-            const rawConfig = field.fieldTypeConfig
-            let config: { globalPicklistId?: string } | null = null
-            if (typeof rawConfig === 'string') {
-              try {
-                config = JSON.parse(rawConfig) as { globalPicklistId?: string }
-              } catch {
-                /* ignore malformed config */
-              }
-            } else if (rawConfig && typeof rawConfig === 'object') {
-              config = rawConfig as { globalPicklistId?: string }
-            }
-            if (config?.globalPicklistId) {
-              sourceId = config.globalPicklistId
-              sourceType = 'GLOBAL'
-            }
+            // Resolve the picklist source (GLOBAL via fieldTypeConfig — including the
+            // legacy pre-#1222 dialect — else field-level values). Shared helper.
+            const { sourceId, sourceType } = resolvePicklistSource(field)
             const values = await apiClient.getList<PicklistValueDto>(
               `/api/picklist-values?filter[picklistSourceId][eq]=${encodeURIComponent(sourceId)}&filter[picklistSourceType][eq]=${sourceType}`
             )

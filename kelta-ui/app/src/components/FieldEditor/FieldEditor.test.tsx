@@ -195,6 +195,61 @@ describe('FieldEditor Component', () => {
       expect(screen.getByTestId('field-global-picklist-select')).toHaveValue('gp-late')
     })
 
+    it('binds the picklist from the legacy picklistSourceId config dialect', () => {
+      // Fields written by the MCP admin tooling before #1222 store
+      // { picklistSourceId, picklistSourceType: 'GLOBAL' } instead of
+      // { globalPicklistId } — both must pre-select the bound picklist.
+      const legacyField: FieldDefinition = {
+        ...mockField,
+        type: 'picklist',
+        fieldTypeConfig: { picklistSourceId: 'gp-legacy', picklistSourceType: 'GLOBAL' },
+      }
+      renderWithProviders(
+        <FieldEditor
+          {...defaultProps}
+          field={legacyField}
+          picklists={[{ id: 'gp-legacy', name: 'Legacy Picklist' }]}
+        />
+      )
+      expect(screen.getByTestId('field-global-picklist-select')).toHaveValue('gp-legacy')
+    })
+
+    it('shows a load error with a retry affordance when the picklists fetch fails', async () => {
+      const user = userEvent.setup()
+      const onRetry = vi.fn()
+      const picklistField: FieldDefinition = {
+        ...mockField,
+        type: 'picklist',
+        fieldTypeConfig: { globalPicklistId: 'gp-1' },
+      }
+      renderWithProviders(
+        <FieldEditor
+          {...defaultProps}
+          field={picklistField}
+          picklists={[]}
+          picklistsError
+          onRetryPicklists={onRetry}
+        />
+      )
+      expect(screen.getByTestId('field-global-picklist-load-error')).toBeInTheDocument()
+      expect(screen.queryByTestId('field-global-picklist-loading')).not.toBeInTheDocument()
+      await user.click(screen.getByTestId('field-global-picklist-retry'))
+      expect(onRetry).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows a loading hint while picklists are loading and none have arrived', () => {
+      const picklistField: FieldDefinition = {
+        ...mockField,
+        type: 'picklist',
+        fieldTypeConfig: { globalPicklistId: 'gp-1' },
+      }
+      renderWithProviders(
+        <FieldEditor {...defaultProps} field={picklistField} picklists={[]} picklistsLoading />
+      )
+      expect(screen.getByTestId('field-global-picklist-loading')).toBeInTheDocument()
+      expect(screen.queryByTestId('field-global-picklist-load-error')).not.toBeInTheDocument()
+    })
+
     it('should render submit button with "Save" text in edit mode', () => {
       renderWithProviders(<FieldEditor {...defaultProps} field={mockField} />)
 

@@ -1827,6 +1827,7 @@
     "globalPicklist": "Global Picklist",
     "selectPicklist": "Select a picklist...",
     "loadingPicklist": "Loading picklists…",
+    "picklistLoadFailed": "Couldn't load picklists.",
     "globalPicklistHint": "Select the global picklist that provides values for this field.",
     "descriptionPlaceholder": "Enter a description for this field...",
     "trackHistory": "Track History",

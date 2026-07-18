@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, CalendarOff, Plus, Save, Trash2 } from 'lucide-react'
 
@@ -56,9 +56,12 @@ export function ProviderAvailabilityPage(): React.ReactElement {
   const [rules, setRules] = useState<RuleRow[]>([])
   const [exceptions, setExceptions] = useState<ExceptionRow[]>([])
 
-  useEffect(() => {
-    if (!data) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Seed the editable state from the fetched availability during render (the
+  // "adjusting state when props change" pattern) — seeding via useEffect trips
+  // react-hooks/set-state-in-effect and forces a cascading re-render.
+  const [seededFrom, setSeededFrom] = useState<AvailabilityDto | null>(null)
+  if (data && data !== seededFrom) {
+    setSeededFrom(data)
     setTimezone(data.timezone || 'Europe/Lisbon')
     setRules(
       (data.rules ?? []).map((r) => ({
@@ -77,7 +80,7 @@ export function ProviderAvailabilityPage(): React.ReactElement {
         end: hhmm(e.endTime),
       }))
     )
-  }, [data])
+  }
 
   // Localized weekday names without hardcoding translations (2024-01-07 is a Sunday).
   const weekdayLabel = useMemo(() => {

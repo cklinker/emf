@@ -297,6 +297,9 @@ now every enum name passes verbatim + friendly aliases added.
 `fieldTypeConfig.globalPicklistId` (`usePicklistOptions`), and never set `referenceTarget` on
 lookups — MCP-created fields showed no picklist binding / no target collection in the UI. The
 canonical shape is the UI's; the builder now writes `globalPicklistId` + `referenceTarget`.
+Fields created before that fix still carry the legacy dialect in `field.field_type_config`;
+the UI readers (`resolveGlobalPicklistId` in `usePicklistOptions`, shared by `FieldEditor`,
+`ObjectFormPage`, `ResourceFormPage`) now accept both shapes, so no data backfill is required.
 (4)–(6) `create_validation_rule` / `create_listview` / `create_layout` posted camelCase paths
 (`/api/validationRules`, `/api/listViews`, `/api/pageLayouts|layoutSections|layoutFields`) that
 404 against the kebab-case system-collection routes, with attribute shapes the worker never

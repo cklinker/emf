@@ -1179,6 +1179,7 @@
     "globalPicklist": "Liste de choix globale",
     "selectPicklist": "Sélectionner une liste de choix...",
     "loadingPicklist": "Chargement des listes…",
+    "picklistLoadFailed": "Impossible de charger les listes.",
     "globalPicklistHint": "Sélectionnez la liste de choix globale qui fournit les valeurs pour ce champ.",
     "descriptionPlaceholder": "Entrez une description pour ce champ...",
     "trackHistory": "Suivi de l'historique",

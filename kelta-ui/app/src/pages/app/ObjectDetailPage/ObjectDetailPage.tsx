@@ -235,16 +235,18 @@ function deriveSystemRows(
   const createdBy = record.createdBy ?? record.created_by
   const updatedBy = record.updatedBy ?? record.updated_by
 
+  // Audit-user rows render even when absent (system/legacy writes) so the
+  // empty value is visible rather than the row vanishing.
+  const userRowValue = (userId: unknown): string => {
+    if (userId == null) return '—'
+    const display = getUserDisplay(String(userId))
+    return display?.name ?? String(userId)
+  }
+
   if (createdAt) rows.push({ label: 'Created', value: formatStamp(createdAt) })
-  if (createdBy != null) {
-    const display = getUserDisplay(String(createdBy))
-    rows.push({ label: 'Created by', value: display?.name ?? String(createdBy) })
-  }
+  rows.push({ label: 'Created by', value: userRowValue(createdBy) })
   if (updatedAt) rows.push({ label: 'Updated', value: formatStamp(updatedAt) })
-  if (updatedBy != null) {
-    const display = getUserDisplay(String(updatedBy))
-    rows.push({ label: 'Updated by', value: display?.name ?? String(updatedBy) })
-  }
+  rows.push({ label: 'Updated by', value: userRowValue(updatedBy) })
   return rows
 }
 

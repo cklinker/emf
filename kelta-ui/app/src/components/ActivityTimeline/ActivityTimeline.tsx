@@ -147,6 +147,8 @@ interface TimelineEntry {
   timestamp: string
   /** Set on VERSION entries — click-through target for the History tab. */
   versionNumber?: number
+  /** Set on VERSION entries — author display name, rendered on its own line. */
+  user?: string
 }
 
 /**
@@ -500,17 +502,15 @@ export function ActivityTimeline({
         const user = getUserDisplay?.(version.changedBy)?.name ?? version.changedBy
         let description: string
         if (version.changeType === 'CREATED') {
-          description = t('activity.versionCreated', { version: version.versionNumber, user })
+          description = t('activity.versionCreated')
         } else if (version.changeType === 'DELETED') {
-          description = t('activity.versionDeleted', { version: version.versionNumber, user })
+          description = t('activity.versionDeleted')
         } else {
           const fields = version.changedFields.map((f) => displayNames.get(f) ?? f).join(', ')
-          description = t('activity.versionUpdated', {
-            version: version.versionNumber,
-            count: version.changedFields.length,
-            fields,
-            user,
-          })
+          description =
+            version.changedFields.length === 1
+              ? t('activity.versionUpdatedOne', { fields })
+              : t('activity.versionUpdated', { count: version.changedFields.length, fields })
         }
         allEntries.push({
           id: `version-${version.id}`,
@@ -518,6 +518,7 @@ export function ActivityTimeline({
           description,
           timestamp: version.changedAt,
           versionNumber: version.versionNumber,
+          user,
         })
       }
     }
@@ -761,6 +762,14 @@ export function ActivityTimeline({
                 <p className="m-0 text-xs text-muted-foreground leading-snug">
                   <time dateTime={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</time>
                 </p>
+                {entry.user && (
+                  <p
+                    className="m-0 text-xs text-muted-foreground leading-snug break-all"
+                    data-testid="activity-entry-user"
+                  >
+                    {entry.user}
+                  </p>
+                )}
               </div>
             </div>
           ))}

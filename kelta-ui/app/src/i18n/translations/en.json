@@ -2042,9 +2042,10 @@
     "fieldChanged": "{{field}} changed from {{from}} to {{to}}",
     "fieldSet": "{{field}} set to {{value}}",
     "fieldCleared": "{{field}} cleared (was {{value}})",
-    "versionCreated": "Record created (v{{version}}) — by {{user}}",
-    "versionUpdated": "Record updated to v{{version}} — {{count}} fields changed: {{fields}} — by {{user}}",
-    "versionDeleted": "Record deleted (v{{version}}) — by {{user}}",
+    "versionCreated": "Record created",
+    "versionUpdated": "Updated {{count}} fields: {{fields}}",
+    "versionUpdatedOne": "Updated 1 field: {{fields}}",
+    "versionDeleted": "Record deleted",
     "loading": "Loading activity..."
   },
   "history": {

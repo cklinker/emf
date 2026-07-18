@@ -1335,9 +1335,10 @@
     "recalled": "Revogado",
     "sharedWith": "Compartilhado com {{id}} ({{level}})",
     "loading": "Carregando atividade...",
-    "versionCreated": "Registro criado (v{{version}}) — por {{user}}",
-    "versionUpdated": "Registro atualizado para v{{version}} — {{count}} campos alterados: {{fields}} — por {{user}}",
-    "versionDeleted": "Registro excluído (v{{version}}) — por {{user}}"
+    "versionCreated": "Registro criado",
+    "versionUpdated": "{{count}} campos atualizados: {{fields}}",
+    "versionUpdatedOne": "1 campo atualizado: {{fields}}",
+    "versionDeleted": "Registro excluído"
   },
   "history": {
     "tabTitle": "Histórico",

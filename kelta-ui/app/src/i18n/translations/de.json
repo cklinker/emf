@@ -1335,9 +1335,10 @@
     "recalled": "Zurückgerufen",
     "sharedWith": "Freigegeben für {{id}} ({{level}})",
     "loading": "Aktivität wird geladen...",
-    "versionCreated": "Datensatz erstellt (v{{version}}) — von {{user}}",
-    "versionUpdated": "Datensatz aktualisiert auf v{{version}} — {{count}} Felder geändert: {{fields}} — von {{user}}",
-    "versionDeleted": "Datensatz gelöscht (v{{version}}) — von {{user}}"
+    "versionCreated": "Datensatz erstellt",
+    "versionUpdated": "{{count}} Felder aktualisiert: {{fields}}",
+    "versionUpdatedOne": "1 Feld aktualisiert: {{fields}}",
+    "versionDeleted": "Datensatz gelöscht"
   },
   "history": {
     "tabTitle": "Verlauf",

@@ -399,46 +399,46 @@ export function DetailTabBar({
                 </span>
               </div>
             )}
-            {createdBy != null && (
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium text-muted-foreground">Created by</span>
-                <span className="text-base text-foreground" data-testid="system-created-by">
-                  {(() => {
-                    const display = getUserDisplay(String(createdBy))
-                    return display ? (
-                      <Link
-                        to={display.linkTo}
-                        className="text-primary no-underline hover:text-primary/80 hover:underline"
-                      >
-                        {display.name}
-                      </Link>
-                    ) : (
-                      String(createdBy)
-                    )
-                  })()}
-                </span>
-              </div>
-            )}
-            {updatedBy != null && (
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium text-muted-foreground">Last modified by</span>
-                <span className="text-base text-foreground" data-testid="system-updated-by">
-                  {(() => {
-                    const display = getUserDisplay(String(updatedBy))
-                    return display ? (
-                      <Link
-                        to={display.linkTo}
-                        className="text-primary no-underline hover:text-primary/80 hover:underline"
-                      >
-                        {display.name}
-                      </Link>
-                    ) : (
-                      String(updatedBy)
-                    )
-                  })()}
-                </span>
-              </div>
-            )}
+            {/* Audit users render even when absent (system/legacy writes) so
+                the empty value is visible rather than the row vanishing. */}
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-muted-foreground">Created by</span>
+              <span className="text-base text-foreground" data-testid="system-created-by">
+                {(() => {
+                  if (createdBy == null) return '—'
+                  const display = getUserDisplay(String(createdBy))
+                  return display ? (
+                    <Link
+                      to={display.linkTo}
+                      className="text-primary no-underline hover:text-primary/80 hover:underline"
+                    >
+                      {display.name}
+                    </Link>
+                  ) : (
+                    String(createdBy)
+                  )
+                })()}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-muted-foreground">Last modified by</span>
+              <span className="text-base text-foreground" data-testid="system-updated-by">
+                {(() => {
+                  if (updatedBy == null) return '—'
+                  const display = getUserDisplay(String(updatedBy))
+                  return display ? (
+                    <Link
+                      to={display.linkTo}
+                      className="text-primary no-underline hover:text-primary/80 hover:underline"
+                    >
+                      {display.name}
+                    </Link>
+                  ) : (
+                    String(updatedBy)
+                  )
+                })()}
+              </span>
+            </div>
           </div>
         </TabsContent>
       </Tabs>

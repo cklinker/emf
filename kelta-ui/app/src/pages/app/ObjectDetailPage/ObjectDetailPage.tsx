@@ -55,6 +55,7 @@ import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { DetailTabBar, HISTORY_TAB } from '@/pages/ResourceDetailPage/DetailTabBar'
+import { scrollDetailTabBarIntoView } from '@/pages/ResourceDetailPage/detailTabBarScroll'
 import { RecordHistoryTab } from '@/components/RecordHistory/RecordHistoryTab'
 import { RecordShell } from '@/components/record/RecordShell'
 import { RecordDetailBody } from '@/components/record/RecordDetailBody'
@@ -302,6 +303,7 @@ export function ObjectDetailPage(): React.ReactElement {
         },
         { replace: true }
       )
+      scrollDetailTabBarIntoView()
     },
     [setSearchParams]
   )

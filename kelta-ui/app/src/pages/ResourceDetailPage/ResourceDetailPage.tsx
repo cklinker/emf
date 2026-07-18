@@ -28,6 +28,7 @@ import { useRecordContext } from '../../hooks/useRecordContext'
 import { usePageLayout } from '../../hooks/usePageLayout'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { DetailTabBar, HISTORY_TAB } from './DetailTabBar'
+import { scrollDetailTabBarIntoView } from './detailTabBarScroll'
 import { RecordHistoryTab } from '../../components/RecordHistory/RecordHistoryTab'
 import { RecordShell } from '../../components/record/RecordShell'
 import { RecordDetailBody } from '../../components/record/RecordDetailBody'
@@ -382,6 +383,7 @@ export function ResourceDetailPage({
         },
         { replace: true }
       )
+      scrollDetailTabBarIntoView()
     },
     [setSearchParams]
   )

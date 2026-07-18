@@ -14,6 +14,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 import { DetailTabBar, HISTORY_TAB } from './DetailTabBar'
+import { scrollDetailTabBarIntoView } from './detailTabBarScroll'
 import type { DetailTabBarProps } from './DetailTabBar'
 import type { ApiClient } from '@/services/apiClient'
 
@@ -133,6 +134,27 @@ describe('DetailTabBar', () => {
       await user.click(screen.getByTestId('detail-tab-notes'))
 
       expect(onTabChange).toHaveBeenCalledWith('__notes__')
+    })
+  })
+
+  describe('scrollDetailTabBarIntoView', () => {
+    it('scrolls the rendered tab bar into view on the next frame', async () => {
+      renderTabBar()
+      const tabBar = screen.getByTestId('detail-tab-bar')
+      const scrollIntoView = vi.fn()
+      Object.defineProperty(tabBar, 'scrollIntoView', { value: scrollIntoView })
+
+      scrollDetailTabBarIntoView()
+
+      // Deferred a frame — nothing yet.
+      expect(scrollIntoView).not.toHaveBeenCalled()
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    })
+
+    it('does not throw when no tab bar is mounted', async () => {
+      expect(() => scrollDetailTabBarIntoView()).not.toThrow()
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
     })
   })
 })

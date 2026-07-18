@@ -31,6 +31,8 @@ import { DetailTabBar, HISTORY_TAB } from './DetailTabBar'
 import { RecordHistoryTab } from '../../components/RecordHistory/RecordHistoryTab'
 import { RecordShell } from '../../components/record/RecordShell'
 import { RecordDetailBody } from '../../components/record/RecordDetailBody'
+import { RecordSectionNav, ACTIVITY_ANCHOR_ID } from '../../components/record/RecordSectionNav'
+import { resolveSectionNavItems } from '../../components/LayoutFieldSections/sectionNavItems'
 import { unwrapResource, extractIncluded } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
 
@@ -400,6 +402,15 @@ export function ResourceDetailPage({
 
   // Resolve page layout for this collection (returns null if none configured)
   const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
+
+  // Left section-nav entries (layout sections only — the admin field grid has no anchors)
+  const sectionNavItems = useMemo(
+    () =>
+      layout?.sections && schema?.fields
+        ? resolveSectionNavItems(layout.sections, schema.fields)
+        : [],
+    [layout?.sections, schema?.fields]
+  )
 
   // Fetch resource data
   const {
@@ -877,6 +888,11 @@ export function ResourceDetailPage({
           />
         </div>
       }
+      sectionNav={
+        sectionNavItems.length > 0 ? (
+          <RecordSectionNav items={sectionNavItems} activityAnchorId={ACTIVITY_ANCHOR_ID} />
+        ) : undefined
+      }
       body={
         <div className="space-y-6 max-md:space-y-4">
           {/* Field Values — layout sections when available, else the admin grid */}
@@ -1023,6 +1039,23 @@ export function ResourceDetailPage({
               </div>
             )}
           </section>
+
+          {/* Activity lives in the main column below the field sections (was
+              below the tab bar) so the section nav can jump straight to it. */}
+          <div id={ACTIVITY_ANCHOR_ID} className="scroll-mt-20">
+            <ActivityTimeline
+              collectionId={schema.id}
+              collectionName={collectionName}
+              recordId={resourceId}
+              recordCreatedAt={(resource.created_at || resource.createdAt) as string | undefined}
+              recordUpdatedAt={(resource.updated_at || resource.updatedAt) as string | undefined}
+              apiClient={apiClient}
+              historyEnabled={!!schema.trackHistory}
+              schemaFields={schema.fields}
+              getUserDisplay={getUserDisplay}
+              onOpenHistory={openHistoryAtVersion}
+            />
+          </div>
         </div>
       }
       tabBar={
@@ -1055,20 +1088,6 @@ export function ResourceDetailPage({
               />
             ) : undefined
           }
-        />
-      }
-      belowTabs={
-        <ActivityTimeline
-          collectionId={schema.id}
-          collectionName={collectionName}
-          recordId={resourceId}
-          recordCreatedAt={(resource.created_at || resource.createdAt) as string | undefined}
-          recordUpdatedAt={(resource.updated_at || resource.updatedAt) as string | undefined}
-          apiClient={apiClient}
-          historyEnabled={!!schema.trackHistory}
-          schemaFields={schema.fields}
-          getUserDisplay={getUserDisplay}
-          onOpenHistory={openHistoryAtVersion}
         />
       }
       dialogs={

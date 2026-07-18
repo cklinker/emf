@@ -1276,6 +1276,9 @@
     "tableLabel": "Registros de {{collection}}",
     "created": "Creado"
   },
+  "recordNav": {
+    "sections": "Secciones"
+  },
   "activity": {
     "title": "Actividad",
     "noActivity": "No se ha registrado actividad para este registro.",

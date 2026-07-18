@@ -196,8 +196,13 @@ export class DataFactory {
     );
   }
 
+  /**
+   * Create a collection. Any override is passed through as a collection
+   * attribute — e.g. `trackHistory: true` enables record versioning (every
+   * record create/update/delete captured as a record_version snapshot).
+   */
   async createCollection(
-    overrides: Record<string, unknown> = {},
+    overrides: Record<string, unknown> & { trackHistory?: boolean } = {},
   ): Promise<JsonApiResource> {
     const uniqueName = `e2e_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const result = await this.request("POST", "/api/collections", {

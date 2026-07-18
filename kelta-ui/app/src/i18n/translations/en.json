@@ -1758,6 +1758,8 @@
     "activeHint": "Inactive collections are hidden from the resource browser but data is preserved.",
     "displayFieldNone": "Auto-detect",
     "displayFieldHint": "The field shown when records appear in lookup dropdowns. If not set, defaults to a field named \"name\" or the first text field.",
+    "trackHistory": "Track record history",
+    "trackHistoryHint": "Capture a full version snapshot of every record create, update, and delete. Adds a History tab to record pages.",
     "validation": {
       "nameRequired": "Collection name is required",
       "nameTooLong": "Collection name must be 50 characters or less",
@@ -2037,7 +2039,23 @@
     "fieldChanged": "{{field}} changed from {{from}} to {{to}}",
     "fieldSet": "{{field}} set to {{value}}",
     "fieldCleared": "{{field}} cleared (was {{value}})",
+    "versionCreated": "Record created (v{{version}}) — by {{user}}",
+    "versionUpdated": "Record updated to v{{version}} — {{count}} fields changed: {{fields}} — by {{user}}",
+    "versionDeleted": "Record deleted (v{{version}}) — by {{user}}",
     "loading": "Loading activity..."
+  },
+  "history": {
+    "tabTitle": "History",
+    "empty": "No versions recorded yet.",
+    "loadError": "Failed to load record history.",
+    "versionLabel": "Version {{version}}",
+    "changedBadge": "Changed",
+    "recordCreated": "Record created",
+    "recordUpdated": "Record updated",
+    "recordDeleted": "Record deleted",
+    "fieldsChangedSummary": "{{count}} fields changed: {{fields}}",
+    "backToList": "All versions",
+    "byUser": "by {{user}}"
   },
   "recordActions": {
     "edit": "Edit",

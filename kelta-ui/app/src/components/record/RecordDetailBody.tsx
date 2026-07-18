@@ -36,6 +36,8 @@ export interface RecordDetailBodyProps {
   editable?: boolean
   /** Persist a committed field value; rejects surface inline. */
   onFieldCommit?: (fieldName: string, value: unknown) => Promise<void>
+  /** Field names to mark with a "Changed" badge (record-version detail view). */
+  highlightedFields?: Set<string>
   /**
    * Rendered when the layout has no sections. Each variant supplies its own
    * fallback (end-user Highlights+Details, admin field grid), keeping the
@@ -53,6 +55,7 @@ export function RecordDetailBody({
   persistKeyPrefix,
   editable,
   onFieldCommit,
+  highlightedFields,
   fallback,
 }: RecordDetailBodyProps): React.ReactElement {
   if (sections && sections.length > 0) {
@@ -66,6 +69,7 @@ export function RecordDetailBody({
         persistKeyPrefix={persistKeyPrefix}
         editable={editable}
         onFieldCommit={onFieldCommit}
+        highlightedFields={highlightedFields}
       />
     )
   }

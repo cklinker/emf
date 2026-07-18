@@ -271,6 +271,7 @@ describe('CollectionForm Component', () => {
           displayName: 'My Collection',
           description: 'A description',
           active: true,
+          trackHistory: false,
         })
       })
     })
@@ -348,6 +349,7 @@ describe('CollectionForm Component', () => {
           displayName: 'Updated Collection',
           description: 'A test collection for testing',
           active: true,
+          trackHistory: false,
         })
       })
     })
@@ -361,6 +363,7 @@ describe('CollectionForm Component', () => {
       expect(screen.getByTestId('collection-display-name-input')).toBeDisabled()
       expect(screen.getByTestId('collection-description-input')).toBeDisabled()
       expect(screen.getByTestId('collection-active-checkbox')).toBeDisabled()
+      expect(screen.getByTestId('collection-track-history-checkbox')).toBeDisabled()
     })
 
     it('should disable buttons when submitting', () => {
@@ -375,6 +378,54 @@ describe('CollectionForm Component', () => {
 
       const submitButton = screen.getByTestId('collection-form-submit')
       expect(submitButton.querySelector('[data-testid="loading-spinner"]')).toBeInTheDocument()
+    })
+  })
+
+  describe('Track History Field', () => {
+    it('should render the track history checkbox', () => {
+      renderWithProviders(<CollectionForm {...defaultProps} />)
+
+      expect(screen.getByTestId('collection-track-history-checkbox')).toBeInTheDocument()
+    })
+
+    it('should default to unchecked in create mode', () => {
+      renderWithProviders(<CollectionForm {...defaultProps} />)
+
+      expect(screen.getByTestId('collection-track-history-checkbox')).not.toBeChecked()
+    })
+
+    it('should be unchecked in edit mode when the collection has no trackHistory', () => {
+      renderWithProviders(<CollectionForm {...defaultProps} collection={mockCollection} />)
+
+      expect(screen.getByTestId('collection-track-history-checkbox')).not.toBeChecked()
+    })
+
+    it('should be checked in edit mode when collection.trackHistory is true', () => {
+      renderWithProviders(
+        <CollectionForm {...defaultProps} collection={{ ...mockCollection, trackHistory: true }} />
+      )
+
+      expect(screen.getByTestId('collection-track-history-checkbox')).toBeChecked()
+    })
+
+    it('should include trackHistory in the submit payload when checked', async () => {
+      const onSubmit = vi.fn().mockResolvedValue(undefined)
+      const user = userEvent.setup()
+      renderWithProviders(<CollectionForm {...defaultProps} onSubmit={onSubmit} />)
+
+      await user.type(screen.getByTestId('collection-name-input'), 'my_collection')
+      await user.type(screen.getByTestId('collection-display-name-input'), 'My Collection')
+      await user.click(screen.getByTestId('collection-track-history-checkbox'))
+
+      await user.click(screen.getByTestId('collection-form-submit'))
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            trackHistory: true,
+          })
+        )
+      })
     })
   })
 

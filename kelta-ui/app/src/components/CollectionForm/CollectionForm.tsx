@@ -31,6 +31,8 @@ export interface CollectionFormData {
   description?: string
   /** Whether the collection is active */
   active: boolean
+  /** Whether every record change is captured as a record_version snapshot */
+  trackHistory: boolean
   /** ID of the field used as display field in lookup dropdowns */
   displayFieldId?: string
 }
@@ -53,6 +55,7 @@ export interface Collection {
   displayName: string
   description?: string
   active: boolean
+  trackHistory?: boolean
   displayFieldId?: string
   currentVersion: number
   createdAt: string
@@ -99,6 +102,7 @@ export const collectionFormSchema = z.object({
     .max(100, 'validation.displayNameTooLong'),
   description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
   active: z.boolean(),
+  trackHistory: z.boolean(),
   displayFieldId: z.string().optional().or(z.literal('')),
 })
 
@@ -142,6 +146,7 @@ export function CollectionForm({
       displayName: collection?.displayName ?? '',
       description: collection?.description ?? '',
       active: collection?.active ?? true,
+      trackHistory: collection?.trackHistory ?? false,
       displayFieldId: collection?.displayFieldId ?? '',
     },
     mode: 'onBlur',
@@ -155,6 +160,7 @@ export function CollectionForm({
         displayName: collection.displayName,
         description: collection.description ?? '',
         active: collection.active,
+        trackHistory: collection.trackHistory ?? false,
         displayFieldId: collection.displayFieldId ?? '',
       })
     }
@@ -168,6 +174,7 @@ export function CollectionForm({
         displayName: data.displayName,
         description: data.description || undefined,
         active: data.active,
+        trackHistory: data.trackHistory,
         displayFieldId: data.displayFieldId || undefined,
       }
       await onSubmit(formData)
@@ -401,6 +408,34 @@ export function CollectionForm({
           data-testid="active-hint"
         >
           {t('collectionForm.activeHint')}
+        </span>
+      </div>
+
+      {/* Track History Field */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <input
+            id="collection-track-history"
+            type="checkbox"
+            className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isSubmitting}
+            aria-describedby="track-history-hint"
+            data-testid="collection-track-history-checkbox"
+            {...register('trackHistory')}
+          />
+          <label
+            htmlFor="collection-track-history"
+            className="text-base text-foreground cursor-pointer"
+          >
+            {t('collectionForm.trackHistory')}
+          </label>
+        </div>
+        <span
+          id="track-history-hint"
+          className="text-xs text-muted-foreground mt-1"
+          data-testid="track-history-hint"
+        >
+          {t('collectionForm.trackHistoryHint')}
         </span>
       </div>
 

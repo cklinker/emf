@@ -128,6 +128,9 @@ public class FieldHistoryHook implements BeforeSaveHook {
         if (definition == null || definition.systemCollection()) {
             return null; // platform metadata isn't field-history tracked
         }
+        if (definition.trackHistory()) {
+            return null; // collection-level versioning supersedes per-field history (RecordVersionHook)
+        }
         List<String> trackedFields = definition.fields().stream()
                 .filter(FieldDefinition::trackHistory)
                 .map(FieldDefinition::name)

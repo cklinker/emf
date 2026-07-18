@@ -1117,7 +1117,9 @@
       "displayNameRequired": "Le nom d'affichage est obligatoire",
       "displayNameTooLong": "Le nom d'affichage ne doit pas dépasser 100 caractères",
       "descriptionTooLong": "La description ne doit pas dépasser 500 caractères"
-    }
+    },
+    "trackHistory": "Suivre l'historique des enregistrements",
+    "trackHistoryHint": "Capture un instantané complet à chaque création, mise à jour et suppression d'enregistrement. Ajoute un onglet Historique aux pages d'enregistrement."
   },
   "authorizationPanel": {
     "title": "Autorisation",
@@ -1291,7 +1293,23 @@
     "rejected": "Rejeté",
     "recalled": "Rappelé",
     "sharedWith": "Partagé avec {{id}} ({{level}})",
-    "loading": "Chargement de l'activité..."
+    "loading": "Chargement de l'activité...",
+    "versionCreated": "Enregistrement créé (v{{version}}) — par {{user}}",
+    "versionUpdated": "Enregistrement mis à jour vers v{{version}} — {{count}} champs modifiés : {{fields}} — par {{user}}",
+    "versionDeleted": "Enregistrement supprimé (v{{version}}) — par {{user}}"
+  },
+  "history": {
+    "tabTitle": "Historique",
+    "empty": "Aucune version enregistrée pour le moment.",
+    "loadError": "Échec du chargement de l'historique de l'enregistrement.",
+    "versionLabel": "Version {{version}}",
+    "changedBadge": "Modifié",
+    "recordCreated": "Enregistrement créé",
+    "recordUpdated": "Enregistrement mis à jour",
+    "recordDeleted": "Enregistrement supprimé",
+    "fieldsChangedSummary": "{{count}} champs modifiés : {{fields}}",
+    "backToList": "Toutes les versions",
+    "byUser": "par {{user}}"
   },
   "recordActions": {
     "edit": "Modifier",

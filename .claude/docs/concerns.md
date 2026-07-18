@@ -184,7 +184,20 @@ risk is closed by `FieldHistorySecurityAdvice`, which resolves each row's *refer
 collection+field and drops FLS-denied rows / redacts MASKED old+new values per requester
 (the generic `CerbosFieldSecurityAdvice` can't, since it keys off the row's own
 `field-history` type). Row-drop makes a page's returned count a lower bound — acceptable for
-an audit feed.
+an audit feed. The same posture applies to **`record_version`** (collection-level snapshots,
+V174) via `RecordVersionSecurityAdvice` — a snapshot carries *every* field value of a record,
+so that advice is the single guard between full-record history and an under-privileged caller;
+treat changes to it as security-sensitive.
+
+**`record_version` growth + known limits** — with `collection.track_history` on, every
+create/update/delete of every record in the collection writes a full jsonb snapshot row. That
+is inherently high-growth (one full record copy per edit) and there is **no retention/pruning
+policy yet** — revisit before production-scale tenants enable it broadly (options: per-tenant
+version cap per record, age-based purge alongside `record_tombstone` archival). Two accepted
+v1 limitations: the DELETED version's `changed_by` is the record's *last updater* (the router
+passes no principal into the delete path — threading the deleter through `QueryEngine.delete`
+is a cross-cutting signature change, deferred), and version detail renders historical lookup
+ids raw when they're not in the live page's `lookupDisplayMap` (no write-time display capture).
 
 ## Known Bugs
 

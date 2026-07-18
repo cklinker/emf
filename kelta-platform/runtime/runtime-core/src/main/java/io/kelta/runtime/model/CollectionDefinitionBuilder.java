@@ -59,6 +59,7 @@ public class CollectionDefinitionBuilder {
     private Map<String, String> columnMapping = new HashMap<>();
     private String displayFieldName;
     private String tenantId;
+    private boolean trackHistory = false;
 
     /**
      * Creates a new collection definition builder.
@@ -288,6 +289,17 @@ public class CollectionDefinitionBuilder {
     }
 
     /**
+     * Sets whether record changes are captured as full snapshots in record_version.
+     *
+     * @param trackHistory true to snapshot every record create/update/delete
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder trackHistory(boolean trackHistory) {
+        this.trackHistory = trackHistory;
+        return this;
+    }
+
+    /**
      * Builds the collection definition.
      *
      * <p>Applies sensible defaults for optional configuration:
@@ -346,7 +358,8 @@ public class CollectionDefinitionBuilder {
             immutableFields,
             columnMapping,
             displayFieldName,
-            tenantId
+            tenantId,
+            trackHistory
         );
     }
 }

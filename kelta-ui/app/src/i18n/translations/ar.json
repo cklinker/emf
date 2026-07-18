@@ -811,7 +811,9 @@
       "displayNameRequired": "اسم العرض مطلوب",
       "displayNameTooLong": "يجب أن يكون اسم العرض 100 حرف أو أقل",
       "descriptionTooLong": "يجب أن يكون الوصف 500 حرف أو أقل"
-    }
+    },
+    "trackHistory": "تتبع سجل التغييرات",
+    "trackHistoryHint": "يلتقط لقطة كاملة عند كل إنشاء وتحديث وحذف للسجل. يضيف علامة تبويب «السجل التاريخي» إلى صفحات السجلات."
   },
   "authorizationPanel": {
     "title": "التفويض",
@@ -928,5 +930,23 @@
     "lightMode": "فاتح",
     "darkMode": "داكن",
     "systemMode": "النظام"
+  },
+  "activity": {
+    "versionCreated": "تم إنشاء السجل (الإصدار {{version}}) — بواسطة {{user}}",
+    "versionUpdated": "تم تحديث السجل إلى الإصدار {{version}} — تم تغيير {{count}} من الحقول: {{fields}} — بواسطة {{user}}",
+    "versionDeleted": "تم حذف السجل (الإصدار {{version}}) — بواسطة {{user}}"
+  },
+  "history": {
+    "tabTitle": "السجل التاريخي",
+    "empty": "لا توجد إصدارات مسجلة بعد.",
+    "loadError": "فشل تحميل سجل التغييرات.",
+    "versionLabel": "الإصدار {{version}}",
+    "changedBadge": "تغيّر",
+    "recordCreated": "تم إنشاء السجل",
+    "recordUpdated": "تم تحديث السجل",
+    "recordDeleted": "تم حذف السجل",
+    "fieldsChangedSummary": "تم تغيير {{count}} من الحقول: {{fields}}",
+    "backToList": "كل الإصدارات",
+    "byUser": "بواسطة {{user}}"
   }
 }

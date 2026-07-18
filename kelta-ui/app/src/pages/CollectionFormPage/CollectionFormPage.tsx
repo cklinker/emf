@@ -114,6 +114,7 @@ export function CollectionFormPage({
           displayName: data.displayName,
           description: data.description || '',
           active: data.active,
+          trackHistory: data.trackHistory,
         }
         // Include displayFieldId — empty string clears it, undefined means no change
         if (data.displayFieldId !== undefined) {

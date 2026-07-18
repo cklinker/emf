@@ -102,6 +102,52 @@ test.describe("Record CRUD", () => {
     await page.waitForURL(new RegExp(`/app/o/${collectionName}`));
   });
 
+  test("inline field edit commits and stays on the detail page", async ({
+    page,
+    dataFactory,
+  }) => {
+    // Inline editing renders through the layout-driven LayoutFieldSections
+    // path only — a collection without a detail page layout falls back to the
+    // read-only Highlights/Details cards. Seed a one-section layout.
+    const collection = await dataFactory.createCollection();
+    const collectionName = collection.attributes.name as string;
+    const titleField = await dataFactory.addField(collection.id, {
+      name: "title",
+      displayName: "Title",
+      type: "string",
+      required: true,
+    });
+    await dataFactory.waitForStorageReady(collectionName);
+    await dataFactory.createDetailLayout(collection.id, [
+      { heading: "Overview", fields: [{ fieldId: titleField.id }] },
+    ]);
+
+    const record = await dataFactory.createRecord(collectionName, {
+      title: `Inline Test ${Date.now()}`,
+    });
+
+    const detailPage = new ObjectDetailPage(
+      page,
+      collectionName,
+      record.id,
+      tenantSlug,
+    );
+    await detailPage.goto();
+
+    const updated = `Inline Updated ${Date.now()}`;
+    await page.getByTestId("inline-field-title").first().click();
+    const input = page.getByRole("textbox", { name: "Title" });
+    await input.fill(updated);
+    await input.press("Enter");
+
+    // Regression (#shared-mutation-onSuccess): committing an inline edit used to
+    // fire the delete-scoped success handler and bounce back to the list page.
+    await expect(page.getByTestId("inline-field-title").first()).toContainText(
+      updated,
+    );
+    expect(page.url()).toContain(`/app/o/${collectionName}/${record.id}`);
+  });
+
   test("deletes a record with confirmation", async ({ page, dataFactory }) => {
     const collectionName = await setupCollection(dataFactory);
 

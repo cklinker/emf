@@ -377,16 +377,20 @@ export function ObjectListPage(): React.ReactElement {
     prevRecordsLoadingRef.current = recordsLoading
   }, [recordsLoading, records.length, total, recordsError, announce])
 
-  // Mutations
+  // Mutations. No shared onSuccess: the hook fires it for EVERY mutation (inline cell
+  // patch included), which would falsely announce "Record deleted" and clear the row
+  // selection on each cell edit. Delete side effects live in the delete confirm handlers.
   const mutations = useRecordMutation({
     collectionName: collectionName || '',
-    onSuccess: () => {
-      setDeleteTarget(null)
-      setShowBulkDeleteDialog(false)
-      setSelectedIds(new Set())
-      announce('Record deleted successfully')
-    },
   })
+
+  // Shared post-delete cleanup for single + bulk delete.
+  const afterDeleteSuccess = useCallback(() => {
+    setDeleteTarget(null)
+    setShowBulkDeleteDialog(false)
+    setSelectedIds(new Set())
+    announce('Record deleted successfully')
+  }, [announce])
 
   // In-place cell edit in the list grid (unified record experience, slice 3).
   const handleCellCommit = useCallback(
@@ -713,9 +717,14 @@ export function ObjectListPage(): React.ReactElement {
 
   const handleDeleteConfirm = useCallback(() => {
     if (deleteTarget) {
-      mutations.remove.mutate(deleteTarget.id)
+      mutations.remove
+        .mutateAsync(deleteTarget.id)
+        .then(afterDeleteSuccess)
+        .catch(() => {
+          // Error state is surfaced by the mutation; keep the dialog open.
+        })
     }
-  }, [deleteTarget, mutations.remove])
+  }, [deleteTarget, mutations.remove, afterDeleteSuccess])
 
   const handleBulkDeleteClick = useCallback(() => {
     if (selectedIds.size > 0) {
@@ -724,8 +733,13 @@ export function ObjectListPage(): React.ReactElement {
   }, [selectedIds])
 
   const handleBulkDeleteConfirm = useCallback(() => {
-    mutations.bulkDelete.mutate(Array.from(selectedIds))
-  }, [mutations.bulkDelete, selectedIds])
+    mutations.bulkDelete
+      .mutateAsync(Array.from(selectedIds))
+      .then(afterDeleteSuccess)
+      .catch(() => {
+        // Error state is surfaced by the mutation; keep the dialog open.
+      })
+  }, [mutations.bulkDelete, selectedIds, afterDeleteSuccess])
 
   // Export handlers
   const handleExportCsv = useCallback(() => {

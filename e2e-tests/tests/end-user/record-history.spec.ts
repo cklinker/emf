@@ -97,11 +97,16 @@ test.describe("Record History", () => {
     await expect(detailPage.versionRows).toHaveCount(2);
 
     // The activity timeline shows a click-through entry for the update
-    await expect(
-      detailPage.activityVersionLinks.filter({
-        hasText: "Updated 1 field:",
-      }),
-    ).toBeVisible();
+    const activityLink = detailPage.activityVersionLinks.filter({
+      hasText: "Updated 1 field:",
+    });
+    await expect(activityLink).toBeVisible();
+
+    // Clicking it opens the History tab at that version and scrolls the tab
+    // bar into view (the switch used to happen off-screen and look like a no-op)
+    await activityLink.click();
+    await expect(detailPage.versionDetail).toBeVisible();
+    await expect(detailPage.versionDetail).toBeInViewport();
   });
 
   test("shows no History tab for a collection without trackHistory", async ({

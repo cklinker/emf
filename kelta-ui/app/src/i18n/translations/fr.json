@@ -1297,9 +1297,10 @@
     "recalled": "Rappelé",
     "sharedWith": "Partagé avec {{id}} ({{level}})",
     "loading": "Chargement de l'activité...",
-    "versionCreated": "Enregistrement créé (v{{version}}) — par {{user}}",
-    "versionUpdated": "Enregistrement mis à jour vers v{{version}} — {{count}} champs modifiés : {{fields}} — par {{user}}",
-    "versionDeleted": "Enregistrement supprimé (v{{version}}) — par {{user}}"
+    "versionCreated": "Enregistrement créé",
+    "versionUpdated": "{{count}} champs modifiés : {{fields}}",
+    "versionUpdatedOne": "1 champ modifié : {{fields}}",
+    "versionDeleted": "Enregistrement supprimé"
   },
   "history": {
     "tabTitle": "Historique",

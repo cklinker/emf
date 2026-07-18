@@ -181,7 +181,7 @@ public class DynamicCollectionRouter {
             // Check system collection cache before querying
             String tenantId = request.getHeader("X-Tenant-ID");
             List<String> includeNames = parseIncludeParam(params);
-            if (definition.systemCollection() && systemCollectionCache != null && includeNames.isEmpty()) {
+            if (cacheable(definition) && includeNames.isEmpty()) {
                 String queryHash = buildQueryHash(queryRequest);
                 Optional<Map<String, Object>> cached = systemCollectionCache.getListResponse(
                         tenantId, collectionName, queryHash);
@@ -210,7 +210,7 @@ public class DynamicCollectionRouter {
             }
 
             // Cache the response for system collections (only when no includes, to keep cache simple)
-            if (definition.systemCollection() && systemCollectionCache != null && includeNames.isEmpty()) {
+            if (cacheable(definition) && includeNames.isEmpty()) {
                 String queryHash = buildQueryHash(queryRequest);
                 systemCollectionCache.putListResponse(tenantId, collectionName, queryHash, response);
             }
@@ -252,8 +252,7 @@ public class DynamicCollectionRouter {
 
             // Check system collection cache for get-by-id (no-include requests only)
             String tenantId = request.getHeader("X-Tenant-ID");
-            if (definition.systemCollection() && systemCollectionCache != null
-                    && includeNames.isEmpty()) {
+            if (cacheable(definition) && includeNames.isEmpty()) {
                 Optional<Map<String, Object>> cached = systemCollectionCache.getByIdResponse(
                         tenantId, collectionName, id);
                 if (cached.isPresent()) {
@@ -288,7 +287,7 @@ public class DynamicCollectionRouter {
             }
 
             // Cache the response for system collections (only when no includes)
-            if (definition.systemCollection() && systemCollectionCache != null && includeNames.isEmpty()) {
+            if (cacheable(definition) && includeNames.isEmpty()) {
                 systemCollectionCache.putByIdResponse(tenantId, collectionName, id, response);
             }
 
@@ -1760,6 +1759,18 @@ public class DynamicCollectionRouter {
      */
     private String buildQueryHash(QueryRequest queryRequest) {
         return queryRequest.toString();
+    }
+
+    /**
+     * Whether this collection's responses may be served from / stored in the
+     * {@link SystemCollectionCache}. Read-only system collections (record-versions,
+     * field-history, email-logs, login-history, audit logs, ...) are excluded:
+     * they are written by backend services via direct JDBC, never through this
+     * router, so no write path ever evicts their entries — caching them serves
+     * stale, per-pod results until the TTL expires.
+     */
+    private boolean cacheable(CollectionDefinition definition) {
+        return definition.systemCollection() && !definition.readOnly() && systemCollectionCache != null;
     }
 
     /**

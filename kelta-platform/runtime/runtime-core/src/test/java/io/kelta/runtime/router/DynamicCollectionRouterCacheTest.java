@@ -70,6 +70,17 @@ class DynamicCollectionRouterCacheTest {
                 .build();
     }
 
+    private CollectionDefinition buildReadOnlySystemCollection(String name) {
+        return new CollectionDefinitionBuilder()
+                .name(name)
+                .displayName(name)
+                .addField(FieldDefinition.requiredString("name"))
+                .systemCollection(true)
+                .tenantScoped(true)
+                .readOnly(true)
+                .build();
+    }
+
     private String jsonApiBody(Map<String, Object> attributes) throws Exception {
         Map<String, Object> data = new HashMap<>();
         data.put("type", "test");
@@ -147,6 +158,26 @@ class DynamicCollectionRouterCacheTest {
         }
 
         @Test
+        @DisplayName("Should NOT cache response for read-only system collections")
+        void list_doesNotCache_forReadOnlySystemCollection() throws Exception {
+            // record-versions / field-history / email-logs etc. are written by backend
+            // services via direct JDBC — no write path ever evicts their cache entries,
+            // so caching them serves stale per-pod results until the TTL.
+            CollectionDefinition def = buildReadOnlySystemCollection("record-versions");
+            when(registry.get("record-versions")).thenReturn(def);
+
+            QueryResult result = QueryResult.empty(Pagination.defaults());
+            when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(result);
+
+            mockMvc.perform(get("/api/record-versions")
+                            .header("X-Tenant-ID", "tenant-1"))
+                    .andExpect(status().isOk());
+
+            verify(cache, never()).getListResponse(any(), any(), any());
+            verify(cache, never()).putListResponse(any(), any(), any(), any());
+        }
+
+        @Test
         @DisplayName("Should NOT cache response when include parameter is present")
         void list_doesNotCache_whenIncludePresent() throws Exception {
             CollectionDefinition def = buildSystemCollection("collections");
@@ -209,6 +240,23 @@ class DynamicCollectionRouterCacheTest {
 
             // Verify the response was cached
             verify(cache).putByIdResponse(eq("tenant-1"), eq("collections"), eq("abc"), any());
+        }
+
+        @Test
+        @DisplayName("Should NOT consult or fill cache for read-only system collections")
+        void get_doesNotUseCache_forReadOnlySystemCollection() throws Exception {
+            CollectionDefinition def = buildReadOnlySystemCollection("record-versions");
+            when(registry.get("record-versions")).thenReturn(def);
+
+            Map<String, Object> record = Map.of("id", "abc", "name", "v1");
+            when(queryEngine.getById(def, "abc")).thenReturn(Optional.of(record));
+
+            mockMvc.perform(get("/api/record-versions/abc")
+                            .header("X-Tenant-ID", "tenant-1"))
+                    .andExpect(status().isOk());
+
+            verify(cache, never()).getByIdResponse(any(), any(), any());
+            verify(cache, never()).putByIdResponse(any(), any(), any(), any());
         }
 
         @Test

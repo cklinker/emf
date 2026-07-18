@@ -7,16 +7,15 @@ import type { ActivityTimelineProps } from './ActivityTimeline'
 import type { ApiClient } from '../../services/apiClient'
 
 // Mock I18n — echo the key so assertions can target stable strings. Version
-// entry keys (the only ones interpolating a `user` param) append the resolved
-// author/fields so tests can assert getUserDisplay + display-name wiring.
+// update keys (the only ones interpolating a `fields` param) append the resolved
+// field display names so tests can assert schema display-name wiring.
 vi.mock('../../context/I18nContext', () => ({
   useI18n: vi.fn(() => ({
     locale: 'en',
     setLocale: vi.fn(),
     t: (key: string, params?: Record<string, string | number> | string) => {
-      if (params && typeof params === 'object' && 'user' in params) {
-        const fields = 'fields' in params ? ` fields=${params.fields}` : ''
-        return `${key} user=${params.user}${fields}`
+      if (params && typeof params === 'object' && 'fields' in params) {
+        return `${key} fields=${params.fields}`
       }
       return key
     },
@@ -252,18 +251,19 @@ describe('ActivityTimeline', () => {
       )
     }
 
-    it('renders one entry per version with the author and suppresses synthesized entries', async () => {
+    it('renders one entry per version with the author on its own line and suppresses synthesized entries', async () => {
       const getList = versionGetList()
 
       renderTimeline({ getList: getList as unknown as ApiClient['getList'] }, historyProps)
 
-      await waitFor(() =>
-        expect(screen.getByText('activity.versionCreated user=Jane Doe')).toBeInTheDocument()
-      )
-      // Changed fields render as schema display names.
-      expect(
-        screen.getByText('activity.versionUpdated user=Jane Doe fields=Full Name')
-      ).toBeInTheDocument()
+      await waitFor(() => expect(screen.getByText('activity.versionCreated')).toBeInTheDocument())
+      // Single changed field uses the singular key; fields render as schema display names.
+      expect(screen.getByText('activity.versionUpdatedOne fields=Full Name')).toBeInTheDocument()
+
+      // The author renders on its own line under the timestamp for each version entry.
+      const userLines = screen.getAllByTestId('activity-entry-user')
+      expect(userLines).toHaveLength(2)
+      expect(userLines[0]).toHaveTextContent('Jane Doe')
 
       // Synthesized created/updated entries are suppressed — the version feed covers them.
       expect(screen.queryByText('activity.recordCreated')).not.toBeInTheDocument()
@@ -289,7 +289,7 @@ describe('ActivityTimeline', () => {
 
       // Newest first: the first link is v2.
       const links = screen.getAllByTestId('activity-version-link')
-      expect(links[0]).toHaveTextContent('activity.versionUpdated')
+      expect(links[0]).toHaveTextContent('activity.versionUpdatedOne')
       fireEvent.click(links[0])
 
       expect(onOpenHistory).toHaveBeenCalledWith(2)

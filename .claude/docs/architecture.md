@@ -260,7 +260,14 @@ jobs. RLS then scopes every query automatically.
 ## Worker Layers
 
 - **Controllers**: `kelta-worker/src/main/java/io/kelta/controller/` — Admin REST endpoints
-- **Dynamic Router**: `runtime-core/.../router/DynamicCollectionRouter.java` — Routes `/api/{collectionName}`
+- **Dynamic Router**: `runtime-core/.../router/DynamicCollectionRouter.java` — Routes `/api/{collectionName}`.
+  System-collection GET responses are cached (`SystemCollectionCache` → worker Caffeine;
+  evicted same-pod on router writes and fleet-wide via `SystemCollectionCacheInvalidationListener` on
+  `kelta.record.changed.>`) — **except read-only system collections** (`record-versions`,
+  `field-history`, `email-logs`, `login-history`, audit logs, …): those are written by backend
+  services via direct JDBC, so no write path ever evicts their entries; the router serves them
+  uncached (previously each pod served stale per-pod version/history lists until the TTL —
+  Activity vs History tab count mismatch, flapping across refreshes).
 - **Services**: `kelta-worker/src/main/java/io/kelta/service/` — Business logic (CollectionLifecycleManager, CerbosAuthorizationService, SearchIndexService, S3StorageService)
 - **Listeners**: `kelta-worker/src/main/java/io/kelta/listener/` — NATS subscribers (CollectionSchemaListener, SearchIndexListener, CerbosCacheInvalidationListener, SvixWebhookPublisher)
 - **Data**: `kelta-worker/src/main/java/io/kelta/repository/` — JdbcTemplate + JPA repositories

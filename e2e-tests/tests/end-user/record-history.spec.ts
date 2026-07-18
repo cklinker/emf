@@ -99,7 +99,7 @@ test.describe("Record History", () => {
     // The activity timeline shows a click-through entry for the update
     await expect(
       detailPage.activityVersionLinks.filter({
-        hasText: "Record updated to v2",
+        hasText: "Updated 1 field:",
       }),
     ).toBeVisible();
   });

@@ -1715,6 +1715,12 @@ export interface CreateFlowRequest {
   active?: boolean;
   triggerConfig?: string;
   definition: string;
+  /**
+   * Audit identity stamped on records this flow writes when the execution has
+   * no initiating user (cron/NATS/webhook starts). Falls back to the flow
+   * owner when unset.
+   */
+  runAsUserId?: string | null;
 }
 
 // --- Scheduled Jobs (Phase 4 Stream E) ---

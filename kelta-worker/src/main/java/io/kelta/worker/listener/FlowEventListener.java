@@ -4,6 +4,7 @@ import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.flow.FlowEngine;
+import io.kelta.worker.service.FlowActorResolver;
 import io.kelta.runtime.flow.FlowTriggerEvaluator;
 import io.kelta.runtime.flow.InitialStateBuilder;
 import io.kelta.worker.service.TenantSlugResolver;
@@ -39,6 +40,7 @@ public class FlowEventListener {
     private static final Logger log = LoggerFactory.getLogger(FlowEventListener.class);
 
     private final FlowEngine flowEngine;
+    private final FlowActorResolver flowActorResolver;
     private final FlowTriggerEvaluator triggerEvaluator;
     private final InitialStateBuilder initialStateBuilder;
     private final JdbcTemplate jdbcTemplate;
@@ -65,8 +67,10 @@ public class FlowEventListener {
                               InitialStateBuilder initialStateBuilder,
                               JdbcTemplate jdbcTemplate,
                               ObjectMapper objectMapper,
-                              TenantSlugResolver tenantSlugResolver) {
+                              TenantSlugResolver tenantSlugResolver,
+                              FlowActorResolver flowActorResolver) {
         this.flowEngine = flowEngine;
+        this.flowActorResolver = flowActorResolver;
         this.triggerEvaluator = triggerEvaluator;
         this.initialStateBuilder = initialStateBuilder;
         this.jdbcTemplate = jdbcTemplate;
@@ -134,7 +138,7 @@ public class FlowEventListener {
                                     config.flowId(),
                                     config.definitionJson(),
                                     initialState,
-                                    boundUserId,
+                                    flowActorResolver.resolve(tenantId, config.flowId(), boundUserId),
                                     payload.getRecordId(),
                                     false);
                         }

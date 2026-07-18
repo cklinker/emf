@@ -106,10 +106,53 @@ class UpdateRecordActionHandlerTest {
         assertFalse(result.successful());
     }
 
+    @Test
+    @DisplayName("Should stamp updatedBy from a UUID execution actor")
+    void shouldStampUpdatedByFromActor() {
+        CollectionDefinition collDef = mock(CollectionDefinition.class);
+        when(registry.get("orders")).thenReturn(collDef);
+        when(queryEngine.update(eq(collDef), eq("r1"), anyMap()))
+            .thenReturn(Optional.of(Map.of("id", "r1")));
+        String actor = "3f2b6c1e-9d4a-4f0b-8e2d-1a2b3c4d5e6f";
+
+        String config = """
+            {"targetCollectionName": "orders", "updates": [{"field": "status", "value": "Approved"}]}
+            """;
+        ActionResult result = handler.execute(makeContext(config, actor));
+        assertTrue(result.successful());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> updatedFields = (Map<String, Object>) result.outputData().get("updatedFields");
+        assertEquals(actor, updatedFields.get("updatedBy"));
+        assertFalse(updatedFields.containsKey("createdBy"));
+    }
+
+    @Test
+    @DisplayName("Should not stamp updatedBy from a non-UUID actor")
+    void shouldNotStampNonUuidActor() {
+        CollectionDefinition collDef = mock(CollectionDefinition.class);
+        when(registry.get("orders")).thenReturn(collDef);
+        when(queryEngine.update(eq(collDef), eq("r1"), anyMap()))
+            .thenReturn(Optional.of(Map.of("id", "r1")));
+
+        String config = """
+            {"targetCollectionName": "orders", "updates": [{"field": "status", "value": "Approved"}]}
+            """;
+        ActionResult result = handler.execute(makeContext(config, "webhook"));
+        assertTrue(result.successful());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> updatedFields = (Map<String, Object>) result.outputData().get("updatedFields");
+        assertFalse(updatedFields.containsKey("updatedBy"));
+    }
+
     private ActionContext makeContext(String config) {
+        return makeContext(config, null);
+    }
+
+    private ActionContext makeContext(String config, String userId) {
         return ActionContext.builder()
             .tenantId("t1").collectionId("c1").collectionName("orders").recordId("r1")
             .data(Map.of("name", "Test"))
+            .userId(userId)
             .actionConfigJson(config).workflowRuleId("wf1").executionLogId("log1").build();
     }
 }

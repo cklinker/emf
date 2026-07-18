@@ -800,6 +800,10 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.integer("version").withDefault(1))
             .addField(FieldDefinition.json("triggerConfig").withColumnName("trigger_config"))
             .addField(FieldDefinition.requiredJson("definition"))
+            // Audit identity stamped on records this flow writes when the
+            // execution has no initiating user (cron/NATS/webhook starts);
+            // falls back to the flow owner (created_by) when unset.
+            .addField(FieldDefinition.string("runAsUserId", 36).withColumnName("run_as_user_id"))
             .build();
     }
 

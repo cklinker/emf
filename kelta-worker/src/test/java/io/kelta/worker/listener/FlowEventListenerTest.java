@@ -46,7 +46,8 @@ class FlowEventListenerTest {
         tenantSlugResolver = mock(TenantSlugResolver.class);
         when(tenantSlugResolver.resolveSlug(anyString())).thenReturn(Optional.of("acme-corp"));
         listener = new FlowEventListener(flowEngine, triggerEvaluator, initialStateBuilder,
-                jdbcTemplate, objectMapper, tenantSlugResolver);
+                jdbcTemplate, objectMapper, tenantSlugResolver,
+                org.mockito.Mockito.mock(io.kelta.worker.service.FlowActorResolver.class));
     }
 
     @Nested

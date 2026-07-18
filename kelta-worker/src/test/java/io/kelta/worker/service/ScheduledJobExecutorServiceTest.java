@@ -60,7 +60,8 @@ class ScheduledJobExecutorServiceTest {
                 mock(org.springframework.beans.factory.ObjectProvider.class);
         lenient().when(provider.getIfAvailable()).thenReturn(email);
         return new ScheduledJobExecutorService(
-                repository, flowEngine, initialStateBuilder, objectMapper,
+                repository, flowEngine, org.mockito.Mockito.mock(FlowActorResolver.class),
+                initialStateBuilder, objectMapper,
                 scriptExecutor, reportExecutionService, dataExportService, dataExportRepository,
                 tenantSlugResolver, provider);
     }

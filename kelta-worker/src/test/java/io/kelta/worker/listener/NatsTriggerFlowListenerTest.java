@@ -54,7 +54,8 @@ class NatsTriggerFlowListenerTest {
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper();
         listener = new NatsTriggerFlowListener(flowEngine, new InitialStateBuilder(),
-                jdbcTemplate, objectMapper, tenantSlugResolver);
+                jdbcTemplate, objectMapper, tenantSlugResolver,
+                org.mockito.Mockito.mock(io.kelta.worker.service.FlowActorResolver.class));
         lenient().when(tenantSlugResolver.resolveSlug(TENANT)).thenReturn(Optional.of("acme"));
     }
 

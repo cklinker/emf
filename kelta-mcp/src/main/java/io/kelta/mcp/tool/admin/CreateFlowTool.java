@@ -38,6 +38,9 @@ public class CreateFlowTool implements AdminTool {
         properties.put("definition", Schemas.freeObject(
                 "Flow JSON definition: nodes, edges, conditions, actions. Shape is flow-engine specific."));
         properties.put("active", Schemas.bool("Whether the flow is active on creation (default false).", false));
+        properties.put("runAsUserId", Schemas.string(
+                "User UUID stamped as createdBy/updatedBy on records this flow writes when no user "
+                + "started the run (cron/NATS/webhook). Defaults to the flow owner."));
 
         Tool tool = Tool.builder()
                 .name("create_flow")
@@ -76,6 +79,7 @@ public class CreateFlowTool implements AdminTool {
                     if (args.get("triggerConfig") instanceof Map<?, ?> tc) attrs.put("triggerConfig", tc);
                     if (args.get("active") instanceof Boolean b) attrs.put("active", b);
                     else attrs.put("active", false);
+                    if (args.get("runAsUserId") instanceof String r && !r.isBlank()) attrs.put("runAsUserId", r);
 
                     Map<String, Object> body = Map.of("data", Map.of(
                             "type", "flows",

@@ -1,7 +1,15 @@
 import { useState, useMemo } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   RecordTriggerForm,
   ScheduledTriggerForm,
@@ -12,6 +20,9 @@ import { useApi } from '@/context/ApiContext'
 import type { CreateFlowRequest } from '@kelta/sdk'
 import { useToast } from '@/components'
 import type { Flow, TriggerConfig } from '../types'
+
+/** Sentinel for "no run-as user configured" (radix Select forbids empty values). */
+const RUN_AS_OWNER = '__owner__'
 
 interface TriggerEditSheetProps {
   open: boolean
@@ -37,16 +48,31 @@ export function TriggerEditSheet({ open, onOpenChange, flow }: TriggerEditSheetP
   const queryClient = useQueryClient()
   const initialConfig = useMemo(() => parseTriggerConfig(flow), [flow])
   const [config, setConfig] = useState<Partial<TriggerConfig>>({})
+  const [runAsUserId, setRunAsUserId] = useState<string>(RUN_AS_OWNER)
   const [initialized, setInitialized] = useState(false)
 
   // Reset config when sheet opens
   if (open && !initialized) {
     setConfig(initialConfig)
+    setRunAsUserId(flow.runAsUserId ?? RUN_AS_OWNER)
     setInitialized(true)
   }
   if (!open && initialized) {
     setInitialized(false)
   }
+
+  // Active users for the run-as picker (fetched only while the sheet is open)
+  const { data: usersData } = useQuery({
+    queryKey: ['flow-run-as-users'],
+    queryFn: () => keltaClient.admin.users.list(undefined, 'ACTIVE', 0, 100),
+    enabled: open,
+  })
+  const users = useMemo(() => {
+    const content = (usersData as { content?: unknown } | undefined)?.content
+    return Array.isArray(content)
+      ? (content as Array<{ id: string; email?: string; firstName?: string; lastName?: string }>)
+      : []
+  }, [usersData])
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -63,6 +89,7 @@ export function TriggerEditSheet({ open, onOpenChange, flow }: TriggerEditSheetP
         active: flow.active,
         definition,
         triggerConfig: config,
+        runAsUserId: runAsUserId === RUN_AS_OWNER ? null : runAsUserId,
       } as Partial<CreateFlowRequest>)
     },
     onSuccess: () => {
@@ -82,13 +109,34 @@ export function TriggerEditSheet({ open, onOpenChange, flow }: TriggerEditSheetP
           <SheetTitle>Edit Trigger</SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
           <TriggerFormRouter
             flowType={flow.flowType}
             config={config}
             onChange={setConfig}
             flowId={flow.id}
           />
+
+          <div className="space-y-1.5 border-t border-border pt-4">
+            <Label htmlFor="flow-run-as-user">Run as user</Label>
+            <Select value={runAsUserId} onValueChange={setRunAsUserId}>
+              <SelectTrigger id="flow-run-as-user" data-testid="flow-run-as-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={RUN_AS_OWNER}>Flow owner (default)</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Audit identity stamped on records this flow creates or updates when no user started
+              the run (scheduled, NATS, or webhook triggers).
+            </p>
+          </div>
         </div>
 
         <SheetFooter className="px-4 pb-4">

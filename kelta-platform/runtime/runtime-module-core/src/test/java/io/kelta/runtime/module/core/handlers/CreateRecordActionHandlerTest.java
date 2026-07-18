@@ -110,10 +110,72 @@ class CreateRecordActionHandlerTest {
         assertTrue(result.successful());
     }
 
+    @Test
+    @DisplayName("Should stamp createdBy/updatedBy from a UUID execution actor")
+    void shouldStampAuditUsersFromActor() {
+        when(registry.get("orders")).thenReturn(mock(CollectionDefinition.class));
+        String actor = "3f2b6c1e-9d4a-4f0b-8e2d-1a2b3c4d5e6f";
+
+        String config = """
+            {"targetCollectionName": "orders", "fieldMappings": [
+                {"targetField": "name", "value": "New Order"}
+            ]}
+            """;
+        ActionResult result = handler.execute(makeContext(config, actor));
+        assertTrue(result.successful());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> recordData = (Map<String, Object>) result.outputData().get("recordData");
+        assertEquals(actor, recordData.get("createdBy"));
+        assertEquals(actor, recordData.get("updatedBy"));
+    }
+
+    @Test
+    @DisplayName("Should not stamp audit users from a non-UUID actor (legacy 'webhook')")
+    void shouldNotStampNonUuidActor() {
+        when(registry.get("orders")).thenReturn(mock(CollectionDefinition.class));
+
+        String config = """
+            {"targetCollectionName": "orders", "fieldMappings": [
+                {"targetField": "name", "value": "New Order"}
+            ]}
+            """;
+        ActionResult result = handler.execute(makeContext(config, "webhook"));
+        assertTrue(result.successful());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> recordData = (Map<String, Object>) result.outputData().get("recordData");
+        assertFalse(recordData.containsKey("createdBy"));
+        assertFalse(recordData.containsKey("updatedBy"));
+    }
+
+    @Test
+    @DisplayName("Should not stamp audit users when the execution has no actor")
+    void shouldNotStampWithoutActor() {
+        when(registry.get("orders")).thenReturn(mock(CollectionDefinition.class));
+
+        String config = """
+            {"targetCollectionName": "orders", "fieldMappings": [
+                {"targetField": "name", "value": "New Order"}
+            ]}
+            """;
+        ActionResult result = handler.execute(makeContext(config));
+        assertTrue(result.successful());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> recordData = (Map<String, Object>) result.outputData().get("recordData");
+        assertFalse(recordData.containsKey("createdBy"));
+    }
+
     private ActionContext makeContext(String config) {
+        return makeContext(config, null);
+    }
+
+    private ActionContext makeContext(String config, String userId) {
         return ActionContext.builder()
             .tenantId("t1").collectionId("c1").collectionName("orders").recordId("r1")
             .data(Map.of("name", "Test"))
+            .userId(userId)
             .actionConfigJson(config).workflowRuleId("wf1").executionLogId("log1").build();
     }
 }

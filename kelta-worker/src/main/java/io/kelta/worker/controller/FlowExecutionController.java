@@ -1,6 +1,7 @@
 package io.kelta.worker.controller;
 
 import io.kelta.jsonapi.JsonApiResponseBuilder;
+import io.kelta.worker.service.FlowActorResolver;
 import io.kelta.runtime.flow.*;
 import io.kelta.worker.repository.FlowRepository;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ public class FlowExecutionController {
     private static final Logger log = LoggerFactory.getLogger(FlowExecutionController.class);
 
     private final FlowEngine flowEngine;
+    private final FlowActorResolver flowActorResolver;
     private final FlowStore flowStore;
     private final InitialStateBuilder initialStateBuilder;
     private final FlowRepository flowRepository;
@@ -34,8 +36,10 @@ public class FlowExecutionController {
     public FlowExecutionController(FlowEngine flowEngine,
                                     FlowStore flowStore,
                                     InitialStateBuilder initialStateBuilder,
-                                    FlowRepository flowRepository) {
+                                    FlowRepository flowRepository,
+                                    FlowActorResolver flowActorResolver) {
         this.flowEngine = flowEngine;
+        this.flowActorResolver = flowActorResolver;
         this.flowStore = flowStore;
         this.initialStateBuilder = initialStateBuilder;
         this.flowRepository = flowRepository;
@@ -107,7 +111,8 @@ public class FlowExecutionController {
         }
 
         String resultExecutionId = flowEngine.startExecution(
-                tenantId, flowId, definitionJson, initialState, userId, null, isTest);
+                tenantId, flowId, definitionJson, initialState,
+                flowActorResolver.resolve(tenantId, flowId, userId), null, isTest);
 
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("flowId", flowId);
@@ -264,7 +269,8 @@ public class FlowExecutionController {
 
         String newExecutionId = flowEngine.startExecution(
                 exec.tenantId(), exec.flowId(), definitionJson, initialState,
-                exec.startedBy(), exec.triggerRecordId(), exec.isTest());
+                flowActorResolver.resolve(exec.tenantId(), exec.flowId(), exec.startedBy()),
+                exec.triggerRecordId(), exec.isTest());
 
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("originalExecutionId", executionId);

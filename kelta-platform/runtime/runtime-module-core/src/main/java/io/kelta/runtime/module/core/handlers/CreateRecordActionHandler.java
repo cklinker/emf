@@ -94,6 +94,10 @@ public class CreateRecordActionHandler implements ActionHandler {
                 }
             }
 
+            // Flow writes bypass the HTTP router's audit stamping — apply the
+            // execution actor (initiator → run-as user → flow owner) here.
+            FlowAuditStamp.stampCreate(recordData, context.userId());
+
             log.info("Create record action: targetCollection={}, fields={}",
                 targetCollectionName, recordData.keySet());
 

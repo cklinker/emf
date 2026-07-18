@@ -46,6 +46,7 @@ public class ScheduledJobExecutorService {
 
     private final ScheduledJobRepository repository;
     private final FlowEngine flowEngine;
+    private final FlowActorResolver flowActorResolver;
     private final InitialStateBuilder initialStateBuilder;
     private final ObjectMapper objectMapper;
     private final ScriptExecutor scriptExecutor;
@@ -67,6 +68,7 @@ public class ScheduledJobExecutorService {
 
     public ScheduledJobExecutorService(ScheduledJobRepository repository,
                                         FlowEngine flowEngine,
+                                        FlowActorResolver flowActorResolver,
                                         InitialStateBuilder initialStateBuilder,
                                         ObjectMapper objectMapper,
                                         ScriptExecutor scriptExecutor,
@@ -77,6 +79,7 @@ public class ScheduledJobExecutorService {
                                         org.springframework.beans.factory.ObjectProvider<DefaultEmailService> emailServiceProvider) {
         this.repository = repository;
         this.flowEngine = flowEngine;
+        this.flowActorResolver = flowActorResolver;
         this.initialStateBuilder = initialStateBuilder;
         this.objectMapper = objectMapper;
         this.scriptExecutor = scriptExecutor;
@@ -195,7 +198,8 @@ public class ScheduledJobExecutorService {
 
         // Execute flow (async — returns immediately)
         String flowExecutionId = flowEngine.startExecution(
-                tenantId, flowReferenceId, definitionJson, initialState, null, null, false);
+                tenantId, flowReferenceId, definitionJson, initialState,
+                flowActorResolver.resolve(tenantId, flowReferenceId, null), null, false);
 
         Instant completedAt = Instant.now();
         long durationMs = completedAt.toEpochMilli() - startedAt.toEpochMilli();

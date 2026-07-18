@@ -131,6 +131,26 @@ no value, and the downstream task fails with whatever generic error comes out of
 own input resolution (often a misleading `"Provider … does not exist"` for FETCH-style
 tasks, not a clear "missing input" message).
 
+### Execution actor & audit stamping (2026-07-18)
+
+Every flow start resolves an **actor** — `FlowActorResolver` (worker):
+**initiating user** (manual runs; emails from auth-code JWTs are translated via
+`JdbcUserIdResolver`) → **flow `runAsUserId`** (`flow.run_as_user_id`, V175;
+"Run as user" in the designer's trigger sheet, `runAsUserId` on the MCP
+create/update_flow tools) → **flow owner** (`created_by`). The actor is passed
+to `FlowEngine.startExecution` as the execution user, so:
+
+- `CreateRecordActionHandler` stamps `createdBy`/`updatedBy` and
+  `UpdateRecordActionHandler` stamps `updatedBy` on records the flow writes
+  (`FlowAuditStamp` — UUID-shaped actors only, explicit field mappings win).
+  Before this, all flow-written records had null audit users.
+- `flow_execution.started_by` records the actor. The webhook path previously
+  stored the literal `"webhook"`; it now stores the resolved actor UUID
+  (provenance stays visible via the state envelope's `trigger.type`).
+- `ActionContext.userId` is now populated for cron/NATS/webhook runs
+  (previously null) — SendNotification's default recipient and
+  `INVOKE_SCRIPT`'s `userId` see the actor.
+
 ### NATS-triggered flows
 
 A flow with `flow_type = 'NATS_TRIGGERED'` (V153) and trigger config `{ "topic": "<topic>" }`

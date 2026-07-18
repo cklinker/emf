@@ -98,6 +98,10 @@ public class UpdateRecordActionHandler implements ActionHandler {
                 }
             }
 
+            // Flow writes bypass the HTTP router's audit stamping — apply the
+            // execution actor (initiator → run-as user → flow owner) here.
+            FlowAuditStamp.stampUpdate(updateData, context.userId());
+
             log.info("Update record action: collection={}, recordId={}, fields={}",
                 targetCollectionName, targetRecordId, updateData.keySet());
 

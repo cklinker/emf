@@ -3,6 +3,7 @@ package io.kelta.worker.controller;
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.flow.FlowEngine;
+import io.kelta.worker.service.FlowActorResolver;
 import io.kelta.runtime.flow.InitialStateBuilder;
 import io.kelta.worker.repository.FlowRepository;
 import io.kelta.worker.service.TenantSlugResolver;
@@ -37,6 +38,7 @@ public class FlowWebhookController {
     private static final Logger log = LoggerFactory.getLogger(FlowWebhookController.class);
 
     private final FlowEngine flowEngine;
+    private final FlowActorResolver flowActorResolver;
     private final FlowRepository flowRepository;
     private final InitialStateBuilder initialStateBuilder;
     private final ObjectMapper objectMapper;
@@ -48,8 +50,10 @@ public class FlowWebhookController {
                                   InitialStateBuilder initialStateBuilder,
                                   ObjectMapper objectMapper,
                                   TenantSlugResolver tenantSlugResolver,
+                                  FlowActorResolver flowActorResolver,
                                   @Value("${kelta.external-base-url:http://localhost:8080}") String externalBaseUrl) {
         this.flowEngine = flowEngine;
+        this.flowActorResolver = flowActorResolver;
         this.flowRepository = flowRepository;
         this.initialStateBuilder = initialStateBuilder;
         this.objectMapper = objectMapper;
@@ -127,9 +131,12 @@ public class FlowWebhookController {
         }
         AtomicReference<String> resultRef = new AtomicReference<>();
         try {
+            // Actor (run-as user -> flow owner) replaces the legacy "webhook"
+            // provenance marker so records the flow writes get audit users.
+            String actor = flowActorResolver.resolve(tenantId, flowId, null);
             TenantContextUtils.withTenant(tenantId, tenantSlug, () ->
                     resultRef.set(flowEngine.startExecution(
-                            tenantId, flowId, definitionJson, initialState, "webhook", null, false)));
+                            tenantId, flowId, definitionJson, initialState, actor, null, false)));
         } catch (Exception e) {
             log.error("Failed to start webhook-triggered flow execution: flowId={}", flowId, e);
             return ResponseEntity.internalServerError().body(

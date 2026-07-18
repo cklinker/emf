@@ -2,6 +2,7 @@ package io.kelta.worker.listener;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.flow.FlowEngine;
+import io.kelta.worker.service.FlowActorResolver;
 import io.kelta.runtime.flow.InitialStateBuilder;
 import io.kelta.worker.service.TenantSlugResolver;
 import tools.jackson.databind.ObjectMapper;
@@ -41,6 +42,7 @@ public class NatsTriggerFlowListener {
     public static final String SUBJECT_PREFIX = "kelta.trigger.";
 
     private final FlowEngine flowEngine;
+    private final FlowActorResolver flowActorResolver;
     private final InitialStateBuilder initialStateBuilder;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -62,8 +64,10 @@ public class NatsTriggerFlowListener {
                                    InitialStateBuilder initialStateBuilder,
                                    JdbcTemplate jdbcTemplate,
                                    ObjectMapper objectMapper,
-                                   TenantSlugResolver tenantSlugResolver) {
+                                   TenantSlugResolver tenantSlugResolver,
+                                   FlowActorResolver flowActorResolver) {
         this.flowEngine = flowEngine;
+        this.flowActorResolver = flowActorResolver;
         this.initialStateBuilder = initialStateBuilder;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -113,8 +117,9 @@ public class NatsTriggerFlowListener {
                     log.info("Starting flow execution: flowId={}, executionId={}, trigger=NATS_MESSAGE topic={}",
                             config.flowId(), executionId, topic);
 
+                    String actor = flowActorResolver.resolve(tenantId, config.flowId(), null);
                     flowEngine.startExecution(tenantId, config.flowId(), config.definitionJson(),
-                            initialState, null, null, false);
+                            initialState, actor, null, false);
                 } catch (Exception e) {
                     log.error("Error starting NATS-triggered flow {}: {}", config.flowId(), e.getMessage(), e);
                 }

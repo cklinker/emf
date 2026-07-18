@@ -279,6 +279,8 @@ export interface Flow {
   active: boolean
   definition: string | null
   triggerConfig: string | null
+  /** Audit identity for userless runs (cron/NATS/webhook); null = flow owner. */
+  runAsUserId?: string | null
   createdBy: string
   createdAt: string
   updatedAt: string

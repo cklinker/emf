@@ -35,6 +35,9 @@ public class UpdateFlowTool implements AdminTool {
         properties.put("triggerConfig", Schemas.freeObject("New trigger config."));
         properties.put("definition", Schemas.freeObject("New flow definition."));
         properties.put("active", Schemas.bool("Active flag — toggles enable/disable.", false));
+        properties.put("runAsUserId", Schemas.string(
+                "User UUID stamped as createdBy/updatedBy on records this flow writes when no user "
+                + "started the run (cron/NATS/webhook). Empty string clears it (falls back to owner)."));
 
         Tool tool = Tool.builder()
                 .name("update_flow")
@@ -59,6 +62,7 @@ public class UpdateFlowTool implements AdminTool {
                     if (args.get("triggerConfig") instanceof Map<?, ?> tc) attrs.put("triggerConfig", tc);
                     if (args.get("definition") instanceof Map<?, ?> d) attrs.put("definition", d);
                     if (args.get("active") instanceof Boolean b) attrs.put("active", b);
+                    if (args.get("runAsUserId") instanceof String r) attrs.put("runAsUserId", r.isBlank() ? null : r);
                     if (attrs.isEmpty()) {
                         return error("Provide at least one of name, description, triggerConfig, definition, active.");
                     }

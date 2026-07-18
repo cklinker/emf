@@ -446,14 +446,11 @@ export function ObjectDetailPage(): React.ReactElement {
   // Screen reader announcements
   const { announce } = useAnnounce()
 
-  // Mutations
+  // Mutations. No shared onSuccess: the hook fires it for EVERY mutation (patch included),
+  // so delete side effects (navigate back to the list) live in handleDeleteConfirm — otherwise
+  // an inline field commit would bounce the user off the record page.
   const mutations = useRecordMutation({
     collectionName: collectionName || '',
-    onSuccess: () => {
-      setShowDeleteDialog(false)
-      announce('Record deleted successfully')
-      navigate(`${basePath}/o/${collectionName}`)
-    },
   })
 
   // In-place inline field edit (unified record experience, slice 2): partial PATCH of one field.
@@ -601,9 +598,18 @@ export function ObjectDetailPage(): React.ReactElement {
 
   const handleDeleteConfirm = useCallback(() => {
     if (recordId) {
-      mutations.remove.mutate(recordId)
+      mutations.remove
+        .mutateAsync(recordId)
+        .then(() => {
+          setShowDeleteDialog(false)
+          announce('Record deleted successfully')
+          navigate(`${basePath}/o/${collectionName}`)
+        })
+        .catch(() => {
+          // Error state is surfaced by the mutation; keep the dialog open.
+        })
     }
-  }, [recordId, mutations.remove])
+  }, [recordId, mutations.remove, announce, navigate, basePath, collectionName])
 
   const handleClone = useCallback(() => {
     // Navigate to the new form — clone will be handled by pre-populating from URL

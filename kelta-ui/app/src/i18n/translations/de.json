@@ -1177,6 +1177,7 @@
     "globalPicklist": "Globale Auswahlliste",
     "selectPicklist": "Auswahlliste auswählen...",
     "loadingPicklist": "Auswahllisten werden geladen…",
+    "picklistLoadFailed": "Auswahllisten konnten nicht geladen werden.",
     "globalPicklistHint": "Wählen Sie die globale Auswahlliste, die Werte für dieses Feld bereitstellt.",
     "descriptionPlaceholder": "Geben Sie eine Beschreibung für dieses Feld ein...",
     "trackHistory": "Verlauf verfolgen",

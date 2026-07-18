@@ -4,9 +4,10 @@
  * fetch into one shared hook so `DropdownInput`, `MultiPicklistInput`, and the `form` field-renderer
  * registry all share a single implementation (no duplication across the three sites).
  *
- * The resolution mirrors `ObjectFormPage.tsx` ~838-865 exactly: `fieldTypeConfig` may arrive as a
- * parsed object OR a JSON string; `globalPicklistId` → `GLOBAL` source, else the field id → `FIELD`.
- * Active values are kept and sorted by `sortOrder`. Errors fall back to an empty list.
+ * `fieldTypeConfig` may arrive as a parsed object OR a JSON string; `globalPicklistId` (or the
+ * legacy pre-#1222 `picklistSourceId` + `picklistSourceType: 'GLOBAL'` dialect) → `GLOBAL` source,
+ * else the field id → `FIELD`. Active values are kept and sorted by `sortOrder`. Errors fall back
+ * to an empty list. `ObjectFormPage`/`ResourceFormPage` share `resolvePicklistSource` directly.
  */
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '@/context/ApiContext'
@@ -21,31 +22,50 @@ interface PicklistValueDto {
   sortOrder: number
 }
 
+/**
+ * Shape of `fieldTypeConfig` for picklist-typed fields. Modern writes use
+ * `globalPicklistId`; fields written by the MCP admin tooling before #1222 carry
+ * `picklistSourceId` + `picklistSourceType: 'GLOBAL'` instead — both dialects
+ * must resolve or the field renders unbound.
+ */
+interface PicklistFieldTypeConfig {
+  globalPicklistId?: string
+  picklistSourceId?: string
+  picklistSourceType?: string
+}
+
+/**
+ * Extract the global-picklist id from a picklist field's `fieldTypeConfig`,
+ * accepting the legacy `picklistSourceId`/`picklistSourceType` dialect.
+ * The config may arrive as a parsed object (JSONB column) or a JSON string.
+ */
+export function resolveGlobalPicklistId(rawConfig: unknown): string | undefined {
+  let config: PicklistFieldTypeConfig | null = null
+  if (typeof rawConfig === 'string') {
+    try {
+      config = JSON.parse(rawConfig) as PicklistFieldTypeConfig
+    } catch {
+      /* ignore malformed config */
+    }
+  } else if (rawConfig && typeof rawConfig === 'object') {
+    config = rawConfig as PicklistFieldTypeConfig
+  }
+  return (
+    config?.globalPicklistId ??
+    (config?.picklistSourceType === 'GLOBAL' ? config?.picklistSourceId : undefined)
+  )
+}
+
 /** Resolve the `{ sourceId, sourceType }` for a picklist/multi_picklist field (FIELD vs GLOBAL). */
 export function resolvePicklistSource(field: Pick<FieldDefinition, 'id' | 'fieldTypeConfig'>): {
   sourceId: string
   sourceType: 'FIELD' | 'GLOBAL'
 } {
-  let sourceId = field.id
-  let sourceType: 'FIELD' | 'GLOBAL' = 'FIELD'
-
-  // fieldTypeConfig may arrive as a parsed object (JSONB column) or a JSON string. Handle both.
-  const rawConfig = field.fieldTypeConfig
-  let config: { globalPicklistId?: string } | null = null
-  if (typeof rawConfig === 'string') {
-    try {
-      config = JSON.parse(rawConfig) as { globalPicklistId?: string }
-    } catch {
-      /* ignore malformed config */
-    }
-  } else if (rawConfig && typeof rawConfig === 'object') {
-    config = rawConfig as { globalPicklistId?: string }
+  const globalPicklistId = resolveGlobalPicklistId(field.fieldTypeConfig)
+  if (globalPicklistId) {
+    return { sourceId: globalPicklistId, sourceType: 'GLOBAL' }
   }
-  if (config?.globalPicklistId) {
-    sourceId = config.globalPicklistId
-    sourceType = 'GLOBAL'
-  }
-  return { sourceId, sourceType }
+  return { sourceId: field.id, sourceType: 'FIELD' }
 }
 
 export interface UsePicklistOptionsResult {

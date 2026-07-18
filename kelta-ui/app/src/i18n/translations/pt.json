@@ -1177,6 +1177,7 @@
     "globalPicklist": "Lista de Opcoes Global",
     "selectPicklist": "Selecione uma lista de opcoes...",
     "loadingPicklist": "Carregando listas…",
+    "picklistLoadFailed": "Não foi possível carregar as listas.",
     "globalPicklistHint": "Selecione a lista de opcoes global que fornece valores para este campo.",
     "descriptionPlaceholder": "Insira uma descricao para este campo...",
     "trackHistory": "Rastrear Historico",

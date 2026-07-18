@@ -31,6 +31,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Braces } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { resolveGlobalPicklistId } from '@/hooks/usePicklistOptions'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { FieldExpressionPicker } from '../FieldExpressionPicker'
@@ -158,6 +159,12 @@ export interface FieldEditorProps {
   collections?: CollectionSummary[]
   /** Available global picklists for picklist field dropdown */
   picklists?: PicklistSummary[]
+  /** Whether the picklists list is still loading (drives the fallback option label) */
+  picklistsLoading?: boolean
+  /** Whether the picklists list failed to load (shows an inline error + retry) */
+  picklistsError?: boolean
+  /** Retry callback for a failed picklists load */
+  onRetryPicklists?: () => void
   /** Loader for child collection fields (used by rollup_summary config) */
   fetchCollectionFields?: FetchCollectionFields
   /** Callback when form is submitted */
@@ -457,6 +464,9 @@ export function FieldEditor({
   field,
   collections = [],
   picklists = [],
+  picklistsLoading = false,
+  picklistsError = false,
+  onRetryPicklists,
   fetchCollectionFields,
   onSave,
   onCancel,
@@ -507,7 +517,7 @@ export function FieldEditor({
       autoNumberPadding: (parsedConfig.padding as number) ?? 4,
       currencyCode: (parsedConfig.currencyCode as string) ?? '',
       currencyPrecision: (parsedConfig.precision as number) ?? 2,
-      globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
+      globalPicklistId: resolveGlobalPicklistId(parsedConfig) ?? '',
       rollupChildCollection: (parsedConfig.childCollection as string) ?? '',
       rollupForeignKey: (parsedConfig.foreignKeyField as string) ?? '',
       rollupFunction: (parsedConfig.aggregateFunction as RollupAggregateFunction) ?? undefined,
@@ -649,7 +659,7 @@ export function FieldEditor({
         autoNumberPadding: (parsedConfig.padding as number) ?? 4,
         currencyCode: (parsedConfig.currencyCode as string) ?? '',
         currencyPrecision: (parsedConfig.precision as number) ?? 2,
-        globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
+        globalPicklistId: resolveGlobalPicklistId(parsedConfig) ?? '',
         rollupChildCollection: (parsedConfig.childCollection as string) ?? '',
         rollupForeignKey: (parsedConfig.foreignKeyField as string) ?? '',
         rollupFunction: (parsedConfig.aggregateFunction as RollupAggregateFunction) ?? undefined,
@@ -1085,9 +1095,40 @@ export function FieldEditor({
             ))}
             {watchedGlobalPicklistId &&
               !picklists.some((p) => p.id === watchedGlobalPicklistId) && (
-                <option value={watchedGlobalPicklistId}>{t('fieldEditor.loadingPicklist')}</option>
+                <option value={watchedGlobalPicklistId}>
+                  {picklistsError
+                    ? t('fieldEditor.picklistLoadFailed')
+                    : t('fieldEditor.loadingPicklist')}
+                </option>
               )}
           </select>
+          {picklistsError && (
+            <span
+              className="flex items-center gap-2 text-sm text-destructive mt-1 before:content-['⚠'] before:text-xs"
+              role="alert"
+              data-testid="field-global-picklist-load-error"
+            >
+              {t('fieldEditor.picklistLoadFailed')}
+              {onRetryPicklists && (
+                <button
+                  type="button"
+                  className="underline font-medium hover:no-underline"
+                  onClick={onRetryPicklists}
+                  data-testid="field-global-picklist-retry"
+                >
+                  {t('common.retry')}
+                </button>
+              )}
+            </span>
+          )}
+          {!picklistsError && picklistsLoading && picklists.length === 0 && (
+            <span
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="field-global-picklist-loading"
+            >
+              {t('fieldEditor.loadingPicklist')}
+            </span>
+          )}
           {errors.globalPicklistId && (
             <span
               id="field-global-picklist-error"

@@ -322,7 +322,12 @@ export function CollectionDetailPage({
   )
 
   // Fetch global picklists for picklist field dropdown
-  const { data: globalPicklists = [] } = useQuery({
+  const {
+    data: globalPicklists = [],
+    isLoading: globalPicklistsLoading,
+    isError: globalPicklistsError,
+    refetch: refetchGlobalPicklists,
+  } = useQuery({
     queryKey: ['global-picklists'],
     queryFn: async () => {
       // Default page size is 20 — an unpaginated fetch silently dropped any
@@ -2093,6 +2098,11 @@ export function CollectionDetailPage({
                 id: p.id,
                 name: p.name,
               }))}
+              picklistsLoading={globalPicklistsLoading}
+              picklistsError={globalPicklistsError}
+              onRetryPicklists={() => {
+                void refetchGlobalPicklists()
+              }}
               fetchCollectionFields={fetchChildCollectionFields}
               onSave={handleFieldSave}
               onCancel={handleFieldCancel}

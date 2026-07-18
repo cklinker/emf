@@ -1,13 +1,18 @@
 /**
  * `usePicklistOptions` tests (slice 2f). Verifies the picklist source resolution (FIELD vs GLOBAL via
- * `fieldTypeConfig.globalPicklistId`, handling both the parsed-object and JSON-string forms), `isActive`
- * filtering, `sortOrder` ordering, and the empty-on-error fallback — matching `ObjectFormPage` behaviour.
+ * `fieldTypeConfig.globalPicklistId` or the legacy pre-#1222 `picklistSourceId`/`picklistSourceType`
+ * dialect, handling both the parsed-object and JSON-string forms), `isActive` filtering, `sortOrder`
+ * ordering, and the empty-on-error fallback — matching `ObjectFormPage` behaviour.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
-import { usePicklistOptions, resolvePicklistSource } from './usePicklistOptions'
+import {
+  usePicklistOptions,
+  resolvePicklistSource,
+  resolveGlobalPicklistId,
+} from './usePicklistOptions'
 
 const mockGetList = vi.fn()
 vi.mock('@/context/ApiContext', () => ({
@@ -48,6 +53,58 @@ describe('resolvePicklistSource', () => {
       sourceId: 'f1',
       sourceType: 'FIELD',
     })
+  })
+
+  it('resolves the legacy picklistSourceId + picklistSourceType GLOBAL dialect', () => {
+    // Written by the MCP admin tooling before #1222; still present on old fields.
+    expect(
+      resolvePicklistSource({
+        id: 'f1',
+        fieldTypeConfig: { picklistSourceId: 'gp-legacy', picklistSourceType: 'GLOBAL' },
+      })
+    ).toEqual({ sourceId: 'gp-legacy', sourceType: 'GLOBAL' })
+  })
+
+  it('ignores picklistSourceId when picklistSourceType is not GLOBAL', () => {
+    expect(
+      resolvePicklistSource({
+        id: 'f1',
+        fieldTypeConfig: { picklistSourceId: 'f1', picklistSourceType: 'FIELD' },
+      })
+    ).toEqual({ sourceId: 'f1', sourceType: 'FIELD' })
+  })
+
+  it('prefers globalPicklistId when both dialects are present', () => {
+    expect(
+      resolvePicklistSource({
+        id: 'f1',
+        fieldTypeConfig: {
+          globalPicklistId: 'gp-modern',
+          picklistSourceId: 'gp-old',
+          picklistSourceType: 'GLOBAL',
+        },
+      })
+    ).toEqual({ sourceId: 'gp-modern', sourceType: 'GLOBAL' })
+  })
+})
+
+describe('resolveGlobalPicklistId', () => {
+  it('reads the modern globalPicklistId key', () => {
+    expect(resolveGlobalPicklistId({ globalPicklistId: 'gp-1' })).toBe('gp-1')
+  })
+
+  it('reads the legacy dialect from a JSON string config', () => {
+    expect(
+      resolveGlobalPicklistId('{"picklistSourceId":"gp-2","picklistSourceType":"GLOBAL"}')
+    ).toBe('gp-2')
+  })
+
+  it('returns undefined for empty, malformed, or non-GLOBAL configs', () => {
+    expect(resolveGlobalPicklistId(undefined)).toBeUndefined()
+    expect(resolveGlobalPicklistId('{not json')).toBeUndefined()
+    expect(
+      resolveGlobalPicklistId({ picklistSourceId: 'x', picklistSourceType: 'FIELD' })
+    ).toBeUndefined()
   })
 })
 

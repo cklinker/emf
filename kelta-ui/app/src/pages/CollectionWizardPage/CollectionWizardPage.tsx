@@ -226,7 +226,12 @@ export function CollectionWizardPage({
   const { summaries: allCollectionSummaries } = useCollectionSummaries()
 
   // Global picklists for picklist field dropdown
-  const { data: globalPicklists = [] } = useQuery({
+  const {
+    data: globalPicklists = [],
+    isLoading: globalPicklistsLoading,
+    isError: globalPicklistsError,
+    refetch: refetchGlobalPicklists,
+  } = useQuery({
     queryKey: ['picklists'],
     queryFn: () => keltaClient.admin.picklists.listGlobal(),
     enabled: fieldEditorOpen,
@@ -1275,6 +1280,11 @@ export function CollectionWizardPage({
                   name: p.name,
                 })
               )}
+              picklistsLoading={globalPicklistsLoading}
+              picklistsError={globalPicklistsError}
+              onRetryPicklists={() => {
+                void refetchGlobalPicklists()
+              }}
               onSave={handleFieldSave}
               onCancel={handleFieldCancel}
             />

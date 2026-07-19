@@ -1119,7 +1119,9 @@
       "descriptionTooLong": "La descripcion debe tener 500 caracteres o menos"
     },
     "trackHistory": "Registrar historial de cambios",
-    "trackHistoryHint": "Captura una instantánea completa de cada creación, actualización y eliminación de registros. Añade una pestaña Historial a las páginas de registros."
+    "trackHistoryHint": "Captura una instantánea completa de cada creación, actualización y eliminación de registros. Añade una pestaña Historial a las páginas de registros.",
+    "captureGeo": "Capturar ubicación del registro",
+    "captureGeoHint": "Registrar el país y la ciudad del origen de la solicitud al crear o actualizar registros."
   },
   "authorizationPanel": {
     "title": "Autorizacion",

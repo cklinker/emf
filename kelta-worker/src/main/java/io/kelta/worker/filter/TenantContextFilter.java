@@ -1,5 +1,7 @@
 package io.kelta.worker.filter;
 
+import io.kelta.runtime.context.GeoContext;
+import io.kelta.runtime.context.GeoHeaders;
 import io.kelta.runtime.context.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,7 +24,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * {@code X-Tenant-Slug} headers to all proxied requests. This filter reads
  * those headers and makes them available to controllers via TenantContext,
  * propagating correctly into any virtual threads / {@code StructuredTaskScope}
- * fan-out started within the request.
+ * fan-out started within the request. When the gateway attached {@code X-Geo-*}
+ * headers, the parsed {@link io.kelta.runtime.context.GeoStamp} is bound to
+ * {@link GeoContext#CURRENT_GEO} in the same scope.
  *
  * <p>Runs with highest precedence so TenantContext is available to all
  * downstream filters and controllers.
@@ -55,6 +59,12 @@ public class TenantContextFilter extends OncePerRequestFilter {
             carrier = (carrier == null)
                     ? ScopedValue.where(TenantContext.CURRENT_TENANT_SLUG, tenantSlug)
                     : carrier.where(TenantContext.CURRENT_TENANT_SLUG, tenantSlug);
+        }
+        // Bind the gateway-attested request-origin geolocation alongside the tenant so
+        // Cerbos principal building and record stamping can read it without the request.
+        var geo = GeoHeaders.parse(request);
+        if (geo.isPresent()) {
+            carrier = carrier.where(GeoContext.CURRENT_GEO, geo.get());
         }
 
         AtomicReference<IOException> ioErr = new AtomicReference<>();

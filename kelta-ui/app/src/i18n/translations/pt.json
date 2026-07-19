@@ -1119,7 +1119,9 @@
       "descriptionTooLong": "A descricao deve ter no maximo 500 caracteres"
     },
     "trackHistory": "Rastrear histórico de registros",
-    "trackHistoryHint": "Captura um instantâneo completo de cada criação, atualização e exclusão de registro. Adiciona uma aba Histórico às páginas de registro."
+    "trackHistoryHint": "Captura um instantâneo completo de cada criação, atualização e exclusão de registro. Adiciona uma aba Histórico às páginas de registro.",
+    "captureGeo": "Capturar localização do registo",
+    "captureGeoHint": "Registar o país e a cidade de origem do pedido ao criar ou atualizar registos."
   },
   "authorizationPanel": {
     "title": "Autorizacao",

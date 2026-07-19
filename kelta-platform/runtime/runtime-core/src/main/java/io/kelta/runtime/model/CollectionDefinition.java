@@ -37,6 +37,10 @@ import java.util.Set;
  *                     snapshot in {@code record_version}. When true, all fields are
  *                     tracked and per-field {@link FieldDefinition#trackHistory()} is
  *                     superseded for this collection.
+ * @param captureGeo Whether HTTP record writes stamp the request-origin geolocation
+ *                   (gateway {@code X-Geo-*} headers) into the {@code created_geo} /
+ *                   {@code updated_geo} JSONB system columns. Flow/system writes leave
+ *                   them null (no HTTP origin).
  *
  * @since 1.0.0
  */
@@ -58,7 +62,8 @@ public record CollectionDefinition(
     Map<String, String> columnMapping,
     String displayFieldName,
     String tenantId,
-    boolean trackHistory
+    boolean trackHistory,
+    boolean captureGeo
 ) {
     /**
      * Compact constructor with validation and defensive copying.
@@ -92,7 +97,7 @@ public record CollectionDefinition(
             long version, Instant createdAt, Instant updatedAt) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
-             false, true, false, Set.of(), Map.of(), null, null, false);
+             false, true, false, Set.of(), Map.of(), null, null, false, false);
     }
 
     /**
@@ -107,7 +112,7 @@ public record CollectionDefinition(
             Set<String> immutableFields, Map<String, String> columnMapping) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
-             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null, null, false);
+             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null, null, false, false);
     }
 
     /**
@@ -124,7 +129,7 @@ public record CollectionDefinition(
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
              systemCollection, tenantScoped, readOnly, immutableFields, columnMapping,
-             displayFieldName, null, false);
+             displayFieldName, null, false, false);
     }
 
     /**
@@ -141,7 +146,24 @@ public record CollectionDefinition(
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
              systemCollection, tenantScoped, readOnly, immutableFields, columnMapping,
-             displayFieldName, tenantId, false);
+             displayFieldName, tenantId, false, false);
+    }
+
+    /**
+     * Backward-compatible constructor without captureGeo parameter.
+     */
+    public CollectionDefinition(
+            String name, String displayName, String description,
+            List<FieldDefinition> fields, StorageConfig storageConfig,
+            ApiConfig apiConfig, AuthzConfig authzConfig,
+            long version, Instant createdAt, Instant updatedAt,
+            boolean systemCollection, boolean tenantScoped, boolean readOnly,
+            Set<String> immutableFields, Map<String, String> columnMapping,
+            String displayFieldName, String tenantId, boolean trackHistory) {
+        this(name, displayName, description, fields, storageConfig, apiConfig,
+             authzConfig, version, createdAt, updatedAt,
+             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping,
+             displayFieldName, tenantId, trackHistory, false);
     }
 
     /**
@@ -223,7 +245,7 @@ public record CollectionDefinition(
             storageConfig, apiConfig, authzConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
-            immutableFields, columnMapping, displayFieldName, tenantId, trackHistory
+            immutableFields, columnMapping, displayFieldName, tenantId, trackHistory, captureGeo
         );
     }
 
@@ -239,7 +261,7 @@ public record CollectionDefinition(
             storageConfig, apiConfig, authzConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
-            immutableFields, columnMapping, displayFieldName, tenantId, trackHistory
+            immutableFields, columnMapping, displayFieldName, tenantId, trackHistory, captureGeo
         );
     }
 

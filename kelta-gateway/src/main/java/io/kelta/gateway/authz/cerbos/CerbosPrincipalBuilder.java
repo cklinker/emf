@@ -15,7 +15,10 @@ public class CerbosPrincipalBuilder {
         Principal builder = Principal.newInstance(principal.getUsername(), "user")
                 .withAttribute("profileId", stringAttr(principal.getProfileId()))
                 .withAttribute("tenantId", stringAttr(principal.getTenantId()))
-                .withAttribute("profileName", stringAttr(principal.getProfileName()));
+                .withAttribute("profileName", stringAttr(principal.getProfileName()))
+                // Empty when the request origin has no geolocation (private IP, no geo DB) —
+                // geo-aware policy rules must handle "".
+                .withAttribute("geoCountry", stringAttr(principal.getGeoCountry()));
 
         List<String> groups = principal.getGroups();
         if (groups != null && !groups.isEmpty()) {

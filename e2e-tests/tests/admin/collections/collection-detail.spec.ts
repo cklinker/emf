@@ -120,6 +120,39 @@ test.describe("Collection Detail", () => {
     ).toBeChecked();
   });
 
+  test("round-trips the capture geo toggle on the edit form", async ({
+    page,
+    dataFactory,
+  }) => {
+    const collection = await dataFactory.createCollection({
+      displayName: `Capture Geo Test ${Date.now()}`,
+    });
+    await dataFactory.waitForCollectionVisible(collection.id);
+
+    const formPage = new CollectionFormPage(page, tenantSlug);
+    await formPage.goto(collection.id);
+
+    const checkbox = page.getByTestId("collection-capture-geo-checkbox");
+    await expect(checkbox).toBeVisible();
+    await expect(checkbox).not.toBeChecked();
+
+    // Enable the toggle and save, waiting for the PATCH to complete
+    await checkbox.check();
+    const patchPromise = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === "PATCH" &&
+        resp.url().includes(`/api/collections/${collection.id}`),
+    );
+    await formPage.submit();
+    await patchPromise;
+
+    // Reload the edit form — the persisted toggle comes back checked
+    await formPage.goto(collection.id);
+    await expect(
+      page.getByTestId("collection-capture-geo-checkbox"),
+    ).toBeChecked();
+  });
+
   test("lists fields added to collection", async ({ page, dataFactory }) => {
     const collection = await dataFactory.createCollection();
 

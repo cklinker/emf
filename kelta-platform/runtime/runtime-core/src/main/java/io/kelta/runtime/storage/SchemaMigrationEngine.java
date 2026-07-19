@@ -284,6 +284,19 @@ public class SchemaMigrationEngine {
             executeMigration(migration);
         }
 
+        // captureGeo turned on → ensure the geo system columns exist. Tables created
+        // before the geo feature lack them; ADD COLUMN IF NOT EXISTS is idempotent, so
+        // NATS event redelivery and multi-pod refresh races are harmless.
+        if (newDefinition.captureGeo() && !oldDefinition.captureGeo()
+                && !newDefinition.systemCollection()) {
+            String geoSql = "ALTER TABLE " + qualifiedName
+                    + " ADD COLUMN IF NOT EXISTS created_geo JSONB,"
+                    + " ADD COLUMN IF NOT EXISTS updated_geo JSONB";
+            jdbcTemplate.execute(geoSql);
+            recordMigration(newDefinition.name(), MigrationType.ADD_COLUMN, geoSql);
+            log.info("Ensured geo system columns on '{}' (captureGeo enabled)", qualifiedName);
+        }
+
         // Detect unique-flag toggles. These need a live constraint-catalog lookup
         // (legacy constraints carry Postgres default names like <table>_<column>_key),
         // so they are applied directly rather than as precomputed MigrationActions —

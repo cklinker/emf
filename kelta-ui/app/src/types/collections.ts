@@ -16,6 +16,8 @@ export interface Collection {
   currentVersion: number
   /** Collection-level record versioning — every record change writes a record_version snapshot */
   trackHistory?: boolean
+  /** Stamp request-origin geolocation into created_geo/updated_geo on HTTP writes */
+  captureGeo?: boolean
   fields?: FieldDefinition[]
   authz?: CollectionAuthz
   createdAt: string

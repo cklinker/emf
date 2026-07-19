@@ -60,6 +60,7 @@ public class CollectionDefinitionBuilder {
     private String displayFieldName;
     private String tenantId;
     private boolean trackHistory = false;
+    private boolean captureGeo = false;
 
     /**
      * Creates a new collection definition builder.
@@ -300,6 +301,18 @@ public class CollectionDefinitionBuilder {
     }
 
     /**
+     * Sets whether HTTP record writes stamp the request-origin geolocation into
+     * the created_geo / updated_geo system columns.
+     *
+     * @param captureGeo true to stamp geo on create/update
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder captureGeo(boolean captureGeo) {
+        this.captureGeo = captureGeo;
+        return this;
+    }
+
+    /**
      * Builds the collection definition.
      *
      * <p>Applies sensible defaults for optional configuration:
@@ -359,7 +372,8 @@ public class CollectionDefinitionBuilder {
             columnMapping,
             displayFieldName,
             tenantId,
-            trackHistory
+            trackHistory,
+            captureGeo
         );
     }
 }

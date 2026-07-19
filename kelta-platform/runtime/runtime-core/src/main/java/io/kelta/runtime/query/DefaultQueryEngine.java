@@ -58,7 +58,8 @@ public class DefaultQueryEngine implements QueryEngine {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultQueryEngine.class);
 
-    private static final Set<String> SYSTEM_FIELDS = Set.of("id", "createdAt", "updatedAt", "createdBy", "updatedBy");
+    private static final Set<String> SYSTEM_FIELDS =
+            Set.of("id", "createdAt", "updatedAt", "createdBy", "updatedBy", "createdGeo", "updatedGeo");
 
     private final StorageAdapter storageAdapter;
     private final ValidationEngine validationEngine;

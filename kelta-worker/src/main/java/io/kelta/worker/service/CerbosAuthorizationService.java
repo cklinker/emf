@@ -8,6 +8,7 @@ import dev.cerbos.sdk.CheckResult;
 import dev.cerbos.sdk.builders.AttributeValue;
 import dev.cerbos.sdk.builders.Principal;
 import dev.cerbos.sdk.builders.Resource;
+import io.kelta.runtime.context.GeoContext;
 import io.kelta.worker.config.WorkerProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -401,7 +402,8 @@ public class CerbosAuthorizationService {
      */
     public boolean checkCollectionWideRecordAccess(String email, String profileId, String tenantId,
                                                     String collectionRef, String action) {
-        String cacheKey = tenantId + ":" + profileId + ":" + collectionRef + ":" + action;
+        String cacheKey = tenantId + ":" + profileId + ":" + collectionRef + ":" + action
+                + ":geo:" + GeoContext.currentCountry();
         Boolean cached = collectionRecordAccessCache.getIfPresent(cacheKey);
         if (cached != null) {
             cacheHits.increment();
@@ -577,9 +579,13 @@ public class CerbosAuthorizationService {
 
     // ── Cache key builders ──────────────────────────────────────────────
 
+    // Both caches key on the request-origin country because the principal now carries it:
+    // once a policy references P.attr.geoCountry, a decision cached for one origin must
+    // never answer for another. Tenant prefix stays first for the eviction prefix match.
     private static String fieldCacheKey(String tenantId, String profileId, String collectionId,
                                         String action) {
-        return tenantId + ":" + profileId + ":" + collectionId + ":" + action;
+        return tenantId + ":" + profileId + ":" + collectionId + ":" + action
+                + ":geo:" + GeoContext.currentCountry();
     }
 
     // ── Circuit breaker helpers ──────────────────────────────────────────
@@ -597,7 +603,10 @@ public class CerbosAuthorizationService {
     private Principal buildPrincipal(String email, String profileId, String tenantId) {
         return Principal.newInstance(email, "user")
                 .withAttribute("profileId", stringAttr(profileId))
-                .withAttribute("tenantId", stringAttr(tenantId));
+                .withAttribute("tenantId", stringAttr(tenantId))
+                // Request-origin country from GeoContext (bound by TenantContextFilter);
+                // "" on flow/system paths and un-geolocated origins — policies must handle it.
+                .withAttribute("geoCountry", stringAttr(GeoContext.currentCountry()));
     }
 
     private void recordSuccess() {

@@ -442,6 +442,8 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.json("adapterConfig").withColumnName("adapter_config"))
             .addField(FieldDefinition.bool("trackHistory").withColumnName("track_history")
                 .withDefault(false))
+            .addField(FieldDefinition.bool("captureGeo").withColumnName("capture_geo")
+                .withDefault(false))
             .build();
     }
 

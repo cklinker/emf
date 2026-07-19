@@ -50,14 +50,14 @@ public class CollectionLifecycleManager {
     private static final String SELECT_COLLECTION_BY_ID = """
             SELECT id, name, display_name, description, active,
                    current_version, system_collection, path, tenant_id, display_field_id,
-                   adapter_config, track_history
+                   adapter_config, track_history, capture_geo
             FROM collection WHERE id = ? AND active = true
             """;
 
     private static final String SELECT_COLLECTION_BY_NAME = """
             SELECT id, name, display_name, description, active,
                    current_version, system_collection, path, tenant_id, display_field_id,
-                   adapter_config, track_history
+                   adapter_config, track_history, capture_geo
             FROM collection WHERE name = ? AND active = true
             LIMIT 1
             """;
@@ -521,6 +521,9 @@ public class CollectionLifecycleManager {
 
         // Collection-level record versioning toggle
         builder.trackHistory(Boolean.TRUE.equals(data.get("track_history")));
+
+        // Collection-level request-origin geo stamping toggle
+        builder.captureGeo(Boolean.TRUE.equals(data.get("capture_geo")));
 
         return builder.build();
     }

@@ -1,6 +1,8 @@
 package io.kelta.runtime.router;
 
 import io.kelta.jsonapi.PaginationLinks;
+import io.kelta.runtime.context.GeoHeaders;
+import io.kelta.runtime.context.GeoStamp;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.model.FieldDefinition;
@@ -90,7 +92,7 @@ public class DynamicCollectionRouter {
     // when a field is deleted.
     private static final Set<String> SYSTEM_ATTRIBUTE_KEYS = Set.of(
             "createdAt", "updatedAt", "createdBy", "updatedBy",
-            "tenantId", "recordTypeId");
+            "createdGeo", "updatedGeo", "tenantId", "recordTypeId");
 
     // Suffixes appended to a primary field name to form companion column keys
     // for CURRENCY and GEOLOCATION fields. Used to keep `<field>_currency_code`,
@@ -384,6 +386,7 @@ public class DynamicCollectionRouter {
                 data.put("createdBy", userId);
                 data.put("updatedBy", userId);
             }
+            stampGeo(data, definition, request, true);
 
             // Inject tenant ID for tenant-scoped system collections
             injectTenantId(data, definition, request);
@@ -484,6 +487,7 @@ public class DynamicCollectionRouter {
             if (userId != null) {
                 data.put("updatedBy", userId);
             }
+            stampGeo(data, definition, request, false);
 
             // Optimistic locking: reject a stale If-Match before mutating (slice 5).
             enforceIfMatch(definition, id, request);
@@ -690,6 +694,7 @@ public class DynamicCollectionRouter {
                 data.put("createdBy", userId);
                 data.put("updatedBy", userId);
             }
+            stampGeo(data, relation.childDef(), request, true);
 
             // Inject tenant ID for tenant-scoped system collections
             injectTenantId(data, relation.childDef(), request);
@@ -786,6 +791,7 @@ public class DynamicCollectionRouter {
             if (userId != null) {
                 data.put("updatedBy", userId);
             }
+            stampGeo(data, relation.childDef(), request, false);
 
             Optional<Map<String, Object>> updated = queryEngine.update(relation.childDef(), childId, data);
 
@@ -940,6 +946,25 @@ public class DynamicCollectionRouter {
             }
         }
         return userId;
+    }
+
+    /**
+     * Stamps the request-origin geolocation (gateway {@code X-Geo-*} headers) into
+     * {@code createdGeo}/{@code updatedGeo} for collections with {@code captureGeo}
+     * enabled. Stamps null when the origin has no geolocation — on update this
+     * intentionally clears a previous stamp, so the value always describes the
+     * origin of the LAST write, never a stale one.
+     */
+    private void stampGeo(Map<String, Object> data, CollectionDefinition definition,
+                          HttpServletRequest request, boolean isCreate) {
+        if (!definition.captureGeo() || definition.systemCollection()) {
+            return;
+        }
+        Map<String, Object> geo = GeoHeaders.parse(request).map(GeoStamp::toMap).orElse(null);
+        if (isCreate) {
+            data.put("createdGeo", geo);
+        }
+        data.put("updatedGeo", geo);
     }
 
     /**

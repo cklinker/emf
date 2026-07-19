@@ -340,7 +340,8 @@ public class CerbosFieldSecurityAdvice implements ResponseBodyAdvice<Object> {
 
     private boolean isSystemField(String fieldId) {
         return "createdAt".equals(fieldId) || "updatedAt".equals(fieldId)
-                || "createdBy".equals(fieldId) || "updatedBy".equals(fieldId);
+                || "createdBy".equals(fieldId) || "updatedBy".equals(fieldId)
+                || "createdGeo".equals(fieldId) || "updatedGeo".equals(fieldId);
     }
 
     /**

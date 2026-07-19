@@ -447,6 +447,13 @@ for removal ("inline the current value"). Findings:
   an empty bean, so consumers (e.g. NATS_TRIGGERED post-visit flows) get no data. `EventPayloadReflectConfigTest`
   now fails CI if any `io.kelta.runtime.event.*Payload` is unregistered. **Rule: a new event payload
   gets a reflect-config entry in BOTH `kelta-worker` and `kelta-gateway` in the same PR.**
+- **Cerbos decision-cache keys MUST carry the request-origin geo country wherever geo can
+  influence a decision.** Both principals (gateway + worker) expose `P.attr.geoCountry`, so all
+  four decision caches (gateway system/object in `CerbosAuthorizationService`, worker
+  field-access + collection-wide record-access) append `:geo:<country>` to their keys. Dropping
+  the suffix from any of them reintroduces cross-location stale allows (a US-origin ALLOW
+  answering a CN-origin request) the moment a tenant writes a geo-aware policy rule. Any NEW
+  Cerbos decision cache added later must include it too.
 - **GeoLite2 lookup models are native-reflective — same rule class as the bootstrap DTOs.** The
   `com.maxmind.db` Reader instantiates `io.kelta.gateway.geo.model.*` (`GeoCityData`, `GeoCountry`,
   `GeoSubdivision`, `GeoCity`, `GeoLocation`) via the `@MaxMindDbConstructor` annotation reflectively;

@@ -115,6 +115,7 @@ export function CollectionFormPage({
           description: data.description || '',
           active: data.active,
           trackHistory: data.trackHistory,
+          captureGeo: data.captureGeo,
         }
         // Include displayFieldId — empty string clears it, undefined means no change
         if (data.displayFieldId !== undefined) {

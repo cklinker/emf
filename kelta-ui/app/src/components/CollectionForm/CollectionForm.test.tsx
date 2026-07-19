@@ -429,6 +429,43 @@ describe('CollectionForm Component', () => {
     })
   })
 
+  describe('Capture Geo Field', () => {
+    it('should render the capture geo checkbox, unchecked by default', () => {
+      renderWithProviders(<CollectionForm {...defaultProps} />)
+
+      expect(screen.getByTestId('collection-capture-geo-checkbox')).toBeInTheDocument()
+      expect(screen.getByTestId('collection-capture-geo-checkbox')).not.toBeChecked()
+    })
+
+    it('should be checked in edit mode when collection.captureGeo is true', () => {
+      renderWithProviders(
+        <CollectionForm {...defaultProps} collection={{ ...mockCollection, captureGeo: true }} />
+      )
+
+      expect(screen.getByTestId('collection-capture-geo-checkbox')).toBeChecked()
+    })
+
+    it('should include captureGeo in the submit payload when checked', async () => {
+      const onSubmit = vi.fn().mockResolvedValue(undefined)
+      const user = userEvent.setup()
+      renderWithProviders(<CollectionForm {...defaultProps} onSubmit={onSubmit} />)
+
+      await user.type(screen.getByTestId('collection-name-input'), 'my_collection')
+      await user.type(screen.getByTestId('collection-display-name-input'), 'My Collection')
+      await user.click(screen.getByTestId('collection-capture-geo-checkbox'))
+
+      await user.click(screen.getByTestId('collection-form-submit'))
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            captureGeo: true,
+          })
+        )
+      })
+    })
+  })
+
   describe('Cancel Action', () => {
     it('should call onCancel when cancel button is clicked', async () => {
       const onCancel = vi.fn()

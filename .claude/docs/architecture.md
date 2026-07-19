@@ -90,6 +90,22 @@ an empty `geoCountry` — geo-aware policy rules must handle the empty value. Wo
 header never fails a request); `LoginTrackingFilter` persists the stamp into
 `login_history.geo_*` columns.
 
+**Authorization:** both Cerbos principals carry `geoCountry` — gateway
+(`CerbosPrincipalBuilder`, from `GatewayPrincipal.geoCountry`) and worker
+(`CerbosAuthorizationService.buildPrincipal`, from the `GeoContext` ScopedValue bound by
+`TenantContextFilter`). Policies can write rules on `P.attr.geoCountry`; the record's stored
+`created_geo` also reaches record rules as a resource attribute via the normal attr copy.
+Every decision cache key (gateway system/object, worker field/record-access) appends
+`:geo:<country>` — a decision cached for one origin must never answer for another.
+
+**Per-record capture:** the `captureGeo` collection flag (clone of `trackHistory`; rides the
+existing `kelta.config.collection.changed` broadcast) makes HTTP record writes stamp
+`createdGeo`/`updatedGeo` JSONB system columns (`DynamicCollectionRouter.stampGeo`; FLS-exempt
+like `createdBy`; excluded from record-version diffs). New user tables get the columns in base
+DDL; flipping the flag on an existing collection triggers an idempotent
+`ADD COLUMN IF NOT EXISTS` in `SchemaMigrationEngine.migrateSchema` on every pod's refresh.
+Flow/system writes stamp null (no HTTP origin); flows still see stamped geo in `record.data`.
+
 Key files: `kelta-gateway/src/main/java/io/kelta/gateway/{filter,auth,authz,ratelimit}/`
 
 ### Authorizing a new endpoint (read before adding one)

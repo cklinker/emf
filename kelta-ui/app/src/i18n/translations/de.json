@@ -1119,7 +1119,9 @@
       "descriptionTooLong": "Beschreibung darf maximal 500 Zeichen lang sein"
     },
     "trackHistory": "Datensatzverlauf verfolgen",
-    "trackHistoryHint": "Erfasst bei jedem Erstellen, Aktualisieren und Löschen eines Datensatzes einen vollständigen Versions-Snapshot. Fügt den Datensatzseiten einen Verlaufs-Tab hinzu."
+    "trackHistoryHint": "Erfasst bei jedem Erstellen, Aktualisieren und Löschen eines Datensatzes einen vollständigen Versions-Snapshot. Fügt den Datensatzseiten einen Verlaufs-Tab hinzu.",
+    "captureGeo": "Datensatz-Standort erfassen",
+    "captureGeoHint": "Land und Stadt des Anfrageursprungs beim Erstellen oder Aktualisieren von Datensätzen speichern."
   },
   "authorizationPanel": {
     "title": "Autorisierung",

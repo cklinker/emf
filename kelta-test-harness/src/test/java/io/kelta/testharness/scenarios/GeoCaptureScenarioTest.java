@@ -172,8 +172,23 @@ class GeoCaptureScenarioTest extends ScenarioBase {
     }
 
     private String geoColumnCountry(Connection conn, String tableName, String recordId) throws Exception {
+        // User tables may live in a tenant-specific schema — resolve it instead of
+        // relying on the admin connection's search_path.
+        String schema;
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT created_geo->>'country' FROM \"" + tableName + "\" WHERE id = ?")) {
+                "SELECT table_schema FROM information_schema.columns "
+                        + "WHERE table_name = ? AND column_name = 'created_geo' LIMIT 1")) {
+            ps.setString(1, tableName);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                schema = rs.getString(1);
+            }
+        }
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT created_geo->>'country' FROM \"" + schema + "\".\"" + tableName
+                        + "\" WHERE id = ?")) {
             ps.setString(1, recordId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getString(1) : null;

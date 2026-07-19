@@ -1,5 +1,7 @@
 package io.kelta.worker.filter;
 
+import io.kelta.runtime.context.GeoHeaders;
+import io.kelta.runtime.context.GeoStamp;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -150,6 +152,7 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
 
         String sourceIp = extractClientIp(request);
         String userAgent = truncateUserAgent(request.getHeader("User-Agent"));
+        GeoStamp geo = GeoHeaders.parse(request).orElse(null);
         Instant loginTime = Instant.now();
         Timestamp ts = Timestamp.from(loginTime);
 
@@ -157,7 +160,7 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
         updateUserLoginInfo(userId, ts);
 
         // 2. Insert login_history row
-        insertLoginHistory(userId, tenantId, ts, sourceIp, userAgent);
+        insertLoginHistory(userId, tenantId, ts, sourceIp, userAgent, geo);
 
         // 3. Insert security_audit_log LOGIN event
         insertSecurityAuditLogin(userId, email, tenantId, sourceIp, userAgent);
@@ -371,12 +374,19 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
     }
 
     private void insertLoginHistory(String userId, String tenantId, Timestamp ts,
-                                     String sourceIp, String userAgent) {
+                                     String sourceIp, String userAgent, GeoStamp geo) {
         String id = UUID.randomUUID().toString();
         jdbcTemplate.update(
-                "INSERT INTO login_history (id, user_id, tenant_id, login_time, source_ip, login_type, status, user_agent, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, userId, tenantId, ts, sourceIp, "OAUTH", "SUCCESS", userAgent, ts, ts);
+                "INSERT INTO login_history (id, user_id, tenant_id, login_time, source_ip, login_type, status, user_agent, " +
+                        "geo_country, geo_region, geo_city, geo_lat, geo_lon, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, userId, tenantId, ts, sourceIp, "OAUTH", "SUCCESS", userAgent,
+                geo != null ? geo.country() : null,
+                geo != null ? geo.region() : null,
+                geo != null ? geo.city() : null,
+                geo != null ? geo.latitude() : null,
+                geo != null ? geo.longitude() : null,
+                ts, ts);
     }
 
     private void insertSecurityAuditLogin(String userId, String email, String tenantId,

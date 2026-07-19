@@ -13,6 +13,15 @@ interface LoginHistoryEntry {
   loginType: 'UI' | 'API' | 'OAUTH' | 'SERVICE_ACCOUNT'
   status: 'SUCCESS' | 'FAILED' | 'LOCKED_OUT'
   userAgent: string
+  geoCountry?: string | null
+  geoRegion?: string | null
+  geoCity?: string | null
+}
+
+function formatLocation(entry: LoginHistoryEntry): string {
+  if (!entry.geoCountry) return '—'
+  const place = [entry.geoCity, entry.geoRegion].filter(Boolean).join(', ')
+  return place ? `${place} ${entry.geoCountry}` : entry.geoCountry
 }
 
 export interface LoginHistoryPageProps {
@@ -102,6 +111,9 @@ export function LoginHistoryPage({
                     Source IP
                   </th>
                   <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
+                    Location
+                  </th>
+                  <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
                     Login Type
                   </th>
                   <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
@@ -120,6 +132,12 @@ export function LoginHistoryPage({
                     </td>
                     <td className="border-b border-border p-3 font-mono text-xs">
                       {entry.sourceIp || '-'}
+                    </td>
+                    <td
+                      className="border-b border-border p-3 whitespace-nowrap"
+                      data-testid="login-history-location"
+                    >
+                      {formatLocation(entry)}
                     </td>
                     <td className="border-b border-border p-3">{entry.loginType}</td>
                     <td className="border-b border-border p-3">

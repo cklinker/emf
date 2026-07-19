@@ -37,7 +37,7 @@ class IpRateLimitFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new IpRateLimitFilter();
+        filter = new IpRateLimitFilter(new io.kelta.gateway.geo.ClientIpResolver(true));
         filter.clearAll();
         chain = mock(GatewayFilterChain.class);
         when(chain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());

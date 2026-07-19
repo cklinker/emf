@@ -1419,6 +1419,11 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("loginType", 20).withColumnName("login_type"))
             .addField(FieldDefinition.string("status", 20))
             .addField(FieldDefinition.text("userAgent").withColumnName("user_agent"))
+            .addField(FieldDefinition.string("geoCountry", 2).withColumnName("geo_country"))
+            .addField(FieldDefinition.string("geoRegion", 100).withColumnName("geo_region"))
+            .addField(FieldDefinition.string("geoCity", 150).withColumnName("geo_city"))
+            .addField(FieldDefinition.doubleField("geoLat").withColumnName("geo_lat"))
+            .addField(FieldDefinition.doubleField("geoLon").withColumnName("geo_lon"))
             .build();
     }
 

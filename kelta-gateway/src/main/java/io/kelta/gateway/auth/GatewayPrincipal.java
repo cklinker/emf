@@ -22,6 +22,7 @@ public final class GatewayPrincipal {
     private final String tenantId;
     private final String connectedAppId;
     private final String appScopes;
+    private final String geoCountry;
 
     /**
      * Creates a new GatewayPrincipal with all fields.
@@ -34,10 +35,11 @@ public final class GatewayPrincipal {
      * @param tenantId       the resolved tenant ID (may be null)
      * @param connectedAppId the connected app ID for machine tokens (may be null)
      * @param appScopes      the app scopes for connected app tokens (may be null)
+     * @param geoCountry     ISO-3166 alpha-2 country of the request origin (may be null)
      */
     public GatewayPrincipal(String username, List<String> groups, Map<String, Object> claims,
                             String profileId, String profileName, String tenantId,
-                            String connectedAppId, String appScopes) {
+                            String connectedAppId, String appScopes, String geoCountry) {
         this.username = Objects.requireNonNull(username, "username cannot be null");
         this.groups = groups != null ? List.copyOf(groups) : Collections.emptyList();
         this.claims = claims != null ? Map.copyOf(claims) : Collections.emptyMap();
@@ -46,6 +48,16 @@ public final class GatewayPrincipal {
         this.tenantId = tenantId;
         this.connectedAppId = connectedAppId;
         this.appScopes = appScopes;
+        this.geoCountry = geoCountry;
+    }
+
+    /**
+     * Creates a new GatewayPrincipal without a geo country (request origin not yet resolved).
+     */
+    public GatewayPrincipal(String username, List<String> groups, Map<String, Object> claims,
+                            String profileId, String profileName, String tenantId,
+                            String connectedAppId, String appScopes) {
+        this(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes, null);
     }
 
     /**
@@ -118,38 +130,53 @@ public final class GatewayPrincipal {
     }
 
     /**
+     * Gets the ISO-3166 alpha-2 country of the request origin, resolved by
+     * {@code GeoEnrichmentFilter}. Null when geolocation is unavailable.
+     */
+    public String getGeoCountry() {
+        return geoCountry;
+    }
+
+    /**
      * Returns a copy of this principal with the given profile ID.
      */
     public GatewayPrincipal withProfileId(String profileId) {
-        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes, geoCountry);
     }
 
     /**
      * Returns a copy of this principal with the given profile name.
      */
     public GatewayPrincipal withProfileName(String profileName) {
-        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes, geoCountry);
     }
 
     /**
      * Returns a copy of this principal with the given tenant ID.
      */
     public GatewayPrincipal withTenantId(String tenantId) {
-        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes, geoCountry);
     }
 
     /**
      * Returns a copy of this principal with the given connected app ID.
      */
     public GatewayPrincipal withConnectedAppId(String connectedAppId) {
-        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes, geoCountry);
     }
 
     /**
      * Returns a copy of this principal with the given app scopes.
      */
     public GatewayPrincipal withAppScopes(String appScopes) {
-        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes, geoCountry);
+    }
+
+    /**
+     * Returns a copy of this principal with the given request-origin country.
+     */
+    public GatewayPrincipal withGeoCountry(String geoCountry) {
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes, geoCountry);
     }
 
     /**
@@ -171,12 +198,13 @@ public final class GatewayPrincipal {
                Objects.equals(profileName, that.profileName) &&
                Objects.equals(tenantId, that.tenantId) &&
                Objects.equals(connectedAppId, that.connectedAppId) &&
-               Objects.equals(appScopes, that.appScopes);
+               Objects.equals(appScopes, that.appScopes) &&
+               Objects.equals(geoCountry, that.geoCountry);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+        return Objects.hash(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes, geoCountry);
     }
 
     @Override

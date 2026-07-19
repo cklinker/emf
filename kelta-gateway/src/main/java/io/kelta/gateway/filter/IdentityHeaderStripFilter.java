@@ -18,7 +18,8 @@ import java.util.List;
  * {@code RouteAuthorizationFilter.forwardWithHeaders}, order 0) and
  * {@code X-Forwarded-User} / {@code X-User-Id} / {@code X-Forwarded-Groups} /
  * {@code X-Forwarded-Roles} (set by {@code HeaderTransformationFilter}, order 50) for identity
- * and permission checks. Authenticated requests get every one of these overwritten downstream,
+ * and permission checks, and {@code X-Geo-*} (set by {@code GeoEnrichmentFilter}, order -45)
+ * for request-origin geolocation. Authenticated requests get every one of these overwritten downstream,
  * but requests that skip those set-points (public paths, unauthenticated bootstrap, any future
  * forwarding branch) would otherwise pass a client-forged value straight through to the worker.
  *
@@ -37,7 +38,13 @@ public class IdentityHeaderStripFilter implements GlobalFilter, Ordered {
             "X-User-Id",
             "X-User-Type",
             "X-Forwarded-Groups",
-            "X-Forwarded-Roles");
+            "X-Forwarded-Roles",
+            "X-Geo-Country",
+            "X-Geo-Region",
+            "X-Geo-City",
+            "X-Geo-Lat",
+            "X-Geo-Lon",
+            "X-Geo-Accuracy-Km");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {

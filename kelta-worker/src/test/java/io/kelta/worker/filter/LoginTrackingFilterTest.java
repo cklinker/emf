@@ -60,7 +60,8 @@ class LoginTrackingFilterTest {
                 contains("INSERT INTO login_history"),
                 any(String.class), eq("user-uuid-1"), eq("tenant-123"),
                 any(), eq("192.168.1.1"), eq("OAUTH"), eq("SUCCESS"),
-                eq("Mozilla/5.0"), any(), any());
+                eq("Mozilla/5.0"), isNull(), isNull(), isNull(), isNull(), isNull(),
+                any(), any());
 
         verify(jdbcTemplate).update(
                 contains("INSERT INTO security_audit_log"),
@@ -70,6 +71,65 @@ class LoginTrackingFilterTest {
                 any(String.class), eq("192.168.1.1"), eq("Mozilla/5.0"), any());
 
         assertTrue(throttleCache.containsKey("tenant-123:alice@example.com"));
+    }
+
+    @Test
+    void shouldRecordGeoColumnsFromGatewayHeaders() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
+        request.addHeader("X-User-Id", "alice@example.com");
+        request.addHeader("X-Tenant-ID", "tenant-123");
+        request.setRemoteAddr("203.0.113.50");
+        request.addHeader("User-Agent", "Mozilla/5.0");
+        request.addHeader("X-Geo-Country", "PT");
+        request.addHeader("X-Geo-Region", "Lisbon");
+        request.addHeader("X-Geo-City", "M%C3%BCnchen"); // percent-encoded on the wire
+        request.addHeader("X-Geo-Lat", "38.6979");
+        request.addHeader("X-Geo-Lon", "-9.4207");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT id FROM platform_user WHERE tenant_id = ? AND email = ? LIMIT 1"),
+                eq(String.class), eq("tenant-123"), eq("alice@example.com")))
+                .thenReturn("user-uuid-1");
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(jdbcTemplate).update(
+                contains("INSERT INTO login_history"),
+                any(String.class), eq("user-uuid-1"), eq("tenant-123"),
+                any(), eq("203.0.113.50"), eq("OAUTH"), eq("SUCCESS"),
+                eq("Mozilla/5.0"), eq("PT"), eq("Lisbon"), eq("München"),
+                eq(38.6979), eq(-9.4207), any(), any());
+    }
+
+    @Test
+    void shouldIgnoreMalformedGeoHeaders() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
+        request.addHeader("X-User-Id", "alice@example.com");
+        request.addHeader("X-Tenant-ID", "tenant-123");
+        request.setRemoteAddr("203.0.113.50");
+        request.addHeader("X-Geo-Country", "NOT-A-COUNTRY");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT id FROM platform_user WHERE tenant_id = ? AND email = ? LIMIT 1"),
+                eq(String.class), eq("tenant-123"), eq("alice@example.com")))
+                .thenReturn("user-uuid-1");
+
+        filter.doFilterInternal(request, response, chain);
+
+        // Malformed country → the whole stamp is dropped, never a failed request
+        verify(chain).doFilter(request, response);
+        verify(jdbcTemplate).update(
+                contains("INSERT INTO login_history"),
+                any(String.class), eq("user-uuid-1"), eq("tenant-123"),
+                any(), eq("203.0.113.50"), eq("OAUTH"), eq("SUCCESS"),
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                any(), any());
     }
 
     @Test
@@ -140,7 +200,8 @@ class LoginTrackingFilterTest {
                 contains("INSERT INTO login_history"),
                 any(String.class), eq("provisioned-uuid"), eq("tenant-123"),
                 any(), eq("192.168.1.1"), eq("OAUTH"), eq("SUCCESS"),
-                eq("Mozilla/5.0"), any(), any());
+                eq("Mozilla/5.0"), isNull(), isNull(), isNull(), isNull(), isNull(),
+                any(), any());
     }
 
     @Test
@@ -162,7 +223,8 @@ class LoginTrackingFilterTest {
         verify(chain).doFilter(request, response);
         verify(jdbcTemplate, never()).update(contains("UPDATE platform_user SET last_login_at"), any(), any(), any());
         verify(jdbcTemplate, never()).update(contains("INSERT INTO login_history"),
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -205,7 +267,8 @@ class LoginTrackingFilterTest {
         verify(chain).doFilter(request, response);
         verify(jdbcTemplate).update(contains("UPDATE platform_user"), any(), any(), any());
         verify(jdbcTemplate).update(contains("INSERT INTO login_history"),
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

@@ -230,7 +230,12 @@ services:
       CERBOS_GRPC_PORT: "3593"
       # CORS — gateway requires explicit origin pattern (no wildcard with credentials)
       CORS_ALLOWED_ORIGIN_PATTERN: "http://localhost:5173"
+      # IP geolocation — set MAXMIND_LICENSE_KEY in .env to enable automatic
+      # GeoLite2 downloads; without it, geo enrichment is silently inactive.
+      MAXMIND_LICENSE_KEY: ${MAXMIND_LICENSE_KEY:-}
       LOG_LEVEL: INFO
+    volumes:
+      - geoip-data:/data/geoip
     ports:
       - "8080:8080"
     depends_on:
@@ -470,6 +475,7 @@ volumes:
   nats_data:
   pgadmin_data:
   opensearch_data:
+  geoip-data:
 
 networks:
   kelta-network:

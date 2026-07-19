@@ -1,5 +1,6 @@
 package io.kelta.gateway.filter;
 
+import io.kelta.gateway.geo.ClientIpResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -23,6 +24,12 @@ import reactor.core.publisher.Mono;
 public class SecurityAuditFilter implements GlobalFilter, Ordered {
 
     private static final Logger securityLog = LoggerFactory.getLogger("security.audit");
+
+    private final ClientIpResolver clientIpResolver;
+
+    public SecurityAuditFilter(ClientIpResolver clientIpResolver) {
+        this.clientIpResolver = clientIpResolver;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -57,12 +64,8 @@ public class SecurityAuditFilter implements GlobalFilter, Ordered {
     }
 
     private String extractClientIp(ServerWebExchange exchange) {
-        String forwarded = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        var remoteAddress = exchange.getRequest().getRemoteAddress();
-        return remoteAddress != null ? remoteAddress.getAddress().getHostAddress() : "unknown";
+        String ip = clientIpResolver.resolve(exchange);
+        return ip != null ? ip : "unknown";
     }
 
     @Override

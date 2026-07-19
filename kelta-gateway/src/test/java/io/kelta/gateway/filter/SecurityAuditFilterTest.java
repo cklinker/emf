@@ -24,7 +24,7 @@ class SecurityAuditFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new SecurityAuditFilter();
+        filter = new SecurityAuditFilter(new io.kelta.gateway.geo.ClientIpResolver(true));
         chain = mock(GatewayFilterChain.class);
     }
 

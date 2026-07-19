@@ -1,6 +1,7 @@
 package io.kelta.gateway.filter;
 
 import io.kelta.gateway.error.ResponseHelpers;
+import io.kelta.gateway.geo.ClientIpResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.Deque;
 import java.util.Iterator;
@@ -55,7 +55,10 @@ public class IpRateLimitFilter implements GlobalFilter, Ordered {
     private final ConcurrentHashMap<String, Deque<Long>> requestLog = new ConcurrentHashMap<>();
     private final ScheduledExecutorService cleanupExecutor;
 
-    public IpRateLimitFilter() {
+    private final ClientIpResolver clientIpResolver;
+
+    public IpRateLimitFilter(ClientIpResolver clientIpResolver) {
+        this.clientIpResolver = clientIpResolver;
         cleanupExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "ip-rate-limit-cleanup");
             t.setDaemon(true);
@@ -108,19 +111,11 @@ public class IpRateLimitFilter implements GlobalFilter, Ordered {
     }
 
     /**
-     * Resolves the client IP from X-Forwarded-For header or the remote address.
+     * Resolves the client IP via the shared trust-aware resolver.
      */
     String resolveClientIp(ServerWebExchange exchange) {
-        String forwarded = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            // Take the first IP in the chain (original client)
-            return forwarded.split(",")[0].trim();
-        }
-        InetSocketAddress remoteAddress = exchange.getRequest().getRemoteAddress();
-        if (remoteAddress != null && remoteAddress.getAddress() != null) {
-            return remoteAddress.getAddress().getHostAddress();
-        }
-        return "unknown";
+        String ip = clientIpResolver.resolve(exchange);
+        return ip != null ? ip : "unknown";
     }
 
     /**

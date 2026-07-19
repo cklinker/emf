@@ -7,6 +7,7 @@ import io.kelta.gateway.authz.cerbos.CerbosAuthorizationService;
 import io.kelta.gateway.cache.GatewayCacheManager;
 import io.kelta.gateway.config.TenantIpConfig;
 import io.kelta.gateway.error.ResponseHelpers;
+import io.kelta.gateway.geo.ClientIpResolver;
 import io.kelta.gateway.metrics.GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,20 +183,7 @@ public class TenantIpAllowlistFilter implements GlobalFilter, Ordered {
      * surrounding brackets ({@code [::1]}). Returns null for blanks.
      */
     static String normalizeIp(String raw) {
-        if (raw == null) return null;
-        String ip = raw.trim();
-        if (ip.isEmpty()) return null;
-        if (ip.startsWith("[")) {
-            int close = ip.indexOf(']');
-            if (close > 0) {
-                ip = ip.substring(1, close);
-            }
-        }
-        int pct = ip.indexOf('%');
-        if (pct >= 0) {
-            ip = ip.substring(0, pct);
-        }
-        return ip.isEmpty() ? null : ip;
+        return ClientIpResolver.normalizeIp(raw);
     }
 
     private boolean matchesAnyCidr(List<String> candidateIps, List<String> cidrs) {

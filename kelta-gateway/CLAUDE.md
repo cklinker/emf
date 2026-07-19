@@ -12,7 +12,8 @@ io.kelta.gateway/
   cache/           ← GatewayCacheManager
   config/          ← Spring Security, Redis, NATS subscriptions, route init, WebSocket, service accounts
   error/           ← Exception classes + GlobalErrorHandler
-  filter/          ← Gateway filters (tenant, security headers, rate limit, logging, caching)
+  filter/          ← Gateway filters (tenant, security headers, rate limit, geo enrichment, logging, caching)
+  geo/             ← IP geolocation: GeoLite2 mmdb download/hot-swap, lookup service, ClientIpResolver
   health/          ← Health indicators (NATS, Redis, Worker)
   listener/        ← NATS event listeners (config events, Cerbos cache invalidation, realtime bridge)
   metrics/         ← GatewayMetrics (Micrometer)
@@ -84,6 +85,8 @@ All handled by `error/GlobalErrorHandler`.
 | Dynamic routing | `route/DynamicRouteLocator.java` + `route/RouteRegistry.java` |
 | NATS event listener | `listener/ConfigEventListener.java` |
 | Error handler | `error/GlobalErrorHandler.java` |
+| Client IP resolution (trust-aware, shared) | `geo/ClientIpResolver.java` |
+| Self-refreshing local dataset (download + hot-swap) | `geo/GeoIpDatabaseManager.java` |
 
 ## Running Tests
 

@@ -36,6 +36,36 @@
     "allDeclaredFields": true
   },
   {
+    "name": "io.kelta.gateway.geo.model.GeoCityData",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.kelta.gateway.geo.model.GeoCountry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.kelta.gateway.geo.model.GeoSubdivision",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.kelta.gateway.geo.model.GeoCity",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.kelta.gateway.geo.model.GeoLocation",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "io.kelta.runtime.event.PlatformEvent",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,

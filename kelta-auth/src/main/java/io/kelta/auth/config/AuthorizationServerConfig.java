@@ -82,7 +82,8 @@ public class AuthorizationServerConfig {
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(
             HttpSecurity http,
-            AuthDomainResolver authDomainResolver) throws Exception {
+            AuthDomainResolver authDomainResolver,
+            RegisteredClientRepository registeredClientRepository) throws Exception {
         // Configure OIDC on the configurer BEFORE capturing endpoint matchers,
         // so that OIDC discovery endpoints (/.well-known/openid-configuration)
         // are included in the security matcher for this chain.
@@ -90,6 +91,15 @@ public class AuthorizationServerConfig {
                 new OAuth2AuthorizationServerConfigurer();
         authorizationServerConfigurer
                 .oidc(Customizer.withDefaults())
+                // Spring AS has no built-in client-authentication path for public-client
+                // refresh_token requests (PublicClientAuthenticationConverter matches PKCE
+                // authorization_code only), so the SPA's silent refresh would 302 to the
+                // HTML login page. These custom converter/provider close that gap; the
+                // refresh token itself is the credential and is rotated on every use.
+                .clientAuthentication(clientAuth -> clientAuth
+                        .authenticationConverter(new PublicClientRefreshTokenAuthenticationConverter())
+                        .authenticationProvider(new PublicClientRefreshTokenAuthenticationProvider(
+                                registeredClientRepository)))
                 .authorizationEndpoint(endpoint -> endpoint
                         .consentPage("/oauth2/consent")
                         .authenticationProviders(configureRedirectUriValidator(authDomainResolver)));

@@ -366,14 +366,23 @@ export function AuthProvider({
 
     refreshTimerRef.current = setTimeout(async () => {
       refreshTimerRef.current = null
+      let refreshed: StoredTokens | null = null
       try {
-        const refreshed = await refreshAccessToken()
-        if (refreshed) {
-          // Schedule the next refresh after this one succeeds
-          scheduleTokenRefresh()
-        }
+        refreshed = await refreshAccessToken()
       } catch (err) {
         console.warn('[Auth] Proactive token refresh failed:', err)
+      }
+      if (refreshed) {
+        // Schedule the next refresh after this one succeeds
+        scheduleTokenRefresh()
+      } else if (getStoredTokens()?.refreshToken) {
+        // Transient failure (network blip, cooldown) but the refresh token is
+        // still there — retry after the cooldown instead of abandoning the
+        // session to die at token expiry.
+        refreshTimerRef.current = setTimeout(() => {
+          refreshTimerRef.current = null
+          scheduleTokenRefresh()
+        }, REFRESH_FAILURE_COOLDOWN_MS)
       }
     }, delay)
   }, [refreshAccessToken])
@@ -814,6 +823,29 @@ export function AuthProvider({
       }
     }
   }, [isAuthenticated, scheduleTokenRefresh])
+
+  /**
+   * Browsers throttle or suspend timers in background tabs and across machine
+   * sleep, so the proactive timer can fire long after the token expired. When
+   * the tab becomes visible again, refresh immediately if we're inside the
+   * expiry window and re-arm the timer.
+   */
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      const tokens = getStoredTokens()
+      if (tokens?.refreshToken && isTokenExpired(tokens.expiresAt)) {
+        refreshAccessToken()
+          .then((refreshed) => {
+            if (refreshed) scheduleTokenRefresh()
+          })
+          .catch((err) => console.warn('[Auth] Refresh on tab wake failed:', err))
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [isAuthenticated, refreshAccessToken, scheduleTokenRefresh])
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo<AuthContextValue>(

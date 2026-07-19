@@ -28,6 +28,13 @@ io.kelta.auth/
 3. `KeltaUserDetailsService` loads user from worker via `WorkerClient`
 4. `KeltaTokenCustomizer` adds custom claims (tenantId, profileId, groups)
 5. Token issued and returned to client
+6. Silent refresh: the SPA (`kelta-platform`, public client, PKCE) refreshes with
+   `grant_type=refresh_token` + `client_id` only. Spring AS has no built-in
+   client-auth path for that request, so
+   `PublicClientRefreshTokenAuthenticationConverter`/`-Provider` (in `config/`)
+   authenticate it as method NONE; the refresh token is the credential and is
+   rotated on every use (`reuseRefreshTokens(false)`). Confidential clients that
+   omit their secret are rejected, never silently authenticated.
 
 ### Identity Brokering (SSO)
 - `DynamicClientRegistrationRepository` — loads OIDC provider configs from worker at runtime

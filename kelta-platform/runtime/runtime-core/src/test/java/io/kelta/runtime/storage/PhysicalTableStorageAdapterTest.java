@@ -310,6 +310,44 @@ class PhysicalTableStorageAdapterTest {
     }
     
     @Nested
+    @DisplayName("Default Ordering Tests")
+    class DefaultOrderingTests {
+
+        @Test
+        @DisplayName("Unsorted queries fall back to deterministic creation order")
+        void unsortedQueriesUseCreationOrder() {
+            adapter.initializeCollection(testCollection);
+
+            // Insert out of creation-time order: ids chosen so neither insert order
+            // nor id order matches created_at order.
+            Instant base = Instant.parse("2026-01-01T00:00:00Z");
+            insertAt("z-third", "Third", base.plusSeconds(30));
+            insertAt("a-first", "First", base.plusSeconds(10));
+            insertAt("m-second", "Second", base.plusSeconds(20));
+
+            QueryRequest request = new QueryRequest(
+                new Pagination(1, 10), List.of(), List.of(), List.of());
+            QueryResult result = adapter.query(testCollection, request);
+
+            List<String> names = result.data().stream()
+                .map(r -> (String) r.get("name"))
+                .toList();
+            assertEquals(List.of("First", "Second", "Third"), names);
+        }
+
+        private void insertAt(String id, String name, Instant createdAt) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", id);
+            data.put("name", name);
+            data.put("price", 1.0);
+            data.put("sku", "SKU-" + id);
+            data.put("createdAt", createdAt);
+            data.put("updatedAt", createdAt);
+            adapter.create(testCollection, data);
+        }
+    }
+
+    @Nested
     @DisplayName("Query Tests")
     class QueryTests {
         

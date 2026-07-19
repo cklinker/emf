@@ -322,10 +322,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             sql.append(buildWhereClause(allFilters, definition, params));
         }
 
-        // Build ORDER BY clause
+        // Build ORDER BY clause. Unsorted queries get a deterministic creation-order
+        // fallback: without it Postgres returns rows in arbitrary heap order, which
+        // (a) makes LIMIT/OFFSET pagination skip or duplicate rows across pages and
+        // (b) leaks nondeterministic ordering into JSON:API include resolution
+        // (e.g. ?include=fields powering field lists in the layout editor).
         if (request.hasSorting()) {
             sql.append(" ORDER BY ");
             sql.append(buildOrderByClause(request.sorting(), definition));
+        } else {
+            sql.append(" ORDER BY created_at, id");
         }
 
         // Build LIMIT and OFFSET for pagination

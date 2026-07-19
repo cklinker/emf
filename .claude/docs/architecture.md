@@ -48,6 +48,7 @@ Order values below are the live `getOrder()` returns from source (lower runs fir
 
 | Order | Filter | Purpose |
 |-------|--------|---------|
+| -400 | IdentityHeaderStripFilter | Strip client-forged internal headers (`X-User-*`, `X-Forwarded-*`, `X-Geo-*`) |
 | -310 | CustomDomainFilter | Map custom domain → tenant |
 | -300 | TenantSlugExtractionFilter | Extract tenant slug from URL |
 | -200 | TenantResolutionFilter | Resolve slug → tenant ID |
@@ -55,6 +56,7 @@ Order values below are the live `getOrder()` returns from source (lower runs fir
 | -100 | JwtAuthenticationFilter | Validate JWT |
 | -99 | PatAuthenticationFilter | Validate PAT (`klt_`) as JWT alternative |
 | -50 | RateLimitFilter / UserIdentityResolutionFilter | Per-tenant rate limit; user identity |
+| -45 | GeoEnrichmentFilter | GeoLite2 lookup of the client IP → `gateway.geo` attr, trusted `X-Geo-*` headers, `GatewayPrincipal.geoCountry` |
 | -40 | TenantIpAllowlistFilter | Per-tenant IP allowlist on `/api/**` (fail-open; `MANAGE_TENANTS` bypass) |
 | 0 | RouteAuthorizationFilter | Cerbos object-level permission check (DynamicRouteLocator then forwards to worker) |
 | 50 | HeaderTransformationFilter | Inject `X-Tenant-*` headers for worker |
@@ -65,6 +67,28 @@ Cross-cutting (off main path): `ObservabilityContextFilter (-90)`, `HttpBodyCapt
 (-80)`, `SystemCollectionResponseCacheFilter (-10)`, `RequestLoggingFilter (MAX)`. `?include=`
 resolution is done by `IncludeResolver` (`jsonapi` package), not a numbered filter; read-side
 FLS is enforced in the worker (`CerbosFieldSecurityAdvice`), not the gateway.
+
+### IP geolocation (GeoLite2) data flow
+
+The gateway owns a per-pod GeoLite2-City `.mmdb` (`io.kelta.gateway.geo` package).
+`GeoIpDatabaseManager` downloads it from MaxMind on a `@Scheduled` interval (needs the
+`MAXMIND_LICENSE_KEY` secret; sha256-verified, atomically hot-swapped; per-pod local file —
+deliberately **no NATS**, this is infrastructure, not tenant config). `GeoEnrichmentFilter`
+(order -45) resolves the client IP via the shared `ClientIpResolver` (leftmost XFF hop under
+the existing `trust-forwarded-for` knob), skips private/CGNAT/ULA addresses, and on a hit:
+
+- sets the `gateway.geo` exchange attribute (`GeoResult`),
+- stamps trusted headers `X-Geo-Country` (ISO-3166 alpha-2), `X-Geo-Region`, `X-Geo-City`
+  (region/city are percent-encoded UTF-8), `X-Geo-Lat`, `X-Geo-Lon`, `X-Geo-Accuracy-Km`,
+- copies the country onto `GatewayPrincipal.geoCountry` for Cerbos.
+
+Trust boundary: `IdentityHeaderStripFilter` (-400) strips all client-supplied `X-Geo-*`, so
+downstream values are gateway-attested. **Fail-open** end-to-end: no database / private IP /
+lookup miss → headers absent, request proceeds, worker stores nulls, and Cerbos policies see
+an empty `geoCountry` — geo-aware policy rules must handle the empty value. Worker-side,
+`io.kelta.runtime.context.GeoHeaders.parse(request)` is the one parser (defensive; a bad
+header never fails a request); `LoginTrackingFilter` persists the stamp into
+`login_history.geo_*` columns.
 
 Key files: `kelta-gateway/src/main/java/io/kelta/gateway/{filter,auth,authz,ratelimit}/`
 

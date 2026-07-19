@@ -88,6 +88,19 @@ kelta:
       # but client-spoofable). Set false to match only the socket source address.
       trust-forwarded-for: ${IP_ALLOWLIST_TRUST_XFF:true}
 
+    # IP geolocation enrichment (GeoLite2-City, self-hosted MMDB).
+    # The gateway downloads and hot-swaps the database itself (per-pod copy).
+    # Fail-open: with no database loaded, requests proceed without X-Geo-* headers.
+    geo:
+      enabled: ${GEO_ENABLED:true}
+      db-path: ${GEO_DB_PATH:/data/geoip/GeoLite2-City.mmdb}
+      # Free MaxMind account required — key is a secret; it is never logged.
+      license-key: ${MAXMIND_LICENSE_KEY:}
+      download-url: https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&suffix=tar.gz
+      refresh-ms: ${GEO_REFRESH_MS:86400000}        # re-check daily
+      stale-after-days: ${GEO_STALE_AFTER_DAYS:7}   # re-download when older than this
+      download-timeout-ms: ${GEO_DOWNLOAD_TIMEOUT_MS:120000}
+
     # Cerbos authorization engine
     cerbos:
       host: ${CERBOS_HOST:cerbos.emf.svc.cluster.local}

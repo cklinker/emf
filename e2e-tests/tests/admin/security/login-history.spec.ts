@@ -22,6 +22,28 @@ test.describe("Login History", () => {
     expect(found).toBe(true);
   });
 
+  test("shows Location column with value or em-dash", async ({ page }) => {
+    const table = page.locator("table");
+    const hasTable = await table.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (!hasTable) {
+      // No login rows seeded — page must still render
+      await expect(
+        page.getByRole("heading", { name: /login history/i }),
+      ).toBeVisible();
+      return;
+    }
+
+    await expect(
+      page.getByRole("columnheader", { name: /location/i }),
+    ).toBeVisible();
+
+    // Every row renders a location cell: either "City, Region CC" or the em-dash
+    // empty state (local/seeded logins come from private IPs → no geo).
+    const firstLocation = page.getByTestId("login-history-location").first();
+    await expect(firstLocation).toBeVisible();
+    await expect(firstLocation).toHaveText(/^—$|^[A-Z]{2}$|.+ [A-Z]{2}$/);
+  });
+
   test("displays pagination controls when data exists", async ({ page }) => {
     // Pagination controls may not exist if there is little data — handle both cases
     const pagination = page

@@ -92,7 +92,8 @@ WORKDIR /app
 
 RUN groupadd -r kelta && useradd -r -g kelta kelta && \
     apt-get update && apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /data/geoip && chown kelta:kelta /data/geoip
 
 COPY --from=builder /build/target/kelta-gateway .
 

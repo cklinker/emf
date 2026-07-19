@@ -447,6 +447,15 @@ for removal ("inline the current value"). Findings:
   an empty bean, so consumers (e.g. NATS_TRIGGERED post-visit flows) get no data. `EventPayloadReflectConfigTest`
   now fails CI if any `io.kelta.runtime.event.*Payload` is unregistered. **Rule: a new event payload
   gets a reflect-config entry in BOTH `kelta-worker` and `kelta-gateway` in the same PR.**
+- **GeoLite2 lookup models are native-reflective — same rule class as the bootstrap DTOs.** The
+  `com.maxmind.db` Reader instantiates `io.kelta.gateway.geo.model.*` (`GeoCityData`, `GeoCountry`,
+  `GeoSubdivision`, `GeoCity`, `GeoLocation`) via the `@MaxMindDbConstructor` annotation reflectively;
+  all five have `reflect-config.json` entries. Adding a field/class to the geo lookup model without a
+  reflect entry works on the JVM and every CI test but breaks lookups on the deployed native gateway
+  only. Also geo-specific: the MaxMind license key rides the download URL query string —
+  `GeoIpDatabaseManager.redact(...)` must wrap ANY log/exception message that could contain the URL
+  (tested by `GeoIpDatabaseManagerTest.redactsLicenseKey`); never log the raw URL or
+  `HttpRequest`/exception toString without it.
 - **Script-engine JS builtins can require host reflection on the native worker.** Found 2026-07-12:
   any flow `INVOKE_SCRIPT` whose script called `new Date()` died on the native image with
   `MissingReflectionRegistrationError: java.util.Locale.getDefault(Locale$Category)` — GraalJS

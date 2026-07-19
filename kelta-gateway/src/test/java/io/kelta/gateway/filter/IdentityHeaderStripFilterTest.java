@@ -152,4 +152,30 @@ class IdentityHeaderStripFilterTest {
     void shouldRunBeforeCustomDomainFilter() {
         assertThat(filter.getOrder()).isLessThan(-310);
     }
+
+    @Test
+    @DisplayName("Should strip client-spoofed geo headers")
+    void shouldStripSpoofedGeoHeaders() {
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/users")
+                .header("X-Geo-Country", "US")
+                .header("X-Geo-City", "Forgedville")
+                .header("X-Geo-Lat", "1.0")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
+        when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
+            capturedExchange[0] = invocation.getArgument(0);
+            return Mono.empty();
+        });
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst("X-Geo-Country")).isNull();
+        assertThat(headers.getFirst("X-Geo-City")).isNull();
+        assertThat(headers.getFirst("X-Geo-Lat")).isNull();
+    }
 }

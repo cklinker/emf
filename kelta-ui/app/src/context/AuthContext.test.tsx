@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from './AuthContext'
 import { clearBootstrapCache } from '../utils/bootstrapCache'
@@ -572,6 +572,92 @@ describe('AuthContext', () => {
       // Stored PROVIDER_ID is the internal provider so refresh and callback
       // always target kelta-auth, never the external IdP.
       expect(mockSessionStorage['kelta_auth_provider_id']).toBe('internal-1')
+    })
+  })
+
+  describe('Proactive Refresh (Requirement 2.4)', () => {
+    const tokenEndpointCalls = () =>
+      (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+        ([input]) => String(input) === mockDiscoveryDoc.token_endpoint
+      ).length
+
+    function storeValidTokens(expiresInMs: number) {
+      const payload = {
+        sub: 'user-123',
+        email: 'test@example.com',
+        exp: Math.floor((Date.now() + expiresInMs) / 1000),
+      }
+      const mockToken = createMockJwt(payload)
+      mockSessionStorage['kelta_auth_tokens'] = JSON.stringify({
+        accessToken: mockToken,
+        idToken: mockToken,
+        refreshToken: 'stored-refresh-token',
+        expiresAt: Date.now() + expiresInMs,
+      })
+    }
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('retries after a failed proactive refresh instead of abandoning the session', async () => {
+      vi.useFakeTimers()
+      storeValidTokens(5 * 60 * 1000) // expires in 5 minutes
+
+      // Token endpoint fails with a network error (transient)
+      const baseFetch = createMockFetch()
+      global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === mockDiscoveryDoc.token_endpoint) {
+          throw new Error('network down')
+        }
+        return baseFetch(input, init)
+      }) as typeof fetch
+
+      renderWithAuth()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated')
+
+      // Advance past the refresh point (expiry - 60s): first attempt fails
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4 * 60 * 1000 + 1000)
+      })
+      expect(tokenEndpointCalls()).toBe(1)
+
+      // A retry is scheduled after the failure cooldown
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31 * 1000)
+      })
+      expect(tokenEndpointCalls()).toBe(2)
+
+      // Transient failure must not discard the refresh token
+      const stored = JSON.parse(mockSessionStorage['kelta_auth_tokens'])
+      expect(stored.refreshToken).toBe('stored-refresh-token')
+    })
+
+    it('refreshes immediately when the tab wakes inside the expiry window', async () => {
+      vi.useFakeTimers()
+      storeValidTokens(5 * 60 * 1000)
+
+      renderWithAuth()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated')
+      expect(tokenEndpointCalls()).toBe(0)
+
+      // Simulate a long sleep: wall clock jumps past expiry without timers firing
+      vi.setSystemTime(Date.now() + 60 * 60 * 1000)
+
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+        await vi.advanceTimersByTimeAsync(0)
+      })
+
+      expect(tokenEndpointCalls()).toBe(1)
+      const stored = JSON.parse(mockSessionStorage['kelta_auth_tokens'])
+      expect(stored.accessToken).toBe('new-access-token')
     })
   })
 

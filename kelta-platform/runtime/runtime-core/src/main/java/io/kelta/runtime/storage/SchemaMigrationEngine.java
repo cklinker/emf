@@ -289,12 +289,7 @@ public class SchemaMigrationEngine {
         // NATS event redelivery and multi-pod refresh races are harmless.
         if (newDefinition.captureGeo() && !oldDefinition.captureGeo()
                 && !newDefinition.systemCollection()) {
-            String geoSql = "ALTER TABLE " + qualifiedName
-                    + " ADD COLUMN IF NOT EXISTS created_geo JSONB,"
-                    + " ADD COLUMN IF NOT EXISTS updated_geo JSONB";
-            jdbcTemplate.execute(geoSql);
-            recordMigration(newDefinition.name(), MigrationType.ADD_COLUMN, geoSql);
-            log.info("Ensured geo system columns on '{}' (captureGeo enabled)", qualifiedName);
+            ensureGeoColumns(newDefinition.name(), qualifiedName);
         }
 
         // Detect unique-flag toggles. These need a live constraint-catalog lookup
@@ -315,6 +310,21 @@ public class SchemaMigrationEngine {
 
         log.info("Schema migration completed for collection '{}': {} changes applied",
             newDefinition.name(), migrations.size() + uniqueToggles);
+    }
+
+    /**
+     * Ensures the {@code created_geo}/{@code updated_geo} JSONB system columns exist on a
+     * captureGeo collection's table. Postgres-only DDL (JSONB) — deliberately NOT part of
+     * the base CREATE TABLE so H2-backed unit suites and non-geo tables never see the type.
+     * Idempotent under event redelivery and multi-pod races.
+     */
+    public void ensureGeoColumns(String collectionName, String qualifiedTableName) {
+        String geoSql = "ALTER TABLE " + qualifiedTableName
+                + " ADD COLUMN IF NOT EXISTS created_geo JSONB,"
+                + " ADD COLUMN IF NOT EXISTS updated_geo JSONB";
+        jdbcTemplate.execute(geoSql);
+        recordMigration(collectionName, MigrationType.ADD_COLUMN, geoSql);
+        log.info("Ensured geo system columns on '{}' (captureGeo enabled)", qualifiedTableName);
     }
 
     /**

@@ -143,9 +143,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         sql.append("updated_by VARCHAR(36), ");
         sql.append("created_at TIMESTAMP NOT NULL, ");
         sql.append("updated_at TIMESTAMP NOT NULL, ");
-        sql.append("record_type_id VARCHAR(36), ");
-        sql.append("created_geo JSONB, ");
-        sql.append("updated_geo JSONB");
+        sql.append("record_type_id VARCHAR(36)");
 
         List<String> postCreateStatements = new ArrayList<>();
 
@@ -280,6 +278,12 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             // hadn't yet registered the collection and falls into the initialize
             // path instead of the migrate path.
             migrationEngine.reconcileSchema(definition, tableRef);
+
+            // Collections born with captureGeo on (imports, promotions) get their geo
+            // system columns here; the flag-flip path lives in migrateSchema.
+            if (definition.captureGeo() && !definition.systemCollection()) {
+                migrationEngine.ensureGeoColumns(definition.name(), qualifiedName);
+            }
 
             for (String stmt : postCreateStatements) {
                 jdbcTemplate.execute(stmt);

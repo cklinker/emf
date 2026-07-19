@@ -50,7 +50,8 @@ public class RecordVersionHook implements BeforeSaveHook {
     private static final Set<String> EXCLUDED_FIELDS = Set.of(
             "id", "recordTypeId", "record_type_id",
             "createdAt", "created_at", "createdBy", "created_by",
-            "updatedAt", "updated_at", "updatedBy", "updated_by");
+            "updatedAt", "updated_at", "updatedBy", "updated_by",
+            "createdGeo", "created_geo", "updatedGeo", "updated_geo");
 
     private final RecordVersionRepository versionRepository;
     private final CollectionRegistry collectionRegistry;

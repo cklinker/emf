@@ -33,6 +33,8 @@ export interface CollectionFormData {
   active: boolean
   /** Whether every record change is captured as a record_version snapshot */
   trackHistory: boolean
+  /** Whether HTTP record writes stamp the request-origin geolocation */
+  captureGeo: boolean
   /** ID of the field used as display field in lookup dropdowns */
   displayFieldId?: string
 }
@@ -56,6 +58,7 @@ export interface Collection {
   description?: string
   active: boolean
   trackHistory?: boolean
+  captureGeo?: boolean
   displayFieldId?: string
   currentVersion: number
   createdAt: string
@@ -103,6 +106,7 @@ export const collectionFormSchema = z.object({
   description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
   active: z.boolean(),
   trackHistory: z.boolean(),
+  captureGeo: z.boolean(),
   displayFieldId: z.string().optional().or(z.literal('')),
 })
 
@@ -147,6 +151,7 @@ export function CollectionForm({
       description: collection?.description ?? '',
       active: collection?.active ?? true,
       trackHistory: collection?.trackHistory ?? false,
+      captureGeo: collection?.captureGeo ?? false,
       displayFieldId: collection?.displayFieldId ?? '',
     },
     mode: 'onBlur',
@@ -161,6 +166,7 @@ export function CollectionForm({
         description: collection.description ?? '',
         active: collection.active,
         trackHistory: collection.trackHistory ?? false,
+        captureGeo: collection.captureGeo ?? false,
         displayFieldId: collection.displayFieldId ?? '',
       })
     }
@@ -175,6 +181,7 @@ export function CollectionForm({
         description: data.description || undefined,
         active: data.active,
         trackHistory: data.trackHistory,
+        captureGeo: data.captureGeo,
         displayFieldId: data.displayFieldId || undefined,
       }
       await onSubmit(formData)
@@ -436,6 +443,34 @@ export function CollectionForm({
           data-testid="track-history-hint"
         >
           {t('collectionForm.trackHistoryHint')}
+        </span>
+      </div>
+
+      {/* Capture Geo Field */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <input
+            id="collection-capture-geo"
+            type="checkbox"
+            className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isSubmitting}
+            aria-describedby="capture-geo-hint"
+            data-testid="collection-capture-geo-checkbox"
+            {...register('captureGeo')}
+          />
+          <label
+            htmlFor="collection-capture-geo"
+            className="text-base text-foreground cursor-pointer"
+          >
+            {t('collectionForm.captureGeo')}
+          </label>
+        </div>
+        <span
+          id="capture-geo-hint"
+          className="text-xs text-muted-foreground mt-1"
+          data-testid="capture-geo-hint"
+        >
+          {t('collectionForm.captureGeoHint')}
         </span>
       </div>
 

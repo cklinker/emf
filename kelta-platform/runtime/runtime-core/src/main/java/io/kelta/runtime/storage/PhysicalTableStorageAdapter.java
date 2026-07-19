@@ -72,7 +72,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     /** Column names handled as system fields in create/update — skipped in the user-defined field loop. */
     private static final Set<String> SYSTEM_COLUMNS = Set.of(
         "id", "created_at", "updated_at", "created_by", "updated_by", "tenant_id",
-        "record_type_id"
+        "record_type_id", "created_geo", "updated_geo"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -143,7 +143,9 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         sql.append("updated_by VARCHAR(36), ");
         sql.append("created_at TIMESTAMP NOT NULL, ");
         sql.append("updated_at TIMESTAMP NOT NULL, ");
-        sql.append("record_type_id VARCHAR(36)");
+        sql.append("record_type_id VARCHAR(36), ");
+        sql.append("created_geo JSONB, ");
+        sql.append("updated_geo JSONB");
 
         List<String> postCreateStatements = new ArrayList<>();
 
@@ -495,6 +497,19 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         columns.add("updated_by");
         placeholders.add("?");
         values.add(data.get("updatedBy"));
+        // Request-origin geo stamps (captureGeo collections only — the router puts
+        // these keys in the map; absent keys leave the columns out of the INSERT
+        // entirely, which also keeps Flyway-managed system tables untouched).
+        if (data.containsKey("createdGeo")) {
+            columns.add("created_geo");
+            placeholders.add("?::jsonb");
+            values.add(convertValueForStorage(data.get("createdGeo"), FieldType.JSON));
+        }
+        if (data.containsKey("updatedGeo")) {
+            columns.add("updated_geo");
+            placeholders.add("?::jsonb");
+            values.add(convertValueForStorage(data.get("updatedGeo"), FieldType.JSON));
+        }
         columns.add("created_at");
         placeholders.add("?");
         values.add(convertValueForStorage(data.get("createdAt"), FieldType.DATETIME));
@@ -573,7 +588,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
     private static final Set<String> PAYLOAD_SYSTEM_KEYS = Set.of(
         "id", "createdAt", "updatedAt", "createdBy", "updatedBy",
-        "tenantId", "recordTypeId"
+        "tenantId", "recordTypeId", "createdGeo", "updatedGeo"
     );
 
     private void warnOnUnknownPayloadKeys(CollectionDefinition definition, Map<String, Object> data) {
@@ -624,6 +639,12 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         if (data.containsKey("updatedBy")) {
             setClauses.add("updated_by = ?");
             values.add(data.get("updatedBy"));
+        }
+
+        // Request-origin geo stamp (captureGeo collections only)
+        if (data.containsKey("updatedGeo")) {
+            setClauses.add("updated_geo = ?::jsonb");
+            values.add(convertValueForStorage(data.get("updatedGeo"), FieldType.JSON));
         }
 
         // Update record type ID
@@ -1032,6 +1053,12 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         selectFields.add("updated_at");
         selectFields.add("created_by");
         selectFields.add("updated_by");
+        // Geo columns exist only on captureGeo collections (base DDL for new tables,
+        // lazy ALTER for existing ones) — selecting them elsewhere would 42703.
+        if (definition.captureGeo()) {
+            selectFields.add("created_geo");
+            selectFields.add("updated_geo");
+        }
 
         for (String field : fields) {
             String columnName = resolveColumnName(definition, field);
@@ -1374,6 +1401,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case "updatedAt" -> "updated_at";
             case "createdBy" -> "created_by";
             case "updatedBy" -> "updated_by";
+            case "createdGeo" -> "created_geo";
+            case "updatedGeo" -> "updated_geo";
             case "tenantId" -> "tenant_id";
             case "recordTypeId" -> "record_type_id";
             default -> {
@@ -1405,6 +1434,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         reverseMap.put("updated_at", "updatedAt");
         reverseMap.put("created_by", "createdBy");
         reverseMap.put("updated_by", "updatedBy");
+        reverseMap.put("created_geo", "createdGeo");
+        reverseMap.put("updated_geo", "updatedGeo");
         reverseMap.put("tenant_id", "tenantId");
         reverseMap.put("record_type_id", "recordTypeId");
 

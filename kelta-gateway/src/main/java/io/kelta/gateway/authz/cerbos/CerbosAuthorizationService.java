@@ -104,7 +104,7 @@ public class CerbosAuthorizationService {
             return Mono.just(false);
         }
 
-        String cacheKey = systemCacheKey(principal.getTenantId(), principal.getProfileId(), permissionName);
+        String cacheKey = systemCacheKey(principal, permissionName);
         Boolean cached = permissionCache.getIfPresent(cacheKey);
         if (cached != null) {
             cacheHits.increment();
@@ -162,7 +162,7 @@ public class CerbosAuthorizationService {
             return Mono.just(false);
         }
 
-        String cacheKey = objectCacheKey(principal.getTenantId(), principal.getProfileId(), collectionId, action);
+        String cacheKey = objectCacheKey(principal, collectionId, action);
         Boolean cached = permissionCache.getIfPresent(cacheKey);
         if (cached != null) {
             cacheHits.increment();
@@ -229,13 +229,21 @@ public class CerbosAuthorizationService {
 
     // ── Cache key builders ──────────────────────────────────────────────
 
-    private static String systemCacheKey(String tenantId, String profileId, String permission) {
-        return tenantId + ":" + profileId + ":system:" + permission;
+    // Keys carry the request-origin country because the Cerbos principal does: a decision
+    // cached for one origin must never answer for another once a policy references
+    // P.attr.geoCountry. Tenant prefix stays first so evictForTenant() keeps matching.
+    static String systemCacheKey(GatewayPrincipal principal, String permission) {
+        return principal.getTenantId() + ":" + principal.getProfileId() + ":system:" + permission
+                + ":geo:" + geoOrEmpty(principal);
     }
 
-    private static String objectCacheKey(String tenantId, String profileId,
-                                          String collectionId, String action) {
-        return tenantId + ":" + profileId + ":object:" + collectionId + ":" + action;
+    static String objectCacheKey(GatewayPrincipal principal, String collectionId, String action) {
+        return principal.getTenantId() + ":" + principal.getProfileId() + ":object:" + collectionId
+                + ":" + action + ":geo:" + geoOrEmpty(principal);
+    }
+
+    private static String geoOrEmpty(GatewayPrincipal principal) {
+        return principal.getGeoCountry() != null ? principal.getGeoCountry() : "";
     }
 
     // ── Circuit breaker helpers ──────────────────────────────────────────

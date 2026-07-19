@@ -72,7 +72,7 @@ public class CollectionLifecycleManager {
                    relationship_type, relationship_name, cascade_delete, field_order, column_name,
                    immutable, searchable, track_history
             FROM field WHERE collection_id = ? AND active = true
-            ORDER BY field_order
+            ORDER BY field_order, created_at, id
             """;
 
     private static final String SELECT_COLLECTION_NAME_BY_ID = """

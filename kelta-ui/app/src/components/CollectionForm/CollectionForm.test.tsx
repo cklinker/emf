@@ -272,6 +272,7 @@ describe('CollectionForm Component', () => {
           description: 'A description',
           active: true,
           trackHistory: false,
+          captureGeo: false,
         })
       })
     })
@@ -350,6 +351,7 @@ describe('CollectionForm Component', () => {
           description: 'A test collection for testing',
           active: true,
           trackHistory: false,
+          captureGeo: false,
         })
       })
     })

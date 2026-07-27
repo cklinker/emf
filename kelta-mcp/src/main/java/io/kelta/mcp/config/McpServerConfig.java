@@ -58,6 +58,74 @@ public class McpServerConfig {
     private static final String SERVER_NAME = "kelta-mcp";
     private static final String SERVER_VERSION = "1.0.0";
 
+    /**
+     * Sent once, in the {@code initialize} response, before any tool call —
+     * the one place a client (or a human reading the connection handshake)
+     * gets oriented instead of reconstructing the operating model tool-by-tool
+     * every session. Keep this in sync with the tool surface: update it in
+     * the same PR that adds/removes/renames a tool. See kelta-mcp/CLAUDE.md.
+     */
+    private static final String USER_INSTRUCTIONS = """
+            Kelta data-plane MCP server: CRUD records, run flows, approvals, and search \
+            over the current tenant's collections.
+
+            Discovery order: list_collections -> get_collection_schema (field names + \
+            types for one collection) -> query_collection / get_record.
+
+            Reading: query_collection lists/filters (ops: EQ NEQ GT GTE LT LTE CONTAINS \
+            STARTS ENDS ICONTAINS ISTARTS IENDS IEQ ISNULL; fields AND together, NO OR — \
+            run multiple queries and union client-side for OR/IN). get_record fetches one \
+            row by id. search is keyword full-text; semantic_search is vector/meaning-based. \
+            describe_api returns the full OpenAPI 3.0 spec for exact request/response shapes, \
+            but only covers plain collection CRUD — flows, approvals, and bulk are NOT in it; \
+            use the dedicated tools below for those.
+
+            Writing: create_record / update_record / delete_record / bulk_apply. Check each \
+            tool's annotations (readOnlyHint / destructiveHint / idempotentHint) before \
+            assuming a call is safe to retry — destructive writes are flagged so a caller \
+            can confirm before running them.
+
+            Automation: execute_flow starts a flow asynchronously (not idempotent — each \
+            call starts a new run); poll get_flow_run with the returned execution id for \
+            status. submit_for_approval / list_approvals drive approval-gated records.
+
+            Conventions: tool arguments are friendly camelCase; the tool boundary translates \
+            them into the platform's native JSON:API shape (kebab-case collection/attribute \
+            names on the wire) — pass names as given in list_collections / \
+            get_collection_schema, don't pre-convert casing yourself.""";
+
+    private static final String ADMIN_INSTRUCTIONS = """
+            Kelta control-plane MCP server: define collections, fields, layouts, flows, \
+            picklists, and validation rules for the current tenant.
+
+            Typical build order for a new object: create_collection (optionally with an \
+            inline initial field set) -> add_field (repeat per additional field) -> \
+            create_validation_rule / create_unique_constraint as needed -> for picklist \
+            fields, create_picklist + add_picklist_value first, then reference it from \
+            add_field via picklistSourceId -> create_layout / create_listview for the admin \
+            UI -> create_flow for automation. update_/delete_ counterparts exist for every \
+            create_ tool.
+
+            Field types: add_field's `type` argument accepts friendly aliases (text, number, \
+            picklist, reference, ...) that map onto the native uppercase FieldType enum — see \
+            that tool's own description for the full alias table. Every uppercase enum name is \
+            also accepted verbatim.
+
+            Validation rules: create_validation_rule's errorConditionFormula is an ERROR \
+            condition — the record is REJECTED when it evaluates TRUE (not a must-hold \
+            condition). Read the tool description before writing a formula; getting this \
+            backwards silently inverts the rule.
+
+            Shared read tools (also callable from /mcp/user): list_collections, \
+            get_collection_schema — use these to look up ids/names before a create_/update_ \
+            call rather than guessing.
+
+            Bringing in external data: import_api_spec + materialize_api_collection wire up \
+            an API-backed collection from an OpenAPI spec.
+
+            Every mutating tool declares destructiveHint / idempotentHint in its annotations \
+            — check them before retrying a failed call or assuming a create_ is safe to repeat.""";
+
     @Bean(name = "userTransportProvider")
     public HttpServletStatelessServerTransportProvider userTransportProvider() {
         return new HttpServletStatelessServerTransportProvider(
@@ -82,6 +150,7 @@ public class McpServerConfig {
             PatPropagatingToolDecorator patPropagator) {
         McpStatelessSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-user", SERVER_VERSION)
+                .instructions(USER_INSTRUCTIONS)
                 .capabilities(ServerCapabilities.builder()
                         .tools(true)
                         .resources(false, false)  // (subscribe, listChanged): both off in stateless
@@ -117,6 +186,7 @@ public class McpServerConfig {
             PatPropagatingToolDecorator patPropagator) {
         McpStatelessSyncServer server = McpServer.sync(transport)
                 .serverInfo(SERVER_NAME + "-admin", SERVER_VERSION)
+                .instructions(ADMIN_INSTRUCTIONS)
                 .capabilities(ServerCapabilities.builder().tools(true).build())
                 .build();
         server.addTool(wrap(pingTool("admin"), "admin", decorator, rateLimiter, patPropagator));

@@ -73,6 +73,14 @@ MCP content, and maps gateway 4xx/5xx via `McpErrorMapper`. Translate friendly c
 args → native JSON:API at this boundary (see `.claude/docs/conventions.md`). Full recipe:
 `.claude/docs/playbooks.md` → "Add an MCP tool".
 
+### Server instructions
+Each server's `.instructions(...)` call in `McpServerConfig` (`USER_INSTRUCTIONS` /
+`ADMIN_INSTRUCTIONS`) is sent once, in the `initialize` response, before any tool call —
+it's the front door that orients a client (discovery order, filter/formula gotchas, build
+order for admin) instead of making it reconstruct the operating model tool-by-tool every
+session. **Update it in the same PR** whenever a tool is added, removed, renamed, or its
+documented behavior changes in a way that affects the recommended usage order.
+
 ### No DB
 kelta-mcp is stateless. The runtime-core auto-configurations (`KeltaRuntimeAutoConfiguration`, `EncryptionAutoConfiguration`) are excluded in `McpApplication`. Component scan is restricted to `io.kelta.mcp` so we only depend on runtime-core for type definitions (CollectionDefinition, FieldDefinition, FieldType).
 

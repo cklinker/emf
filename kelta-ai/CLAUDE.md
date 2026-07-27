@@ -42,8 +42,10 @@ public SseEmitter chatStream(@RequestHeader("X-Tenant-ID") String tenantId, ...)
 ### Anthropic API Integration
 - `AnthropicService` wraps the `anthropic-java` SDK
 - Model configurable via `AiConfigProperties` — see `kelta-platform/pom.xml` for the current default model ID
-- Rate limit errors (429) retried with exponential backoff
 - Context built via `SystemPromptService` using schema from `WorkerApiClient`
+
+### Conversation-length guard
+`ChatService.buildMessageHistory` resends a conversation's *entire* message history every turn — unbounded, since a thread can be resumed indefinitely. Before that (and before the schema-fetching `SystemPromptService.buildSystemPrompt` call), both `chat()` and `chatStream()` check `isConversationTooLarge` — the most recent assistant message's recorded `tokensInput` against `MAX_CONVERSATION_INPUT_TOKENS` (160k; claude-sonnet-5's 200k window minus the reserved max-tokens budget, with margin). If tripped, one extra non-streaming call asks Claude for a structured handoff summary, which is returned/streamed to the user with a message to start a new conversation — no schema change, no automatic compaction of the thread itself. See `docs/superpowers/specs/2026-07-27-ai-chat-length-guard-design.md`.
 
 ### Config Properties
 ```java
@@ -56,8 +58,8 @@ public record AiConfigProperties(
 ```
 
 ### Error Handling
-- Anthropic 429 → exponential backoff retry
-- Map SDK errors to HTTP status codes
+- No retry/backoff around Anthropic calls — a 429/5xx/context-length error surfaces to the caller on that turn
+- `ChatService.chat()` and `chatStream()` both catch any exception from the tool loop and return/emit a clean `{"code": "AI_PROVIDER_ERROR", "message": ...}` shape instead of letting it propagate as a raw 500 — `chatStream()` as an `error` SSE event, `chat()` as an `error` key in the response map
 - No custom exception classes — uses standard Spring exceptions
 
 ## When Adding a New Endpoint

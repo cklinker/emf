@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Orchestrates the AI chat flow: builds context, drives Anthropic's multi-turn
@@ -35,6 +36,29 @@ public class ChatService {
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     private static final int MAX_TOOL_ITERATIONS = 8;
     private static final long TOKEN_BUDGET = 100_000L;
+
+    /**
+     * Guard against unbounded conversation-history growth (see
+     * docs/superpowers/specs/2026-07-27-ai-chat-length-guard-design.md).
+     * claude-sonnet-5's context window is 200k tokens and Anthropic reserves
+     * the full requested max-tokens budget (32,768 default) against it on
+     * every call, so the real ceiling is ~167k input tokens. This threshold
+     * leaves enough margin to trip before that wall without firing while
+     * there's still real room left.
+     */
+    private static final int MAX_CONVERSATION_INPUT_TOKENS = 160_000;
+
+    private static final String LENGTH_GUARD_SUMMARY_PROMPT = """
+            Summarize this conversation for someone continuing it in a new session. Cover, briefly:
+            (1) what collections/fields/objects were discussed, created, or proposed,
+            (2) decisions made and why,
+            (3) any stated preferences or constraints ("don't do X", "always Y"),
+            (4) open questions or unfinished next steps.
+            Be concise — this is a handoff note, not a transcript.""";
+
+    private static final String LENGTH_GUARD_REDIRECT =
+            "This conversation has gotten long enough that I can't reliably keep working in it. "
+            + "Start a new conversation and paste the summary above if you'd like me to pick up where we left off.";
 
     private final AnthropicService anthropicService;
     private final SystemPromptService systemPromptService;
@@ -68,15 +92,30 @@ public class ChatService {
         Conversation conversation = getOrCreateConversation(tenantId, userId, conversationId, userMessage);
         messageRepository.save(ChatMessage.user(tenantId, conversation.id(), userMessage));
 
-        String systemPrompt = systemPromptService.buildSystemPrompt(tenantId, contextType, contextId);
         List<MessageParam> conversationParams = new ArrayList<>(buildMessageHistory(conversation.id(), tenantId));
 
+        if (isConversationTooLarge(conversation.id(), tenantId)) {
+            LengthGuardReply guard = buildLengthGuardReply(tenantId, conversationParams);
+            return persistLengthGuardReply(tenantId, conversation, guard);
+        }
+
+        String systemPrompt = systemPromptService.buildSystemPrompt(tenantId, contextType, contextId);
         List<AiProposal> proposals = new ArrayList<>();
         int[] tokenCounts = {0, 0};
         StringBuilder lastText = new StringBuilder();
 
-        runSyncToolLoop(tenantId, userId, conversation, systemPrompt, conversationParams,
-                proposals, tokenCounts, lastText);
+        try {
+            runSyncToolLoop(tenantId, userId, conversation, systemPrompt, conversationParams,
+                    proposals, tokenCounts, lastText);
+        } catch (Exception e) {
+            log.error("Error in chat: {}", e.getMessage(), e);
+            Map<String, Object> errorResult = new LinkedHashMap<>();
+            errorResult.put("conversationId", conversation.id().toString());
+            errorResult.put("error", Map.of(
+                    "code", "AI_PROVIDER_ERROR",
+                    "message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            return errorResult;
+        }
 
         conversationRepository.updateTimestamp(conversation.id(), tenantId);
 
@@ -95,9 +134,15 @@ public class ChatService {
             Conversation conversation = getOrCreateConversation(tenantId, userId, conversationId, userMessage);
             messageRepository.save(ChatMessage.user(tenantId, conversation.id(), userMessage));
 
-            String systemPrompt = systemPromptService.buildSystemPrompt(tenantId, contextType, contextId);
             List<MessageParam> conversationParams = new ArrayList<>(buildMessageHistory(conversation.id(), tenantId));
 
+            if (isConversationTooLarge(conversation.id(), tenantId)) {
+                LengthGuardReply guard = buildLengthGuardReply(tenantId, conversationParams);
+                streamLengthGuardReply(tenantId, conversation, guard, emitter);
+                return;
+            }
+
+            String systemPrompt = systemPromptService.buildSystemPrompt(tenantId, contextType, contextId);
             List<AiProposal> proposals = new ArrayList<>();
             int[] tokenCounts = {0, 0};
 
@@ -128,6 +173,90 @@ public class ChatService {
             }
             emitter.complete();
         }
+    }
+
+    // =========================================================================
+    // Conversation-length guard
+    // =========================================================================
+
+    private record LengthGuardReply(String text, int tokensInput, int tokensOutput) {}
+
+    private boolean isConversationTooLarge(UUID conversationId, String tenantId) {
+        return messageRepository.findMostRecentAssistantTokensInput(conversationId, tenantId)
+                > MAX_CONVERSATION_INPUT_TOKENS;
+    }
+
+    /**
+     * One extra non-streaming call asking Claude to summarize the
+     * conversation so far into a handoff note, so the user has something to
+     * carry into a fresh conversation. If the call itself fails, falls back
+     * to the plain redirect with no summary and no recorded token usage —
+     * the guard's job (never let the turn hard-fail) holds either way.
+     */
+    private LengthGuardReply buildLengthGuardReply(String tenantId, List<MessageParam> conversationParams) {
+        try {
+            MessageCreateParams params = anthropicService
+                    .buildRequest(tenantId, LENGTH_GUARD_SUMMARY_PROMPT, conversationParams).build();
+            Message response = anthropicService.sendMessage(params);
+
+            String summary = response.content().stream()
+                    .flatMap(block -> block.text().stream())
+                    .map(TextBlock::text)
+                    .collect(Collectors.joining("\n"));
+
+            String text = (summary.isBlank() ? "" : summary + "\n\n---\n") + LENGTH_GUARD_REDIRECT;
+            return new LengthGuardReply(text,
+                    (int) response.usage().inputTokens(), (int) response.usage().outputTokens());
+        } catch (Exception e) {
+            log.warn("Length-guard summarization failed, falling back to plain redirect: {}", e.getMessage());
+            return new LengthGuardReply(LENGTH_GUARD_REDIRECT, 0, 0);
+        }
+    }
+
+    private Map<String, Object> persistLengthGuardReply(String tenantId, Conversation conversation,
+                                                          LengthGuardReply guard) {
+        messageRepository.save(ChatMessage.assistant(
+                tenantId, conversation.id(), List.of(textBlock(guard.text())),
+                guard.tokensInput(), guard.tokensOutput()));
+        if (guard.tokensInput() > 0 || guard.tokensOutput() > 0) {
+            tokenTrackingService.recordUsage(tenantId, guard.tokensInput(), guard.tokensOutput());
+        }
+        conversationRepository.updateTimestamp(conversation.id(), tenantId);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("conversationId", conversation.id().toString());
+        result.put("content", guard.text());
+        result.put("proposals", List.of());
+        result.put("tokensUsed", Map.of("input", guard.tokensInput(), "output", guard.tokensOutput()));
+        result.put("conversationTooLarge", true);
+        return result;
+    }
+
+    private void streamLengthGuardReply(String tenantId, Conversation conversation, LengthGuardReply guard,
+                                         SseEmitter emitter) throws IOException {
+        messageRepository.save(ChatMessage.assistant(
+                tenantId, conversation.id(), List.of(textBlock(guard.text())),
+                guard.tokensInput(), guard.tokensOutput()));
+        if (guard.tokensInput() > 0 || guard.tokensOutput() > 0) {
+            tokenTrackingService.recordUsage(tenantId, guard.tokensInput(), guard.tokensOutput());
+        }
+        conversationRepository.updateTimestamp(conversation.id(), tenantId);
+
+        emitter.send(SseEmitter.event().name("delta").data(objectMapper.writeValueAsString(Map.of("text", guard.text()))));
+
+        Map<String, Object> doneData = new LinkedHashMap<>();
+        doneData.put("conversationId", conversation.id().toString());
+        doneData.put("tokensUsed", Map.of("input", guard.tokensInput(), "output", guard.tokensOutput()));
+        doneData.put("conversationTooLarge", true);
+        emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(doneData)));
+        emitter.complete();
+    }
+
+    private static Map<String, Object> textBlock(String text) {
+        Map<String, Object> block = new LinkedHashMap<>();
+        block.put("type", "text");
+        block.put("text", text);
+        return block;
     }
 
     // =========================================================================

@@ -1,0 +1,39 @@
+# Local-dev override: JVM images instead of GraalVM native images.
+#
+# Why this exists
+# ---------------
+# The base compose builds kelta-auth, kelta-worker and kelta-gateway from their
+# native `Dockerfile`s, which end in `mvn -Pnative native:compile`. Compose builds
+# those three concurrently, and GraalVM's `native-image` sizes its heap to ~80% of
+# whatever the cgroup reports — so on a Docker Desktop with, say, 12 GB allocated,
+# three builders each try to claim ~9 GB and the build dies with:
+#
+#     ResourceExhausted: ... did not complete successfully: cannot allocate memory
+#
+# Running native locally needs ~24 GB allocated to Docker and ~10 min per service.
+# For day-to-day work the JVM variants are equivalent in behavior, build in a few
+# minutes, and fit comfortably in a default Docker Desktop allocation.
+#
+# Unlike docker-compose.ci.yml (which also strips host ports and container_names
+# for the shared CI daemon), this override touches ONLY the build stanzas, so
+# localhost ports, container names, healthchecks and env all stay as in base.
+#
+# Usage:  make up-jvm       (or up-jvm-ai / up-jvm-full)
+# Native: make up           (unchanged — still the production-parity path)
+
+services:
+  kelta-auth:
+    build:
+      dockerfile: kelta-auth/Dockerfile.jvm
+
+  kelta-worker:
+    build:
+      dockerfile: kelta-worker/Dockerfile.jvm
+
+  kelta-gateway:
+    build:
+      dockerfile: kelta-gateway/Dockerfile.jvm
+
+  kelta-ai:
+    build:
+      dockerfile: kelta-ai/Dockerfile.jvm

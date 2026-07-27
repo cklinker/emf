@@ -422,6 +422,15 @@ for removal ("inline the current value"). Findings:
 
 ## Dependency Risks
 
+- **`make up` needs ~24 GB allocated to Docker.** Compose builds `kelta-auth`, `kelta-worker` and
+  `kelta-gateway` concurrently from their native `Dockerfile`s, and `native-image` sizes its heap to
+  ~80% of whatever the cgroup reports — so on a 12 GB Docker Desktop three builders each claim ~9 GB
+  and one dies with `ResourceExhausted: ... cannot allocate memory`. It reads like a build break but
+  is purely a resource ceiling. Fix: `make up-jvm` (overlay `docker-compose.jvm.yml` swaps the three
+  services to their `Dockerfile.jvm` variants; ports, container names, healthchecks and env are
+  unchanged), or raise the Docker Desktop memory allocation. Use native locally only when debugging
+  native-specific behavior — reachability metadata, `reflect-config.json` gaps, build-time init
+  (see the entry below).
 - **Gateway is a GraalVM native image — every DTO deserialized from `/internal/bootstrap` MUST be
   in `reflect-config.json`.** Root cause of the 2026-07-02 total-API outage: V148 added
   `ipAllowlists: Map<String,TenantIpConfig>` to `kelta-gateway/.../config/BootstrapConfig` + the

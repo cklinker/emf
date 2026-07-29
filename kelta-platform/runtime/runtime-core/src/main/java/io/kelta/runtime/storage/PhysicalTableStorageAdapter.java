@@ -1014,7 +1014,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case GEOLOCATION -> "DOUBLE PRECISION";
             case LOOKUP -> "VARCHAR(36)";
             case MASTER_DETAIL -> "VARCHAR(36)";
-            case FORMULA, ROLLUP_SUMMARY -> null;
+            case ROLLUP_SUMMARY -> null;
+            case FORMULA -> {
+                Map<String, Object> cfg = field.fieldTypeConfig();
+                String returnType = cfg != null ? (String) cfg.get("returnType") : null;
+                yield switch (returnType != null ? returnType.toUpperCase() : "TEXT") {
+                    case "NUMBER" -> "NUMERIC";
+                    case "BOOLEAN" -> "BOOLEAN";
+                    default -> "TEXT";
+                };
+            }
         };
     }
 

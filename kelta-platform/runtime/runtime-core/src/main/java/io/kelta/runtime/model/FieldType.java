@@ -120,10 +120,10 @@ public enum FieldType {
 
     /**
      * Returns true if this type has a physical column in the database.
-     * FORMULA and ROLLUP_SUMMARY are computed on read.
+     * ROLLUP_SUMMARY is computed on read; FORMULA fields have a materialized DB column.
      */
     public boolean hasPhysicalColumn() {
-        return this != FORMULA && this != ROLLUP_SUMMARY;
+        return this != ROLLUP_SUMMARY;
     }
 
     /**

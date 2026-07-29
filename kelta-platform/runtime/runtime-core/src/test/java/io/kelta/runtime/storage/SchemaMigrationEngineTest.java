@@ -445,6 +445,30 @@ class SchemaMigrationEngineTest {
     class SqlTypeMappingTests {
 
         @Test
+        @DisplayName("FORMULA with returnType=TEXT maps to TEXT column")
+        void formulaTextMapsToTextColumn() {
+            FieldDefinition field = new FieldDefinition("label", FieldType.FORMULA,
+                    true, false, false, null, null, null, null, Map.of("returnType", "TEXT", "expression", "name"));
+            assertEquals("TEXT", migrationEngine.mapFieldTypeToSql(FieldType.FORMULA, field));
+        }
+
+        @Test
+        @DisplayName("FORMULA with returnType=NUMBER maps to NUMERIC column")
+        void formulaNumberMapsToNumericColumn() {
+            FieldDefinition field = new FieldDefinition("total", FieldType.FORMULA,
+                    true, false, false, null, null, null, null, Map.of("returnType", "NUMBER", "expression", "price * qty"));
+            assertEquals("NUMERIC", migrationEngine.mapFieldTypeToSql(FieldType.FORMULA, field));
+        }
+
+        @Test
+        @DisplayName("FORMULA with returnType=BOOLEAN maps to BOOLEAN column")
+        void formulaBooleanMapsToBooleanColumn() {
+            FieldDefinition field = new FieldDefinition("isLarge", FieldType.FORMULA,
+                    true, false, false, null, null, null, null, Map.of("returnType", "BOOLEAN", "expression", "amount > 100"));
+            assertEquals("BOOLEAN", migrationEngine.mapFieldTypeToSql(FieldType.FORMULA, field));
+        }
+
+        @Test
         @DisplayName("TEXT and RICH_TEXT both emit the Postgres TEXT column type")
         void textAndRichTextEmitText() {
             FieldDefinition text = new FieldDefinition("synopsis", FieldType.TEXT,

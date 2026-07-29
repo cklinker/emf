@@ -4,6 +4,7 @@ import io.kelta.mcp.resource.UserResource;
 import io.kelta.mcp.resource.UserResourceTemplate;
 import io.kelta.mcp.tool.AdminTool;
 import io.kelta.mcp.tool.UserTool;
+import io.kelta.mcp.transport.HttpServletStatelessServerTransportProvider;
 import io.kelta.mcp.transport.KeltaMcpController;
 import io.modelcontextprotocol.server.McpStatelessSyncServer;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
@@ -12,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
@@ -53,6 +56,14 @@ class McpApplicationTest {
 
     @Autowired
     private List<AdminTool> adminTools;
+
+    @Autowired
+    @Qualifier("userTransportProvider")
+    private HttpServletStatelessServerTransportProvider userTransport;
+
+    @Autowired
+    @Qualifier("adminTransportProvider")
+    private HttpServletStatelessServerTransportProvider adminTransport;
 
     @Test
     void bothMcpServersAreWired() {
@@ -235,6 +246,41 @@ class McpApplicationTest {
             assertThat(t.annotations().readOnlyHint()).as("%s readOnlyHint=false", t.name()).isFalse();
             assertThat(t.annotations().destructiveHint()).as("%s destructiveHint=true", t.name()).isTrue();
         }
+    }
+
+    @Test
+    void userServerSendsOrientingInstructionsOnInitialize() throws Exception {
+        // The `instructions` field of the initialize response is the one
+        // place a client is oriented before making any tool call — assert
+        // it's actually populated (not left as the SDK default of null/blank)
+        // and mentions the discovery path a fresh client needs.
+        MockHttpServletResponse res = initialize(userTransport, "/threadline-clothing/mcp/user");
+        assertThat(res.getStatus()).isEqualTo(200);
+        String body = res.getContentAsString();
+        assertThat(body).contains("list_collections").contains("get_collection_schema");
+    }
+
+    @Test
+    void adminServerSendsOrientingInstructionsOnInitialize() throws Exception {
+        MockHttpServletResponse res = initialize(adminTransport, "/threadline-clothing/mcp/admin");
+        assertThat(res.getStatus()).isEqualTo(200);
+        String body = res.getContentAsString();
+        assertThat(body).contains("create_collection").contains("add_field");
+    }
+
+    private static MockHttpServletResponse initialize(
+            HttpServletStatelessServerTransportProvider transport, String path) throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
+        req.addHeader("Content-Type", "application/json");
+        req.setContent("""
+                {"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+                  "protocolVersion":"2025-11-25",
+                  "capabilities":{},
+                  "clientInfo":{"name":"test-client","version":"1.0"}
+                }}""".getBytes());
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        transport.service(req, res);
+        return res;
     }
 
     @Test

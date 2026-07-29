@@ -58,6 +58,26 @@ public class ChatMessageRepository {
                 this::mapRow, conversationId, tenantId);
     }
 
+    /**
+     * The most recent assistant turn's recorded input-token count — i.e. the
+     * true size of history + system prompt actually sent to Anthropic on
+     * that turn. Used as a cheap proxy for "how big is this conversation
+     * right now" without any new token-counting logic. Returns 0 if the
+     * conversation has no assistant turns yet.
+     */
+    public int findMostRecentAssistantTokensInput(UUID conversationId, String tenantId) {
+        List<Integer> result = jdbc.query(
+                """
+                SELECT tokens_input FROM ai_message
+                 WHERE conversation_id = ? AND tenant_id = ? AND role = 'assistant'
+                 ORDER BY created_at DESC
+                 LIMIT 1
+                """,
+                (rs, rowNum) -> rs.getInt("tokens_input"),
+                conversationId, tenantId);
+        return result.isEmpty() ? 0 : result.getFirst();
+    }
+
     public Optional<ChatMessage> findById(UUID id, String tenantId) {
         List<ChatMessage> results = jdbc.query(
                 "SELECT * FROM ai_message WHERE id = ? AND tenant_id = ?",

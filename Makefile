@@ -10,7 +10,18 @@ COMPOSE_AI    := docker compose --profile ai
 COMPOSE_FULL  := docker compose --profile ai --profile tools
 COMPOSE_TELE  := docker compose --profile telehealth
 
-.PHONY: setup gen-keys copy-env up up-ai up-full up-telehealth down reset seed rebuild logs debug ps help
+# JVM-mode overlay: builds the Java services from their Dockerfile.jvm variants
+# instead of GraalVM native-image. Three concurrent native builds need ~24 GB
+# allocated to Docker; the JVM path fits a default allocation and is ~5x faster.
+# See the header of docker-compose.jvm.yml.
+JVM_FILES         := -f docker-compose.yml -f docker-compose.jvm.yml
+COMPOSE_JVM       := docker compose $(JVM_FILES)
+COMPOSE_JVM_AI    := docker compose $(JVM_FILES) --profile ai
+COMPOSE_JVM_FULL  := docker compose $(JVM_FILES) --profile ai --profile tools
+
+.PHONY: setup gen-keys copy-env up up-ai up-full up-telehealth \
+        up-jvm up-jvm-ai up-jvm-full rebuild-jvm \
+        down reset seed rebuild logs debug ps help
 
 # ─── First-time setup ────────────────────────────────────────────────────────
 
@@ -70,6 +81,23 @@ up-full: setup
 up-telehealth: setup
 	$(COMPOSE_TELE) up -d
 
+# ─── JVM mode (faster local builds, low memory) ──────────────────────────────
+# Same stack as `up`, but Java services build from Dockerfile.jvm. Use these if
+# `make up` dies with "cannot allocate memory" — that's GraalVM native-image
+# running out of room, not a code failure. See docker-compose.jvm.yml.
+
+## up-jvm: start default stack using JVM images (fast build, low memory)
+up-jvm: setup
+	$(COMPOSE_JVM) up -d
+
+## up-jvm-ai: start JVM stack + AI service
+up-jvm-ai: setup
+	$(COMPOSE_JVM_AI) up -d
+
+## up-jvm-full: start full JVM stack (default + ai + tools)
+up-jvm-full: setup
+	$(COMPOSE_JVM_FULL) up -d
+
 ## down: stop and remove containers (keeps volumes)
 down:
 	$(COMPOSE) --profile ai --profile tools --profile observability --profile telehealth down
@@ -91,6 +119,12 @@ rebuild:
 	@[ -n "$(SVC)" ] || (echo "Usage: make rebuild SVC=<service-name>"; exit 1)
 	$(COMPOSE) build $(SVC)
 	$(COMPOSE) up -d --no-deps $(SVC)
+
+## rebuild-jvm SVC=<name>: same as rebuild, but builds the JVM image variant
+rebuild-jvm:
+	@[ -n "$(SVC)" ] || (echo "Usage: make rebuild-jvm SVC=<service-name>"; exit 1)
+	$(COMPOSE_JVM) build $(SVC)
+	$(COMPOSE_JVM) up -d --no-deps $(SVC)
 
 ## logs SVC=<name>: tail logs for a service (omit SVC for all)
 logs:

@@ -253,6 +253,7 @@ runtime/runtime-messaging-nats -am -B
 | Frontend lint/type/test | `/test-frontend` · or in `kelta-web`/`kelta-ui/app`: `npm run lint && npm run typecheck && npm run test:run` |
 | Single Java test | `mvn test -f kelta-<svc>/pom.xml -Dtest=ClassName` |
 | Run full local stack | `make up` (then `make seed`) — see `README.md` |
+| Local stack, low-memory box | `make up-jvm` — JVM images instead of GraalVM native. `make up` builds 3 native images concurrently and needs ~24 GB allocated to Docker, else `cannot allocate memory` |
 
 Java tests: surefire runs `*Test`/`*Tests`/`*Properties` in parallel; failsafe runs
 `*IntegrationTest` only under `-Pintegration-tests`. Frontend coverage gate: 80% in

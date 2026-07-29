@@ -53,6 +53,8 @@ provided by the internal `kelta-auth` service — no external identity server re
 - Maven 3.9+
 - Node.js 18+
 - Docker & Docker Compose
+  - `make up` builds GraalVM native images and needs **~24 GB allocated to Docker**.
+    With less, use `make up-jvm` — see [Native vs JVM images](#native-vs-jvm-images).
 
 ## Local Development
 
@@ -63,6 +65,9 @@ make setup   # first time only: copies .env, generates RSA JWK + AES key
 make up      # starts postgres, redis, nats, cerbos, auth, worker, gateway, ui
 make seed    # waits for healthy stack, then prints credentials
 ```
+
+> **Build fails with `cannot allocate memory`?** That's GraalVM native-image, not a
+> code error. Run `make up-jvm` instead — see [Native vs JVM images](#native-vs-jvm-images).
 
 Default credentials (seeded by Flyway migrations):
 
@@ -100,7 +105,45 @@ make rebuild SVC=kelta-worker   # rebuild + restart one service
 make logs SVC=kelta-gateway     # tail logs
 make down            # stop all containers
 make reset           # wipe volumes and restart clean
+
+make up-jvm          # default stack, JVM images (fast build, low memory)
+make up-jvm-ai       # JVM stack + kelta-ai
+make up-jvm-full     # JVM stack + ai + tools
+make rebuild-jvm SVC=kelta-worker   # rebuild one service as a JVM image
 ```
+
+`make help` lists every target.
+
+### Native vs JVM images
+
+`kelta-auth`, `kelta-worker` and `kelta-gateway` ship two Dockerfiles: `Dockerfile`
+(GraalVM native-image, what production runs) and `Dockerfile.jvm` (plain JRE).
+
+`make up` uses the native path. Compose builds those three **concurrently**, and
+`native-image` sizes its heap to ~80% of whatever the cgroup reports — so three
+builders on a 12 GB Docker Desktop each try to claim ~9 GB and the build dies with:
+
+```
+ResourceExhausted: ... "mvn -Pnative native:compile ..." did not complete
+successfully: cannot allocate memory
+```
+
+Two ways to fix it:
+
+| | `make up` (native) | `make up-jvm` |
+|---|---|---|
+| Docker memory needed | ~24 GB (Settings → Resources) | fits a default allocation |
+| Build time | ~10 min per service | ~2–3 min per service |
+| Startup | ~50 ms | ~20–40 s |
+| Production parity | yes | behaviorally equivalent for dev |
+
+JVM mode is the right default for day-to-day work. Reach for native when you're
+debugging something native-specific — reachability metadata, `reflect-config.json`
+gaps, or build-time initialization (see `.claude/docs/concerns.md`).
+
+Ports, container names, healthchecks and env are identical in both modes — the
+overlay (`docker-compose.jvm.yml`) only swaps `build.dockerfile`. Switching modes
+recreates the containers but keeps volumes, so your data survives.
 
 ### Debugging a service in the IDE (hybrid mode)
 

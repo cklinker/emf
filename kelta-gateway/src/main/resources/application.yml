@@ -75,9 +75,23 @@ kelta:
     # AI service URL (used for routing /api/ai/** requests)
     ai-service-url: ${AI_SERVICE_URL:http://emf-ai:80}
     
-    # Rate limiting is driven by per-tenant governor limits (apiCallsPerDay)
-    # fetched from the worker during bootstrap.
+    # Rate limiting for AUTHENTICATED traffic is driven by per-tenant governor
+    # limits (apiCallsPerDay) fetched from the worker during bootstrap.
     # See GatewayCacheManager for details.
+    rate-limit:
+      # Per-IP limits for UNAUTHENTICATED paths, which the tenant limiter cannot
+      # cover (it needs a principal). Comma-separated <path-prefix>=<per-minute>.
+      # Matched by longest prefix; each prefix gets its own per-IP bucket.
+      ip-paths: ${RATE_LIMIT_IP_PATHS:/actuator/health=100,/api/billing/webhooks=300}
+      # IPs / CIDR ranges exempt from ALL rate limiting (per-IP and per-tenant).
+      # For trusted infrastructure whose traffic is legitimately bursty: uptime
+      # probes, in-cluster callers, a payment processor's webhook egress ranges.
+      # A bare address is treated as a single host (/32 or /128). Invalid entries
+      # are logged and skipped. Empty (the default) exempts nobody.
+      # NOTE: with ip-allowlist.trust-forwarded-for=true the resolved client IP
+      # can include client-supplied X-Forwarded-For hops — keep this list to
+      # narrow ranges you actually control.
+      exempt-cidrs: ${RATE_LIMIT_EXEMPT_CIDRS:}
 
     # Per-tenant IP allowlist (network access restriction).
     # Non-admin users of a restricted tenant may only reach /api/** from an allowed CIDR;
@@ -117,9 +131,13 @@ kelta:
       # Paths accessible without authentication for ALL HTTP methods.
       # Used for endpoints receiving data from unauthenticated sources (e.g., browser OTEL SDK,
       # campaign open-pixel / click-redirect / unsubscribe links authenticated by HMAC token,
-      # telehealth visit links authenticated by their signed token, and LiveKit webhooks
-      # authenticated by their signed JWT + body digest).
-      unauthenticated-paths: /otel,/api/webhooks,/scim,/api/track,/api/telehealth/visits,/api/telehealth/webhooks
+      # telehealth visit links authenticated by their signed token, LiveKit webhooks
+      # authenticated by their signed JWT + body digest, and payment-processor
+      # billing webhooks authenticated by their HMAC signature).
+      # NOTE: an unauthenticated path also bypasses TenantIpAllowlistFilter, so a
+      # restricted tenant gets no network restriction there — the endpoint's own
+      # signature check is the only trust anchor. Keep these prefixes narrow.
+      unauthenticated-paths: /otel,/api/webhooks,/scim,/api/track,/api/telehealth/visits,/api/telehealth/webhooks,/api/billing/webhooks
 
 # Actuator configuration for health and metrics
 management:

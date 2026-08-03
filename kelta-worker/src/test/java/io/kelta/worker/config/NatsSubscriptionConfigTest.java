@@ -2,6 +2,7 @@ package io.kelta.worker.config;
 
 import io.kelta.runtime.event.EventSubscription;
 import io.kelta.runtime.messaging.nats.NatsSubscriptionManager;
+import io.kelta.worker.listener.BillingEntitlementCacheListener;
 import io.kelta.worker.listener.CerbosCacheInvalidationListener;
 import io.kelta.worker.listener.CollectionSchemaListener;
 import io.kelta.worker.listener.CredentialCacheInvalidationListener;
@@ -47,7 +48,8 @@ class NatsSubscriptionConfigTest {
                 mock(LayoutCacheInvalidationListener.class),
                 mock(MenuCacheInvalidationListener.class),
                 mock(TranslationCacheInvalidationListener.class),
-                mock(SystemCollectionCacheInvalidationListener.class));
+                mock(SystemCollectionCacheInvalidationListener.class),
+                mock(BillingEntitlementCacheListener.class));
     }
 
     @Test
@@ -57,13 +59,14 @@ class NatsSubscriptionConfigTest {
         // when kelta.encryption.key is not configured.
         config.registerSubscriptions();
 
-        // Fourteen always-on subscriptions: worker-flows, worker-nats-trigger,
+        // Fifteen always-on subscriptions: worker-flows, worker-nats-trigger,
         // worker-search-index, worker-schema, worker-modules, worker-cerbos,
         // worker-flow-cache, worker-nats-trigger-cache, worker-domain-cache,
         // worker-feature-cache, worker-layout-cache, worker-menu-cache,
-        // worker-translation-cache, worker-system-collection-cache.
+        // worker-translation-cache, worker-system-collection-cache,
+        // worker-billing-entitlement.
         // Credential/Superset/Svix are conditional.
-        verify(subscriptionManager, times(14)).register(any(EventSubscription.class));
+        verify(subscriptionManager, times(15)).register(any(EventSubscription.class));
     }
 
     @Test
@@ -74,6 +77,6 @@ class NatsSubscriptionConfigTest {
 
         config.registerSubscriptions();
 
-        verify(subscriptionManager, times(15)).register(any(EventSubscription.class));
+        verify(subscriptionManager, times(16)).register(any(EventSubscription.class));
     }
 }

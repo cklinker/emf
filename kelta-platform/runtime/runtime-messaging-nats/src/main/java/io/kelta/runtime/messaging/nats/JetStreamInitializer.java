@@ -70,6 +70,12 @@ public class JetStreamInitializer {
             ensureStream(jsm, "KELTA_CHAT",
                     List.of("kelta.chat.message.>", "kelta.chat.conversation.>"),
                     Duration.ofHours(24));
+            // Portal billing: kelta.billing.entitlement.changed.<tenantId>.<userId>
+            // — broadcast entitlement-cache invalidation. Its own stream because an
+            // existing stream's subject list cannot be extended (add-if-absent).
+            ensureStream(jsm, "KELTA_BILLING",
+                    List.of("kelta.billing.>"),
+                    Duration.ofHours(24));
         } catch (Exception e) {
             log.error("Failed to initialize JetStream streams: {}", e.getMessage(), e);
         }

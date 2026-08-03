@@ -52,7 +52,7 @@ Order values below are the live `getOrder()` returns from source (lower runs fir
 | -310 | CustomDomainFilter | Map custom domain → tenant |
 | -300 | TenantSlugExtractionFilter | Extract tenant slug from URL |
 | -200 | TenantResolutionFilter | Resolve slug → tenant ID |
-| -150 | IpRateLimitFilter | Per-IP rate limiting |
+| -150 | IpRateLimitFilter | Per-IP rate limiting on configured public path prefixes (in-memory, per-pod) |
 | -100 | JwtAuthenticationFilter | Validate JWT |
 | -99 | PatAuthenticationFilter | Validate PAT (`klt_`) as JWT alternative |
 | -50 | RateLimitFilter / UserIdentityResolutionFilter | Per-tenant rate limit; user identity |
@@ -67,6 +67,34 @@ Cross-cutting (off main path): `ObservabilityContextFilter (-90)`, `HttpBodyCapt
 (-80)`, `SystemCollectionResponseCacheFilter (-10)`, `RequestLoggingFilter (MAX)`. `?include=`
 resolution is done by `IncludeResolver` (`jsonapi` package), not a numbered filter; read-side
 FLS is enforced in the worker (`CerbosFieldSecurityAdvice`), not the gateway.
+
+### Rate limiting
+
+Two limiters with different jobs, plus one shared exemption list.
+
+| | `IpRateLimitFilter` (-150) | `RateLimitFilter` (-50) |
+|---|---|---|
+| Covers | unauthenticated public paths | authenticated traffic |
+| Keyed on | matched path prefix + client IP | tenant |
+| Budget from | `kelta.gateway.rate-limit.ip-paths` | tenant governor limit (`apiCallsPerDay`) |
+| Store | in-memory per pod | Redis (shared across replicas) |
+
+`ip-paths` is a comma-separated list of `<path-prefix>=<per-minute>` entries matched by
+**longest prefix** (so `/api/billing/webhooks` covers `/api/billing/webhooks/stripe/{tenantId}`),
+and each prefix gets its own per-IP bucket — a burst on one public endpoint cannot exhaust
+another's budget for that client. 429 carries a `Retry-After` computed from the real remaining
+window. `RateLimitFilter` returns early when there is no principal, which is exactly why the
+per-IP filter exists.
+
+**Exemption.** `kelta.gateway.rate-limit.exempt-cidrs` (env `RATE_LIMIT_EXEMPT_CIDRS`) lists IPs
+or CIDR ranges that bypass **both** limiters — uptime probes, in-cluster callers, a payment
+processor's webhook egress. A bare address means a single host (`/32`/`/128`); invalid entries
+are logged and skipped, and an empty list (the default) exempts nobody.
+`RateLimitExemptionService` and `TenantIpAllowlistFilter` share one `CidrBlock` matcher
+(`io.kelta.gateway.net`), which parses address **literals** only so a hostname in a forwarded
+header can never trigger a DNS lookup. Caveat: exemption is evaluated against the same resolved
+client IP the limiter keys on, so with `ip-allowlist.trust-forwarded-for=true` an exempt entry
+is only as trustworthy as the proxy chain — keep the list to narrow ranges you control.
 
 ### IP geolocation (GeoLite2) data flow
 
@@ -231,6 +259,19 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `BootstrapRepository.findProfileSystemPermissions` check as bulk-ops), so a delegated admin
   without it cannot shorten retention or release a hold. The retention *purge* is a background
   sweep (not an endpoint), DRY-RUN by default — see concerns.md.
+- **Portal billing** (consumer-alerting slice 1, V178): `/api/billing/**` is a static route, so
+  only `API_ACCESS` is checked at the gateway — member scoping belongs in the controller.
+  `POST /api/billing/webhooks/stripe/{tenantId}` is an **unauthenticated path**: the HMAC
+  `Stripe-Signature` over the **raw** body is its only trust anchor, verified before the body is
+  parsed. The `{tenantId}` in the path is **untrusted** — it merely selects which tenant's
+  `webhookSecret` to verify against, so a passing signature is what proves the event belongs to
+  that tenant. An unknown tenant and a bad signature both answer 401 with no detail, so an
+  unauthenticated caller cannot enumerate which tenants have billing configured. Processing is
+  idempotent by event id (`billing_webhook_event`), and the claim insert shares one transaction
+  with the mutation so a failure rolls the claim back and the processor's retry genuinely
+  re-runs. Being an unauthenticated path also bypasses `TenantIpAllowlistFilter` — the same
+  trade the LiveKit webhook makes. Admin authoring of plans/rules rides the system-collection
+  JSON:API and is gated by the new **`MANAGE_BILLING`** permission.
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

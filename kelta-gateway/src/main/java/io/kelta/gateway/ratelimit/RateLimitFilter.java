@@ -45,20 +45,24 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     private final RedisRateLimiter rateLimiter;
     private final GatewayCacheManager cacheManager;
     private final GatewayMetrics metrics;
+    private final RateLimitExemptionService exemptionService;
 
     /**
      * Creates a new RateLimitFilter.
      *
-     * @param rateLimiter  the Redis-based rate limiter
-     * @param cacheManager the gateway cache manager
-     * @param metrics      the gateway metrics service
+     * @param rateLimiter      the Redis-based rate limiter
+     * @param cacheManager     the gateway cache manager
+     * @param metrics          the gateway metrics service
+     * @param exemptionService decides whether the caller's IP bypasses limiting
      */
     public RateLimitFilter(RedisRateLimiter rateLimiter,
                           GatewayCacheManager cacheManager,
-                          GatewayMetrics metrics) {
+                          GatewayMetrics metrics,
+                          RateLimitExemptionService exemptionService) {
         this.rateLimiter = rateLimiter;
         this.cacheManager = cacheManager;
         this.metrics = metrics;
+        this.exemptionService = exemptionService;
     }
 
     @Override
@@ -78,6 +82,13 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         if (tenantId == null || tenantId.isBlank()) {
             log.debug("No tenant context, skipping rate limiting for path: {}",
                 exchange.getRequest().getPath().value());
+            return chain.filter(exchange);
+        }
+
+        // Trusted infrastructure ranges bypass the tenant window entirely, so a
+        // load test or in-cluster caller cannot consume a tenant's whole budget.
+        if (exemptionService.isExempt(exchange)) {
+            log.debug("Client IP is rate-limit exempt, skipping for tenant: {}", tenantId);
             return chain.filter(exchange);
         }
 

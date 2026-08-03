@@ -59,7 +59,10 @@ class RateLimitFilterTest {
         when(webClientBuilder.build()).thenReturn(webClient);
 
         cacheManager = new GatewayCacheManager(webClientBuilder, "http://localhost:8080");
-        filter = new RateLimitFilter(rateLimiter, cacheManager, metrics);
+        // No exempt ranges configured, so every request is subject to the limiter.
+        filter = new RateLimitFilter(rateLimiter, cacheManager, metrics,
+                new RateLimitExemptionService(
+                        new io.kelta.gateway.geo.ClientIpResolver(true), List.of()));
         lenient().when(chain.filter(any())).thenReturn(Mono.empty());
         lenient().when(rateLimiter.incrementDailyCounter(anyString())).thenReturn(Mono.empty());
     }

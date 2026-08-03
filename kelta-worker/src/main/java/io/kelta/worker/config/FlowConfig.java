@@ -28,6 +28,7 @@ import io.kelta.worker.listener.CerbosPolicySyncHook;
 import io.kelta.worker.listener.FieldPermissionSyncHook;
 import io.kelta.worker.listener.ProfilePermissionSyncHook;
 import io.kelta.worker.listener.ApiSpecConfigHook;
+import io.kelta.worker.listener.BillingPlanRefreshHook;
 import io.kelta.worker.listener.CredentialEncryptionHook;
 import io.kelta.worker.listener.CredentialEventPublisher;
 import io.kelta.runtime.module.integration.api.OpenApiSpecParser;
@@ -581,6 +582,15 @@ public class FlowConfig {
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher) {
         LayoutRuleRefreshHook hook = new LayoutRuleRefreshHook(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public BillingPlanRefreshHook billingPlanRefreshHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        BillingPlanRefreshHook hook = new BillingPlanRefreshHook(eventPublisher);
         hookRegistry.register(hook);
         return hook;
     }

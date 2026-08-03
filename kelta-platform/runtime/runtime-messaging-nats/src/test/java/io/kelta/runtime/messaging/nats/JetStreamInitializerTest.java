@@ -48,5 +48,9 @@ class JetStreamInitializerTest {
                 .anyMatch(c -> "KELTA_CHAT".equals(c.getName())
                         && c.getSubjects().containsAll(
                                 List.of("kelta.chat.message.>", "kelta.chat.conversation.>")));
+        assertThat(created)
+                .as("KELTA_BILLING stream capturing kelta.billing.>")
+                .anyMatch(c -> "KELTA_BILLING".equals(c.getName())
+                        && c.getSubjects().contains("kelta.billing.>"));
     }
 }

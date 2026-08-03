@@ -3,6 +3,24 @@
 > Child of `specs/consumer-alerting/README.md`. Two PRs: **1A core + webhook**, **1B portal
 > surface + enforcement**. Both **security-typed → NO auto-merge**.
 
+> **1A landed (V178).** Two items listed below under PR-1A moved to **1B**, because 1A has no
+> caller for either and shipping unused code is worse than shipping it late:
+> - `StripeApiClient` — every call it makes (create customer, checkout session, portal
+>   session) belongs to a 1B endpoint. The webhook path never calls out to Stripe. The
+>   credential test (`GET /v1/account`) lives in `StripeCredentialType` and uses the JDK
+>   `HttpClient`, matching the runtime-core convention — runtime-core deliberately does not
+>   depend on a concrete HTTP client.
+> - `BillingEntitlementRuleRefreshHook` — it exists to invalidate the rule cache that
+>   `MemberEntitlementQuotaHook` owns, and that hook is 1B. 1A ships
+>   `BillingEntitlementRuleRepository` (uncached) so 1B only adds the cache and its hook.
+>
+> Also landed in 1A but not listed below: the gateway's `IpRateLimitFilter` needed real work
+> before the webhook entry could function — its path set was **exact-match**, so
+> `/api/billing/webhooks` would never have matched `/api/billing/webhooks/stripe/{tenantId}`.
+> It is now longest-prefix with per-path budgets and per-path buckets, plus a shared
+> IP/CIDR **exemption** list (`kelta.gateway.rate-limit.exempt-cidrs`) honoured by both
+> limiters. That anticipates part of slice 7 — see that spec's updated scope note.
+
 ## 1. Goal & scope
 
 Delivers: a reusable tenant→portal-user commerce capability — plans with opaque entitlements,

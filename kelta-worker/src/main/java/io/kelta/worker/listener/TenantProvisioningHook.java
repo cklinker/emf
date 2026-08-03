@@ -40,7 +40,7 @@ public class TenantProvisioningHook implements BeforeSaveHook {
             "MANAGE_CREDENTIALS", "VIEW_CREDENTIALS",
             "MANAGE_API_SPECS", "VIEW_API_SPECS", "MANAGE_CAMPAIGNS",
             "MANAGE_DELEGATED_ADMINS", "MANAGE_SANDBOXES", "VIEW_ANALYTICS",
-            "MANAGE_CHAT"
+            "MANAGE_CHAT", "MANAGE_BILLING"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -130,7 +130,7 @@ public class TenantProvisioningHook implements BeforeSaveHook {
                                 "MANAGE_CREDENTIALS", "VIEW_CREDENTIALS",
                                 "MANAGE_API_SPECS", "VIEW_API_SPECS", "MANAGE_CAMPAIGNS",
                                 "MANAGE_DELEGATED_ADMINS", "MANAGE_SANDBOXES", "VIEW_ANALYTICS",
-                                "MANAGE_CHAT")),
+                                "MANAGE_CHAT", "MANAGE_BILLING")),
                 new ProfileDef("Standard User",
                         "Read, create, and edit records in all collections",
                         Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "VIEW_CREDENTIALS", "VIEW_API_SPECS",

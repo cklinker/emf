@@ -4,6 +4,24 @@
 > protects). **Security-typed → NO auto-merge. Gate for enabling portal self-signup in
 > production.**
 
+> **Partially pre-empted by slice 1A**, which had to fix the per-IP limiter to make the
+> billing webhook path work at all. Already landed:
+> - `IpRateLimitFilter` matches **longest path prefix** (it was exact `Set.contains`, so only
+>   a literal `/actuator/health` was ever limited), takes budgets from
+>   `kelta.gateway.rate-limit.ip-paths` as `<prefix>=<per-minute>`, and gives each prefix its
+>   own per-IP bucket so one endpoint's burst cannot exhaust another's budget.
+> - `Retry-After` reports the real remaining window rather than the full window length.
+> - **IP/CIDR exemption** (`kelta.gateway.rate-limit.exempt-cidrs`, env
+>   `RATE_LIMIT_EXEMPT_CIDRS`) honoured by **both** the per-IP and per-tenant limiters, via
+>   `RateLimitExemptionService`. The CIDR matcher was extracted out of
+>   `TenantIpAllowlistFilter` into shared `io.kelta.gateway.net.CidrBlock` — one
+>   implementation, address-literals only so a hostname in a forwarded header cannot trigger
+>   a DNS lookup.
+>
+> Still open for this slice: making the per-IP limiter **Redis-backed** (it remains in-memory
+> per pod, so N replicas mean N× the budget), the **per-user** window, route-class
+> multipliers, the ALTCHA bot challenge, edge controls, and the public-surface sweep.
+
 ## 1. Goal & scope
 
 Delivers: Redis-backed per-IP rate limiting for public paths (consistent across gateway

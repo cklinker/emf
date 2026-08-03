@@ -46,6 +46,13 @@
 >   the challenge (an outage becomes an open door on the endpoint it protects). Relatedly,
 >   enabling it without a shared HMAC key **refuses to start**: a per-pod random key verifies
 >   only on the issuing pod, so a share of real signups would fail with no visible cause.
+> - **A fractional per-user budget is a trap; the default is 0.9, not 0.5.** The tenant window
+>   is derived from the tenant's *whole* governor budget, so one admin or integration PAT
+>   legitimately is most of a tenant. A half share looked conservative and was a functional
+>   regression — the e2e suite (one admin, one tenant, ~1450 requests into a 1735/5min window)
+>   went from passing to failing on 429. Bound the runaway credential; do not divide fairly.
+>   The same run also showed CI sitting at ~84% of the tenant cap with no think-time, so
+>   `docker-compose.yml` now exempts the private compose network (**local/CI only**).
 > - **Found en route:** `checkWindow` failed open on a Redis *error* but not on an *empty*
 >   reply — the Mono completed empty, the calling filter never reached `chain.filter`, and the
 >   request hung with no status or body. Fixed with `switchIfEmpty`. Pre-existing on the tenant

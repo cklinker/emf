@@ -27,6 +27,23 @@ Everything fails **open** on a Redis outage except the bot challenge's replay cl
 fails **closed** — a limiter failing open leaves the other controls standing, while a
 challenge failing open is an open door on the endpoint it exists to protect.
 
+**The e2e suite runs at ~84% of the tenant rate limit.** The tenant window is
+`(apiCallsPerDay / 288) * 5` = **1735 requests per 5 minutes** at the 100k default; the
+Playwright run drives roughly 1450 into it, as one admin in one tenant with no think-time. That
+margin is thin enough that ordinary runner variance tips it into a tenant-wide 429 — it already
+produced one incident-shaped failure (see Known Bugs) and it is why `docker-compose.yml` now
+exempts the private compose network via `RATE_LIMIT_EXEMPT_CIDRS`. **That exemption is
+local/CI only** — deployed environments use the homelab-argo manifests and never read that
+file. The consequence to know: e2e no longer exercises either rate limiter at all, so limiter
+regressions must be caught by unit tests.
+
+**Sizing a per-user budget as a fraction of the tenant window is a trap worth remembering.**
+The tenant window is derived from the tenant's *whole* governor budget, and one admin, bulk
+import, or integration PAT legitimately is most of a tenant. A 0.5 `user-share` therefore
+halved real single-user throughput — it looked conservative and was in fact a functional
+regression, caught only because the e2e suite is a faithful single-user workload. The default
+is 0.9: bound the runaway credential, do not attempt fair division.
+
 `PublicSurfaceTest` pins the gateway's unauthenticated prefix allowlist against the shipped
 `application.yml`. Widening that surface is one line of YAML and nothing else in the build
 would notice, so the test fails on any change — update it deliberately, and confirm the new

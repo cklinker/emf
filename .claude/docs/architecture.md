@@ -120,9 +120,14 @@ per-IP filter exists.
 hammering an endpoint — or one stolen PAT — locked out everyone in the tenant. The per-user
 window is checked **first** and, when it rejects, the tenant counter is deliberately **not**
 incremented, so a misbehaving member cannot spend the shared budget merely by being rejected.
-The budget is `kelta.gateway.rate-limit.user-share` (default `0.5`, i.e. half the tenant
-window, floored at 1); a share of `1.0` disables it, and an out-of-range value falls back to
-the default rather than silently switching the limit off. The key is the principal username,
+The budget is `kelta.gateway.rate-limit.user-share` (default `0.9`, floored at 1); a share of
+`1.0` disables it, and an out-of-range value falls back to the default rather than silently
+switching the limit off. **The default is deliberately close to 1.** The tenant window is
+derived from the tenant's *whole* governor budget, so one admin, bulk import, or integration
+PAT legitimately is most of a tenant; a 0.5 share was tried first and halved real single-user
+throughput (the e2e suite — one admin driving one tenant — went from comfortably under the cap
+to failing on 429). This window bounds a runaway or stolen credential, it does not divide the
+budget fairly. Tenants with many members should tighten it. The key is the principal username,
 which is the member's email for **both** kelta-auth JWTs and PATs — so a member cannot double
 their budget by switching credential type. An entitlement-driven per-member budget (a paid tier
 buying a bigger window) is a follow-up; the seam is `RateLimitFilter.checkPerUser`.

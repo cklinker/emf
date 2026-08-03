@@ -43,8 +43,19 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
-    /** Fraction of the tenant window any single member may consume. */
-    static final double DEFAULT_USER_SHARE = 0.5;
+    /**
+     * Fraction of the tenant window any single member may consume.
+     *
+     * <p>Deliberately close to 1: the tenant window is derived from the tenant's
+     * <em>whole</em> governor budget, and a single admin, bulk import, or
+     * integration PAT legitimately <em>is</em> most of a tenant. A half share was
+     * tried first and immediately halved real single-user throughput — the e2e
+     * suite, which is one admin driving one tenant, went from comfortably under
+     * the cap to failing on 429. This window's job is to stop one runaway or
+     * stolen credential consuming the <em>entire</em> budget, not to divide it
+     * fairly; tenants with many members should tighten it.
+     */
+    static final double DEFAULT_USER_SHARE = 0.9;
 
     private final RedisRateLimiter rateLimiter;
     private final GatewayCacheManager cacheManager;

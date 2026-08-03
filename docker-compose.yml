@@ -233,6 +233,16 @@ services:
       # IP geolocation — set MAXMIND_LICENSE_KEY in .env to enable automatic
       # GeoLite2 downloads; without it, geo enrichment is silently inactive.
       MAXMIND_LICENSE_KEY: ${MAXMIND_LICENSE_KEY:-}
+      # Rate-limit exemption for callers on this private compose network.
+      # LOCAL/CI ONLY — deployed environments use the homelab-argo manifests and
+      # never read this file. The e2e suite drives roughly 1450 requests into a
+      # 5-minute window whose production-shaped cap is 1735: it runs at ~84% of
+      # the limit with no think-time, which is a flake generator independent of
+      # any one change (it already produced one incident-shaped failure — see
+      # concerns.md → Known Bugs). An in-cluster test runner is exactly the
+      # "trusted infrastructure whose traffic is legitimately bursty" case this
+      # list exists for.
+      RATE_LIMIT_EXEMPT_CIDRS: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32"
       LOG_LEVEL: INFO
     volumes:
       - geoip-data:/data/geoip

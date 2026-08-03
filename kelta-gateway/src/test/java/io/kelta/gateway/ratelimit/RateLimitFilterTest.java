@@ -390,16 +390,30 @@ class RateLimitFilterTest {
         }
 
         @Test
+        @DisplayName("should leave most of the tenant window to a single busy member by default")
+        void defaultShareLeavesRoomForOneBusyMember() {
+            // The tenant window is derived from the tenant's WHOLE governor
+            // budget, and one admin, bulk import, or integration PAT legitimately
+            // IS most of a tenant. A 0.5 default halved real single-user
+            // throughput and took the e2e suite — one admin driving one tenant —
+            // from comfortably under the cap to failing on 429. This window bounds
+            // a runaway or stolen credential; it does not divide fairly.
+            assertThat(RateLimitFilter.DEFAULT_USER_SHARE)
+                    .isGreaterThanOrEqualTo(0.9)
+                    .isLessThan(1.0);
+        }
+
+        @Test
         @DisplayName("should fall back to the default share when configured as zero")
         void zeroShareFallsBackToDefault() {
             // A misconfigured share must not silently disable the limit.
-            assertThat(captureUserConfig(filterWithShare(0)).getRequestsPerWindow()).isEqualTo(5);
+            assertThat(captureUserConfig(filterWithShare(0)).getRequestsPerWindow()).isEqualTo(9);
         }
 
         @Test
         @DisplayName("should fall back to the default share when configured negative")
         void negativeShareFallsBackToDefault() {
-            assertThat(captureUserConfig(filterWithShare(-1)).getRequestsPerWindow()).isEqualTo(5);
+            assertThat(captureUserConfig(filterWithShare(-1)).getRequestsPerWindow()).isEqualTo(9);
         }
 
         @Test
@@ -407,7 +421,7 @@ class RateLimitFilterTest {
         void aboveOneShareFallsBackToDefault() {
             // 2.0 would otherwise make the user budget exceed the tenant's and skip
             // the check, which is the opposite of what an operator typing it meant.
-            assertThat(captureUserConfig(filterWithShare(2.0)).getRequestsPerWindow()).isEqualTo(5);
+            assertThat(captureUserConfig(filterWithShare(2.0)).getRequestsPerWindow()).isEqualTo(9);
         }
 
         @Test

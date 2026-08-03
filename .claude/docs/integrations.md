@@ -314,6 +314,31 @@ are additionally bridged onto `kelta.trigger.<tenantId>.billing.subscription`, s
 build welcome / dunning-nudge / win-back automations as flow configuration — flows read
 `$.input.payload.*`.
 
+**Outbound calls** (`StripeApiClient`): create customer, create checkout session, create
+billing-portal session. Idempotency keys are chosen per operation, and the distinction
+matters: customer creation uses a **deterministic** key (`cust:<tenantId>:<userId>`) because a
+member gets exactly one processor customer ever and a racing retry must replay rather than
+create a duplicate that would violate `billing_customer`'s unique constraint. Checkout and
+portal sessions use a **per-attempt** key — a deterministic one would replay the previous
+session for the processor's 24-hour idempotency window, which would stop a member buying a
+second one-time pass of the same plan on the same day.
+
+**Member endpoints.** `POST /api/billing/checkout-sessions {planCode, successUrl, cancelUrl}`
+→ `{url}`; `POST /api/billing/portal-sessions {returnUrl}` → `{url}` (409 when the member has
+never transacted — there is nothing to manage); `GET /api/billing/me`; `GET /api/billing/plans`.
+Return URLs must be absolute HTTPS whose **origin** exactly matches an entry in the
+credential's `allowedReturnOrigins` — origin equality, not prefix, because a prefix check also
+accepts `https://app.example.com.evil.test`. An empty allowlist denies everything, so a tenant
+that has not configured origins cannot redirect anywhere rather than anywhere at all.
+
+**Quota enforcement.** `billing-entitlement-rules` rows say "records in collection X are capped
+by entitlement key Y", and a wildcard before-save hook enforces them, so capping a new
+collection is configuration rather than code. A rule's optional `countFilter` narrows what
+counts (e.g. only ACTIVE rows); its field names are validated against the collection definition
+and its values bound as parameters. At the limit the create is rejected with **HTTP 400**
+(JSON:API code `beforeSaveHook`) carrying an upgrade-oriented message. Enforcement **fails
+open** — a billing glitch must not block a tenant's data entry.
+
 **Dashboard prerequisites** (nothing here provisions them): Products and Prices, with each
 price id recorded on a `billing-plans` row; Stripe Tax if the tenant charges tax; the Billing
 Portal configured; retry/dunning settings; and a webhook endpoint pointed at the URL above

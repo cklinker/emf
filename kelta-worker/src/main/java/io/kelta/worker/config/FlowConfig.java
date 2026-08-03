@@ -596,6 +596,35 @@ public class FlowConfig {
     }
 
     @Bean
+    public io.kelta.worker.listener.BillingEntitlementRuleRefreshHook billingEntitlementRuleRefreshHook(
+            BeforeSaveHookRegistry hookRegistry,
+            PlatformEventPublisher eventPublisher) {
+        io.kelta.worker.listener.BillingEntitlementRuleRefreshHook hook =
+                new io.kelta.worker.listener.BillingEntitlementRuleRefreshHook(eventPublisher);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    /**
+     * Wildcard hook — runs on every record create, so its fast path (cached empty
+     * rule list) must stay allocation-free. See the class doc.
+     */
+    @Bean
+    public io.kelta.worker.listener.MemberEntitlementQuotaHook memberEntitlementQuotaHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.worker.service.billing.BillingEntitlementRuleCache ruleCache,
+            io.kelta.worker.service.billing.EntitlementService entitlementService,
+            io.kelta.runtime.registry.CollectionRegistry collectionRegistry,
+            io.kelta.runtime.query.QueryEngine queryEngine,
+            tools.jackson.databind.ObjectMapper objectMapper) {
+        io.kelta.worker.listener.MemberEntitlementQuotaHook hook =
+                new io.kelta.worker.listener.MemberEntitlementQuotaHook(
+                        ruleCache, entitlementService, collectionRegistry, queryEngine, objectMapper);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
     public PageLayoutConfigEventPublisher pageLayoutConfigEventPublisher(
             BeforeSaveHookRegistry hookRegistry,
             PlatformEventPublisher eventPublisher) {

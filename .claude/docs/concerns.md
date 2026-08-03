@@ -564,6 +564,19 @@ Regression guard: `TenantAwareDataSourceTest` asserts tenant connections use tra
 
 **Remaining caveat — kelta-ai:** `kelta-ai/src/main/resources/application.yml` still uses `hikari.connection-init-sql: SET app.current_tenant_id = ''` (a session-level set to the bypass value). kelta-ai runs in admin/bypass mode and filters tenants explicitly in SQL rather than relying on RLS tenant isolation, so it is not a leak vector — but if kelta-ai ever begins relying on RLS for tenant-scoped reads, it must adopt the same transaction-scoped `SET LOCAL` mechanism before being placed behind a transaction-pool. Tracked as a follow-up.
 
+- **Compose healthchecks for kelta-worker and kelta-ai can never fail.** Both set
+  `management.endpoint.health.show-details: always`, so `/actuator/health` returns every
+  component in the body — and their healthcheck is
+  `wget -qO- .../actuator/health | grep -q UP`, which matches a healthy *sub-component* even
+  when the overall status is DOWN. In practice `docker compose up --wait` will happily proceed
+  with a DOWN worker. `kelta-auth` is unaffected (`show-details: when-authorized`, so an
+  unauthenticated probe sees only the top-level status). The gateway's check was fixed to use
+  the exit code against `/actuator/health/readiness` (Spring maps DOWN to 503, and wget exits
+  non-zero). **The same fix was deliberately NOT applied to worker/ai here**: their overall
+  health aggregates every indicator, so making the check strict could newly block startup on an
+  optional/degraded component, and that needs a verified full-stack run rather than a
+  speculative one-liner. Fix it as its own change, with a compose run to prove it.
+
 ## Test Coverage Gaps
 
 - Schema migration edge cases (`SchemaMigrationEngine` — ~880 lines) — the destructive `migrateSchemaDestructive` (ADD/DROP/ALTER) path now has engine unit tests + a real-DB `SchemaMigrationScenarioTest`; the older non-destructive `migrateSchema` (deprecate) branch is still lightly covered.

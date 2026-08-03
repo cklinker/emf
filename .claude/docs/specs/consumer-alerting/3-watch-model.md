@@ -3,6 +3,35 @@
 > Child of `specs/consumer-alerting/README.md`. Foundation for slice 4 (matcher) and slice 5
 > (member surface). Backend-only.
 
+> **Landed (V179).** Five tables, both system collections, five repositories, the
+> `service/availability` scaffold, 21 unit tests and a harness scenario. Four notes against
+> the design below:
+> - **No refresh hooks were written.** §5 calls for `WatchTargetRefreshHook` /
+>   `WatchRefreshHook`, but `SystemCollectionCacheInvalidationListener` derives its name set
+>   from `SystemCollectionDefinitions.byName()` and consumes `kelta.record.changed.>`
+>   broadcast — so simply registering the collections already gives fleet-wide cache eviction.
+>   Dedicated hooks would have been two dead classes. Slice 4 should revisit only if its
+>   matcher adds a target cache of its own.
+> - **Episode minting moved into the upsert statement.** `AvailabilityStateRepository.record`
+>   is one atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING`, so a CLOSED→OPEN edge is
+>   decided by the database. A read-then-write would let two pods processing the same event
+>   both conclude "this just opened" and both alert.
+> - **`alert_delivery` has no `tenant_id` and no RLS policy.** It is reachable only through
+>   its alert, which is tenant-scoped and RLS'd, and the FK cascade ties their lifetimes.
+>   A denormalized tenant column purely to hang a policy on would be a second source of truth
+>   that could drift from the parent.
+> - **`WatchCriteria` is versioned** (`v` key). The matcher pushes the date overlap into SQL,
+>   so the stored shape is effectively part of a query plan: a silent shape change would not
+>   error, it would just stop matching and members would quietly receive nothing. Dates are
+>   `LocalDate`, not instants — "August 14–16" means those calendar days wherever the target
+>   is, and converting to an instant would shift the window by a timezone offset.
+>
+> Verified against real Postgres before building on it: duplicate `(tenant, source,
+> external_id)` rejected; same external id under a different source allowed; deleting a target
+> with live watches blocked; alert dedupe tuple rejected; a **new episode for the same slot
+> accepted** (the reopen case); deliveries cascade. Episode semantics tested directly —
+> first sighting alerts, four repeat polls do not, close clears, reopen alerts again.
+
 ## 1. Goal & scope
 
 Delivers: the watch/target data model as reusable platform substrate — `watch-targets` +

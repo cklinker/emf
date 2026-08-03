@@ -124,6 +124,10 @@ public final class SystemCollectionDefinitions {
         definitions.add(billingPlans());
         definitions.add(billingEntitlementRules());
 
+        // Availability alerting (consumer-alerting slice 3)
+        definitions.add(watchTargets());
+        definitions.add(watches());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -480,6 +484,58 @@ public final class SystemCollectionDefinitions {
                 .withEnumValues(List.of("PORTAL", "ALL")))
             .addField(FieldDefinition.string("message", 500))
             .addField(FieldDefinition.bool("active", true))
+            .build();
+    }
+
+    /**
+     * Something watchable — a campsite, an interview slot pool, a race, a permit
+     * (consumer-alerting slice 3). Identified by {@code (source, externalId)}, so
+     * two sources that happen to reuse the same upstream id cannot collide; that
+     * pair is what an external poller's report resolves against.
+     *
+     * <p>{@code metadata} is opaque per-source extras (upstream ids, grouping,
+     * optional geo) — the platform stores and returns it without interpreting it.
+     */
+    public static CollectionDefinition watchTargets() {
+        return systemBuilder("watch-targets", "Watch Targets", "watch_target")
+            .displayFieldName("name")
+            .addImmutableField("source")
+            .addImmutableField("externalId")
+            .addField(FieldDefinition.requiredString("source", 50))
+            .addField(FieldDefinition.requiredString("externalId", 200)
+                .withColumnName("external_id"))
+            .addField(FieldDefinition.requiredString("name", 255))
+            .addField(FieldDefinition.string("category", 50))
+            .addField(FieldDefinition.json("metadata").withDefault(Map.of()))
+            .addField(FieldDefinition.bool("active", true))
+            .build();
+    }
+
+    /**
+     * A member's standing interest in a target (consumer-alerting slice 3).
+     *
+     * <p>{@code criteria} holds the match predicate
+     * ({@code {dateStart, dateEnd, quantity?, minDuration?}}); the matcher pushes
+     * the date-range overlap into SQL and evaluates the rest in Java, so this
+     * shape must stay stable — see {@code WatchCriteria}, which versions it.
+     * {@code channels} is the subset of the member's entitled alert channels.
+     *
+     * <p>Written through the slice-5 owner-scoped controller; the generic route is
+     * owner-guarded there too.
+     */
+    public static CollectionDefinition watches() {
+        return systemBuilder("watches", "Watches", "watch")
+            .displayFieldName("id")
+            .addField(FieldDefinition.lookup("memberId", "users", "Member")
+                .withColumnName("member_id"))
+            .addField(FieldDefinition.lookup("targetId", "watch-targets", "Target")
+                .withColumnName("target_id"))
+            .addField(FieldDefinition.json("criteria").withDefault(Map.of()))
+            .addField(FieldDefinition.json("channels").withDefault(List.of()))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("ACTIVE")
+                .withEnumValues(List.of("ACTIVE", "PAUSED", "EXPIRED", "FULFILLED")))
+            .addField(FieldDefinition.datetime("expiresAt").withColumnName("expires_at"))
             .build();
     }
 

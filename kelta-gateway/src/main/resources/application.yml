@@ -150,6 +150,14 @@ management:
       show-details: always
       probes:
         enabled: true
+      group:
+        # The gateway is only READY once its route table is populated.
+        # RouteInitializer is an ApplicationRunner, so it runs AFTER the web
+        # server starts accepting requests — without this, /actuator/health
+        # reports UP while every /api/** request still 404s, and a Kubernetes
+        # readiness probe would send real traffic to a pod that cannot route it.
+        readiness:
+          include: readinessState,routeReadiness
   health:
     redis:
       enabled: true

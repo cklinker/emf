@@ -1,6 +1,7 @@
 package io.kelta.gateway.config;
 
 import io.kelta.gateway.cache.GatewayCacheManager;
+import io.kelta.gateway.health.RouteReadinessHealthIndicator;
 import io.kelta.gateway.route.RouteRegistry;
 import io.kelta.gateway.service.RouteConfigService;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,9 +10,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 /**
@@ -42,16 +47,49 @@ class RouteInitializerTest {
     @Mock
     private ApplicationArguments applicationArguments;
 
+    private RouteReadinessHealthIndicator routeReadiness;
     private RouteInitializer routeInitializer;
 
     @BeforeEach
     void setUp() {
+        // Real indicator, not a mock — the point of these tests is that the
+        // readiness flag actually flips.
+        routeReadiness = new RouteReadinessHealthIndicator(routeRegistry);
         routeInitializer = new RouteInitializer(
             routeRegistry,
             routeConfigService,
             eventPublisher,
-            cacheManager
+            cacheManager,
+            routeReadiness
         );
+    }
+
+    @Test
+    void testGatewayIsNotReadyBeforeRoutesLoad() {
+        // The web server is already accepting requests at this point; readiness
+        // must not claim otherwise.
+        assertFalse(routeReadiness.isReady());
+        assertEquals(Status.DOWN, routeReadiness.health().getStatus());
+    }
+
+    @Test
+    void testRun_MarksGatewayReady() {
+        routeInitializer.run(applicationArguments);
+
+        assertTrue(routeReadiness.isReady());
+        assertEquals(Status.UP, routeReadiness.health().getStatus());
+    }
+
+    @Test
+    void testRun_MarksReadyEvenWhenBootstrapFetchFails() {
+        // Static routes are registered unconditionally, so a worker blip must not
+        // leave this pod permanently out of the load balancer.
+        doThrow(new IllegalStateException("worker unreachable"))
+            .when(routeConfigService).refreshRoutes();
+
+        routeInitializer.run(applicationArguments);
+
+        assertTrue(routeReadiness.isReady());
     }
 
     @Test

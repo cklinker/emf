@@ -1,6 +1,7 @@
 package io.kelta.gateway.config;
 
 import io.kelta.gateway.cache.GatewayCacheManager;
+import io.kelta.gateway.health.RouteReadinessHealthIndicator;
 import io.kelta.gateway.route.RouteDefinition;
 import io.kelta.gateway.route.RouteRegistry;
 import io.kelta.gateway.service.RouteConfigService;
@@ -34,6 +35,7 @@ public class RouteInitializer implements ApplicationRunner {
     private final RouteConfigService routeConfigService;
     private final ApplicationEventPublisher eventPublisher;
     private final GatewayCacheManager cacheManager;
+    private final RouteReadinessHealthIndicator routeReadiness;
 
     @Value("${kelta.gateway.ai-service-url:}")
     private String aiServiceUrl;
@@ -48,16 +50,19 @@ public class RouteInitializer implements ApplicationRunner {
      * @param routeConfigService Service for fetching routes from the worker
      * @param eventPublisher     Event publisher for triggering route refresh
      * @param cacheManager       Gateway cache manager to prime on startup
+     * @param routeReadiness     Readiness gate flipped once routes are loaded
      */
     public RouteInitializer(
             RouteRegistry routeRegistry,
             RouteConfigService routeConfigService,
             ApplicationEventPublisher eventPublisher,
-            GatewayCacheManager cacheManager) {
+            GatewayCacheManager cacheManager,
+            RouteReadinessHealthIndicator routeReadiness) {
         this.routeRegistry = routeRegistry;
         this.routeConfigService = routeConfigService;
         this.eventPublisher = eventPublisher;
         this.cacheManager = cacheManager;
+        this.routeReadiness = routeReadiness;
     }
 
     @Override
@@ -85,7 +90,15 @@ public class RouteInitializer implements ApplicationRunner {
         logger.info("Publishing RefreshRoutesEvent to update Gateway route cache");
         eventPublisher.publishEvent(new RefreshRoutesEvent(this));
 
-        logger.info("Route initialization completed with {} routes", routeRegistry.size());
+        // Only now is the gateway able to route /api/** — the web server has been
+        // accepting requests since before this runner started. Flip readiness last,
+        // and flip it even if the bootstrap fetch failed above: static routes are
+        // registered unconditionally, so the gateway is still useful, and staying
+        // unready over a transient worker blip would turn it into an outage.
+        routeReadiness.markRoutesInitialized();
+
+        logger.info("Route initialization completed with {} routes; gateway is now READY",
+                routeRegistry.size());
     }
 
     /**

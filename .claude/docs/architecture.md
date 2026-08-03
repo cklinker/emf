@@ -68,6 +68,35 @@ Cross-cutting (off main path): `ObservabilityContextFilter (-90)`, `HttpBodyCapt
 resolution is done by `IncludeResolver` (`jsonapi` package), not a numbered filter; read-side
 FLS is enforced in the worker (`CerbosFieldSecurityAdvice`), not the gateway.
 
+### Gateway startup & readiness
+
+`RouteInitializer` is an `ApplicationRunner`, and those run **after** Spring Boot has started
+the web server. So there is a window where the gateway is listening, answers
+`/actuator/health` with UP, and has an **empty route table** — every `/api/**` request 404s.
+The window is not instant: initialization makes two blocking calls to the worker (tenant-slug
+priming, then the bootstrap fetch).
+
+`RouteReadinessHealthIndicator` closes that window. It reports DOWN until `RouteInitializer`
+finishes and is wired into the **readiness group**
+(`management.endpoint.health.group.readiness.include: readinessState,routeReadiness`), so
+`/actuator/health/readiness` returns 503 until routes exist. Verified end-to-end: 503 with
+`routeCount: 0` while loading, 200 with the real count afterwards.
+
+Three properties worth preserving:
+
+- **Gate on the readiness *group*, not overall `/actuator/health`.** The group contains only
+  `readinessState` + `routeReadiness`, so a degraded Redis/worker/Cerbos indicator cannot stop
+  a gateway pod from serving traffic it is perfectly able to serve.
+- **Readiness is one-way.** Once ready, a later refresh returning zero routes does not flap the
+  pod back out of the load balancer — that would turn a worker problem into a gateway outage.
+- **Ready even if the bootstrap fetch failed.** Static routes are registered unconditionally,
+  so the gateway still routes; staying unready over a transient worker blip would be worse than
+  serving the static route table.
+
+In Kubernetes this matters beyond tests: a readiness probe satisfied during the window sends
+real traffic to a pod that cannot route it, so every rollout serves 404s until each new pod
+catches up. Point the readiness probe at `/actuator/health/readiness`.
+
 ### Rate limiting
 
 Two limiters with different jobs, plus one shared exemption list.

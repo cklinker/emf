@@ -3,7 +3,28 @@
 > Child of `specs/consumer-alerting/README.md`. Two PRs: **1A core + webhook**, **1B portal
 > surface + enforcement**. Both **security-typed → NO auto-merge**.
 
-> **1A landed (V178).** Two items listed below under PR-1A moved to **1B**, because 1A has no
+> **1B landed.** Delivered: `StripeApiClient` (+ `StripeFormBody`, `StripeApiException`),
+> `ReturnUrlValidator`, `BillingCheckoutService`, `BillingController`,
+> `MemberEntitlementQuotaHook` + `BillingEntitlementRuleCache` +
+> `BillingEntitlementRuleRefreshHook`, `BillingPassExpirySweep`, and
+> `BillingWebhookScenarioTest` in the harness.
+>
+> Two corrections to the design below, both found while implementing:
+> - **Quota rejections are HTTP 400, not 422.** A `BeforeSaveResult.error(...)` becomes a
+>   `ValidationException`, which `GlobalExceptionHandler` maps to 400 with JSON:API code
+>   `beforeSaveHook` and pointer `/data/attributes/_record`. There is no 422 mapping in the
+>   platform; inventing one would have meant a bespoke exception path for this hook alone.
+> - **Wildcard hook ordering is not what `getOrder()` suggests.** `BeforeSaveHookRegistry`
+>   runs *every* collection-specific hook before *any* wildcard hook, so the quota hook's
+>   `-90` orders it only within the wildcard group.
+>
+> Also added, not in the original plan: `ReturnUrlValidator`. Checkout and portal return
+> URLs are handed to the processor, which redirects a paying member to them — unvalidated
+> that is an open redirect originating inside a real payment flow. Validation is
+> origin-equality (not prefix, which `https://app.example.com.evil.test` defeats), HTTPS-only,
+> userinfo rejected, and an empty allowlist denies everything.
+>
+> **1A landed (V178).** Two items listed below under PR-1A moved to **1B**, because 1A had no
 > caller for either and shipping unused code is worse than shipping it late:
 > - `StripeApiClient` — every call it makes (create customer, checkout session, portal
 >   session) belongs to a 1B endpoint. The webhook path never calls out to Stripe. The

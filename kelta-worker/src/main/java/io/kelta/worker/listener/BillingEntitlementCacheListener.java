@@ -1,5 +1,6 @@
 package io.kelta.worker.listener;
 
+import io.kelta.worker.service.billing.BillingEntitlementRuleCache;
 import io.kelta.worker.service.billing.EntitlementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,11 +25,14 @@ public class BillingEntitlementCacheListener {
     private static final Logger log = LoggerFactory.getLogger(BillingEntitlementCacheListener.class);
 
     private final EntitlementService entitlementService;
+    private final BillingEntitlementRuleCache ruleCache;
     private final ObjectMapper objectMapper;
 
     public BillingEntitlementCacheListener(EntitlementService entitlementService,
+                                           BillingEntitlementRuleCache ruleCache,
                                            ObjectMapper objectMapper) {
         this.entitlementService = entitlementService;
+        this.ruleCache = ruleCache;
         this.objectMapper = objectMapper;
     }
 
@@ -49,6 +53,17 @@ public class BillingEntitlementCacheListener {
             String userId = payload == null || payload.isNull()
                     ? null
                     : textOrNull(payload.get("userId"));
+            String reason = payload == null || payload.isNull()
+                    ? null
+                    : textOrNull(payload.get("reason"));
+
+            if (BillingEntitlementRuleRefreshHook.REASON_RULES_CHANGED.equals(reason)) {
+                // A rule change alters what the quota hook enforces, not what any
+                // member is entitled to — evict the rules, leave entitlements warm.
+                log.info("Billing entitlement rules changed for {} — evicting rule cache", tenantId);
+                ruleCache.invalidate(tenantId);
+                return;
+            }
 
             if (userId == null) {
                 log.info("Billing entitlements changed tenant-wide for {} — evicting all", tenantId);

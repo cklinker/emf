@@ -199,6 +199,27 @@ passes no principal into the delete path — threading the deleter through `Quer
 is a cross-cutting signature change, deferred), and version detail renders historical lookup
 ids raw when they're not in the live page's `lookupDisplayMap` (no write-time display capture).
 
+- **Flow/job execution logs grew without bound — mitigated by `FlowLogRetentionSweep`
+  (consumer-alerting slice 2), but DRY-RUN by default so it is not yet actually pruning.**
+  `flow_execution`, `flow_step_log`, `flow_pending_resume` and `job_execution_log` had no
+  pruning at all — `JdbcFlowStore`'s only DELETE is `deletePendingResume` — so a
+  high-frequency flow makes them the largest tables in the database. The sweep prunes terminal
+  executions older than `kelta.flow.retention.max-age-days` (default 60), cascading to step
+  logs and pending-resume rows, plus `job_execution_log` by the same age. **It is DRY-RUN by
+  default** (`kelta.flow.retention.dry-run:true`, matching the telehealth purge posture): it
+  only LOGS what it WOULD delete until an operator sets `dry-run=false`, so **this remains a
+  growth concern in any environment left in dry-run**. Guardrails when armed: only terminal
+  statuses (`COMPLETED|FAILED|CANCELLED`) are eligible, so a `WAITING` flow parked for months
+  is never collected out from under itself; `FOR UPDATE SKIP LOCKED` keeps concurrent pods on
+  disjoint slices; and work is capped per cycle at `batch-size × max-batches` per table so a
+  first arming against a large backlog drains gradually rather than in one enormous delete
+  against a shared Postgres. Age is `COALESCE(completed_at, started_at)` because
+  `completed_at` is nullable and a terminal row missing one would otherwise never age out.
+  **Deletion is irreversible and purged runs vanish from the flow-run observability UI** — the
+  60-day default keeps recent history; confirm that window suits the environment before
+  arming, and watch `pg_stat_activity` on the first armed cycle. Related, still open: the
+  `record_version` growth concern above, which this sweep does **not** address.
+
 ## Known Bugs
 
 (No open bugs from the original audit. See Resolved → Bugs.)

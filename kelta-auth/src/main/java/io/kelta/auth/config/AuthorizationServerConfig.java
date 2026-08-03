@@ -149,6 +149,7 @@ public class AuthorizationServerConfig {
                                 "/portal/login/verify",
                                 "/portal/api/login/request",
                                 "/portal/api/login/verify",
+                                "/portal/api/signup",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/auth/session",
@@ -217,7 +218,10 @@ public class AuthorizationServerConfig {
                 )
                 .csrf(csrf -> csrf
                         .ignoringRequestMatchers("/auth/session", "/auth/direct-login",
-                                "/portal/api/login/request", "/portal/api/login/verify")
+                                "/portal/api/login/request", "/portal/api/login/verify",
+                                // Easy to miss: permitAll alone is not enough — without
+                                // a CSRF exemption this POST 403s for every caller.
+                                "/portal/api/signup")
                 );
 
         // Enable federated OAuth2 login only when federation is configured

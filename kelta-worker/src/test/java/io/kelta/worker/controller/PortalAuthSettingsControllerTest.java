@@ -76,7 +76,7 @@ class PortalAuthSettingsControllerTest {
         ResponseEntity<PortalAuthSettingsController.PortalAuthSettings> response =
                 withTenant(() -> controller.put(request,
                         new PortalAuthSettingsController.PortalAuthSettings(
-                                List.of(ALLOWED), ALLOWED)));
+                                List.of(ALLOWED), ALLOWED, false)));
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         verify(jdbcTemplate).update(contains("jsonb_set"),
@@ -88,23 +88,23 @@ class PortalAuthSettingsControllerTest {
     void putValidation() {
         assertThatThrownBy(() -> withTenant(() -> controller.put(request,
                 new PortalAuthSettingsController.PortalAuthSettings(
-                        List.of("http://portal.example.com/cb"), null))))
+                        List.of("http://portal.example.com/cb"), null, false))))
                 .isInstanceOf(ResponseStatusException.class);
 
         assertThatThrownBy(() -> withTenant(() -> controller.put(request,
                 new PortalAuthSettingsController.PortalAuthSettings(
-                        List.of("https://portal.example.com/cb#frag"), null))))
+                        List.of("https://portal.example.com/cb#frag"), null, false))))
                 .isInstanceOf(ResponseStatusException.class);
 
         List<String> eleven = java.util.stream.IntStream.range(0, 11)
                 .mapToObj(i -> "https://portal.example.com/cb" + i).toList();
         assertThatThrownBy(() -> withTenant(() -> controller.put(request,
-                new PortalAuthSettingsController.PortalAuthSettings(eleven, null))))
+                new PortalAuthSettingsController.PortalAuthSettings(eleven, null, false))))
                 .isInstanceOf(ResponseStatusException.class);
 
         assertThatThrownBy(() -> withTenant(() -> controller.put(request,
                 new PortalAuthSettingsController.PortalAuthSettings(
-                        List.of(ALLOWED), "https://other.example.com/cb"))))
+                        List.of(ALLOWED), "https://other.example.com/cb", false))))
                 .isInstanceOf(ResponseStatusException.class);
 
         verify(jdbcTemplate, never()).update(anyString(), anyString(), anyString());
@@ -116,7 +116,7 @@ class PortalAuthSettingsControllerTest {
         ResponseEntity<PortalAuthSettingsController.PortalAuthSettings> response =
                 withTenant(() -> controller.put(request,
                         new PortalAuthSettingsController.PortalAuthSettings(
-                                List.of("http://localhost:3000/auth/callback"), null)));
+                                List.of("http://localhost:3000/auth/callback"), null, false)));
         assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 
@@ -128,7 +128,7 @@ class PortalAuthSettingsControllerTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("MANAGE_USERS");
         assertThatThrownBy(() -> withTenant(() -> controller.put(request,
-                new PortalAuthSettingsController.PortalAuthSettings(List.of(), null))))
+                new PortalAuthSettingsController.PortalAuthSettings(List.of(), null, false))))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("MANAGE_USERS");
     }

@@ -131,6 +131,31 @@ public class PortalLoginService {
      * per-request — no cache, so no cross-pod invalidation to keep consistent.
      * Empty when the tenant is unknown or nothing is configured.
      */
+    /**
+     * Whether this tenant permits public portal self-signup
+     * ({@code tenant.settings.portalAuth.selfSignupEnabled}).
+     *
+     * <p><b>Defaults to false</b>, including for an unknown tenant or absent
+     * setting: signup opens a door that creates accounts from unauthenticated
+     * traffic, so it must be turned on deliberately rather than inherited by
+     * every existing invite-only tenant on deploy.
+     *
+     * <p>Read per-request straight from the tenant row, matching
+     * {@link #portalRedirectUris} — no cache, so no cross-pod invalidation to
+     * keep consistent, and disabling it takes effect immediately.
+     */
+    public boolean selfSignupEnabled(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return false;
+        }
+        return jdbcTemplate.queryForList(
+                        "SELECT settings#>>'{portalAuth,selfSignupEnabled}' FROM tenant WHERE id = ?",
+                        String.class, tenantId).stream()
+                .findFirst()
+                .map(Boolean::parseBoolean)
+                .orElse(false);
+    }
+
     public List<String> portalRedirectUris(String tenantId) {
         if (tenantId == null || tenantId.isBlank()) {
             return List.of();

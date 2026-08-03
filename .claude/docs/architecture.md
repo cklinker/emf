@@ -327,6 +327,30 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   re-runs. Being an unauthenticated path also bypasses `TenantIpAllowlistFilter` — the same
   trade the LiveKit webhook makes. Admin authoring of plans/rules rides the system-collection
   JSON:API and is gated by the new **`MANAGE_BILLING`** permission.
+- **Member watch API** (consumer-alerting slice 5): `/api/watches/**` is a static route, so
+  only `API_ACCESS` is checked at the gateway and **all** member scoping is in
+  `WatchController`. Every endpoint acts on the calling member from `X-User-Id`; a foreign
+  watch id returns **404, not 403**, because 403 would confirm the id exists and let a member
+  enumerate others' watches by probing. Mutations are self-only — internal staff holding
+  `MANAGE_DATA` may pass `?memberId=` to *read* a member's watches for support, but not to
+  write them. Writes go through `QueryEngine`, not the repository, so `WatchGuardHook` and
+  `MemberEntitlementQuotaHook` both fire. `WatchGuardHook` (BeforeSaveHook on `watches`,
+  order -100) covers the **generic dynamic route**, which bypasses the controller entirely —
+  it blocks creating/editing/deleting another member's watch and, notably, re-owning one; it
+  **fails closed** on an unresolvable identity (unlike the fail-open quota hook: this protects
+  other members' data, not revenue) and admits internal-tier writes with no HTTP identity.
+- **Portal self-signup** (consumer-alerting slice 5): `POST /portal/api/signup` on **kelta-auth**
+  (not gateway-routed). Always answers **202** — distinguishing created/exists/staff would make
+  an unauthenticated endpoint an account-enumeration oracle. The only client-visible failure is
+  a disallowed `redirectUri`, validated *before* any account lookup so it carries no account
+  signal; an unknown tenant has an empty allowlist and fails identically. Gated per tenant on
+  `tenant.settings.portalAuth.selfSignupEnabled`, **default false** — a deploy must not open
+  public account creation on existing invite-only tenants. Account creation is delegated to the
+  worker's `POST /api/internal/portal/signup` (shared internal token) so
+  `PortalUserService.invitePortalUser` enforces the **`maxPortalUsers` seat governor**: public
+  signup without a seat cap is unbounded account creation, and kelta-auth has no quota resolver
+  to duplicate it with. Requires **both** the `permitAll` entry and a **CSRF exemption** in
+  `AuthorizationServerConfig` — permitAll alone leaves the POST returning 403.
 - **Analytics endpoints** (`/api/reports/{id}/execute|export`, `/api/dashboards/{id}/data`,
   `/api/dashboards/{id}/components/{cid}/data`): static routes, so gated **in-controller** —
   `ReportExecutionController`/`DashboardDataController.requireAnalyticsAccess` requires a granted

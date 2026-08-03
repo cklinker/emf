@@ -5,6 +5,34 @@ at the bottom so reviewers can see what's already been addressed.
 
 ## Security Risks
 
+**Public-traffic controls — what is enforced, and where (consumer-alerting slice 7).**
+Rate limiting is now Redis-backed everywhere, so a budget is the fleet's rather than each
+replica's. Three things are worth knowing before changing any of it:
+- **`/portal/**` is limited in kelta-auth, not the gateway.** kelta-auth has its own ingress
+  and that traffic never reaches the gateway, so a gateway `ip-paths` entry for
+  `/portal/api/signup` would match nothing while *reading* like protection. Adding a portal
+  path to the gateway map is a no-op; add it to `kelta.auth.rate-limit.ip-paths` instead.
+- **The fixed-window TTL must never be refreshed per request.** Both implementations
+  (`RedisRateLimiter` in the gateway, `PortalPublicRateLimitFilter` in kelta-auth) carry the
+  same Lua guard. Refreshing it turns the window into an idle-expiry that never resets under
+  sustained traffic — the 2026-07-11 lockout, see Known Bugs below. The duplication is
+  deliberate: one side is reactive, the other servlet-blocking. **They must stay behaviourally
+  identical**; each has a regression test asserting the guard.
+- **Limiter keys never trust the leftmost `X-Forwarded-For` entry.** kelta-auth counts
+  `trusted-proxy-count` hops back from the right. Honouring the leftmost value would let a
+  caller mint a fresh bucket per request by varying one header, i.e. make the limiter
+  decorative. Set the count to 0 when the service is directly exposed.
+
+Everything fails **open** on a Redis outage except the bot challenge's replay claim, which
+fails **closed** — a limiter failing open leaves the other controls standing, while a
+challenge failing open is an open door on the endpoint it exists to protect.
+
+`PublicSurfaceTest` pins the gateway's unauthenticated prefix allowlist against the shipped
+`application.yml`. Widening that surface is one line of YAML and nothing else in the build
+would notice, so the test fails on any change — update it deliberately, and confirm the new
+endpoint carries its own trust anchor, since an unauthenticated path also bypasses
+`TenantIpAllowlistFilter`.
+
 **`TenantContext.runAsPlatform`/`callAsPlatform` is a silent-data-loss trap (2026-07-04).**
 The javadoc claims a `platform_bypass` RLS policy grants access under the `__platform__`
 sentinel — **that policy does not exist in any migration**. `TenantAwareDataSource` binds the
@@ -580,6 +608,12 @@ Regression guard: `TenantAwareDataSourceTest` asserts tenant connections use tra
 ## Test Coverage Gaps
 
 - **No worker Spring-context test — bean-wiring bugs reach production silently.** Nothing in the worker suite starts an application context, so a bean that cannot be constructed compiles, passes every unit test, and fails only at pod startup. This has now bitten **three** classes, all the same shape: a `@Component` with a **package-private test constructor alongside the production one** is multi-constructor, so Spring looks for a no-arg constructor and refuses to start. `StripeApiClient` (caught by a harness run that failed to boot the container); `FcmPushProvider` **and** `ApnsPushProvider` (caught 2026-08-03 by the new `PushProviderWiringTest` — both meant `kelta.push.provider=fcm|apns` was **unstartable**, undetected since those providers shipped). **Adding a second constructor to a `@Component` requires `@Autowired` on the production one.** Likewise, adding a second bean of an already-injected type breaks single-typed injection points (`WebPushProvider` vs `PushProvider` — fixed by `@Primary` on the mutually exclusive `kelta.push.provider` transports). `PushProviderWiringTest` is the pattern to copy: an `ApplicationContextRunner` over just the beans involved, no infrastructure. A whole-worker context test is still owed.
+- **Rate-limit tests are mocked — no test proves two replicas actually share a counter.** The
+  gateway and kelta-auth suites assert the Redis *key shape* and the TTL contract, which is
+  what the multi-replica fix turns on, but nothing executes the Lua against a real Redis. The
+  window guard is likewise a text assertion on the script source: it catches an added
+  unconditional `EXPIRE`, not a semantically-equivalent rewrite using `SET … EX`. A
+  Testcontainers-Redis scenario in `kelta-test-harness` would close both.
 - Schema migration edge cases (`SchemaMigrationEngine` — ~880 lines) — the destructive `migrateSchemaDestructive` (ADD/DROP/ALTER) path now has engine unit tests + a real-DB `SchemaMigrationScenarioTest`; the older non-destructive `migrateSchema` (deprecate) branch is still lightly covered.
 - SQL filter operator mappings in `PhysicalTableStorageAdapter` — no tests.
 - Federated user provisioning (`FederatedUserMapper`) — happy path only; group→profile mapping permutations not covered.

@@ -2,10 +2,16 @@ package io.kelta.gateway.filter;
 
 import io.kelta.gateway.geo.ClientIpResolver;
 import io.kelta.gateway.ratelimit.RateLimitExemptionService;
+import io.kelta.gateway.ratelimit.RateLimitResult;
+import io.kelta.gateway.ratelimit.RedisRateLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -14,12 +20,17 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,34 +39,42 @@ import static org.mockito.Mockito.when;
  *
  * Tests verify that the filter:
  * - Rate-limits only the configured public path prefixes (longest-prefix match)
- * - Gives each path prefix its own per-IP bucket
- * - Honours the CIDR exemption list
+ * - Delegates counting to the shared Redis window, keyed per prefix and per IP
+ * - Honours the CIDR exemption list without spending a Redis round trip
  * - Returns 429 with an honest Retry-After when a budget is exhausted
- * - Resolves client IPs from headers and remote address, and cleans up stale entries
+ * - Resolves client IPs from headers and remote address
  */
+@ExtendWith(MockitoExtension.class)
 @DisplayName("IpRateLimitFilter Tests")
 class IpRateLimitFilterTest {
 
-    /** Small budgets keep the exhaustion loops fast. */
+    /** Small budgets keep the expectations readable. */
     private static final List<String> PATHS =
             List.of("/actuator/health=3", "/api/billing/webhooks=5");
 
-    private IpRateLimitFilter filter;
+    @Mock
+    private RedisRateLimiter rateLimiter;
+
+    @Mock
     private GatewayFilterChain chain;
+
+    private IpRateLimitFilter filter;
 
     @BeforeEach
     void setUp() {
         filter = newFilter(List.of());
-        chain = mock(GatewayFilterChain.class);
-        when(chain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());
+        lenient().when(chain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());
     }
 
     private IpRateLimitFilter newFilter(List<String> exemptCidrs) {
         ClientIpResolver resolver = new ClientIpResolver(true);
-        IpRateLimitFilter f = new IpRateLimitFilter(
-                resolver, new RateLimitExemptionService(resolver, exemptCidrs), PATHS);
-        f.clearAll();
-        return f;
+        return new IpRateLimitFilter(
+                resolver, new RateLimitExemptionService(resolver, exemptCidrs), rateLimiter, PATHS);
+    }
+
+    private void givenWindow(RateLimitResult result) {
+        when(rateLimiter.checkWindow(anyString(), anyLong(), any(Duration.class)))
+                .thenReturn(Mono.just(result));
     }
 
     @Nested
@@ -100,9 +119,11 @@ class IpRateLimitFilterTest {
         void shouldPreferLongestPrefix() {
             Map<String, Integer> budgets = IpRateLimitFilter.parsePathBudgets(
                     List.of("/api/billing=10", "/api/billing/webhooks=300"));
+            ClientIpResolver resolver = new ClientIpResolver(true);
             IpRateLimitFilter f = new IpRateLimitFilter(
-                    new ClientIpResolver(true),
-                    new RateLimitExemptionService(new ClientIpResolver(true), List.of()),
+                    resolver,
+                    new RateLimitExemptionService(resolver, List.of()),
+                    rateLimiter,
                     List.of("/api/billing=10", "/api/billing/webhooks=300"));
             assertThat(budgets).containsEntry("/api/billing/webhooks", 300);
             assertThat(f.matchPath("/api/billing/webhooks/stripe/t1"))
@@ -120,94 +141,138 @@ class IpRateLimitFilterTest {
             assertThat(budgets).doesNotContainKey("/nonpositive");
             assertThat(budgets).doesNotContainKey("");
         }
+
+        @Test
+        @DisplayName("defaults should not claim to protect /portal, which never transits the gateway")
+        void defaultsShouldNotIncludePortalPaths() {
+            // /portal/** is served by kelta-auth's own ingress, so an entry here
+            // would read as protection that can never fire.
+            Map<String, Integer> defaults = IpRateLimitFilter.parsePathBudgets(
+                    List.of(IpRateLimitFilter.DEFAULT_IP_PATHS.split(",")));
+            assertThat(defaults).containsOnlyKeys("/actuator/health", "/api/billing/webhooks");
+        }
     }
 
     @Nested
-    @DisplayName("Rate limiting behavior")
-    class RateLimiting {
+    @DisplayName("Redis-backed window")
+    class RedisBackedWindow {
 
         @Test
-        @DisplayName("should allow requests within limit")
-        void shouldAllowRequestsWithinLimit() {
+        @DisplayName("should pass the request down the chain when the window allows it")
+        void shouldAllowRequestWithinBudget() {
+            givenWindow(RateLimitResult.allowed(2));
             MockServerWebExchange exchange = createExchange("/actuator/health", "192.168.1.1");
 
-            StepVerifier.create(filter.filter(exchange, chain))
-                    .verifyComplete();
+            StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
 
-            verify(chain).filter(any(ServerWebExchange.class));
+            verify(chain).filter(exchange);
+            assertThat(exchange.getResponse().getStatusCode())
+                    .isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         }
 
         @Test
-        @DisplayName("should pass through non-rate-limited paths without counting")
+        @DisplayName("should return 429 with the window's real remaining TTL as Retry-After")
+        void shouldReturn429WithHonestRetryAfter() {
+            // Retry-After must be what Redis reports is left of the window, not the
+            // full window — a client told to wait 60s after 43s have elapsed backs
+            // off for nearly two windows.
+            givenWindow(RateLimitResult.notAllowed(Duration.ofSeconds(17)));
+            MockServerWebExchange exchange = createExchange("/actuator/health", "10.0.0.1");
+
+            StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+            assertThat(exchange.getResponse().getStatusCode())
+                    .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+            assertThat(exchange.getResponse().getHeaders().getFirst("Retry-After")).isEqualTo("17");
+            assertThat(exchange.getResponse().getHeaders().getFirst("Content-Type"))
+                    .isEqualTo("application/json");
+            verify(chain, never()).filter(any(ServerWebExchange.class));
+        }
+
+        @Test
+        @DisplayName("should floor Retry-After at one second")
+        void shouldFloorRetryAfterAtOneSecond() {
+            // A sub-second TTL rounds to 0, and "Retry-After: 0" invites an
+            // immediate retry that is guaranteed to be rejected again.
+            givenWindow(RateLimitResult.notAllowed(Duration.ofMillis(200)));
+            MockServerWebExchange exchange = createExchange("/actuator/health", "10.0.0.2");
+
+            StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+            assertThat(exchange.getResponse().getHeaders().getFirst("Retry-After")).isEqualTo("1");
+        }
+
+        @Test
+        @DisplayName("should key the window by matched prefix and client IP")
+        void shouldKeyWindowByPrefixAndClientIp() {
+            // This key IS the multi-replica fix: every gateway pod must increment
+            // the same counter, so the shape is asserted exactly.
+            givenWindow(RateLimitResult.allowed(4));
+            MockServerWebExchange exchange =
+                    createExchange("/api/billing/webhooks/stripe/tenant-1", "203.0.113.9");
+
+            StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+            ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+            ArgumentCaptor<Long> limitCaptor = ArgumentCaptor.forClass(Long.class);
+            ArgumentCaptor<Duration> windowCaptor = ArgumentCaptor.forClass(Duration.class);
+            verify(rateLimiter).checkWindow(keyCaptor.capture(), limitCaptor.capture(),
+                    windowCaptor.capture());
+
+            assertThat(keyCaptor.getValue())
+                    .isEqualTo("ratelimit:ip:/api/billing/webhooks:203.0.113.9");
+            assertThat(limitCaptor.getValue()).isEqualTo(5L);
+            assertThat(windowCaptor.getValue()).isEqualTo(IpRateLimitFilter.WINDOW);
+        }
+
+        @Test
+        @DisplayName("should give each matched prefix its own key for the same IP")
+        void shouldUseDistinctKeysPerPrefix() {
+            // One public endpoint's burst must not spend another endpoint's budget.
+            givenWindow(RateLimitResult.allowed(1));
+            String clientIp = "10.0.0.7";
+
+            StepVerifier.create(filter.filter(createExchange("/actuator/health", clientIp), chain))
+                    .verifyComplete();
+            StepVerifier.create(filter.filter(
+                            createExchange("/api/billing/webhooks/stripe/t1", clientIp), chain))
+                    .verifyComplete();
+
+            ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+            verify(rateLimiter, times(2))
+                    .checkWindow(keyCaptor.capture(), anyLong(), any(Duration.class));
+            assertThat(keyCaptor.getAllValues()).containsExactly(
+                    "ratelimit:ip:/actuator/health:10.0.0.7",
+                    "ratelimit:ip:/api/billing/webhooks:10.0.0.7");
+        }
+
+        @Test
+        @DisplayName("should give each client IP its own key for the same prefix")
+        void shouldUseDistinctKeysPerClientIp() {
+            givenWindow(RateLimitResult.allowed(1));
+
+            StepVerifier.create(filter.filter(createExchange("/actuator/health", "10.0.0.1"), chain))
+                    .verifyComplete();
+            StepVerifier.create(filter.filter(createExchange("/actuator/health", "10.0.0.2"), chain))
+                    .verifyComplete();
+
+            ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+            verify(rateLimiter, times(2))
+                    .checkWindow(keyCaptor.capture(), anyLong(), any(Duration.class));
+            assertThat(keyCaptor.getAllValues()).containsExactly(
+                    "ratelimit:ip:/actuator/health:10.0.0.1",
+                    "ratelimit:ip:/actuator/health:10.0.0.2");
+        }
+
+        @Test
+        @DisplayName("should not touch Redis for a path that is not rate limited")
         void shouldPassThroughNonRateLimitedPaths() {
             MockServerWebExchange exchange = createExchangeWithRemoteAddress("/api/collections");
 
-            StepVerifier.create(filter.filter(exchange, chain))
-                    .verifyComplete();
+            StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
 
-            verify(chain).filter(any(ServerWebExchange.class));
-            assertThat(filter.getTrackedIpCount()).isZero();
-        }
-
-        @Test
-        @DisplayName("should return 429 when rate limit exceeded")
-        void shouldReturn429WhenRateLimitExceeded() {
-            String clientIp = "10.0.0.1";
-            exhaust("/actuator/health", clientIp, 3);
-
-            MockServerWebExchange exceededExchange = createExchange("/actuator/health", clientIp);
-            StepVerifier.create(filter.filter(exceededExchange, chain))
-                    .verifyComplete();
-
-            assertThat(exceededExchange.getResponse().getStatusCode())
-                    .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-            // Retry-After reports the remaining window, so it is positive and never
-            // longer than the window itself.
-            String retryAfter = exceededExchange.getResponse().getHeaders().getFirst("Retry-After");
-            assertThat(retryAfter).isNotNull();
-            assertThat(Long.parseLong(retryAfter)).isBetween(1L, 60L);
-        }
-
-        @Test
-        @DisplayName("should track IPs independently")
-        void shouldTrackIpsIndependently() {
-            exhaust("/actuator/health", "10.0.0.1", 3);
-
-            MockServerWebExchange otherIpExchange = createExchange("/actuator/health", "10.0.0.2");
-            StepVerifier.create(filter.filter(otherIpExchange, chain))
-                    .verifyComplete();
-
-            assertThat(otherIpExchange.getResponse().getStatusCode())
-                    .isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-        }
-
-        @Test
-        @DisplayName("should bucket each path prefix separately for the same IP")
-        void shouldBucketPathsSeparately() {
-            String clientIp = "10.0.0.7";
-            exhaust("/actuator/health", clientIp, 3);
-
-            // Health is exhausted for this IP; the webhook path must be unaffected.
-            MockServerWebExchange webhook =
-                    createExchange("/api/billing/webhooks/stripe/tenant-1", clientIp);
-            StepVerifier.create(filter.filter(webhook, chain)).verifyComplete();
-
-            assertThat(webhook.getResponse().getStatusCode())
-                    .isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-        }
-
-        @Test
-        @DisplayName("should return JSON error body on 429")
-        void shouldReturnJsonErrorBodyOn429() {
-            String clientIp = "10.0.0.50";
-            exhaust("/actuator/health", clientIp, 3);
-
-            MockServerWebExchange exceededExchange = createExchange("/actuator/health", clientIp);
-            StepVerifier.create(filter.filter(exceededExchange, chain))
-                    .verifyComplete();
-
-            assertThat(exceededExchange.getResponse().getHeaders().getFirst("Content-Type"))
-                    .isEqualTo("application/json");
+            verify(chain).filter(exchange);
+            verify(rateLimiter, never()).checkWindow(anyString(), anyLong(), any(Duration.class));
         }
     }
 
@@ -216,31 +281,25 @@ class IpRateLimitFilterTest {
     class Exemption {
 
         @Test
-        @DisplayName("should never limit an IP inside an exempt range")
+        @DisplayName("should short-circuit an exempt IP without a Redis round trip")
         void shouldNotLimitExemptRange() {
             IpRateLimitFilter exempting = newFilter(List.of("10.0.0.0/8"));
 
-            // Well past the budget of 3.
             for (int i = 0; i < 10; i++) {
                 MockServerWebExchange exchange = createExchange("/actuator/health", "10.1.2.3");
                 StepVerifier.create(exempting.filter(exchange, chain)).verifyComplete();
                 assertThat(exchange.getResponse().getStatusCode())
                         .isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
             }
-            // Exempt traffic is not tracked at all.
-            assertThat(exempting.getTrackedIpCount()).isZero();
+            verify(rateLimiter, never()).checkWindow(anyString(), anyLong(), any(Duration.class));
         }
 
         @Test
         @DisplayName("should still limit an IP outside the exempt range")
         void shouldLimitNonExemptRange() {
+            givenWindow(RateLimitResult.notAllowed(Duration.ofSeconds(30)));
             IpRateLimitFilter exempting = newFilter(List.of("10.0.0.0/8"));
 
-            for (int i = 0; i < 3; i++) {
-                StepVerifier.create(
-                        exempting.filter(createExchange("/actuator/health", "192.0.2.5"), chain))
-                        .verifyComplete();
-            }
             MockServerWebExchange exceeded = createExchange("/actuator/health", "192.0.2.5");
             StepVerifier.create(exempting.filter(exceeded, chain)).verifyComplete();
 
@@ -251,18 +310,23 @@ class IpRateLimitFilterTest {
         @Test
         @DisplayName("should accept a bare address as a single-host exemption")
         void shouldAcceptBareAddress() {
+            givenWindow(RateLimitResult.allowed(2));
             IpRateLimitFilter exempting = newFilter(List.of("203.0.113.7"));
 
             for (int i = 0; i < 10; i++) {
-                MockServerWebExchange exchange = createExchange("/actuator/health", "203.0.113.7");
-                StepVerifier.create(exempting.filter(exchange, chain)).verifyComplete();
+                StepVerifier.create(
+                                exempting.filter(createExchange("/actuator/health", "203.0.113.7"), chain))
+                        .verifyComplete();
             }
             MockServerWebExchange neighbour = createExchange("/actuator/health", "203.0.113.8");
             StepVerifier.create(exempting.filter(neighbour, chain)).verifyComplete();
 
             assertThat(neighbour.getResponse().getStatusCode())
                     .isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-            assertThat(exempting.getTrackedIpCount()).isEqualTo(1); // only the neighbour
+            // Only the neighbour was counted; the exempt host never reached Redis.
+            ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+            verify(rateLimiter).checkWindow(keyCaptor.capture(), anyLong(), any(Duration.class));
+            assertThat(keyCaptor.getValue()).isEqualTo("ratelimit:ip:/actuator/health:203.0.113.8");
         }
     }
 
@@ -294,40 +358,6 @@ class IpRateLimitFilterTest {
     }
 
     @Nested
-    @DisplayName("Cleanup")
-    class Cleanup {
-
-        @Test
-        @DisplayName("should clean up stale entries")
-        void shouldCleanupStaleEntries() {
-            MockServerWebExchange exchange = createExchange("/actuator/health", "10.0.0.99");
-            StepVerifier.create(filter.filter(exchange, chain))
-                    .verifyComplete();
-
-            assertThat(filter.getTrackedIpCount()).isEqualTo(1);
-
-            // Cleanup should keep recent entries
-            filter.cleanupStaleEntries();
-            assertThat(filter.getTrackedIpCount()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("clearAll should remove all tracked IPs")
-        void clearAllShouldRemoveAllTrackedIps() {
-            MockServerWebExchange exchange1 = createExchange("/actuator/health", "10.0.0.1");
-            MockServerWebExchange exchange2 = createExchange("/actuator/health", "10.0.0.2");
-
-            StepVerifier.create(filter.filter(exchange1, chain)).verifyComplete();
-            StepVerifier.create(filter.filter(exchange2, chain)).verifyComplete();
-
-            assertThat(filter.getTrackedIpCount()).isEqualTo(2);
-
-            filter.clearAll();
-            assertThat(filter.getTrackedIpCount()).isZero();
-        }
-    }
-
-    @Nested
     @DisplayName("Filter ordering")
     class FilterOrdering {
 
@@ -335,13 +365,6 @@ class IpRateLimitFilterTest {
         @DisplayName("should have order -150 (before JWT filter)")
         void shouldHaveCorrectOrder() {
             assertThat(filter.getOrder()).isEqualTo(-150);
-        }
-    }
-
-    private void exhaust(String path, String clientIp, int budget) {
-        for (int i = 0; i < budget; i++) {
-            StepVerifier.create(filter.filter(createExchange(path, clientIp), chain))
-                    .verifyComplete();
         }
     }
 

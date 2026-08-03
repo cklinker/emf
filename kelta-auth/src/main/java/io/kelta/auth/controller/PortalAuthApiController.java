@@ -3,6 +3,7 @@ package io.kelta.auth.controller;
 import io.kelta.auth.config.AuthProperties;
 import io.kelta.auth.service.AuthDomainResolver;
 import io.kelta.auth.service.PortalLoginService;
+import io.kelta.auth.service.botchallenge.BotChallengeVerifier;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,7 @@ import java.util.UUID;
 public class PortalAuthApiController {
 
     private static final Logger log = LoggerFactory.getLogger(PortalAuthApiController.class);
+    private static final Logger audit = LoggerFactory.getLogger("security.audit");
 
     private static final long ACCESS_TOKEN_TTL_HOURS = 8;
 
@@ -52,25 +54,36 @@ public class PortalAuthApiController {
     private final AuthDomainResolver domainResolver;
     private final AuthProperties authProperties;
     private final JwtEncoder jwtEncoder;
+    private final BotChallengeVerifier botChallengeVerifier;
 
     public PortalAuthApiController(PortalLoginService portalLoginService,
                                    AuthDomainResolver domainResolver,
                                    AuthProperties authProperties,
-                                   JwtEncoder jwtEncoder) {
+                                   JwtEncoder jwtEncoder,
+                                   BotChallengeVerifier botChallengeVerifier) {
         this.portalLoginService = portalLoginService;
         this.domainResolver = domainResolver;
         this.authProperties = authProperties;
         this.jwtEncoder = jwtEncoder;
+        this.botChallengeVerifier = botChallengeVerifier;
     }
 
-    public record LoginLinkRequest(String email, String tenant, String redirectUri) {}
+    public record LoginLinkRequest(String email, String tenant, String redirectUri,
+                                   String challenge, String website) {}
 
     public record VerifyRequest(String token) {}
 
     /**
      * Always answers 202 whether or not the email matches a portal user — the
-     * only client-visible failure is a disallowed {@code redirectUri}, which is
-     * validated before any user lookup and therefore carries no account signal.
+     * only client-visible failures are a disallowed {@code redirectUri} and a
+     * failed bot challenge, both decided before any user lookup and therefore
+     * carrying no account signal.
+     *
+     * <p>Challenged for the same reason as signup: this endpoint sends mail to an
+     * address the caller supplies, so unmetered access to it is a way to have the
+     * platform spam arbitrary inboxes. The per-email budget in
+     * {@code PortalLoginService} caps one address; the challenge and
+     * {@code PortalPublicRateLimitFilter}'s per-IP budget cap the breadth.
      */
     @PostMapping("/request")
     public ResponseEntity<Map<String, String>> requestLink(@RequestBody LoginLinkRequest body,
@@ -78,6 +91,25 @@ public class PortalAuthApiController {
         String email = body == null ? null : body.email();
         if (email == null || email.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "email_required"));
+        }
+
+        // Hidden field — only a form filler populates it. Answer 202 so the
+        // script learns nothing. Audited on the same stream as the signup
+        // equivalent: these two paths are the same abuse surface, so a trip on
+        // one must not be invisible where the other is visible.
+        if (body.website() != null && !body.website().isBlank()) {
+            audit.info("security_event=PORTAL_LOGIN_REQUEST actor={} result=ignored detail=honeypot",
+                    AuditText.sanitize(email));
+            return ResponseEntity.accepted().body(Map.of("status", "ok"));
+        }
+
+        BotChallengeVerifier.Result challenge = botChallengeVerifier.verify(body.challenge());
+        if (challenge != BotChallengeVerifier.Result.VALID
+                && challenge != BotChallengeVerifier.Result.DISABLED) {
+            audit.info("security_event=PORTAL_LOGIN_REQUEST actor={} result=rejected "
+                    + "detail=bot_challenge_{}", AuditText.sanitize(email),
+                    challenge.name().toLowerCase());
+            return ResponseEntity.badRequest().body(Map.of("error", "bot_challenge_failed"));
         }
 
         String tenant = body.tenant() != null && !body.tenant().isBlank()

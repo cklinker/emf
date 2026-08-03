@@ -1,6 +1,8 @@
 package io.kelta.gateway.ratelimit;
 
 import io.kelta.gateway.route.RateLimitConfig;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -20,6 +22,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("RedisRateLimiter Tests")
 class RedisRateLimiterTest {
 
     @Mock
@@ -195,5 +198,129 @@ class RedisRateLimiterTest {
         ArgumentCaptor<List<String>> argsCaptor = ArgumentCaptor.forClass(List.class);
         verify(redisTemplate).execute(any(RedisScript.class), anyList(), argsCaptor.capture());
         assertThat(argsCaptor.getValue()).containsExactly("30");
+    }
+
+    @Nested
+    @DisplayName("checkWindow — the shared window primitive")
+    class CheckWindow {
+
+        private static final String KEY = "ratelimit:ip:/api/billing/webhooks:203.0.113.9";
+
+        @Test
+        @DisplayName("should allow and report the remaining budget when under the limit")
+        void allowsWhenUnderTheLimit() {
+            givenWindowCount(3L);
+
+            StepVerifier.create(newLimiter().checkWindow(KEY, 5, Duration.ofSeconds(60)))
+                .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 2)
+                .verifyComplete();
+        }
+
+        @Test
+        @DisplayName("should fail open when the script completes without emitting")
+        @SuppressWarnings("unchecked")
+        void allowsWhenScriptEmitsNothing() {
+            // An empty Flux is not an error, so it slips past onErrorResume. Left
+            // unhandled the Mono completes empty, the calling filter never reaches
+            // chain.filter(), and the request hangs with no status and no body —
+            // strictly worse than the documented fail-open, and on a public path
+            // that is a hung client rather than a retried API call.
+            when(redisTemplate.execute(any(RedisScript.class), anyList(), anyList()))
+                .thenReturn(Flux.empty());
+
+            StepVerifier.create(newLimiter().checkWindow(KEY, 5, Duration.ofSeconds(60)))
+                .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 5)
+                .verifyComplete();
+        }
+
+        @Test
+        @DisplayName("should reject with the window's remaining TTL once over the limit")
+        void rejectsWhenOverTheLimit() {
+            givenWindowCount(6L);
+            when(redisTemplate.getExpire(KEY)).thenReturn(Mono.just(Duration.ofSeconds(12)));
+
+            StepVerifier.create(newLimiter().checkWindow(KEY, 5, Duration.ofSeconds(60)))
+                .expectNextMatches(result ->
+                    !result.isAllowed() && result.getRetryAfter().equals(Duration.ofSeconds(12)))
+                .verifyComplete();
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        @DisplayName("should pass the caller's key through verbatim with the window as TTL")
+        void passesKeyAndTtlThrough() {
+            // Callers namespace their own keys (the IP limiter uses "ratelimit:ip:"),
+            // so this method must not re-prefix them or the two limiters collide.
+            givenWindowCount(1L);
+
+            StepVerifier.create(newLimiter().checkWindow(KEY, 5, Duration.ofSeconds(90)))
+                .expectNextMatches(RateLimitResult::isAllowed)
+                .verifyComplete();
+
+            ArgumentCaptor<List<String>> keysCaptor = ArgumentCaptor.forClass(List.class);
+            ArgumentCaptor<List<String>> argsCaptor = ArgumentCaptor.forClass(List.class);
+            verify(redisTemplate).execute(any(RedisScript.class), keysCaptor.capture(), argsCaptor.capture());
+            assertThat(keysCaptor.getValue()).containsExactly(KEY);
+            assertThat(argsCaptor.getValue()).containsExactly("90");
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        @DisplayName("should clamp a sub-second window to a one-second TTL")
+        void clampsSubSecondWindow() {
+            // EXPIRE 0 deletes the key outright, which would reset the counter on
+            // every request and silently disable the limit.
+            givenWindowCount(1L);
+
+            StepVerifier.create(newLimiter().checkWindow(KEY, 5, Duration.ofMillis(400)))
+                .expectNextMatches(RateLimitResult::isAllowed)
+                .verifyComplete();
+
+            ArgumentCaptor<List<String>> argsCaptor = ArgumentCaptor.forClass(List.class);
+            verify(redisTemplate).execute(any(RedisScript.class), anyList(), argsCaptor.capture());
+            assertThat(argsCaptor.getValue()).containsExactly("1");
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        @DisplayName("should fail open when Redis is unreachable")
+        void failsOpenOnRedisError() {
+            // A cache outage must not take the platform down; it does mean limiting
+            // is off for the duration, which is the accepted trade-off.
+            when(redisTemplate.execute(any(RedisScript.class), anyList(), anyList()))
+                .thenReturn(Flux.error(new RuntimeException("Redis connection failed")));
+
+            StepVerifier.create(newLimiter().checkWindow(KEY, 5, Duration.ofSeconds(60)))
+                .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 5)
+                .verifyComplete();
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        @DisplayName("should keep the TTL write guarded inside the Lua script")
+        void luaScriptSetsTtlOnlyConditionally() {
+            // Regression guard for the 2026-07-11 production incident: an
+            // unconditional EXPIRE refreshed the window on every request, turning
+            // the fixed window into an idle-expiry. Under continuous traffic the
+            // counter never reset, so once a tenant crossed its limit every
+            // rejected request re-extended the TTL and sustained a tenant-wide 429
+            // lockout indefinitely. The TTL may only be written when the window is
+            // new (count == 1) or a previous EXPIRE was lost (TTL < 0).
+            givenWindowCount(1L);
+
+            StepVerifier.create(newLimiter().checkWindow(KEY, 5, Duration.ofSeconds(60)))
+                .expectNextMatches(RateLimitResult::isAllowed)
+                .verifyComplete();
+
+            ArgumentCaptor<RedisScript<Long>> scriptCaptor = ArgumentCaptor.forClass(RedisScript.class);
+            verify(redisTemplate).execute(scriptCaptor.capture(), anyList(), anyList());
+            String source = scriptCaptor.getValue().getScriptAsString();
+
+            assertThat(source).contains("count == 1");
+            assertThat(source).contains("TTL");
+            // Strip the guarded block; nothing that sets an expiry may survive it.
+            String outsideTheGuard = source.replaceAll("(?s)if\\s+count\\s*==\\s*1.*?\\bend\\b", "");
+            assertThat(outsideTheGuard).doesNotContainIgnoringCase("expire");
+        }
     }
 }

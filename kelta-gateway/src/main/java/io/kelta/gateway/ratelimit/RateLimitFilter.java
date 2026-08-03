@@ -9,6 +9,7 @@ import io.kelta.gateway.metrics.GatewayMetrics;
 import io.kelta.gateway.route.RateLimitConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -42,10 +43,14 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
+    /** Fraction of the tenant window any single member may consume. */
+    static final double DEFAULT_USER_SHARE = 0.5;
+
     private final RedisRateLimiter rateLimiter;
     private final GatewayCacheManager cacheManager;
     private final GatewayMetrics metrics;
     private final RateLimitExemptionService exemptionService;
+    private final double userShare;
 
     /**
      * Creates a new RateLimitFilter.
@@ -54,15 +59,28 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
      * @param cacheManager     the gateway cache manager
      * @param metrics          the gateway metrics service
      * @param exemptionService decides whether the caller's IP bypasses limiting
+     * @param userShare        fraction of the tenant window one member may consume;
+     *                         out-of-range values fall back to the default rather
+     *                         than disabling the limit by accident
      */
     public RateLimitFilter(RedisRateLimiter rateLimiter,
                           GatewayCacheManager cacheManager,
                           GatewayMetrics metrics,
-                          RateLimitExemptionService exemptionService) {
+                          RateLimitExemptionService exemptionService,
+                          @Value("${kelta.gateway.rate-limit.user-share:" + DEFAULT_USER_SHARE + "}")
+                          double userShare) {
         this.rateLimiter = rateLimiter;
         this.cacheManager = cacheManager;
         this.metrics = metrics;
         this.exemptionService = exemptionService;
+        if (userShare <= 0 || userShare > 1) {
+            log.warn("Ignoring out-of-range kelta.gateway.rate-limit.user-share={} (expected 0 < share <= 1); using {}",
+                    userShare, DEFAULT_USER_SHARE);
+            this.userShare = DEFAULT_USER_SHARE;
+        } else {
+            this.userShare = userShare;
+        }
+        log.info("RateLimitFilter initialized: per-user share of the tenant window = {}", this.userShare);
     }
 
     @Override
@@ -99,6 +117,57 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         log.debug("Checking rate limit for tenant: {}, principal: {}, limit: {} requests per {}",
             tenantId, principal.getUsername(), config.getRequestsPerWindow(), config.getWindowDuration());
 
+        // Per-user window FIRST, so one member cannot spend the tenant's budget
+        // just by being rejected — a request that fails the user check must not
+        // also increment the shared tenant counter.
+        return checkPerUser(tenantId, principal, config)
+            .flatMap(userResult -> {
+                if (!userResult.isAllowed()) {
+                    String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+                    log.warn("Per-user rate limit exceeded for tenant: {}, principal: {}, retry after: {}",
+                        tenantId, principal.getUsername(), userResult.getRetryAfter());
+                    metrics.recordRateLimitExceeded(tenantSlug);
+                    return tooManyRequests(exchange, config, userResult);
+                }
+                return checkPerTenant(exchange, chain, tenantId, principal, config, rateLimitKey);
+            });
+    }
+
+    /**
+     * Per-user fixed window, keyed {@code tenantId + user:<principal>}.
+     *
+     * <p>The tenant window alone is not enough: it is shared, so a single member
+     * (or a stolen PAT) hammering an endpoint locks out <em>everyone</em> in the
+     * tenant — the exact shape of the 2026-07-11 lockout incident. The per-user
+     * window bounds any one member's share of it.
+     *
+     * <p>The budget is {@code user-share} of the tenant's window (default half),
+     * floored at 1. Deriving it from the tenant governor rather than looking up
+     * the member's plan entitlement keeps this off the cross-service path; an
+     * entitlement-driven per-member budget is a follow-up, and the seam for it is
+     * this method.
+     *
+     * <p>A share of {@code >= 1.0} makes the user budget equal the tenant budget,
+     * which is the pre-slice-7 behaviour (effectively off).
+     *
+     * <p>The principal's username is the key: kelta-auth JWTs and PATs both carry
+     * the member's email there, so a member cannot double their budget by
+     * switching credential type.
+     */
+    private Mono<RateLimitResult> checkPerUser(String tenantId, GatewayPrincipal principal,
+                                               RateLimitConfig config) {
+        long userLimit = Math.max(1, Math.round(config.getRequestsPerWindow() * userShare));
+        if (userLimit >= config.getRequestsPerWindow()) {
+            // Nothing to enforce beyond the tenant window — skip the Redis call.
+            return Mono.just(RateLimitResult.allowed(userLimit));
+        }
+        return rateLimiter.checkRateLimit(tenantId, "user:" + principal.getUsername(),
+                new RateLimitConfig((int) userLimit, config.getWindowDuration()));
+    }
+
+    private Mono<Void> checkPerTenant(ServerWebExchange exchange, GatewayFilterChain chain,
+                                      String tenantId, GatewayPrincipal principal,
+                                      RateLimitConfig config, String rateLimitKey) {
         // Check rate limit keyed by tenant (all users in a tenant share the limit)
         return rateLimiter.checkRateLimit(rateLimitKey, "tenant", config)
             .flatMap(result -> {

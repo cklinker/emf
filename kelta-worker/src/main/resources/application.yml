@@ -79,6 +79,26 @@ kelta:
     public-url: ${SUPERSET_PUBLIC_URL:${SUPERSET_URL:}}
     admin-username: ${SUPERSET_ADMIN_USERNAME:admin}
     admin-password: ${SUPERSET_ADMIN_PASSWORD:}
+  flow:
+    # Retention for flow/job execution history. Nothing else deletes these tables,
+    # so without this they grow without bound.
+    # DESTRUCTIVE — dry-run is the DEFAULT: the sweep only logs what it WOULD
+    # delete until an operator explicitly sets dry-run=false. Recommended arming:
+    # leave dry-run on for a cycle, read the "WOULD delete" counts, then arm.
+    # Only terminal executions (COMPLETED/FAILED/CANCELLED) are eligible; RUNNING
+    # and WAITING are never touched, so a parked Wait state is never collected.
+    # Deleting an execution cascades to its step logs and pending-resume rows.
+    # NOTE: purged executions disappear from the flow-run observability UI.
+    retention:
+      enabled: ${FLOW_RETENTION_ENABLED:true}
+      dry-run: ${FLOW_RETENTION_DRY_RUN:true}
+      max-age-days: ${FLOW_RETENTION_MAX_AGE_DAYS:60}
+      batch-size: ${FLOW_RETENTION_BATCH_SIZE:1000}
+      # Caps work per cycle (batch-size x max-batches rows per table), so a first
+      # arming against a large backlog drains over several cycles rather than in
+      # one enormous delete against a shared database.
+      max-batches: ${FLOW_RETENTION_MAX_BATCHES:20}
+      poll-interval-ms: ${FLOW_RETENTION_POLL_INTERVAL_MS:3600000}
   email:
     from-address: ${EMAIL_FROM_ADDRESS:noreply@kelta.io}
     from-name: ${EMAIL_FROM_NAME:Kelta Platform}

@@ -210,6 +210,11 @@ public class RouteConfigService {
                 {"approvals", "/api/approvals/**", "approvals"},
                 {"svix", "/api/svix/**", "svix"},
                 {"webhooks", "/api/webhooks/**", "webhooks"},
+                // Portal billing (consumer-alerting slice 1) — a static- route, so
+                // only API_ACCESS is checked here; the controller enforces member
+                // scoping. /api/billing/webhooks additionally rides the
+                // unauthenticated-paths list (the HMAC signature is its trust anchor).
+                {"billing", "/api/billing/**", "billing"},
                 {"connected-apps", "/api/connected-apps/**", "connected-apps"},
                 {"email-templates", "/api/email-templates/**", "email-templates"},
                 {"email", "/api/email/**", "email"},

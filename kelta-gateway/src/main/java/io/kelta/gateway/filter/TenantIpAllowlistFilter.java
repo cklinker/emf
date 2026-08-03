@@ -9,6 +9,7 @@ import io.kelta.gateway.config.TenantIpConfig;
 import io.kelta.gateway.error.ResponseHelpers;
 import io.kelta.gateway.geo.ClientIpResolver;
 import io.kelta.gateway.metrics.GatewayMetrics;
+import io.kelta.gateway.net.CidrBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +25,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -188,7 +188,7 @@ public class TenantIpAllowlistFilter implements GlobalFilter, Ordered {
 
     private boolean matchesAnyCidr(List<String> candidateIps, List<String> cidrs) {
         for (String cidr : cidrs) {
-            Cidr parsed = Cidr.parse(cidr);
+            CidrBlock parsed = CidrBlock.parse(cidr);
             if (parsed == null) {
                 // Validated on write, but never let a bad range throw here.
                 log.warn("Skipping invalid CIDR in allowlist: {}", cidr);
@@ -201,53 +201,6 @@ public class TenantIpAllowlistFilter implements GlobalFilter, Ordered {
             }
         }
         return false;
-    }
-
-    /**
-     * A parsed CIDR block with dependency-free, DNS-free containment checking.
-     * Uses {@link InetAddress#ofLiteral(String)} (JDK 22+) so attacker-supplied
-     * forwarded IPs are never resolved via DNS.
-     */
-    private record Cidr(byte[] network, int prefixLen) {
-
-        static Cidr parse(String cidr) {
-            if (cidr == null) return null;
-            String s = cidr.trim();
-            int slash = s.indexOf('/');
-            if (slash <= 0 || slash == s.length() - 1) return null;
-            byte[] network;
-            int prefixLen;
-            try {
-                network = InetAddress.ofLiteral(s.substring(0, slash)).getAddress();
-                prefixLen = Integer.parseInt(s.substring(slash + 1).trim());
-            } catch (RuntimeException e) {
-                return null;
-            }
-            if (prefixLen < 0 || prefixLen > network.length * 8) return null;
-            return new Cidr(network, prefixLen);
-        }
-
-        boolean contains(String ip) {
-            byte[] target;
-            try {
-                target = InetAddress.ofLiteral(ip).getAddress();
-            } catch (RuntimeException e) {
-                return false;
-            }
-            if (target.length != network.length) {
-                return false; // address-family mismatch (IPv4 vs IPv6)
-            }
-            int fullBytes = prefixLen / 8;
-            for (int i = 0; i < fullBytes; i++) {
-                if (network[i] != target[i]) return false;
-            }
-            int remBits = prefixLen % 8;
-            if (remBits > 0) {
-                int mask = (0xFF << (8 - remBits)) & 0xFF;
-                if ((network[fullBytes] & mask) != (target[fullBytes] & mask)) return false;
-            }
-            return true;
-        }
     }
 
     private Mono<Void> forbidden(ServerWebExchange exchange, String message) {

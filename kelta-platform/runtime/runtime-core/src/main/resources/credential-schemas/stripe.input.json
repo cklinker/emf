@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stripe",
+  "type": "object",
+  "required": ["secretKey", "webhookSecret"],
+  "properties": {
+    "secretKey": {
+      "type": "string",
+      "format": "secret",
+      "title": "Secret Key",
+      "description": "Stripe API secret key (sk_live_… or sk_test_…). Sent as 'Authorization: Bearer <secretKey>'.",
+      "minLength": 1
+    },
+    "webhookSecret": {
+      "type": "string",
+      "format": "secret",
+      "title": "Webhook Signing Secret",
+      "description": "Endpoint signing secret (whsec_…) used to verify inbound webhook signatures. This is the only trust anchor for the webhook endpoint.",
+      "minLength": 1
+    },
+    "publishableKey": {
+      "type": "string",
+      "title": "Publishable Key",
+      "description": "Publishable key (pk_live_… or pk_test_…). Safe to expose to a frontend."
+    },
+    "allowedReturnOrigins": {
+      "type": "array",
+      "title": "Allowed Return Origins",
+      "description": "Origins a checkout or billing-portal return URL may point at, e.g. https://app.example.com. Anything else is rejected — this is what stops a caller redirecting a paying member to an attacker-controlled page.",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

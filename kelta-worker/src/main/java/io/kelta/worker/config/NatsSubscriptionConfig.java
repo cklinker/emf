@@ -2,6 +2,7 @@ package io.kelta.worker.config;
 
 import io.kelta.runtime.event.EventSubscription;
 import io.kelta.runtime.messaging.nats.NatsSubscriptionManager;
+import io.kelta.worker.listener.BillingEntitlementCacheListener;
 import io.kelta.worker.listener.CerbosCacheInvalidationListener;
 import io.kelta.worker.listener.CollectionSchemaListener;
 import io.kelta.worker.listener.CredentialCacheInvalidationListener;
@@ -54,6 +55,7 @@ public class NatsSubscriptionConfig {
     private final MenuCacheInvalidationListener menuCacheInvalidationListener;
     private final TranslationCacheInvalidationListener translationCacheInvalidationListener;
     private final SystemCollectionCacheInvalidationListener systemCollectionCacheInvalidationListener;
+    private final BillingEntitlementCacheListener billingEntitlementCacheListener;
 
     @Autowired(required = false)
     private CredentialCacheInvalidationListener credentialCacheInvalidationListener;
@@ -82,7 +84,8 @@ public class NatsSubscriptionConfig {
                                    LayoutCacheInvalidationListener layoutCacheInvalidationListener,
                                    MenuCacheInvalidationListener menuCacheInvalidationListener,
                                    TranslationCacheInvalidationListener translationCacheInvalidationListener,
-                                   SystemCollectionCacheInvalidationListener systemCollectionCacheInvalidationListener) {
+                                   SystemCollectionCacheInvalidationListener systemCollectionCacheInvalidationListener,
+                                   BillingEntitlementCacheListener billingEntitlementCacheListener) {
         this.subscriptionManager = subscriptionManager;
         this.flowEventListener = flowEventListener;
         this.natsTriggerFlowListener = natsTriggerFlowListener;
@@ -96,6 +99,7 @@ public class NatsSubscriptionConfig {
         this.menuCacheInvalidationListener = menuCacheInvalidationListener;
         this.translationCacheInvalidationListener = translationCacheInvalidationListener;
         this.systemCollectionCacheInvalidationListener = systemCollectionCacheInvalidationListener;
+        this.billingEntitlementCacheListener = billingEntitlementCacheListener;
     }
 
     @PostConstruct
@@ -190,6 +194,13 @@ public class NatsSubscriptionConfig {
         subscriptionManager.register(EventSubscription.broadcast(
                 "worker-translation-cache", "kelta.config.translation.changed.*",
                 translationCacheInvalidationListener::handleTranslationChanged));
+
+        // Member entitlement invalidation (portal billing) — every pod drops its
+        // cached entitlements when a subscription, pass, or plan changes anywhere.
+        // A payload with no userId means "every member of this tenant".
+        subscriptionManager.register(EventSubscription.broadcast(
+                "worker-billing-entitlement", "kelta.billing.entitlement.changed.>",
+                billingEntitlementCacheListener::handleEntitlementChanged));
 
         // Optional queue group subscriptions — only registered when the integration is enabled
         if (supersetCollectionSyncListener != null) {

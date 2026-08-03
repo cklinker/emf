@@ -120,6 +120,10 @@ public final class SystemCollectionDefinitions {
         // Archival & retention (telehealth slice 7)
         definitions.add(telehealthArchives());
 
+        // Portal billing (consumer-alerting slice 1)
+        definitions.add(billingPlans());
+        definitions.add(billingEntitlementRules());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -160,6 +164,9 @@ public final class SystemCollectionDefinitions {
         definitions.add(collectionVersions());
         definitions.add(fieldVersions());
         definitions.add(migrationSteps());
+        definitions.add(billingCustomers());
+        definitions.add(billingSubscriptions());
+        definitions.add(billingPasses());
 
         return Collections.unmodifiableList(definitions);
     }
@@ -422,6 +429,126 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.datetime("retentionUntil").withColumnName("retention_until"))
             .addField(FieldDefinition.bool("legalHold", false).withColumnName("legal_hold"))
             .addField(FieldDefinition.datetime("purgedAt").withColumnName("purged_at"))
+            .build();
+    }
+
+    /**
+     * Billing plans a tenant offers its portal members (consumer-alerting slice 1).
+     * {@code entitlements} is an OPAQUE tenant-defined map — the platform merges and
+     * compares its values but never interprets the keys, so tenants add limits
+     * without a schema change. {@code kind=DEFAULT} is the free/lapsed baseline.
+     */
+    public static CollectionDefinition billingPlans() {
+        return systemBuilder("billing-plans", "Billing Plans", "billing_plan")
+            .displayFieldName("name")
+            .addImmutableField("code")
+            .addField(FieldDefinition.requiredString("code", 100))
+            .addField(FieldDefinition.requiredString("name", 255))
+            .addField(FieldDefinition.text("description"))
+            .addField(FieldDefinition.requiredString("kind", 20)
+                .withDefault("SUBSCRIPTION")
+                .withEnumValues(List.of("SUBSCRIPTION", "ONE_TIME", "DEFAULT")))
+            .addField(FieldDefinition.string("stripeProductId", 100)
+                .withColumnName("stripe_product_id"))
+            .addField(FieldDefinition.string("stripePriceId", 100)
+                .withColumnName("stripe_price_id"))
+            .addField(FieldDefinition.json("entitlements").withDefault(Map.of()))
+            .addField(FieldDefinition.integer("passDurationDays")
+                .withColumnName("pass_duration_days"))
+            .addField(FieldDefinition.bool("active", true))
+            .addField(FieldDefinition.integer("sortOrder").withColumnName("sort_order"))
+            .build();
+    }
+
+    /**
+     * Quota enforcement as configuration (consumer-alerting slice 1): "records in
+     * collection X are capped by entitlement key Y". The generic member-quota hook
+     * reads these rows, so capping a new collection needs no new code.
+     */
+    public static CollectionDefinition billingEntitlementRules() {
+        return systemBuilder("billing-entitlement-rules", "Billing Entitlement Rules",
+                "billing_entitlement_rule")
+            .displayFieldName("limitKey")
+            .addField(FieldDefinition.requiredString("collectionName", 100)
+                .withColumnName("collection_name"))
+            .addField(FieldDefinition.requiredString("limitKey", 100)
+                .withColumnName("limit_key"))
+            .addField(FieldDefinition.json("countFilter").withColumnName("count_filter"))
+            .addField(FieldDefinition.requiredString("appliesTo", 20)
+                .withColumnName("applies_to")
+                .withDefault("PORTAL")
+                .withEnumValues(List.of("PORTAL", "ALL")))
+            .addField(FieldDefinition.string("message", 500))
+            .addField(FieldDefinition.bool("active", true))
+            .build();
+    }
+
+    /**
+     * Member-to-processor customer mapping (consumer-alerting slice 1). Read-only:
+     * rows are written only by the verified webhook and checkout paths.
+     */
+    public static CollectionDefinition billingCustomers() {
+        return readOnlySystemBuilder("billing-customers", "Billing Customers",
+                "billing_customer")
+            .tenantScoped(true)
+            .displayFieldName("email")
+            .addField(FieldDefinition.lookup("userId", "users", "Member")
+                .withColumnName("user_id"))
+            .addField(FieldDefinition.requiredString("stripeCustomerId", 100)
+                .withColumnName("stripe_customer_id"))
+            .addField(FieldDefinition.string("email", 255))
+            .build();
+    }
+
+    /**
+     * Mirrored subscription state (consumer-alerting slice 1). {@code status} holds
+     * the processor's own vocabulary verbatim rather than a platform enum, so an
+     * unrecognized status degrades to "not entitled" instead of dropping the event.
+     */
+    public static CollectionDefinition billingSubscriptions() {
+        return readOnlySystemBuilder("billing-subscriptions", "Billing Subscriptions",
+                "billing_subscription")
+            .tenantScoped(true)
+            .displayFieldName("stripeSubscriptionId")
+            .addField(FieldDefinition.lookup("userId", "users", "Member")
+                .withColumnName("user_id"))
+            .addField(FieldDefinition.lookup("planId", "billing-plans", "Plan")
+                .withColumnName("plan_id"))
+            .addField(FieldDefinition.requiredString("stripeSubscriptionId", 100)
+                .withColumnName("stripe_subscription_id"))
+            .addField(FieldDefinition.string("stripeCustomerId", 100)
+                .withColumnName("stripe_customer_id"))
+            .addField(FieldDefinition.requiredString("status", 40))
+            .addField(FieldDefinition.datetime("currentPeriodEnd")
+                .withColumnName("current_period_end"))
+            .addField(FieldDefinition.bool("cancelAtPeriodEnd", false)
+                .withColumnName("cancel_at_period_end"))
+            .addField(FieldDefinition.datetime("canceledAt").withColumnName("canceled_at"))
+            .build();
+    }
+
+    /**
+     * One-time passes (consumer-alerting slice 1) — a bounded window of elevated
+     * entitlements. Expired passes are ignored at resolution time regardless of
+     * row status; the expiry sweep only tidies the stored status.
+     */
+    public static CollectionDefinition billingPasses() {
+        return readOnlySystemBuilder("billing-passes", "Billing Passes", "billing_pass")
+            .tenantScoped(true)
+            .displayFieldName("stripeCheckoutSessionId")
+            .addField(FieldDefinition.lookup("userId", "users", "Member")
+                .withColumnName("user_id"))
+            .addField(FieldDefinition.lookup("planId", "billing-plans", "Plan")
+                .withColumnName("plan_id"))
+            .addField(FieldDefinition.requiredString("stripeCheckoutSessionId", 100)
+                .withColumnName("stripe_checkout_session_id"))
+            .addField(FieldDefinition.string("stripePaymentIntentId", 100)
+                .withColumnName("stripe_payment_intent_id"))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("ACTIVE")
+                .withEnumValues(List.of("ACTIVE", "EXPIRED", "REFUNDED")))
+            .addField(FieldDefinition.datetime("startsAt").withColumnName("starts_at"))
+            .addField(FieldDefinition.datetime("expiresAt").withColumnName("expires_at"))
             .build();
     }
 

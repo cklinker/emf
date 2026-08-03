@@ -254,6 +254,72 @@ definition can be driven by cron or by `execute_flow` as long as the static
 `triggerConfig.inputData` and the caller-supplied `body.input` produce the same
 shape under `$.input`.
 
+## Stripe (portal billing — consumer-alerting slice 1)
+
+A tenant sells plans to its **PORTAL** members. Stripe owns money, tax, invoicing, and
+dunning; the platform mirrors ids and coarse state and resolves entitlements from them.
+Nothing here computes an amount.
+
+**No `stripe-java`.** Its large Gson-reflective model surface is a native-image hazard and
+the platform needs only a handful of calls, so outbound calls use a plain REST client
+(form-encoded, `JsonNode` responses, pinned `Stripe-Version`, `Idempotency-Key` on POSTs).
+
+**Credential.** Type key `stripe`, resolved by the name `stripe` via `CredentialResolver`.
+Secrets `secretKey` (outbound auth) and `webhookSecret` (inbound verification); metadata
+`publishableKey` and `allowedReturnOrigins` (bounds where a checkout/portal return URL may
+point — without it a caller could redirect a paying member to an attacker-controlled page).
+Test connection calls `GET /v1/account`; the webhook secret can only be format-checked,
+since verifying it needs a real delivery.
+
+**Webhook.** `POST /api/billing/webhooks/stripe/{tenantId}` — a gateway
+`unauthenticated-paths` entry. The `Stripe-Signature` HMAC over the **raw** body is the only
+trust anchor, so the body must be verified before it is parsed: re-serializing JSON changes
+the bytes and invalidates a genuine signature. Verification is constant-time, tolerates 5
+minutes of clock drift in either direction (an unbounded window leaves a captured request
+replayable forever), and accepts any of several `v1` signatures so a secret can be rotated
+without dropping deliveries. The `{tenantId}` in the path is **untrusted** — it selects which
+tenant's `webhookSecret` to verify against, and a passing HMAC is what proves the event
+belongs to that tenant. An unknown tenant and a bad signature both answer a bare 401, so an
+unauthenticated caller cannot enumerate which tenants have billing configured.
+
+Idempotency is a claim row in `billing_webhook_event` keyed by the processor's event id, and
+**the claim shares a transaction with the mutation** — if processing throws, the claim rolls
+back with it and the retry genuinely re-runs. Answers 200 for duplicates and for event types
+the platform ignores, so the processor stops retrying them.
+
+| Event | Action |
+|---|---|
+| `checkout.session.completed` (mode=payment) | upsert customer; grant a pass, idempotent on the session id |
+| `checkout.session.completed` (mode=subscription) | upsert customer only — the subscription arrives on its own event |
+| `customer.subscription.created` / `.updated` | upsert `billing_subscription`; plan resolved via the price id |
+| `customer.subscription.deleted` | mark canceled — the member drops to the DEFAULT plan on next resolve |
+| `invoice.paid` / `invoice.payment_failed` | flow-trigger bridge only |
+| anything else | claimed, then ignored |
+
+**Member resolution** for an event, in order: `client_reference_id` → `metadata.userId`
+(stamped on both the session and `subscription_data`) → the stored `billing_customer`
+mapping. An event with no resolvable member is skipped rather than guessed at.
+
+**Entitlements.** `billing_plan.entitlements` is an opaque tenant-authored JSON object. The
+base plan is the member's subscription plan while its status is `active`, `trialing`, or
+`past_due` (grace while the card is retried), otherwise the tenant's DEFAULT plan; every live
+pass then merges on top — numbers SUM, booleans OR, arrays union — so a pass can add a
+capability but never revoke one. Pass expiry is judged when entitlements are read, not by the
+sweep, so a member is never over-entitled by a sweep that has not run yet.
+
+**Events out.** `kelta.billing.entitlement.changed.<tenantId>.<userId>` (KELTA_BILLING
+stream, broadcast) invalidates the entitlement cache on every pod; a payload with no
+`userId` means the whole tenant, which is what a plan edit publishes. Subscription changes
+are additionally bridged onto `kelta.trigger.<tenantId>.billing.subscription`, so tenants
+build welcome / dunning-nudge / win-back automations as flow configuration — flows read
+`$.input.payload.*`.
+
+**Dashboard prerequisites** (nothing here provisions them): Products and Prices, with each
+price id recorded on a `billing-plans` row; Stripe Tax if the tenant charges tax; the Billing
+Portal configured; retry/dunning settings; and a webhook endpoint pointed at the URL above
+with its signing secret stored in the credential. Local testing:
+`stripe listen --forward-to localhost:<gw>/api/billing/webhooks/stripe/<tenantId>`.
+
 ## Email (SMTP)
 
 Worker emails go out via `spring-boot-starter-mail`. The kelta-worker `application.yml`

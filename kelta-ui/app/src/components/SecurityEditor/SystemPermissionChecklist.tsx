@@ -126,6 +126,11 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
           'Supervisor chat access: all conversations, queue management, cross-assignment',
       },
       {
+        name: 'MANAGE_BILLING',
+        label: 'Manage Billing',
+        description: 'Configure portal billing plans and entitlement rules',
+      },
+      {
         name: 'MANAGE_DATA',
         label: 'Manage Data',
         description: 'Import, export, and mass update records',

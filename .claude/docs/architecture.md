@@ -288,6 +288,32 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `BootstrapRepository.findProfileSystemPermissions` check as bulk-ops), so a delegated admin
   without it cannot shorten retention or release a hold. The retention *purge* is a background
   sweep (not an endpoint), DRY-RUN by default — see concerns.md.
+- **Portal billing member endpoints** (consumer-alerting slice 1B): `GET /api/billing/plans`
+  (any authenticated caller; safe fields only — no processor ids, no raw entitlement map),
+  `GET /api/billing/me`, `POST /api/billing/checkout-sessions`,
+  `POST /api/billing/portal-sessions`. All are on the `static-billing` route, so the gateway
+  applies only `API_ACCESS` and **scoping is in-controller**: every endpoint acts on the
+  **calling** member resolved from `X-User-Id` via `UserIdResolver`, and none accepts a member
+  id — there is no id to tamper with and no cross-member read to guard. Checkout and portal
+  **return URLs are validated against the credential's `allowedReturnOrigins`**
+  (`ReturnUrlValidator`: origin equality, HTTPS-only, userinfo rejected, empty allowlist denies
+  all) because those URLs are handed to the processor, which will redirect a paying member to
+  them — an unvalidated one is an open redirect starting inside a real payment flow. Processor
+  errors are mapped to caller-safe statuses (401 → 409 "not configured", anything else → 502)
+  and the processor's own message is logged, never returned, since it can name account
+  internals.
+- **Per-member record quotas** (consumer-alerting slice 1B): `MemberEntitlementQuotaHook` is a
+  **wildcard** `BeforeSaveHook` (order -90) — it runs on every record create in the system, so
+  its fast path (cached empty rule list) does no query and no allocation. Note
+  `BeforeSaveHookRegistry` runs every collection-specific hook before any wildcard hook, so
+  `getOrder()` only sorts within the wildcard group. Counting goes through
+  `QueryEngine.aggregate`, which validates each filter field against the collection definition
+  and binds values as parameters — that is the injection guard for the tenant-authored
+  `countFilter` JSON. Rejection is `BeforeSaveResult.error(...)` → `ValidationException` →
+  **HTTP 400** with JSON:API code `beforeSaveHook`. The hook **fails open** (unknown
+  collection, unparseable filter, failed count → allow), matching the governor-limit hooks and
+  deliberately unlike the fail-closed guard hooks: those protect other users' data, this one
+  protects revenue.
 - **Portal billing** (consumer-alerting slice 1, V178): `/api/billing/**` is a static route, so
   only `API_ACCESS` is checked at the gateway — member scoping belongs in the controller.
   `POST /api/billing/webhooks/stripe/{tenantId}` is an **unauthenticated path**: the HMAC

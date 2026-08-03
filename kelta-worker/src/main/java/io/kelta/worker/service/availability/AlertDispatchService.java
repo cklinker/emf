@@ -1,0 +1,231 @@
+package io.kelta.worker.service.availability;
+
+import io.kelta.runtime.context.TenantContext;
+import io.kelta.worker.repository.AlertDeliveryRepository;
+import io.kelta.worker.service.billing.EntitlementService;
+import io.kelta.runtime.module.integration.spi.EmailService;
+import io.kelta.worker.service.push.DefaultPushService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Delivers a claimed alert to a member over their chosen channels.
+ *
+ * <p><b>Sends happen outside any database transaction, and after the alert row is
+ * already committed.</b> That ordering is the point: the alert row is the dedupe
+ * record, so if a push provider times out and the send is retried, the member
+ * must not receive a *second* alert. A failed send is recorded as a FAILED
+ * delivery row, never by rolling back the alert.
+ *
+ * <p>Channels are the intersection of what the watch asked for and what the
+ * member's plan entitles them to, so a downgraded member stops getting SMS
+ * without anyone editing their watches. An empty intersection is not an error —
+ * it just means nothing is owed.
+ *
+ * <p>SMS is a deliberate seam: the channel is accepted and recorded, but there is
+ * no sender wired yet, so it fails loudly as an unsupported channel rather than
+ * silently reporting success.
+ */
+@Service
+public class AlertDispatchService {
+
+    private static final Logger log = LoggerFactory.getLogger(AlertDispatchService.class);
+
+    static final String CHANNEL_PUSH = "push";
+    static final String CHANNEL_EMAIL = "email";
+    static final String CHANNEL_SMS = "sms";
+
+    /** Entitlement key listing the channels a member's plan permits. */
+    static final String ENTITLEMENT_CHANNELS = "channels";
+    /** Tenant-overridable email template for an availability alert. */
+    static final String EMAIL_TEMPLATE = "availability.alert";
+
+    private static final DateTimeFormatter WINDOW_FORMAT =
+            DateTimeFormatter.ofPattern("d MMM yyyy").withZone(ZoneOffset.UTC);
+
+    private final AlertDeliveryRepository deliveryRepository;
+    private final DefaultPushService pushService;
+    private final EmailService emailService;
+    private final EntitlementService entitlementService;
+    private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
+
+    public AlertDispatchService(AlertDeliveryRepository deliveryRepository,
+                                DefaultPushService pushService,
+                                EmailService emailService,
+                                EntitlementService entitlementService,
+                                JdbcTemplate jdbcTemplate,
+                                ObjectMapper objectMapper) {
+        this.deliveryRepository = deliveryRepository;
+        this.pushService = pushService;
+        this.emailService = emailService;
+        this.entitlementService = entitlementService;
+        this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
+    }
+
+    /** Delivers one claimed alert. Never throws — a failure is recorded, not propagated. */
+    public void dispatch(String tenantId, AvailabilityMatchService.ClaimedAlert alert) {
+        List<String> channels = resolveChannels(tenantId, alert);
+        if (channels.isEmpty()) {
+            log.debug("Alert {} has no deliverable channels for member {}",
+                    alert.alertId(), alert.watch().memberId());
+            return;
+        }
+
+        // Record what is owed BEFORE attempting any send, so a crash mid-dispatch
+        // leaves evidence rather than losing the obligation.
+        List<String> deliveryIds = deliveryRepository.createPending(alert.alertId(), channels);
+
+        String title = "Now available: " + alert.target().name();
+        String body = describeWindow(alert) + " just opened.";
+
+        for (int i = 0; i < channels.size(); i++) {
+            String channel = channels.get(i);
+            String deliveryId = deliveryIds.get(i);
+            try {
+                send(tenantId, alert, channel, title, body);
+                deliveryRepository.markSent(deliveryId, Instant.now());
+            } catch (Exception e) {
+                // One channel failing must not stop the others: a member whose
+                // push token is stale should still get the email.
+                log.warn("Alert {} delivery over {} failed: {}",
+                        alert.alertId(), channel, e.getMessage());
+                deliveryRepository.markFailed(deliveryId, e.getMessage());
+            }
+        }
+    }
+
+    private void send(String tenantId, AvailabilityMatchService.ClaimedAlert alert,
+                      String channel, String title, String body) {
+        switch (channel) {
+            case CHANNEL_PUSH -> {
+                int devices = pushService.sendToUser(alert.watch().memberId(), tenantId,
+                        title, body, pushData(alert));
+                if (devices == 0) {
+                    // Not an error worth failing the delivery over, but worth
+                    // knowing: the member has no registered devices.
+                    log.debug("Alert {} push reached no devices for member {}",
+                            alert.alertId(), alert.watch().memberId());
+                }
+            }
+            case CHANNEL_EMAIL -> {
+                String email = memberEmail(tenantId, alert.watch().memberId());
+                if (email == null) {
+                    throw new IllegalStateException("member has no email address");
+                }
+                emailService.sendByName(tenantId, email, EMAIL_TEMPLATE, emailVars(alert),
+                                "availability-alert", alert.alertId())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "email template '" + EMAIL_TEMPLATE + "' not found"));
+            }
+            case CHANNEL_SMS -> throw new UnsupportedOperationException(
+                    "sms channel is not wired yet");
+            default -> throw new IllegalArgumentException("unknown channel: " + channel);
+        }
+    }
+
+    /**
+     * The channels actually owed: what the watch asked for, intersected with what
+     * the member's plan permits. A watch with no explicit channels falls back to
+     * the member's full entitlement.
+     */
+    List<String> resolveChannels(String tenantId, AvailabilityMatchService.ClaimedAlert alert) {
+        Set<String> entitled = new LinkedHashSet<>(
+                entitlementService.listLimit(tenantId, alert.watch().memberId(), ENTITLEMENT_CHANNELS));
+        List<String> requested = parseChannels(alert.watch().channels());
+
+        if (requested.isEmpty()) {
+            return new ArrayList<>(entitled);
+        }
+        if (entitled.isEmpty()) {
+            // No channels entitlement configured at all: treat the tenant as not
+            // using channel gating rather than silently muting every alert.
+            return requested;
+        }
+        List<String> intersection = new ArrayList<>();
+        for (String channel : requested) {
+            if (entitled.contains(channel)) {
+                intersection.add(channel);
+            }
+        }
+        return intersection;
+    }
+
+    private List<String> parseChannels(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (!node.isArray()) {
+                return List.of();
+            }
+            List<String> channels = new ArrayList<>();
+            node.forEach(item -> {
+                if (item != null && item.isTextual()) {
+                    channels.add(item.stringValue());
+                }
+            });
+            return channels;
+        } catch (RuntimeException e) {
+            log.warn("Unparseable watch channels {} — falling back to entitlement", json);
+            return List.of();
+        }
+    }
+
+    private String memberEmail(String tenantId, String memberId) {
+        return TenantContext.callWithTenant(tenantId, () -> {
+            List<String> rows = jdbcTemplate.queryForList(
+                    "SELECT email FROM platform_user WHERE id = ? AND tenant_id = ?",
+                    String.class, memberId, tenantId);
+            return rows.isEmpty() ? null : rows.get(0);
+        });
+    }
+
+    private Map<String, String> pushData(AvailabilityMatchService.ClaimedAlert alert) {
+        Map<String, String> data = new LinkedHashMap<>();
+        data.put("watchId", alert.watch().id());
+        data.put("targetId", alert.target().id());
+        data.put("slotKey", alert.slotKey());
+        return data;
+    }
+
+    private Map<String, Object> emailVars(AvailabilityMatchService.ClaimedAlert alert) {
+        Map<String, Object> vars = new LinkedHashMap<>();
+        vars.put("targetName", alert.target().name());
+        vars.put("slotKey", alert.slotKey());
+        vars.put("window", describeWindow(alert));
+        return vars;
+    }
+
+    /** Human-readable window for the notification body. */
+    private String describeWindow(AvailabilityMatchService.ClaimedAlert alert) {
+        if (alert.windowStart() == null && alert.windowEnd() == null) {
+            return alert.slotKey();
+        }
+        if (alert.windowEnd() == null) {
+            return WINDOW_FORMAT.format(alert.windowStart());
+        }
+        if (alert.windowStart() == null) {
+            return WINDOW_FORMAT.format(alert.windowEnd());
+        }
+        String start = WINDOW_FORMAT.format(alert.windowStart());
+        String end = WINDOW_FORMAT.format(alert.windowEnd());
+        return start.equals(end) ? start : start + " – " + end;
+    }
+}

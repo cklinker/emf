@@ -3,6 +3,29 @@
 > Child of `specs/consumer-alerting/README.md`. Depends on slice 3. This is the alert hot
 > path — the latency budget is seconds from poller publish to push/email send.
 
+> **Landed.** `KELTA_AVAILABILITY` stream, `AvailabilityEventListener` (queue group
+> `worker-availability`), `AvailabilityMatchService`, `AlertDispatchService`, the trigger
+> bridge, and 42 unit tests. Four notes against the design below:
+> - **Criteria are evaluated in Java, not pushed into SQL.** §3 step 3 proposed pushing the
+>   date-window overlap into the match query. It is not: `criteria` is opaque member-authored
+>   JSONB, and welding a query plan to a shape members can change is how a later tweak
+>   silently stops matching. The candidate set is already bounded by the indexed
+>   `(tenant_id, target_id, status)` query, so the Java filter is cheap — revisit only if a
+>   single target ever carries enough watches to matter.
+> - **No composite partial index was added.** §4 offered one conditionally; the existing
+>   slice-3 index covers the match query, and adding a speculative index for an unmeasured
+>   plan is worse than not having one.
+> - **Invalid criteria alert rather than drop.** A member who mis-saved criteria gets a
+>   slightly-too-broad alert instead of silence — an over-alert is recoverable, never
+>   alerting someone who is paying for alerts is not.
+> - **The email template is not code-seeded.** `availability.alert` is tenant-overridable and
+>   must exist before go-live; a missing template records a FAILED delivery rather than
+>   throwing. Documented in `integrations.md` as tenant setup.
+>
+> Ordering that matters and should not be "simplified" later: sends happen **outside any
+> transaction and after the alert row is committed**, because that row is the dedupe record —
+> rolling it back on a provider timeout would re-alert the member on retry.
+
 ## 1. Goal & scope
 
 Delivers: the `KELTA_AVAILABILITY` stream + `AvailabilityEventListener` (normalize →

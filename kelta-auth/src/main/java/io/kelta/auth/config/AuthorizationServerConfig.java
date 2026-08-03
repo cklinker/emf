@@ -150,6 +150,7 @@ public class AuthorizationServerConfig {
                                 "/portal/api/login/request",
                                 "/portal/api/login/verify",
                                 "/portal/api/signup",
+                                "/portal/api/challenge",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/auth/session",

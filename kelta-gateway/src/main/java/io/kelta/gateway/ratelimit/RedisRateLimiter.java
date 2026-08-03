@@ -67,39 +67,69 @@ public class RedisRateLimiter {
      * @return Mono<RateLimitResult> indicating if the request is allowed
      */
     public Mono<RateLimitResult> checkRateLimit(String routeId, String principal, RateLimitConfig config) {
-        String key = buildKey(routeId, principal);
-        String windowSeconds = String.valueOf(Math.max(1, config.getWindowDuration().toSeconds()));
+        return checkWindow(buildKey(routeId, principal),
+                config.getRequestsPerWindow(), config.getWindowDuration());
+    }
+
+    /**
+     * Fixed-window check against an arbitrary key — the single implementation
+     * behind every limiter in the gateway.
+     *
+     * <p>The per-IP limiter for unauthenticated paths shares this rather than
+     * keeping its own counter: an in-memory bucket is per-pod, so N replicas
+     * silently grant N× the configured budget, and a public endpoint's budget is
+     * the whole point. Anything counting requests here must go through this
+     * method — a second copy of the window logic is how the TTL-refresh lockout
+     * bug (2026-07-11) would come back.
+     *
+     * <p><b>Fails open.</b> If Redis is unreachable the request is allowed, matching
+     * the pre-existing posture: a cache outage must not take the platform down. It
+     * does mean a Redis outage removes rate limiting, so the failure is logged at
+     * WARN rather than swallowed.
+     *
+     * @param key    the full Redis key (callers namespace their own keys)
+     * @param limit  requests permitted per window
+     * @param window the window duration
+     */
+    public Mono<RateLimitResult> checkWindow(String key, long limit, Duration window) {
+        String windowSeconds = String.valueOf(Math.max(1, window.toSeconds()));
 
         return redisTemplate.execute(INCREMENT_WINDOW_SCRIPT, List.of(key), List.of(windowSeconds))
             .next()
             .flatMap(count -> {
-                long limit = config.getRequestsPerWindow();
-
                 if (count > limit) {
                     // Rate limit exceeded — report the true time until the window
                     // resets, not the full window duration.
-                    log.debug("Rate limit exceeded for route={}, principal={}, count={}, limit={}",
-                        routeId, principal, count, limit);
+                    log.debug("Rate limit exceeded for key={}, count={}, limit={}", key, count, limit);
                     return redisTemplate.getExpire(key)
-                        .map(ttl -> ttl.isPositive() ? ttl : config.getWindowDuration())
-                        .defaultIfEmpty(config.getWindowDuration())
+                        .map(ttl -> ttl.isPositive() ? ttl : window)
+                        .defaultIfEmpty(window)
                         .map(RateLimitResult::notAllowed);
                 } else {
                     // Request allowed
                     long remaining = limit - count;
-                    log.debug("Rate limit check passed for route={}, principal={}, count={}, remaining={}",
-                        routeId, principal, count, remaining);
+                    log.debug("Rate limit check passed for key={}, count={}, remaining={}",
+                        key, count, remaining);
                     return Mono.just(RateLimitResult.allowed(remaining));
                 }
             })
             .onErrorResume(error -> {
                 // Graceful degradation: if Redis is unavailable, allow the request
-                log.warn("Redis error during rate limit check for route={}, principal={}. Allowing request. Error: {}",
-                    routeId, principal, error.getMessage());
-                return Mono.just(RateLimitResult.allowed(config.getRequestsPerWindow()));
-            });
+                log.warn("Redis error during rate limit check for key={}. Allowing request. Error: {}",
+                    key, error.getMessage());
+                return Mono.just(RateLimitResult.allowed(limit));
+            })
+            // A script that completes WITHOUT emitting is not an error, so it
+            // slips past onErrorResume — and an empty Mono here means the calling
+            // filter never reaches chain.filter(), so the request hangs with no
+            // status and no body instead of failing open. Same outcome as an
+            // error: allow, and say so.
+            .switchIfEmpty(Mono.fromSupplier(() -> {
+                log.warn("Rate limit check for key={} returned no result. Allowing request.", key);
+                return RateLimitResult.allowed(limit);
+            }));
     }
-    
+
     /**
      * Increments the daily API call counter for a tenant.
      *

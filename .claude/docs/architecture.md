@@ -52,10 +52,10 @@ Order values below are the live `getOrder()` returns from source (lower runs fir
 | -310 | CustomDomainFilter | Map custom domain → tenant |
 | -300 | TenantSlugExtractionFilter | Extract tenant slug from URL |
 | -200 | TenantResolutionFilter | Resolve slug → tenant ID |
-| -150 | IpRateLimitFilter | Per-IP rate limiting on configured public path prefixes (in-memory, per-pod) |
+| -150 | IpRateLimitFilter | Per-IP rate limiting on configured public path prefixes (Redis-backed, shared across replicas) |
 | -100 | JwtAuthenticationFilter | Validate JWT |
 | -99 | PatAuthenticationFilter | Validate PAT (`klt_`) as JWT alternative |
-| -50 | RateLimitFilter / UserIdentityResolutionFilter | Per-tenant rate limit; user identity |
+| -50 | RateLimitFilter / UserIdentityResolutionFilter | Per-**user** then per-tenant rate limit; user identity |
 | -45 | GeoEnrichmentFilter | GeoLite2 lookup of the client IP → `gateway.geo` attr, trusted `X-Geo-*` headers, `GatewayPrincipal.geoCountry` |
 | -40 | TenantIpAllowlistFilter | Per-tenant IP allowlist on `/api/**` (fail-open; `MANAGE_TENANTS` bypass) |
 | 0 | RouteAuthorizationFilter | Cerbos object-level permission check (DynamicRouteLocator then forwards to worker) |
@@ -99,14 +99,15 @@ catches up. Point the readiness probe at `/actuator/health/readiness`.
 
 ### Rate limiting
 
-Two limiters with different jobs, plus one shared exemption list.
+Three windows with different jobs, plus one shared exemption list. **All Redis-backed** —
+an in-memory bucket is per-pod, so N replicas silently grant N× the configured budget.
 
-| | `IpRateLimitFilter` (-150) | `RateLimitFilter` (-50) |
-|---|---|---|
-| Covers | unauthenticated public paths | authenticated traffic |
-| Keyed on | matched path prefix + client IP | tenant |
-| Budget from | `kelta.gateway.rate-limit.ip-paths` | tenant governor limit (`apiCallsPerDay`) |
-| Store | in-memory per pod | Redis (shared across replicas) |
+| | `IpRateLimitFilter` (gateway, -150) | `RateLimitFilter` per-user (gateway, -50) | `RateLimitFilter` per-tenant (gateway, -50) | `PortalPublicRateLimitFilter` (kelta-auth, -150) |
+|---|---|---|---|---|
+| Covers | unauthenticated gateway paths | authenticated traffic | authenticated traffic | kelta-auth's public portal paths |
+| Keyed on | path prefix + client IP | `tenantId` + `user:<principal>` | tenant | path prefix + client IP |
+| Budget from | `kelta.gateway.rate-limit.ip-paths` | `user-share` × the tenant window | tenant governor (`apiCallsPerDay`) | `kelta.auth.rate-limit.ip-paths` |
+| Redis key | `ratelimit:ip:<prefix>:<ip>` | `ratelimit:<tenantId>:user:<principal>` | `ratelimit:<tenantId>:tenant` | `authratelimit:ip:<prefix>:<ip>` |
 
 `ip-paths` is a comma-separated list of `<path-prefix>=<per-minute>` entries matched by
 **longest prefix** (so `/api/billing/webhooks` covers `/api/billing/webhooks/stripe/{tenantId}`),
@@ -114,6 +115,42 @@ and each prefix gets its own per-IP bucket — a burst on one public endpoint ca
 another's budget for that client. 429 carries a `Retry-After` computed from the real remaining
 window. `RateLimitFilter` returns early when there is no principal, which is exactly why the
 per-IP filter exists.
+
+**Per-user window (consumer-alerting slice 7).** The tenant window is *shared*, so one member
+hammering an endpoint — or one stolen PAT — locked out everyone in the tenant. The per-user
+window is checked **first** and, when it rejects, the tenant counter is deliberately **not**
+incremented, so a misbehaving member cannot spend the shared budget merely by being rejected.
+The budget is `kelta.gateway.rate-limit.user-share` (default `0.9`, floored at 1); a share of
+`1.0` disables it, and an out-of-range value falls back to the default rather than silently
+switching the limit off. **The default is deliberately close to 1.** The tenant window is
+derived from the tenant's *whole* governor budget, so one admin, bulk import, or integration
+PAT legitimately is most of a tenant; a 0.5 share was tried first and halved real single-user
+throughput (the e2e suite — one admin driving one tenant — went from comfortably under the cap
+to failing on 429). This window bounds a runaway or stolen credential, it does not divide the
+budget fairly. Tenants with many members should tighten it. The key is the principal username,
+which is the member's email for **both** kelta-auth JWTs and PATs — so a member cannot double
+their budget by switching credential type. An entitlement-driven per-member budget (a paid tier
+buying a bigger window) is a follow-up; the seam is `RateLimitFilter.checkPerUser`.
+
+**The portal public paths are limited in kelta-auth, not the gateway.** `/portal/**` is served
+by kelta-auth, which has its own ingress; that traffic never reaches the gateway. A gateway
+entry for `/portal/api/signup` would match nothing while reading, in config and in review, as
+though signup were limited — so the control lives in `PortalPublicRateLimitFilter` where the
+request actually lands, with the same fixed-window semantics. Its defaults cover
+`/portal/api/{signup,login/request,challenge}` **and** the Thymeleaf `/portal/login` form, which
+sends the same email through the same service.
+
+**Forwarded-header posture for limiter keys.** `PortalPublicRateLimitFilter` takes the hop the
+*trusted* proxy appended — counting `kelta.auth.rate-limit.trusted-proxy-count` (default 1)
+entries back from the right of `X-Forwarded-For` — never the leftmost entry. The leftmost entry
+is whatever the client sent, so honouring it lets anyone mint a fresh bucket per request by
+varying one header, which makes the limiter decorative. With zero trusted proxies the header is
+ignored entirely.
+
+**Fail-open, with one deliberate exception.** Every limiter allows the request when Redis is
+unreachable (logged at WARN): a cache outage must not take the platform down, and the other
+controls still stand. The bot challenge's replay check fails **closed** instead — a challenge
+that passes during an outage is an open door on the exact endpoint it protects.
 
 **Exemption.** `kelta.gateway.rate-limit.exempt-cidrs` (env `RATE_LIMIT_EXEMPT_CIDRS`) lists IPs
 or CIDR ranges that bypass **both** limiters — uptime probes, in-cluster callers, a payment

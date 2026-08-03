@@ -3,6 +3,7 @@ package io.kelta.auth.controller;
 import io.kelta.auth.service.AuthDomainResolver;
 import io.kelta.auth.service.PortalLoginService;
 import io.kelta.auth.service.WorkerClient;
+import io.kelta.auth.service.botchallenge.BotChallengeVerifier;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,10 +36,14 @@ import java.util.Optional;
  * {@code maxPortalUsers} seat governor is enforced: public signup without a seat
  * cap is unbounded account creation. See {@code InternalPortalSignupController}.
  *
- * <p>Rate limiting: per-email throttling rides the existing
- * {@code PortalLoginService} link budget for the re-invite path. The per-IP
- * budget is a gateway concern and is not yet applied to this host — see the
- * production gate in the slice-7 spec, which is why signup stays off by default.
+ * <p><b>Abuse controls (slice 7).</b> Three independent layers, because none of
+ * them is sufficient alone: per-email throttling from {@code PortalLoginService}
+ * (bounds mail sent to one address), the Redis-backed per-IP budget in
+ * {@code PortalPublicRateLimitFilter} (bounds one source), and the proof-of-work
+ * {@code BotChallengeVerifier} plus a honeypot field (bounds a distributed script
+ * that stays under every per-IP budget). The challenge is opt-in per deployment.
+ * The per-IP budget lives in this service rather than the gateway because
+ * {@code /portal/**} has its own ingress and never transits the gateway.
  */
 @RestController
 @RequestMapping("/portal/api")
@@ -50,13 +55,16 @@ public class PortalSignupController {
     private final PortalLoginService portalLoginService;
     private final AuthDomainResolver domainResolver;
     private final WorkerClient workerClient;
+    private final BotChallengeVerifier botChallengeVerifier;
 
     public PortalSignupController(PortalLoginService portalLoginService,
                                   AuthDomainResolver domainResolver,
-                                  WorkerClient workerClient) {
+                                  WorkerClient workerClient,
+                                  BotChallengeVerifier botChallengeVerifier) {
         this.portalLoginService = portalLoginService;
         this.domainResolver = domainResolver;
         this.workerClient = workerClient;
+        this.botChallengeVerifier = botChallengeVerifier;
     }
 
     /**
@@ -66,7 +74,8 @@ public class PortalSignupController {
      * both, and two names for one concept is a needless trap.
      */
     public record SignupRequest(String email, String tenant, String redirectUri,
-                                String firstName, String lastName) {
+                                String firstName, String lastName,
+                                String challenge, String website) {
     }
 
     @PostMapping("/signup")
@@ -75,6 +84,30 @@ public class PortalSignupController {
         String email = body == null ? null : body.email();
         if (email == null || email.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "email_required"));
+        }
+
+        // Honeypot: `website` is hidden in the form, so only an automated filler
+        // ever populates it. Answer 202 like everything else — an error here
+        // would just teach the script which field to leave alone.
+        if (body.website() != null && !body.website().isBlank()) {
+            audit.info("security_event=PORTAL_SIGNUP actor={} result=ignored detail=honeypot",
+                    AuditText.sanitize(email));
+            return ResponseEntity.accepted().body(Map.of("status", "ok"));
+        }
+
+        // A failed challenge is a plain 400: it is decided before any account
+        // lookup, so unlike the 202 path it leaks nothing about the address, and
+        // a silent no-op would leave a user with a broken widget stuck with no
+        // way to tell.
+        BotChallengeVerifier.Result challenge = botChallengeVerifier.verify(body.challenge());
+        if (challenge != BotChallengeVerifier.Result.VALID
+                && challenge != BotChallengeVerifier.Result.DISABLED) {
+            // Audited, not just logged: a distributed script failing the challenge
+            // is exactly the signal this control exists to surface, and it would
+            // be invisible in an application log nobody alerts on.
+            audit.info("security_event=PORTAL_SIGNUP actor={} result=rejected detail=bot_challenge_{}",
+                    AuditText.sanitize(email), challenge.name().toLowerCase());
+            return ResponseEntity.badRequest().body(Map.of("error", "bot_challenge_failed"));
         }
 
         String tenant = body.tenant() != null && !body.tenant().isBlank()
@@ -102,12 +135,12 @@ public class PortalSignupController {
                 // Silent no-op: a disabled tenant must look exactly like an
                 // enabled one to an anonymous caller.
                 audit.info("security_event=PORTAL_SIGNUP actor={} tenant={} result=ignored "
-                        + "detail=self_signup_disabled", email, uuid);
+                        + "detail=self_signup_disabled", AuditText.sanitize(email), uuid);
                 return;
             }
             String outcome = workerClient.portalSignup(uuid, email, body.firstName(), body.lastName());
             audit.info("security_event=PORTAL_SIGNUP actor={} tenant={} result={} detail={}",
-                    email, uuid, outcome == null ? "failure" : "success",
+                    AuditText.sanitize(email), uuid, outcome == null ? "failure" : "success",
                     outcome == null ? "worker_unavailable" : outcome);
         });
 

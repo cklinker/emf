@@ -22,6 +22,53 @@
 > per pod, so N replicas mean N× the budget), the **per-user** window, route-class
 > multipliers, the ALTCHA bot challenge, edge controls, and the public-surface sweep.
 
+> **Landed.** Redis-backed per-IP limiting, the per-user window, the ALTCHA challenge +
+> honeypot, and the public-surface guard. Five notes against the design below:
+> - **§3/§5 put the portal budgets in the gateway. They cannot go there.** `/portal/**` is
+>   served by kelta-auth, which has its own ingress — that traffic never transits the gateway,
+>   so `kelta.gateway.rate-limit.ip-paths: "/portal/api/signup": 5/min` would match nothing
+>   while reading, in config and in review, exactly like protection. The control ships as
+>   kelta-auth's own `PortalPublicRateLimitFilter` with identical window semantics, and the
+>   gateway's default map deliberately does **not** list the portal paths. Its defaults also
+>   cover the Thymeleaf `/portal/login` form, which §3 missed: it sends the same email through
+>   the same service, so limiting only the JSON API leaves the identical abuse one URL over.
+> - **The per-user budget is derived from the tenant governor, not from `apiCallsPerDay`
+>   entitlements.** §3's entitlement lookup would put a cross-service call on the authenticated
+>   hot path for what is a monetization feature ("a paid tier buys a bigger window"), not the
+>   launch gate. The security property — one member cannot lock out the tenant — is fully
+>   delivered by a share of the tenant window. `RateLimitFilter.checkPerUser` is the seam.
+> - **Route-class multipliers skipped deliberately.** The per-path `ip-paths` map already sets
+>   explicit budgets per path, which is strictly clearer than a multiplier. Adding a second,
+>   differently-shaped knob for authenticated traffic with no concrete driver is the kind of
+>   config that rots unused.
+> - **The bot challenge fails CLOSED**, unlike every limiter here. §8 discusses fail-open for
+>   Redis; that reasoning holds for a limiter (the other controls still stand) and inverts for
+>   the challenge (an outage becomes an open door on the endpoint it protects). Relatedly,
+>   enabling it without a shared HMAC key **refuses to start**: a per-pod random key verifies
+>   only on the issuing pod, so a share of real signups would fail with no visible cause.
+> - **A fractional per-user budget is a trap; the default is 0.9, not 0.5.** The tenant window
+>   is derived from the tenant's *whole* governor budget, so one admin or integration PAT
+>   legitimately is most of a tenant. A half share looked conservative and was a functional
+>   regression — the e2e suite (one admin, one tenant, ~1450 requests into a 1735/5min window)
+>   went from passing to failing on 429. Bound the runaway credential; do not divide fairly.
+>   The same run also showed CI sitting at ~84% of the tenant cap with no think-time, so
+>   `docker-compose.yml` now exempts the private compose network (**local/CI only**).
+> - **Found en route:** `checkWindow` failed open on a Redis *error* but not on an *empty*
+>   reply — the Mono completed empty, the calling filter never reached `chain.filter`, and the
+>   request hung with no status or body. Fixed with `switchIfEmpty`. Pre-existing on the tenant
+>   path; routing public traffic through the same method would have extended it to
+>   unauthenticated endpoints, where a hung client is worse than a retried API call.
+>
+> Also added beyond the spec: failed challenges and honeypot trips now emit `security.audit`
+> events on **both** endpoints (they were app-log-only, so the control they represent was
+> unobservable), and caller-supplied emails pass through `AuditText.sanitize` — a newline in an
+> unvalidated field could otherwise forge audit records. `PublicSurfaceTest` implements §3's
+> public-surface check as a build-time guard over the shipped `application.yml`.
+>
+> **Still open:** nothing proves two replicas share a counter (mocked Redis only — a
+> Testcontainers scenario is owed), the edge controls are deployment-repo work, and the ALTCHA
+> widget plus difficulty tuning belong to the consumer frontend.
+
 ## 1. Goal & scope
 
 Delivers: Redis-backed per-IP rate limiting for public paths (consistent across gateway

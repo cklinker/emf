@@ -63,7 +63,12 @@ public class PortalAuthSettingsController {
         this.objectMapper = objectMapper;
     }
 
-    public record PortalAuthSettings(List<String> redirectUris, String inviteRedirectUri) {}
+    /**
+     * @param selfSignupEnabled gates public portal self-signup; null on input is
+     *        treated as false, so the flag must be set deliberately
+     */
+    public record PortalAuthSettings(List<String> redirectUris, String inviteRedirectUri,
+                                     Boolean selfSignupEnabled) {}
 
     @GetMapping
     public ResponseEntity<PortalAuthSettings> get(HttpServletRequest request) {
@@ -79,7 +84,11 @@ public class PortalAuthSettingsController {
                         String.class, tenantId).stream()
                 .filter(v -> v != null && !v.isBlank())
                 .findFirst().orElse(null);
-        return ResponseEntity.ok(new PortalAuthSettings(uris, invite));
+        boolean selfSignup = jdbcTemplate.queryForList(
+                        "SELECT settings#>>'{portalAuth,selfSignupEnabled}' FROM tenant WHERE id = ?",
+                        String.class, tenantId).stream()
+                .findFirst().map(Boolean::parseBoolean).orElse(false);
+        return ResponseEntity.ok(new PortalAuthSettings(uris, invite, selfSignup));
     }
 
     @PutMapping
@@ -108,8 +117,15 @@ public class PortalAuthSettingsController {
                     "inviteRedirectUri must be one of redirectUris");
         }
 
+        // This PUT REPLACES the whole {portalAuth} object, so every field must be
+        // written back — omitting one silently resets it. selfSignupEnabled is
+        // written unconditionally for exactly that reason: leaving it out on an
+        // unrelated allowlist edit would quietly switch public signup off (or, if
+        // the default ever flipped, on).
+        boolean selfSignup = body != null && Boolean.TRUE.equals(body.selfSignupEnabled());
         Map<String, Object> portalAuth = new LinkedHashMap<>();
         portalAuth.put("redirectUris", uris);
+        portalAuth.put("selfSignupEnabled", selfSignup);
         if (invite != null && !invite.isBlank()) {
             portalAuth.put("inviteRedirectUri", invite);
         }
@@ -118,12 +134,13 @@ public class PortalAuthSettingsController {
                         + "'{portalAuth}', ?::jsonb), updated_at = NOW() WHERE id = ?",
                 objectMapper.writeValueAsString(portalAuth), tenantId);
 
-        audit.info("security_event=PORTAL_AUTH_SETTINGS_CHANGED actor={} tenant={} redirect_uris={} invite_redirect={}",
+        audit.info("security_event=PORTAL_AUTH_SETTINGS_CHANGED actor={} tenant={} redirect_uris={} "
+                        + "invite_redirect={} self_signup={}",
                 request.getHeader("X-User-Id"), tenantId, uris.size(),
-                invite != null && !invite.isBlank());
+                invite != null && !invite.isBlank(), selfSignup);
         log.info("Portal auth settings updated for tenant {} ({} redirect URIs)", tenantId, uris.size());
         return ResponseEntity.ok(new PortalAuthSettings(uris,
-                invite != null && !invite.isBlank() ? invite : null));
+                invite != null && !invite.isBlank() ? invite : null, selfSignup));
     }
 
     /**

@@ -3,6 +3,33 @@
 > Child of `specs/consumer-alerting/README.md`. Depends on slices 3 (watches) + 1
 > (entitlements). **Security-typed → NO auto-merge** (public signup + portal authz boundary).
 
+> **Landed.** `WatchController`, `WatchGuardHook`, `PortalSignupController`,
+> `InternalPortalSignupController`, the `selfSignupEnabled` setting, and 27 unit tests. Four
+> notes against the design below:
+> - **Signup creates the account via the worker, not in kelta-auth.** §5 reads as though
+>   kelta-auth would insert the `platform_user` itself, and it could — it shares the database.
+>   But `PortalUserService.invitePortalUser` already enforces the **`maxPortalUsers` seat
+>   governor**, which the spec never mentions. Public self-signup without a seat cap is
+>   unbounded account creation, and kelta-auth has no `TenantQuotaResolver` to duplicate the
+>   check with (two copies would drift). So signup calls a new internal-token endpoint,
+>   `POST /api/internal/portal/signup`, reusing the existing enforcement. The existing
+>   `/api/admin/users/portal-invite` could not be reused: it requires `MANAGE_USERS` and a
+>   resolved profile, which an unauthenticated signup has neither of.
+> - **A CSRF exemption is required, not just `permitAll`.** §5 lists only the permitAll entry;
+>   without also adding the path to `AuthorizationServerConfig`'s `ignoringRequestMatchers`,
+>   every signup POST returns 403.
+> - **The request field is `tenant`, not `tenantSlug`.** The sibling
+>   `PortalAuthApiController.LoginLinkRequest` already calls it `tenant`, and the same frontend
+>   calls both endpoints — two names for one concept is a needless trap.
+> - **The INTERNAL-collision explanatory email is not sent.** No such template key exists, so
+>   it would mean inventing and seeding one; an unseeded template just records a FAILED
+>   delivery. The collision is audited server-side and the response is still 202, which is the
+>   security property. Worth adding as a UX follow-up.
+>
+> Also: `PortalAuthSettingsController`'s PUT **replaces the whole `{portalAuth}` object**, so
+> `selfSignupEnabled` is written back unconditionally — omitting it would let an unrelated
+> allowlist edit silently switch signup off.
+
 ## 1. Goal & scope
 
 Delivers: opt-in portal self-signup (magic-link verified), an owner-scoped watch CRUD API,

@@ -149,6 +149,38 @@ public class WorkerClient {
         }
     }
 
+    /**
+     * Creates (or re-invites) a portal user for self-signup, delegating to the
+     * worker so the {@code maxPortalUsers} seat governor is enforced — kelta-auth
+     * has no quota resolver, and public signup without a seat cap is unbounded
+     * account creation.
+     *
+     * @return the worker's outcome for auditing, or {@code null} when the call
+     *         failed — the caller answers 202 either way, so a worker outage must
+     *         not turn into an account-existence signal
+     */
+    public String portalSignup(String tenantId, String email, String firstName, String lastName) {
+        try {
+            Map<String, Object> requestBody = new java.util.LinkedHashMap<>();
+            requestBody.put("tenantId", tenantId);
+            requestBody.put("email", email);
+            if (firstName != null) requestBody.put("firstName", firstName);
+            if (lastName != null)  requestBody.put("lastName", lastName);
+
+            JsonNode response = restClient.post()
+                    .uri("/api/internal/portal/signup")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Internal-Token", internalToken)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(JsonNode.class);
+            return response == null ? null : response.path("outcome").asText(null);
+        } catch (Exception e) {
+            log.error("Portal signup via worker failed for tenant {}: {}", tenantId, e.getMessage());
+            return null;
+        }
+    }
+
     public record OidcProviderInfo(
             String id, String name, String issuer, String jwksUri, String audience,
             String clientId, String clientSecretEnc,

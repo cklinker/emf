@@ -215,6 +215,10 @@ public class RouteConfigService {
                 // scoping. /api/billing/webhooks additionally rides the
                 // unauthenticated-paths list (the HMAC signature is its trust anchor).
                 {"billing", "/api/billing/**", "billing"},
+                // Member-facing watch API (consumer-alerting slice 5) — a static-
+                // route, so only API_ACCESS is checked here; WatchController owns
+                // member scoping and WatchGuardHook covers the generic route.
+                {"watches", "/api/watches/**", "watches"},
                 {"connected-apps", "/api/connected-apps/**", "connected-apps"},
                 {"email-templates", "/api/email-templates/**", "email-templates"},
                 {"email", "/api/email/**", "email"},

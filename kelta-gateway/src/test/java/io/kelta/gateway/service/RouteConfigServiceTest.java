@@ -156,9 +156,9 @@ class RouteConfigServiceTest {
         // Give async processing time to complete
         Thread.sleep(500);
 
-        // Assert (2 collection routes + 55 static routes; "users" bootstrap overwrites static-users)
+        // Assert (2 collection routes + 56 static routes; "users" bootstrap overwrites static-users)
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(56, routes.size());
+        assertEquals(57, routes.size());
 
         // Verify bootstrap collection route (overwrites the static-users route for same path)
         RouteDefinition usersRoute = routeRegistry.findByPath("/api/users/**").orElse(null);
@@ -213,9 +213,9 @@ class RouteConfigServiceTest {
         routeConfigService.refreshRoutes();
         Thread.sleep(500);
 
-        // Assert (2 collection routes + 55 static routes)
+        // Assert (2 collection routes + 56 static routes)
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(57, routes.size());
+        assertEquals(58, routes.size());
 
         // Even though bootstrap included a pod IP, gateway should use configured service URL
         RouteDefinition productRoute = routeRegistry.findByPath("/api/product/**").orElse(null);
@@ -251,9 +251,9 @@ class RouteConfigServiceTest {
         routeConfigService.refreshRoutes();
         Thread.sleep(500);
 
-        // Assert - invalid route should be skipped (only 55 static routes remain)
+        // Assert - invalid route should be skipped (only 56 static routes remain)
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(55, routes.size());
+        assertEquals(56, routes.size());
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-admin")));
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-collections")));
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-metrics")));
@@ -278,9 +278,9 @@ class RouteConfigServiceTest {
         routeConfigService.refreshRoutes();
         Thread.sleep(500);
 
-        // Assert (only 55 static routes remain)
+        // Assert (only 56 static routes remain)
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(55, routes.size());
+        assertEquals(56, routes.size());
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-admin")));
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-collections")));
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-me")));
@@ -331,9 +331,9 @@ class RouteConfigServiceTest {
         routeConfigService.refreshRoutes();
         Thread.sleep(500);
 
-        // Assert - only valid route + 55 static routes should be added
+        // Assert - only valid route + 56 static routes should be added
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(56, routes.size());
+        assertEquals(57, routes.size());
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("valid-collection")));
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-admin")));
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-collections")));

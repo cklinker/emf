@@ -586,6 +586,22 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Owner guard for {@code watches} reached via the GENERIC dynamic route —
+     * {@code WatchController} scopes the purpose-built API, but the generic route
+     * bypasses it entirely, so both doors need locking.
+     */
+    @Bean
+    public io.kelta.worker.listener.WatchGuardHook watchGuardHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.runtime.router.UserIdResolver userIdResolver,
+            JdbcTemplate jdbcTemplate) {
+        io.kelta.worker.listener.WatchGuardHook hook =
+                new io.kelta.worker.listener.WatchGuardHook(userIdResolver, jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public BillingPlanRefreshHook billingPlanRefreshHook(
             BeforeSaveHookRegistry hookRegistry,

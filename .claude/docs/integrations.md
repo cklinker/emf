@@ -254,6 +254,55 @@ definition can be driven by cron or by `execute_flow` as long as the static
 `triggerConfig.inputData` and the caller-supplied `body.input` produce the same
 shape under `$.input`.
 
+## Availability pollers (consumer-alerting slices 3–4)
+
+An external poller watches a source and reports what it sees; the platform decides what is
+worth alerting on. Pollers live **outside this repository** — the contract below is their
+whole interface.
+
+**Publish** to `kelta.availability.event.<tenantId>.<source>` (KELTA_AVAILABILITY stream, 1h
+retention). The body is **plain poller-authored JSON**, not a `PlatformEvent` — a poller
+should not have to construct a platform envelope, and keeping records off this subject means
+no native reflect-config entries:
+
+```json
+{
+  "source": "source-key", "targetExternalId": "12345", "slotKey": "2026-08-14",
+  "status": "OPEN", "window": {"start": "2026-08-14T00:00:00Z", "end": "2026-08-16T00:00:00Z"},
+  "quantity": 1, "meta": {}, "polledAt": "2026-08-02T17:31:04Z"
+}
+```
+
+`source` may be omitted — it falls back to the subject segment. `window`, `quantity`, `meta`
+and `polledAt` are optional: "this slot opened" is actionable without them. `targetExternalId`
+resolves against `watch_target (tenant_id, source, external_id)`; an unregistered target is
+dropped quietly, because a poller may legitimately cover more than any one tenant registers.
+
+**Report what you see, not what changed.** Re-publishing the same OPEN slot every minute is
+harmless and expected — the platform derives the transition against `availability_state` and
+short-circuits when nothing changed. Pollers stay dumb and replaceable; deduplication is not
+their problem.
+
+**Alerting is once per opening.** A fresh `episode_id` is minted on each CLOSED→OPEN edge, and
+`alert` is unique on `(tenant, watch, slot, episode)`. A slot open across a hundred polls
+alerts once; a genuine close-then-reopen alerts again. A suppression window
+(`kelta.availability.suppression-minutes`, default 30) additionally guards against a slot
+flapping. Duplicate pollers double-publishing are therefore harmless.
+
+**Consumed** on the queue group `worker-availability` — exactly one pod handles each
+observation. This subject is deliberately **not** under `kelta.trigger.>`: it is the alert hot
+path with a seconds-level budget and must not queue behind tenant flows.
+
+**Flows react afterwards.** Once members are notified, a compact summary
+(`{targetId, targetName, source, slotKey, windowStart, windowEnd, matchedWatches}` — ids and
+counts, never member identities) is republished to `kelta.trigger.<tenantId>.availability`, so
+NATS_TRIGGERED flows with topic `availability` fire for digests, tickers and custom
+automations. Flows read `$.input.payload.*`.
+
+**Tenant setup before go-live:** create `watch-targets` rows for whatever the poller covers,
+and an `availability.alert` email template (tenant-overridable) — without it the email channel
+records a FAILED delivery.
+
 ## Stripe (portal billing — consumer-alerting slice 1)
 
 A tenant sells plans to its **PORTAL** members. Stripe owns money, tax, invoicing, and

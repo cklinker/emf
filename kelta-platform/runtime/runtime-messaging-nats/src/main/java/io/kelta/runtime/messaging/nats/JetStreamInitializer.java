@@ -76,6 +76,15 @@ public class JetStreamInitializer {
             ensureStream(jsm, "KELTA_BILLING",
                     List.of("kelta.billing.>"),
                     Duration.ofHours(24));
+            // Availability observations from external pollers (consumer-alerting
+            // slice 4): kelta.availability.event.<tenantId>.<source>. Deliberately
+            // NOT on kelta.trigger.> — this is the alert hot path with a
+            // seconds-level budget, and it must not queue behind tenant flows.
+            // Short retention: a stale availability report is worse than none, so
+            // there is no value in replaying an hour-old observation.
+            ensureStream(jsm, "KELTA_AVAILABILITY",
+                    List.of("kelta.availability.>"),
+                    Duration.ofHours(1));
         } catch (Exception e) {
             log.error("Failed to initialize JetStream streams: {}", e.getMessage(), e);
         }

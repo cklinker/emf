@@ -63,6 +63,25 @@ gen-keys:
 		echo "✅  KELTA_ENCRYPTION_KEY written to .env"; \
 	fi
 
+## gen-vapid: generate a dev VAPID key pair for browser Web Push (idempotent)
+gen-vapid:
+	@if grep -q "^KELTA_PUSH_VAPID_PUBLIC_KEY=." .env 2>/dev/null; then \
+		echo "🔑  KELTA_PUSH_VAPID_PUBLIC_KEY already set in .env — skipping"; \
+	else \
+		echo "🔑  Generating VAPID P-256 key pair..."; \
+		docker run --rm node:20-alpine node -e " \
+			const c = require('crypto'); \
+			const {publicKey, privateKey} = c.generateKeyPairSync('ec',{namedCurve:'prime256v1'}); \
+			const pub = publicKey.export({format:'jwk'}), priv = privateKey.export({format:'jwk'}); \
+			const b = s => Buffer.from(s,'base64url'); \
+			const point = Buffer.concat([Buffer.from([4]), b(pub.x), b(pub.y)]); \
+			console.log('KELTA_PUSH_VAPID_PUBLIC_KEY=' + point.toString('base64url')); \
+			console.log('KELTA_PUSH_VAPID_PRIVATE_KEY=' + priv.d); \
+			console.log('KELTA_PUSH_VAPID_SUBJECT=mailto:admin@localhost'); \
+		" >> .env; \
+		echo "✅  VAPID keys written to .env (restart kelta-worker to activate web push)"; \
+	fi
+
 # ─── Stack lifecycle ─────────────────────────────────────────────────────────
 
 ## up: start default stack (infra + auth + worker + gateway + ui)

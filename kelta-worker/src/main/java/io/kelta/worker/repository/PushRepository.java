@@ -44,6 +44,16 @@ public class PushRepository {
         return id;
     }
 
+    /**
+     * Stores the raw Web Push subscription for a device. Kept separate from the
+     * token columns because native devices never have one.
+     */
+    public void updateWebPushSubscription(String deviceId, String subscription) {
+        jdbcTemplate.update(
+                "UPDATE push_device SET web_push_subscription = ? WHERE id = ?",
+                subscription, deviceId);
+    }
+
     public void updateDevice(String deviceId, String userId, String platform, String deviceName) {
         jdbcTemplate.update(
                 "UPDATE push_device SET user_id = ?, platform = ?, device_name = ?, updated_at = NOW() WHERE id = ?",
@@ -67,13 +77,15 @@ public class PushRepository {
 
     public List<Map<String, Object>> findDevicesForUser(String userId, String tenantId) {
         return jdbcTemplate.queryForList(
-                "SELECT id, device_token, platform FROM push_device WHERE user_id = ? AND tenant_id = ?",
+                "SELECT id, device_token, platform, web_push_subscription "
+                        + "FROM push_device WHERE user_id = ? AND tenant_id = ?",
                 userId, tenantId);
     }
 
     public List<Map<String, Object>> findDevicesForTenant(String tenantId) {
         return jdbcTemplate.queryForList(
-                "SELECT id, device_token, platform FROM push_device WHERE tenant_id = ?", tenantId);
+                "SELECT id, device_token, platform, web_push_subscription "
+                        + "FROM push_device WHERE tenant_id = ?", tenantId);
     }
 
     /**

@@ -25,11 +25,33 @@ public class DefaultPushService {
     private static final int MAX_TOKEN_LENGTH = 500;
 
     private final PushProvider pushProvider;
+    private final java.util.List<PushProvider> providers;
     private final PushRepository pushRepository;
 
-    public DefaultPushService(PushProvider pushProvider, PushRepository pushRepository) {
+    public DefaultPushService(PushProvider pushProvider, PushRepository pushRepository,
+                              java.util.List<PushProvider> allProviders) {
         this.pushProvider = pushProvider;
         this.pushRepository = pushRepository;
+        // Browser push runs ALONGSIDE the property-selected mobile provider — a
+        // tenant can have both kinds of subscriber — so routing is per device
+        // rather than one provider taking everything.
+        this.providers = allProviders == null ? java.util.List.of() : allProviders;
+    }
+
+    /**
+     * Picks the provider for a device's platform, falling back to the configured
+     * default so single-provider deployments behave exactly as before.
+     */
+    private PushProvider providerFor(String platform) {
+        for (PushProvider candidate : providers) {
+            // A platform-specific provider wins over the configured default; the
+            // default's supports() returns true for everything, so checking it
+            // first would always shadow the specialist.
+            if (candidate != pushProvider && candidate.supports(platform)) {
+                return candidate;
+            }
+        }
+        return pushProvider;
     }
 
     public String registerDevice(String userId, String tenantId, String platform,
@@ -55,6 +77,44 @@ public class DefaultPushService {
 
         log.info("Device registered: id={} user={} platform={}", deviceId, userId, platform);
         return deviceId;
+    }
+
+    /**
+     * Registers a browser subscription.
+     *
+     * <p>The device token is {@code sha256(endpoint)} rather than the endpoint
+     * itself: endpoints run well past the 500-char column and the token carries a
+     * per-tenant UNIQUE constraint, so hashing keeps both intact while staying
+     * stable and unique per subscription. The subscription JSON is what is
+     * actually addressable, so it is stored alongside.
+     */
+    public String registerWebDevice(String userId, String tenantId, String subscriptionJson,
+                                    String deviceName) {
+        if (subscriptionJson == null || subscriptionJson.isBlank()) {
+            throw new IllegalArgumentException("subscription is required for web devices");
+        }
+        String deviceId = registerDevice(userId, tenantId, "web",
+                webDeviceToken(subscriptionJson), deviceName);
+        pushRepository.updateWebPushSubscription(deviceId, subscriptionJson);
+        return deviceId;
+    }
+
+    /** Stable per-subscription token: the SHA-256 of its endpoint, hex-encoded. */
+    static String webDeviceToken(String subscriptionJson) {
+        try {
+            var node = new tools.jackson.databind.ObjectMapper().readTree(subscriptionJson);
+            String endpoint = node.path("endpoint").stringValue();
+            if (endpoint == null || endpoint.isBlank()) {
+                throw new IllegalArgumentException("subscription has no endpoint");
+            }
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of()
+                    .formatHex(digest.digest(endpoint.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("unreadable web push subscription");
+        }
     }
 
     public void removeDevice(String deviceId, String tenantId) {
@@ -89,7 +149,10 @@ public class DefaultPushService {
             String deviceId = (String) device.get("id");
 
             try {
-                pushProvider.send(new PushMessage(token, platform, title, body, data), tenantSettings);
+                String subscription = (String) device.get("web_push_subscription");
+                providerFor(platform).send(
+                        new PushMessage(token, platform, title, body, data, subscription),
+                        tenantSettings);
                 delivered++;
             } catch (PushDeliveryException e) {
                 if (e.isInvalidToken()) {

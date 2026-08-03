@@ -3,6 +3,28 @@
 > Child of `specs/consumer-alerting/README.md`. Independent of every other slice; **must land
 > before high-frequency polling flows turn on** (slice 4 / poller go-live).
 
+> **Landed.** `FlowLogRetentionSweep` + `FlowLogRetentionRepository`, config block, 11 unit
+> tests, and `FlowLogRetentionScenarioTest` on real Postgres. Three notes against the design
+> below:
+> - **Age is `COALESCE(completed_at, started_at)`, not `completed_at`.** `completed_at` is
+>   nullable, so a terminal row that never got one would be invisible to a plain
+>   `completed_at < cutoff` predicate — it would leak forever, which is exactly the bug this
+>   sweep exists to fix. The harness test covers that path explicitly.
+> - **Added `max-batches` (default 20)**, not in the original config block. `batch-size` alone
+>   bounds a single statement but not a cycle; without a batch cap, a first arming against a
+>   large backlog would loop until the whole backlog was gone in one pass against a shared
+>   Postgres. Work per cycle is now `batch-size × max-batches` per table and the remainder
+>   drains on the next cycle.
+> - **No index was added.** The delete claims by `status` + age with a `LIMIT`, and the
+>   verified-cascade FKs already carry the dependent deletes; add
+>   `flow_execution (status, completed_at)` only if an armed environment shows the scan in
+>   `pg_stat_activity`. Deliberately not speculating a migration.
+>
+> Verified: only two tables reference `flow_execution` (`flow_step_log`,
+> `flow_pending_resume`) and **both cascade**, so no delete can fail on a dependent constraint
+> and no orphans are left. `job_execution_log`'s FK is to `scheduled_job` and does not cascade,
+> so it is pruned directly.
+
 ## 1. Goal & scope
 
 Delivers: age-based pruning of `flow_execution` (cascading to `flow_step_log` +

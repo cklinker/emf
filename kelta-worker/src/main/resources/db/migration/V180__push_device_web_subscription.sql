@@ -1,0 +1,12 @@
+-- Consumer-alerting slice 6: browser Web Push
+-- (specs/consumer-alerting/6-web-push.md).
+--
+-- A Web Push subscription cannot be addressed by a token: it needs the endpoint
+-- URL plus two keys. Rather than widen device_token (500 chars, UNIQUE per
+-- tenant, and load-bearing for stale-token pruning), device_token stays a
+-- sha256 hash of the endpoint — stable, short, and unique per subscription —
+-- and the subscription itself lives here.
+--
+-- Nullable and untouched for native devices: FCM/APNs rows keep a real token
+-- and leave this column NULL.
+ALTER TABLE push_device ADD COLUMN IF NOT EXISTS web_push_subscription TEXT;

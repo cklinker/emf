@@ -4,7 +4,9 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -44,6 +46,11 @@ import java.util.Map;
  * @since 1.0.0
  */
 @Component
+// @Primary: WebPushProvider registers as a SECOND PushProvider bean whenever VAPID
+// keys are set, which would make the single-typed injection in DefaultPushService
+// ambiguous and fail worker startup. The three kelta.push.provider transports are
+// mutually exclusive, so exactly one is ever primary.
+@Primary
 @ConditionalOnProperty(name = "kelta.push.provider", havingValue = "fcm")
 public class FcmPushProvider implements PushProvider {
 
@@ -65,6 +72,10 @@ public class FcmPushProvider implements PushProvider {
             .expireAfterWrite(TOKEN_TTL)
             .build();
 
+    // @Autowired is REQUIRED: the package-private test constructor below makes this
+    // class multi-constructor, and Spring then looks for a no-arg one and fails to
+    // start the worker outright (kelta.push.provider=fcm was unstartable without it).
+    @Autowired
     public FcmPushProvider(
             @Value("${kelta.push.fcm.project-id:}") String projectId,
             @Value("${kelta.push.fcm.credentials-path:}") String credentialsPath,

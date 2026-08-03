@@ -31,4 +31,17 @@ public interface PushProvider {
     default void send(PushMessage message) throws PushDeliveryException {
         send(message, null);
     }
+
+    /**
+     * Whether this provider handles the given device platform
+     * ({@code ios}, {@code android}, {@code web}).
+     *
+     * <p>Defaults to true so existing single-provider deployments are unchanged:
+     * before browser push there was exactly one provider and it took everything.
+     * {@link WebPushProvider} narrows to {@code web} so it can run alongside the
+     * property-selected mobile provider rather than instead of it.
+     */
+    default boolean supports(String platform) {
+        return true;
+    }
 }

@@ -413,6 +413,39 @@ route `/api/email/**`) — stored-template-only, `MANAGE_EMAIL_TEMPLATES`-gated,
 per-tenant rate-limited; backs the `send_email` UI Quick Action. See
 `architecture.md` → *Transactional send endpoint*.
 
+## Push notifications (FCM · APNs · Web Push)
+
+One `PushProvider` SPI, three transports. `kelta.push.provider` (`log` default, `fcm`,
+`apns`) selects **one** mobile provider; `WebPushProvider` is not part of that choice — it
+registers independently whenever VAPID keys are present and runs **alongside** the mobile
+one, because a tenant can have both browser and native subscribers. `DefaultPushService`
+routes per device: `PushProvider.supports(platform)` (default `true`) lets a specialist
+claim a platform, and a platform-specific provider wins over the configured default.
+
+**Browser Web Push (consumer-alerting slice 6)** implements the standards directly on JDK
+crypto — RFC 8291 message encryption over RFC 8188 `aes128gcm`, RFC 8292 VAPID, RFC 5869
+HKDF. **No push library and no BouncyCastle**: the available libraries pull BouncyCastle,
+whose reflective surface would have to be enumerated in the worker's `reflect-config.json`
+or it fails *only* on the native image in production. The VAPID JWT is signed with nimbus
+(already native-proven here via LiveKit token minting). `WebPushCrypto` is verified against
+the RFC 8291 §5 published test vector byte-for-byte — an encryption bug in this area does
+not throw, it produces a body every browser silently discards, so vector conformance is the
+guard.
+
+| Piece | Detail |
+|---|---|
+| Config | `kelta.push.vapid.{public-key,private-key,subject}` (env `KELTA_PUSH_VAPID_*`). `make gen-vapid` writes a dev pair. Absent ⇒ provider not registered |
+| Public key | base64url **uncompressed P-256 point**; private key its raw base64url scalar; subject a `mailto:`/`https:` URI (Safari is strict) |
+| Key discovery | `GET /api/devices/vapid-public-key` → `{data:{publicKey}}`, 404 when unconfigured. Deliberately on the existing `/api/devices/**` gateway route rather than a new `/api/push/**` segment, which would need its own static route |
+| Registration | `POST /api/devices` with `subscription` (the full `PushSubscription` JSON) instead of `deviceToken`. The device token is derived as **`sha256(endpoint)` hex** — endpoints run well past the 500-char column while the token carries `UNIQUE (tenant_id, device_token)`; the subscription JSON lives in `push_device.web_push_subscription` (V180) |
+| Authorization | `/api/devices/**` is a static route ⇒ blanket `API_ACCESS` only, which the seeded **Portal User** profile has. Portal members can register and list **their own** devices without a policy change |
+| Request | `POST <endpoint>`, `Content-Encoding: aes128gcm`, `TTL: 86400`, `Authorization: vapid t=<JWT>, k=<public key>`. The JWT audience is the push service **origin**, never the full endpoint — the endpoint path *is* the subscription |
+| Pruning | 404/410 ⇒ `PushDeliveryException(invalidToken=true)` ⇒ the device row is deleted, exactly as for a stale FCM/APNs token. Other non-2xx are transient and keep the device. A missing/unparseable VAPID key fails **without** pruning — an operator config gap must not wipe every subscription |
+| Rotation | Changing the VAPID pair invalidates every existing browser subscription; clients must re-subscribe |
+
+Per-tenant VAPID overrides could ride `TenantPushSettings` (as APNs/FCM overrides already
+do) but are platform-level in v1.
+
 ## Portal magic-link login (telehealth slice 1)
 
 Passwordless sign-in for external `user_type=PORTAL` users. kelta-auth serves the pages

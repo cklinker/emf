@@ -2,8 +2,10 @@ package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.service.push.DefaultPushService;
+import io.kelta.worker.service.push.WebPushProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,10 +30,14 @@ public class PushDeviceController {
 
     private final DefaultPushService pushService;
     private final JdbcTemplate jdbcTemplate;
+    private final ObjectProvider<WebPushProvider> webPushProvider;
 
-    public PushDeviceController(DefaultPushService pushService, JdbcTemplate jdbcTemplate) {
+    public PushDeviceController(DefaultPushService pushService, JdbcTemplate jdbcTemplate,
+                                ObjectProvider<WebPushProvider> webPushProvider) {
         this.pushService = pushService;
         this.jdbcTemplate = jdbcTemplate;
+        // Absent unless VAPID keys are configured.
+        this.webPushProvider = webPushProvider;
     }
 
     @PostMapping("/api/devices")
@@ -41,15 +47,41 @@ public class PushDeviceController {
         if (tenantId == null) return ResponseEntity.badRequest().body(Map.of("error", "No tenant context"));
 
         try {
-            String deviceId = pushService.registerDevice(
-                    userId, tenantId,
-                    body.get("platform"),
-                    body.get("deviceToken"),
-                    body.get("deviceName"));
+            String subscription = body.get("subscription");
+            String deviceId;
+            if (subscription != null && !subscription.isBlank()) {
+                // A browser has a PushSubscription, not a device token — the token
+                // is derived from its endpoint.
+                deviceId = pushService.registerWebDevice(userId, tenantId, subscription,
+                        body.get("deviceName"));
+            } else {
+                deviceId = pushService.registerDevice(
+                        userId, tenantId,
+                        body.get("platform"),
+                        body.get("deviceToken"),
+                        body.get("deviceName"));
+            }
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("data", Map.of("id", deviceId)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /**
+     * The VAPID application-server public key a browser needs for
+     * {@code pushManager.subscribe}. Public by design — it is the counterpart the
+     * push service uses to verify our signature, and a frontend cannot subscribe
+     * without it. 404 when web push is not configured, so a client can tell
+     * "not enabled here" from "misconfigured".
+     */
+    @GetMapping("/api/devices/vapid-public-key")
+    public ResponseEntity<?> vapidPublicKey() {
+        WebPushProvider provider = webPushProvider.getIfAvailable();
+        if (provider == null || provider.publicKey() == null || provider.publicKey().isBlank()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Web push is not configured"));
+        }
+        return ResponseEntity.ok(Map.of("data", Map.of("publicKey", provider.publicKey())));
     }
 
     @DeleteMapping("/api/devices/{deviceId}")

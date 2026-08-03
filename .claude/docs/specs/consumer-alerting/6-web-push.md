@@ -3,6 +3,32 @@
 > Child of `specs/consumer-alerting/README.md`. Depends on slice 4 (the dispatch path). Adds
 > the browser push channel beside the existing native providers.
 
+> **Landed.** `WebPushCrypto`, `WebPushProvider`, `PushProvider.supports()`, per-device
+> routing, `V180`, the controller surface, and 29 unit tests. Four notes against the design
+> below:
+> - **Hand-rolled on JDK crypto, as §5 anticipated.** Every candidate library pulls
+>   BouncyCastle. The check that makes this defensible is `WebPushCryptoTest` reproducing the
+>   **RFC 8291 §5 published ciphertext byte-for-byte**: an encryption bug here does not throw
+>   and does not fail a smoke test — the browser just discards the body — so vector
+>   conformance is the only cheap proof. Do not touch that class without re-running it. The
+>   VAPID JWT uses nimbus, already on the classpath and already native-proven via LiveKit.
+> - **The key endpoint is `GET /api/devices/vapid-public-key`, not `/api/push/…`.** §2's path
+>   would be a new top-level `/api/push/**` segment, and a segment without a gateway static
+>   route 404s. Hanging it off the existing `/api/devices/**` route costs nothing and skips
+>   that trap.
+> - **No Cerbos change was needed.** §5's last bullet asked to confirm portal reach:
+>   `/api/devices/**` is a static route, so it gets only the blanket `API_ACCESS` check, and
+>   the seeded Portal User profile has exactly that (`TenantProvisioningHookTest` locks it).
+> - **A missing/unparseable VAPID key fails WITHOUT pruning.** The obvious symmetry with
+>   404/410 is wrong here: an operator config gap would silently delete every browser
+>   subscription in the tenant. Only the push service saying the subscription is gone prunes.
+>
+> Also added beyond the spec: `make gen-vapid` (the key encoding — uncompressed point for the
+> public half, raw scalar for the private — is easy to get wrong by hand, and a mismatch
+> surfaces as an opaque 401 from the push service; `acceptsGeneratedPair` guards the recipe).
+> **Live-stack verification is still owed** — §8's native-image crypto risk is real and CI
+> cannot reach it.
+
 ## 1. Goal & scope
 
 Delivers: standards-based browser Web Push (VAPID ES256 + RFC 8291 aes128gcm) as a

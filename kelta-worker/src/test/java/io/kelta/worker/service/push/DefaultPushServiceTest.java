@@ -27,7 +27,7 @@ class DefaultPushServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DefaultPushService(pushProvider, pushRepository);
+        service = new DefaultPushService(pushProvider, pushRepository, List.of(pushProvider));
     }
 
     @Nested
@@ -137,6 +137,112 @@ class DefaultPushServiceTest {
 
             assertThat(delivered).isEqualTo(1);
             verify(pushProvider).send(any(), isNull());
+        }
+    }
+
+    @Nested
+    @DisplayName("Provider Routing")
+    class ProviderRouting {
+
+        @Mock private PushProvider webProvider;
+
+        /** Browser push runs beside the mobile provider, not instead of it. */
+        private DefaultPushService routingService() {
+            when(webProvider.supports(anyString()))
+                    .thenAnswer(call -> "web".equals(call.getArgument(0)));
+            return new DefaultPushService(pushProvider, pushRepository,
+                    List.of(pushProvider, webProvider));
+        }
+
+        @Test
+        @DisplayName("routes each device to the provider claiming its platform")
+        void routesPerDevice() {
+            var routing = routingService();
+            when(pushRepository.findDevicesForUser("u1", "t1")).thenReturn(List.of(
+                    Map.of("id", "d1", "device_token", "tok1", "platform", "ios"),
+                    Map.of("id", "d2", "device_token", "tok2", "platform", "web",
+                            "web_push_subscription", "{\"endpoint\":\"https://push.test/a\"}")));
+            when(pushRepository.getTenantSettings("t1")).thenReturn(null);
+
+            int delivered = routing.sendToUser("u1", "t1", "Title", "Body", null);
+
+            assertThat(delivered).isEqualTo(2);
+            verify(pushProvider).send(argThat(m -> "ios".equals(m.platform())), isNull());
+            verify(webProvider).send(argThat(m -> "web".equals(m.platform())), isNull());
+        }
+
+        @Test
+        @DisplayName("passes the stored subscription through to the web provider")
+        void passesSubscription() {
+            var routing = routingService();
+            when(pushRepository.findDevicesForUser("u1", "t1")).thenReturn(List.of(
+                    Map.of("id", "d2", "device_token", "tok2", "platform", "web",
+                            "web_push_subscription", "{\"endpoint\":\"https://push.test/a\"}")));
+            when(pushRepository.getTenantSettings("t1")).thenReturn(null);
+
+            routing.sendToUser("u1", "t1", "Title", "Body", null);
+
+            // Without this the provider has only a hash of the endpoint and cannot
+            // address the browser at all.
+            verify(webProvider).send(argThat(m ->
+                    m.subscription() != null && m.subscription().contains("push.test/a")), isNull());
+        }
+
+        @Test
+        @DisplayName("falls back to the configured provider when nothing claims the platform")
+        void fallsBackToDefault() {
+            var routing = routingService();
+            when(pushRepository.findDevicesForUser("u1", "t1")).thenReturn(List.of(
+                    Map.of("id", "d1", "device_token", "tok1", "platform", "android")));
+            when(pushRepository.getTenantSettings("t1")).thenReturn(null);
+
+            routing.sendToUser("u1", "t1", "Title", "Body", null);
+
+            verify(pushProvider).send(any(), isNull());
+            verify(webProvider, never()).send(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Web Device Registration")
+    class WebDeviceRegistration {
+
+        @Test
+        @DisplayName("stores the subscription and keys the device by the endpoint hash")
+        void storesSubscription() {
+            String subscription = "{\"endpoint\":\"https://push.test/" + "x".repeat(600)
+                    + "\",\"keys\":{\"p256dh\":\"a\",\"auth\":\"b\"}}";
+            String expectedToken = DefaultPushService.webDeviceToken(subscription);
+            when(pushRepository.findDeviceIdByToken("t1", expectedToken)).thenReturn(Optional.empty());
+            when(pushRepository.insertDevice("u1", "t1", "web", expectedToken, "Chrome"))
+                    .thenReturn("d9");
+
+            String id = service.registerWebDevice("u1", "t1", subscription, "Chrome");
+
+            assertThat(id).isEqualTo("d9");
+            verify(pushRepository).updateWebPushSubscription("d9", subscription);
+        }
+
+        @Test
+        @DisplayName("re-subscribing the same browser updates rather than duplicates")
+        void reSubscribeUpdates() {
+            String subscription = "{\"endpoint\":\"https://push.test/a\"}";
+            when(pushRepository.findDeviceIdByToken("t1", DefaultPushService.webDeviceToken(subscription)))
+                    .thenReturn(Optional.of("d1"));
+
+            String id = service.registerWebDevice("u1", "t1", subscription, "Chrome");
+
+            assertThat(id).isEqualTo("d1");
+            verify(pushRepository, never()).insertDevice(any(), any(), any(), any(), any());
+            verify(pushRepository).updateWebPushSubscription("d1", subscription);
+        }
+
+        @Test
+        @DisplayName("rejects a missing subscription")
+        void rejectsMissingSubscription() {
+            assertThatThrownBy(() -> service.registerWebDevice("u1", "t1", "  ", "Chrome"))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verifyNoInteractions(pushRepository);
         }
     }
 }

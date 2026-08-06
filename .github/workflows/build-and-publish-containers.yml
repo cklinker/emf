@@ -539,6 +539,16 @@ jobs:
         working-directory: e2e-tests
         run: npx playwright install --with-deps chromium
 
+      # The CLI smoke spec (tests/admin/cli-smoke.spec.ts) spawns the built CLI
+      # against the deployed stack. Build it here (formula+sdk first — the CLI
+      # consumes @kelta/sdk's dist); the spec self-skips when the dist is absent.
+      - name: Build kelta CLI for the CLI smoke spec
+        working-directory: kelta-web
+        run: |
+          npm ci
+          npm run build -w packages/formula -w packages/sdk
+          npm run build -w packages/cli
+
       # Deploys are GitOps: the pipeline bumps the kustomize image tag and ArgoCD rolls the
       # worker out ASYNCHRONOUSLY. Until every worker pod is the new revision the gateway
       # load-balances some requests to OLD pods, which 404 any brand-new endpoint (e.g. a

@@ -1,8 +1,8 @@
-import { Command } from 'commander';
 import { writeFileSync } from 'node:fs';
 import type { AxiosInstance } from 'axios';
 import { generateTypesFromSpec } from '@kelta/sdk/cli';
-import { createClient } from '../client.js';
+import { z } from 'zod';
+import { defineCommand, type RegisteredCommand } from '../registry/types.js';
 
 export interface GenerateTypesResult {
   file: string;
@@ -39,22 +39,21 @@ export async function runGenerateTypes(
   return { file, typesGenerated: result.typesGenerated };
 }
 
-export function registerSdkCommands(program: Command): void {
-  const sdk = program
-    .command('sdk')
-    .description('Generate typed SDK artifacts from this tenant’s schema');
-
-  sdk
-    .command('types')
-    .description('Generate TypeScript types from this tenant’s live OpenAPI document')
-    .option('-o, --output <file>', 'Output file (default: kelta-types.ts)')
-    .action(async (opts: { output?: string }) => {
-      try {
-        const { file, typesGenerated } = await runGenerateTypes(createClient(), opts);
-        process.stdout.write(`Wrote ${String(typesGenerated)} types to ${file}\n`);
-      } catch (e) {
-        process.stderr.write(`${(e as Error).message}\n`);
-        process.exit(1);
-      }
+const types = defineCommand({
+  group: 'sdk',
+  name: 'types',
+  summary: "Generate TypeScript types from this tenant's live OpenAPI document",
+  options: [{ flag: '-o, --out <file>', description: 'Output file (default: kelta-types.ts)' }],
+  input: z.object({ out: z.string().optional() }),
+  handler: async (ctx, input) => {
+    const { file, typesGenerated } = await runGenerateTypes(ctx.client.getAxiosInstance(), {
+      output: input.out,
     });
-}
+    return {
+      data: { file, typesGenerated },
+      message: `Wrote ${String(typesGenerated)} types to ${file}`,
+    };
+  },
+});
+
+export const sdkCommands: RegisteredCommand[] = [types];

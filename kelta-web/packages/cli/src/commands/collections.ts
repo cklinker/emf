@@ -1,5 +1,5 @@
-import { Command } from 'commander';
-import { createClient } from '../client.js';
+import { z } from 'zod';
+import { defineCommand, type RegisteredCommand } from '../registry/types.js';
 
 interface CollectionAttrs {
   name?: string;
@@ -13,81 +13,77 @@ interface CollectionResource {
   attributes?: CollectionAttrs;
 }
 
-interface CollectionResponse {
-  data?: CollectionResource[] | CollectionResource;
+const list = defineCommand({
+  group: 'collections',
+  name: 'list',
+  summary: 'List all collections',
+  input: z.object({}),
+  handler: async (ctx) => {
+    const body = (await ctx.client.resource('collections').list({ size: 200 })) as {
+      data?: CollectionResource[];
+    };
+    const rows = (body.data ?? []).map((col) => ({
+      id: col.id,
+      name: col.attributes?.name ?? col.id,
+      displayName: col.attributes?.displayName ?? '',
+      fields: col.attributes?.fields?.length ?? 0,
+      readOnly: col.attributes?.readOnly ?? false,
+    }));
+    return {
+      data: body,
+      columns: [
+        { key: 'name', header: 'NAME' },
+        { key: 'displayName', header: 'DISPLAY NAME' },
+        { key: 'fields', header: 'FIELDS' },
+        { key: 'readOnly', header: 'READ-ONLY' },
+      ],
+      human: rowsAsTable(rows),
+    };
+  },
+});
+
+function rowsAsTable(
+  rows: { name: string; displayName: string; fields: number; readOnly: boolean }[]
+): string {
+  if (rows.length === 0) return 'No collections found.\n';
+  const out = [
+    `${'NAME'.padEnd(30)} ${'DISPLAY NAME'.padEnd(30)} ${'FIELDS'.padEnd(8)} READ-ONLY`,
+    '-'.repeat(80),
+  ];
+  for (const row of rows) {
+    out.push(
+      `${row.name.padEnd(30)} ${row.displayName.padEnd(30)} ${String(row.fields).padEnd(8)} ${row.readOnly ? 'Yes' : 'No'}`
+    );
+  }
+  return out.join('\n') + '\n';
 }
 
-export function registerCollectionCommands(program: Command): void {
-  const collections = program.command('collections').description('Collection management');
+const describe = defineCommand({
+  group: 'collections',
+  name: 'describe',
+  summary: 'Show collection details and fields',
+  positionals: [{ name: 'name', description: 'Collection name', required: true }],
+  input: z.object({ name: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    const body = (await ctx.client.resource('collections').get(input.name)) as {
+      data?: CollectionResource;
+    };
+    const attrs = body.data?.attributes ?? {};
+    const lines = [
+      `Collection: ${attrs.name ?? input.name}`,
+      `Display:    ${attrs.displayName ?? ''}`,
+      `Read-Only:  ${attrs.readOnly ? 'Yes' : 'No'}`,
+      '',
+      'Fields:',
+      `  ${'Name'.padEnd(25)} ${'Type'.padEnd(15)} Nullable`,
+      `  ${'-'.repeat(50)}`,
+      ...(attrs.fields ?? []).map(
+        (field) =>
+          `  ${field.name.padEnd(25)} ${field.type.padEnd(15)} ${field.nullable ? 'Yes' : 'No'}`
+      ),
+    ];
+    return { data: body, human: lines.join('\n') + '\n' };
+  },
+});
 
-  collections
-    .command('list')
-    .description('List all collections')
-    .option('--json', 'Output raw JSON')
-    .action(async (opts: { json?: boolean }) => {
-      const client = createClient();
-      const res = await client.get<CollectionResponse>('/api/collections');
-
-      if (res.status !== 200) {
-        process.stderr.write(`Error ${String(res.status)}: ${JSON.stringify(res.data)}\n`);
-        process.exit(1);
-      }
-
-      if (opts.json) {
-        process.stdout.write(JSON.stringify(res.data, null, 2) + '\n');
-        return;
-      }
-
-      const data = Array.isArray(res.data?.data) ? res.data.data : [];
-      if (data.length === 0) {
-        process.stdout.write('No collections found.\n');
-        return;
-      }
-
-      process.stdout.write(
-        `${'Name'.padEnd(30)} ${'Display Name'.padEnd(30)} ${'Fields'.padEnd(8)} Read-Only\n`
-      );
-      process.stdout.write('-'.repeat(80) + '\n');
-      for (const col of data) {
-        const attrs: CollectionAttrs = col.attributes ?? {};
-        const name = (attrs.name ?? col.id ?? '').padEnd(30);
-        const display = (attrs.displayName ?? '').padEnd(30);
-        const fields = String(attrs.fields?.length ?? 0).padEnd(8);
-        const readOnly = attrs.readOnly ? 'Yes' : 'No';
-        process.stdout.write(`${name} ${display} ${fields} ${readOnly}\n`);
-      }
-    });
-
-  collections
-    .command('describe <name>')
-    .description('Show collection details and fields')
-    .option('--json', 'Output raw JSON')
-    .action(async (name: string, opts: { json?: boolean }) => {
-      const client = createClient();
-      const res = await client.get<CollectionResponse>(`/api/collections/${name}`);
-
-      if (res.status !== 200) {
-        process.stderr.write(`Error ${String(res.status)}: ${JSON.stringify(res.data)}\n`);
-        process.exit(1);
-      }
-
-      if (opts.json) {
-        process.stdout.write(JSON.stringify(res.data, null, 2) + '\n');
-        return;
-      }
-
-      const resource = !Array.isArray(res.data?.data) ? res.data?.data : undefined;
-      const attrs: CollectionAttrs = resource?.attributes ?? {};
-      process.stdout.write(`Collection: ${attrs.name ?? name}\n`);
-      process.stdout.write(`Display:    ${attrs.displayName ?? ''}\n`);
-      process.stdout.write(`Read-Only:  ${attrs.readOnly ? 'Yes' : 'No'}\n`);
-      process.stdout.write('\nFields:\n');
-      process.stdout.write(`  ${'Name'.padEnd(25)} ${'Type'.padEnd(15)} Nullable\n`);
-      process.stdout.write(`  ${'-'.repeat(50)}\n`);
-      for (const field of attrs.fields ?? []) {
-        process.stdout.write(
-          `  ${field.name.padEnd(25)} ${field.type.padEnd(15)} ${field.nullable ? 'Yes' : 'No'}\n`
-        );
-      }
-    });
-}
+export const collectionCommands: RegisteredCommand[] = [list, describe];

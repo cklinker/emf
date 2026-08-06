@@ -55,6 +55,36 @@ Reusable React component library for building Kelta UIs.
 - `PageLayout`, `TwoColumnLayout`, `ThreeColumnLayout` -- Responsive layouts
 - `LayoutRenderer` -- Dynamic layout rendering from config
 
+### @kelta/cli
+
+The `kelta` command-line tool (see `.claude/docs/specs/kelta-cli/` for the roadmap). Built on
+a **command registry** (`src/registry/`): every command is a data record with a zod input
+schema and a handler returning structured data — the parser, help, and (in later slices) the
+machine-readable manifest and local MCP tools all derive from it. HTTP goes through
+`@kelta/sdk` (`KeltaClient`/`ResourceClient`/`AdminClient`), not a private client.
+
+**Profiles & auth** — named profiles in `~/.kelta/config.json` plus credentials (PATs) in
+`~/.kelta/credentials.json` (mode 0600). Legacy `~/.keltarc` migrates silently on first run.
+Precedence: flags > env (`KELTA_PROFILE`, `KELTA_URL`, `KELTA_TENANT`, `KELTA_TOKEN`) >
+profile file. `KELTA_CONFIG_DIR` relocates the config dir (CI/tests).
+
+```bash
+kelta auth login --url https://api.kelta.io --tenant acme --token klt_… --profile prod
+kelta profile list|use|show|remove|rename
+kelta collections list --output json
+kelta records list invoices --filter status=open --filter amount.gte=100 --sort -createdAt
+kelta records create invoices --data @invoice.json     # or inline JSON, or - for stdin
+kelta metadata export -n app -v 1.0 -o app.json        # file flag is -o/--out
+kelta sandbox create -n dev && kelta promote create -s <src> -t <dst>
+```
+
+**Output contract** (machine-first): global `--output table|json|yaml|csv|ndjson` — defaults
+to `table` on a TTY and `json` when piped; `--raw` emits the unflattened JSON:API envelope;
+`--quiet` prints ids only. Flattened rows are `{ id, ...attributes, <toOneRel>: id }`. Errors
+are single-line JSON on stderr (`{"error":{code,status,detail,requestId}}`) with stable exit
+codes: 0 ok, 1 API, 2 usage, 3 auth, 4 not-found, 5 conflict/rate-limit. Destructive
+commands confirm on a TTY and require `--yes` otherwise.
+
 ### @kelta/plugin-sdk
 
 Plugin development toolkit for extending Kelta UIs.
@@ -68,6 +98,7 @@ Plugin development toolkit for extending Kelta UIs.
 ```
 @kelta/components ──► @kelta/sdk (peer)
 @kelta/plugin-sdk ──► @kelta/sdk (peer)
+@kelta/cli        ──► @kelta/sdk (runtime — build sdk before cli)
 ```
 
 ## Scripts

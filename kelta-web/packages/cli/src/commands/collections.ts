@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { collectionIdByName } from '../admin/lookups.js';
+import { readDataArgument } from '../data.js';
 import { defineCommand, type RegisteredCommand } from '../registry/types.js';
 
 interface CollectionAttrs {
@@ -86,4 +88,87 @@ const describe = defineCommand({
   },
 });
 
-export const collectionCommands: RegisteredCommand[] = [list, describe];
+const create = defineCommand({
+  group: 'collections',
+  name: 'create',
+  summary: 'Create a collection',
+  options: [
+    { flag: '--name <name>', description: 'API name (required)' },
+    { flag: '--display-name <label>', description: 'Display name' },
+    { flag: '--description <text>', description: 'Description' },
+    { flag: '--data <json>', description: 'Extra attributes as JSON, @file, or - (merged last)' },
+  ],
+  input: z.object({
+    name: z.string().min(1),
+    displayName: z.string().optional(),
+    description: z.string().optional(),
+    data: z.string().optional(),
+  }),
+  handler: async (ctx, input) => {
+    const attributes: Record<string, unknown> = { name: input.name };
+    if (input.displayName) attributes.displayName = input.displayName;
+    if (input.description) attributes.description = input.description;
+    if (input.data) Object.assign(attributes, readDataArgument(input.data));
+    const response = await ctx.client
+      .getAxiosInstance()
+      .post<{ data?: CollectionResource }>('/api/collections', {
+        data: { type: 'collections', attributes },
+      });
+    return {
+      data: response.data,
+      message: `Collection "${input.name}" created (id ${response.data.data?.id ?? '?'})`,
+      ids: response.data.data?.id ? [response.data.data.id] : [],
+    };
+  },
+});
+
+const update = defineCommand({
+  group: 'collections',
+  name: 'update',
+  summary: 'Update a collection (name or id)',
+  positionals: [{ name: 'collection', description: 'Collection name or id', required: true }],
+  options: [
+    { flag: '--display-name <label>', description: 'Display name' },
+    { flag: '--description <text>', description: 'Description' },
+    { flag: '--data <json>', description: 'Extra attributes as JSON, @file, or - (merged last)' },
+  ],
+  input: z.object({
+    collection: z.string().min(1),
+    displayName: z.string().optional(),
+    description: z.string().optional(),
+    data: z.string().optional(),
+  }),
+  handler: async (ctx, input) => {
+    const axios = ctx.client.getAxiosInstance();
+    const id = await collectionIdByName(axios, input.collection);
+    const attributes: Record<string, unknown> = {};
+    if (input.displayName) attributes.displayName = input.displayName;
+    if (input.description) attributes.description = input.description;
+    if (input.data) Object.assign(attributes, readDataArgument(input.data));
+    const response = await axios.patch<{ data?: CollectionResource }>(`/api/collections/${id}`, {
+      data: { type: 'collections', id, attributes },
+    });
+    return { data: response.data, message: `Collection "${input.collection}" updated` };
+  },
+});
+
+const remove = defineCommand({
+  group: 'collections',
+  name: 'delete',
+  summary: 'Delete a collection and its data',
+  dangerous: true,
+  positionals: [{ name: 'collection', description: 'Collection name or id', required: true }],
+  input: z.object({ collection: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    const axios = ctx.client.getAxiosInstance();
+    const id = await collectionIdByName(axios, input.collection);
+    await axios.delete(`/api/collections/${id}`);
+    return {
+      data: { deleted: true, collection: input.collection, id },
+      message: `Collection "${input.collection}" deleted`,
+      ids: [id],
+    };
+  },
+});
+
+export const collectionCommands: RegisteredCommand[] = [list, describe, create, update, remove];

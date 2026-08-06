@@ -569,6 +569,16 @@ Print the machine-readable command catalog (JSON Schema per command)
 
 - `--group <group>` — Only commands of one group
 
+### `kelta version`
+
+Show detailed build information
+
+### `kelta update`
+
+Self-update from the cluster downloads service (--check only reports)
+
+- `--check` — Report whether an update exists without installing
+
 ### `kelta api <method> <path>`
 
 Raw API escape hatch: profile auth + tenant prefix applied, response verbatim **(destructive — needs --yes off-TTY)**

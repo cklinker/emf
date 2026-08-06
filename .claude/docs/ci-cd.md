@@ -76,3 +76,15 @@ auto-merged** (see `SECURITY.md`).
   namespace **`kelta`**. In-cluster service DNS is `emf-<service>` (e.g. `emf-gateway`).
 - Local dev never touches CI: `make up` / `docker-compose.yml`. CI overrides live in
   `docker-compose.ci.yml` (no fixed host ports, JVM Dockerfiles, CI-only cerbos image).
+
+## CLI downloads image (kelta-cli-downloads)
+
+The `cli-downloads` matrix entry builds `kelta-cli-downloads/Dockerfile`: a node stage
+builds `@kelta/sdk`, a bun stage (pinned `oven/bun:1.2.19`) cross-compiles the kelta CLI
+for all five targets with `--define` build identity (version `1.0.<run_number>`, git sha,
+target), and nginx serves `/cli/manifest.json`, `/cli/latest.txt`,
+`/cli/releases/<version>/…` (+ `SHA256SUMS`), and the install scripts. The deploy job bumps
+`emf-cli-downloads` like any service; the smoke job (runner is in-cluster) curls the
+Service, asserts the manifest version equals this run's, downloads the linux binary, and
+executes `kelta version` — warning-skipping only while the homelab-argo manifests don't
+exist yet. Ingress/Service/Deployment live in homelab-argo (`downloads.kelta.io`).

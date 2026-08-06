@@ -94,6 +94,7 @@ kelta-mcp       MCP server — kelta-admin + kelta-user toolsets over HTTP, PAT 
 kelta-web       Frontend SDK monorepo: @kelta/{sdk,components,plugin-sdk,cli,formula}
 kelta-ui/app    Admin/builder + end-user UI (React 19 + Vite)
 kelta-marketing Astro marketing site (not part of platform deploy)
+kelta-cli-downloads  nginx image serving self-update CLI binaries + manifest (downloads.kelta.io)
 kelta-test-harness  Cross-service integration tests (Testcontainers full mini-stack)
 e2e-tests       Playwright end-to-end tests
 ```
@@ -142,6 +143,7 @@ visual system.
 | Frontend | React | 19.2 | `kelta-ui/app/package.json` |
 | Frontend build | Vite / Vitest | web 5.1/1.3, ui 7.2/4.0 | package.json (npm, Node 18 in CI) |
 | E2E | Playwright | 1.50 | `e2e-tests/package.json` |
+| CLI binaries | Bun (compile-only) | 1.2.19 (pinned in `kelta-cli-downloads/Dockerfile`) | `kelta-web/scripts/build-binaries.mjs` |
 | Migrations | Flyway | baseline **V1__baseline** (#1189 flatten); check the migration directory for the current head before adding one (deployed history keeps pre-flatten numbering) | `kelta-worker/.../db/migration/` |
 
 Check the relevant `pom.xml` / `package.json` for exact current versions before pinning.

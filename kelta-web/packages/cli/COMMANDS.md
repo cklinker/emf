@@ -554,6 +554,24 @@ Raw API escape hatch: profile auth + tenant prefix applied, response verbatim **
 - `--data <json>` — Request body as JSON, @file, or - (any JSON value)
 - `--header <h>` — Extra header as Name:value (repeatable) (repeatable)
 
+## mcp
+
+### `kelta mcp serve`
+
+Run a stdio MCP server: hosted kelta-mcp tools bridged + cli_ local tools
+
+- `--toolset <set>` — user|admin|all (default: "all")
+- `--source <source>` — auto|remote|local (default: "auto")
+- `--mcp-url <url>` — Hosted MCP base URL (default: api.→mcp. derivation)
+- `--enable-api-tool` — Expose the raw cli_api escape hatch (off by default)
+
+### `kelta mcp install <client>`
+
+Print MCP client configuration for this profile (stdio bridge by default)
+
+- `--toolset <set>` — user|admin|all (default: "all")
+- `--direct` — Hosted HTTP config instead of the stdio bridge
+
 ## docs
 
 ### `kelta docs agent`

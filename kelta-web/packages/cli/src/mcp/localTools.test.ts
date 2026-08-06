@@ -1,0 +1,104 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { setConfigDirForTesting, setLegacyRcForTesting } from '../config/paths.js';
+import { saveConfig, setToken } from '../config/store.js';
+import { allCommands } from '../registry/registry.js';
+import { deriveMcpUrl } from './remote.js';
+import { localToolName, runLocalCommand, selectLocalCommands, toMcpTool } from './localTools.js';
+
+describe('selectLocalCommands', () => {
+  it('exposes CLI-only groups plus picks, never the hosted-covered admin surface', () => {
+    const selected = selectLocalCommands(allCommands);
+    const keys = selected.map((command) => `${command.group}:${command.name}`);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        'metadata:export',
+        'metadata:diff',
+        'metadata:apply',
+        'sandbox:create',
+        'promote:execute',
+        'sdk:types',
+        'profile:list',
+      ])
+    );
+    // hosted toolset territory stays remote
+    expect(keys.some((key) => key.startsWith('fields:'))).toBe(false);
+    expect(keys.some((key) => key.startsWith('records:'))).toBe(false);
+    expect(keys.some((key) => key.startsWith('flows:'))).toBe(false);
+    // raw escape hatch is opt-in
+    expect(keys).not.toContain(':api');
+    const withApi = selectLocalCommands(allCommands, { enableApiTool: true });
+    expect(withApi.map((command) => `${command.group}:${command.name}`)).toContain(':api');
+  });
+
+  it('names are cli_-prefixed with dashes normalized (collision-proof vs hosted)', () => {
+    const selected = selectLocalCommands(allCommands, { enableApiTool: true });
+    for (const command of selected) {
+      const name = localToolName(command);
+      expect(name).toMatch(/^cli_[a-z0-9_]+$/);
+    }
+    const metadataExport = selected.find(
+      (command) => command.group === 'metadata' && command.name === 'export'
+    );
+    expect(localToolName(metadataExport!)).toBe('cli_metadata_export');
+  });
+
+  it('toMcpTool carries schema and destructive annotations', () => {
+    const promoteRollback = allCommands.find(
+      (command) => command.group === 'promote' && command.name === 'rollback'
+    );
+    const tool = toMcpTool(promoteRollback!);
+    expect(tool.name).toBe('cli_promote_rollback');
+    expect(tool.annotations.destructiveHint).toBe(true);
+    expect((tool.inputSchema as { properties?: object }).properties).toHaveProperty('id');
+  });
+});
+
+describe('runLocalCommand', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'kelta-cli-mcp-'));
+    setConfigDirForTesting(join(dir, '.kelta'));
+    setLegacyRcForTesting(join(dir, '.keltarc'));
+    saveConfig({
+      version: 1,
+      defaultProfile: 'prod',
+      profiles: { prod: { apiUrl: 'https://api.kelta.io', tenantSlug: 'acme' } },
+    });
+    setToken('prod', 'klt_mcp1234567890abc');
+  });
+
+  afterEach(() => {
+    setConfigDirForTesting();
+    setLegacyRcForTesting();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('executes the handler with json semantics and returns flattened JSON text', async () => {
+    const profileList = allCommands.find(
+      (command) => command.group === 'profile' && command.name === 'list'
+    );
+    const text = await runLocalCommand(profileList!, {}, undefined);
+    const rows = JSON.parse(text) as { name: string; token: string }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe('prod');
+    expect(text).not.toContain('klt_mcp1234567890abc'); // prefix only, never the full token
+  });
+
+  it('validates arguments through the command zod schema', async () => {
+    const profileShow = allCommands.find(
+      (command) => command.group === 'profile' && command.name === 'show'
+    );
+    await expect(runLocalCommand(profileShow!, { name: 123 }, undefined)).rejects.toThrow();
+  });
+});
+
+describe('deriveMcpUrl', () => {
+  it('swaps api. for mcp. and rejects non-conventional hosts', () => {
+    expect(deriveMcpUrl('https://api.kelta.io')).toBe('https://mcp.kelta.io');
+    expect(deriveMcpUrl('https://gateway.internal')).toBeUndefined();
+  });
+});

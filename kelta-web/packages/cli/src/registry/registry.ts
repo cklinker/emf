@@ -10,6 +10,7 @@ import { flowCommands } from '../commands/flows.js';
 import { layoutCommands } from '../commands/layouts.js';
 import { limitCommands } from '../commands/limits.js';
 import { manifestCommands } from '../commands/manifest.js';
+import { mcpCommands } from '../commands/mcp.js';
 import { metadataCommands } from '../commands/metadata.js';
 import { picklistCommands } from '../commands/picklists.js';
 import { profileCommands } from '../commands/profile.js';
@@ -38,6 +39,7 @@ export const allCommands: RegisteredCommand[] = [
   ...environmentCommands,
   ...sdkCommands,
   ...manifestCommands,
+  ...mcpCommands,
   ...apiCommands,
   ...docsCommands,
 ];

@@ -17,6 +17,7 @@ import { picklistCommands } from '../commands/picklists.js';
 import { profileCommands } from '../commands/profile.js';
 import { recordCommands } from '../commands/records.js';
 import { sdkCommands } from '../commands/sdk.js';
+import { updateCommands } from '../commands/update.js';
 import { userCommands } from '../commands/users.js';
 import { validationCommands } from '../commands/validation.js';
 import type { RegisteredCommand } from './types.js';
@@ -41,6 +42,7 @@ export const allCommands: RegisteredCommand[] = [
   ...environmentCommands,
   ...sdkCommands,
   ...manifestCommands,
+  ...updateCommands,
   ...mcpCommands,
   ...apiCommands,
   ...docsCommands,

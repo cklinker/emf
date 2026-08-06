@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { createInterface } from 'node:readline/promises';
 import { buildContext } from '../context.js';
+import { maybeNotifyUpdate } from '../update/passiveCheck.js';
 import { CliError, EXIT, mapError, toErrorPayload } from '../errors.js';
 import { OUTPUT_FORMATS, pickFormat, renderResult, type OutputFormat } from '../render/render.js';
 import type { CommandContext, RegisteredCommand, GlobalOptions } from './types.js';
@@ -82,6 +83,9 @@ export async function dispatch(
     const result = await def.handler(ctx, input as never);
     const format = pickFormat(global.output, process.stdout.isTTY ?? false);
     process.stdout.write(renderResult(result, { format, raw: global.raw, quiet: global.quiet }));
+    // stdio MCP servers must never write hints; everything else may nudge once/day
+    if (def.group !== 'mcp')
+      await maybeNotifyUpdate((message) => process.stderr.write(message + '\n'));
   } catch (error) {
     const mapped = mapError(error);
     const format = pickFormat(global.output, process.stderr.isTTY ?? false);

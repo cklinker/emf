@@ -180,6 +180,21 @@ mvn clean install -DskipTests -f kelta-platform/pom.xml \
   -am -B
 ```
 
+## Kelta CLI
+
+Install the self-updating `kelta` CLI (macOS/Linux; Windows via `install.ps1`):
+
+```bash
+curl -fsSL https://downloads.kelta.io/cli/install.sh | sh
+kelta auth login --url https://api.kelta.io --tenant <slug>   # browser + PKCE
+kelta update            # self-update from the cluster (sha256-verified)
+```
+
+Binaries are cross-compiled and published by CI on every merge to main
+(`kelta-cli-downloads` image, served at downloads.kelta.io). Agent-facing docs:
+`kelta docs agent` / `kelta manifest`; command reference in
+`kelta-web/packages/cli/COMMANDS.md`.
+
 ## Running Tests
 
 ### Java

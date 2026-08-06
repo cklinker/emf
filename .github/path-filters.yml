@@ -38,6 +38,11 @@ ui:
   - *web
   - 'kelta-ui/**'
 
+# CLI downloads image — binaries are compiled from kelta-web inside the image.
+cli_downloads:
+  - *web
+  - 'kelta-cli-downloads/**'
+
 # Any Java service change triggers integration tests.
 any_java:
   - *runtime

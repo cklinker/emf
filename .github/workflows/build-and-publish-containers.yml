@@ -61,6 +61,7 @@ jobs:
       mcp: ${{ steps.resolved.outputs.mcp }}
       web: ${{ steps.resolved.outputs.web }}
       ui: ${{ steps.resolved.outputs.ui }}
+      cli_downloads: ${{ steps.resolved.outputs.cli_downloads }}
       any_java: ${{ steps.resolved.outputs.any_java }}
       workflows: ${{ steps.resolved.outputs.workflows }}
     steps:
@@ -91,6 +92,7 @@ jobs:
             echo "mcp=$(resolve '${{ steps.filter.outputs.mcp }}')"
             echo "web=$(resolve '${{ steps.filter.outputs.web }}')"
             echo "ui=$(resolve '${{ steps.filter.outputs.ui }}')"
+            echo "cli_downloads=$(resolve '${{ steps.filter.outputs.cli_downloads }}')"
             echo "any_java=$(resolve '${{ steps.filter.outputs.any_java }}')"
             echo "workflows=${{ steps.filter.outputs.workflows }}"
           } >> "$GITHUB_OUTPUT"
@@ -247,6 +249,10 @@ jobs:
             dockerfile: kelta-mcp/Dockerfile
             image: kelta-mcp
             changed: ${{ needs.changes.outputs.mcp }}
+          - service: cli-downloads
+            dockerfile: kelta-cli-downloads/Dockerfile
+            image: kelta-cli-downloads
+            changed: ${{ needs.changes.outputs.cli_downloads }}
     steps:
       - name: Skip if unchanged
         if: matrix.changed != 'true' && needs.changes.outputs.workflows != 'true'
@@ -293,6 +299,12 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           platforms: linux/amd64
+          # Only the cli-downloads image consumes these; harmless elsewhere.
+          # CLI release version: MAJOR.MINOR fixed, patch = monotonic run
+          # number — no manual tagging on the merge path.
+          build-args: |
+            CLI_VERSION=1.0.${{ github.run_number }}
+            GIT_SHA=${{ steps.sha.outputs.short }}
 
   # ===========================================================================
   # Update ArgoCD manifests for services that were actually built.
@@ -336,6 +348,7 @@ jobs:
           AI_CHANGED: ${{ needs.changes.outputs.ai }}
           MCP_CHANGED: ${{ needs.changes.outputs.mcp }}
           UI_CHANGED: ${{ needs.changes.outputs.ui }}
+          CLI_DOWNLOADS_CHANGED: ${{ needs.changes.outputs.cli_downloads }}
           WORKFLOWS_CHANGED: ${{ needs.changes.outputs.workflows }}
           HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
           HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
@@ -386,6 +399,7 @@ jobs:
             bump "harbor.rzware.com/emf/emf-ui"             "$UI_CHANGED"
             bump "harbor.rzware.com/emf/emf-ai"             "$AI_CHANGED"
             bump "harbor.rzware.com/emf/emf-mcp"            "$MCP_CHANGED"
+            bump "harbor.rzware.com/emf/emf-cli-downloads"  "$CLI_DOWNLOADS_CHANGED"
             cd ..
           fi
 
@@ -411,7 +425,7 @@ jobs:
   # ===========================================================================
   smoke-test:
     name: Smoke Test
-    needs: deploy
+    needs: [changes, deploy]
     if: needs.deploy.result == 'success'
     runs-on: k8s-runner
     timeout-minutes: 10
@@ -471,6 +485,39 @@ jobs:
           done
           echo "Worker health check failed"
           exit 1
+
+      # The runner itself runs in-cluster, so it can hit the Service directly,
+      # download the linux binary, and execute it — proving the whole chain:
+      # compile → manifest → serve → self-describing binary.
+      - name: Verify CLI downloads service (when built)
+        if: needs.changes.outputs.cli_downloads == 'true' || needs.changes.outputs.workflows == 'true'
+        run: |
+          NS=${{ steps.k8s.outputs.ns }}
+          DEPLOY=emf-cli-downloads
+          if ! kubectl -n ${NS} get deploy ${DEPLOY} >/dev/null 2>&1; then
+            echo "::warning::${DEPLOY} not deployed in ${NS} yet (argo manifests pending) — skipping CLI downloads smoke."
+            exit 0
+          fi
+          kubectl -n ${NS} rollout status deploy/${DEPLOY} --timeout=180s
+          BASE="http://${DEPLOY}.${NS}.svc.cluster.local"
+          EXPECT="1.0.${{ github.run_number }}"
+
+          curl -fsS "${BASE}/health" | grep -q '"status":"UP"'
+          MANIFEST=$(curl -fsS "${BASE}/cli/manifest.json")
+          GOT=$(echo "${MANIFEST}" | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1)
+          if [ "${GOT}" != "${EXPECT}" ]; then
+            echo "::error::Manifest version ${GOT} != expected ${EXPECT} — stale image served?"
+            exit 1
+          fi
+
+          curl -fsS "${BASE}/cli/releases/${EXPECT}/kelta-linux-x64" -o /tmp/kelta-smoke
+          chmod +x /tmp/kelta-smoke
+          OUT=$(/tmp/kelta-smoke version --output json)
+          echo "binary says: ${OUT}"
+          echo "${OUT}" | grep -q "\"version\": \"${EXPECT}\"" || {
+            echo "::error::Downloaded binary reports the wrong version"; exit 1;
+          }
+          echo "CLI downloads smoke OK: ${EXPECT} served and executable."
 
   # ===========================================================================
   # Auto-rollback on smoke-test failure — reverts the image bump in homelab-argo.

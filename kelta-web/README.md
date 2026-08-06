@@ -100,6 +100,12 @@ kelta metadata export -n app -v 1.0 -o app.json        # file flag is -o/--out
 kelta sandbox create -n dev && kelta promote create -s <src> -t <dst>
 ```
 
+**Self-update & distribution** — released binaries (`kelta-cli-downloads` image,
+downloads.kelta.io) embed version/sha/target and self-update with `kelta update`
+(sha256-verified atomic swap; `--check` reports only; `KELTA_UPDATE_URL` overrides the
+host, `KELTA_UPDATE_CHECK=0` silences the daily TTY nudge). Dev builds (`node dist/`)
+refuse to self-update. Release binaries: `bun scripts/build-binaries.mjs --version X --sha Y`.
+
 **Output contract** (machine-first): global `--output table|json|yaml|csv|ndjson` — defaults
 to `table` on a TTY and `json` when piped; `--raw` emits the unflattened JSON:API envelope;
 `--quiet` prints ids only. Flattened rows are `{ id, ...attributes, <toOneRel>: id }`. Errors

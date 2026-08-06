@@ -146,6 +146,7 @@ export function bindCommands(program: Command, defs: RegisteredCommand[]): void 
 function groupSummary(group: string, defs: RegisteredCommand[]): string {
   const summaries: Record<string, string> = {
     auth: 'Authentication and token management',
+    token: 'Manage personal access tokens',
     profile: 'Manage named connection profiles',
     collections: 'Collection management',
     records: 'Record CRUD operations',

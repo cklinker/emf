@@ -1,4 +1,5 @@
 import { authCommands } from '../commands/auth.js';
+import { tokenCommands } from '../commands/token.js';
 import { collectionCommands } from '../commands/collections.js';
 import { environmentCommands } from '../commands/environments.js';
 import { metadataCommands } from '../commands/metadata.js';
@@ -10,6 +11,7 @@ import type { RegisteredCommand } from './types.js';
 /** Every CLI command. The manifest and local MCP tools derive from this list. */
 export const allCommands: RegisteredCommand[] = [
   ...authCommands,
+  ...tokenCommands,
   ...profileCommands,
   ...collectionCommands,
   ...recordCommands,

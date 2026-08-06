@@ -16,6 +16,16 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    // The Build-and-Deploy workflow runs this suite on the same runner as three
+    // concurrent GraalVM native image builds. Under that contention a test BODY
+    // (not just a waitFor) can exceed vitest's 5s default — a userEvent.type of
+    // ~15 chars is ~15 React renders. That surfaced as a deterministic-looking
+    // "Test timed out in 5000ms" on main that blocked every image build and
+    // therefore every deploy. Same rationale as asyncUtilTimeout in
+    // vitest.setup.ts; kept well below the job timeout so a genuine hang still
+    // fails fast.
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
     include: ['packages/**/*.{test,spec}.{ts,tsx}', 'packages/**/*.property.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',

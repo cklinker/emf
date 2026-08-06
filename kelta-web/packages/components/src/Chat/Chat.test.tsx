@@ -60,7 +60,11 @@ describe('MessageComposer', () => {
     render(<MessageComposer onSend={onSend} />);
     const input = screen.getByTestId('kelta-message-composer-input');
 
-    await userEvent.type(input, '  hello there  ');
+    // fireEvent.change over userEvent.type: one render instead of ~15, and the
+    // committed value is asserted before Enter so the keydown handler cannot
+    // close over a stale draft. This test is about trimming, not keystrokes.
+    fireEvent.change(input, { target: { value: '  hello there  ' } });
+    await waitFor(() => expect(input).toHaveValue('  hello there  '));
     fireEvent.keyDown(input, { key: 'Enter' });
 
     await waitFor(() => expect(onSend).toHaveBeenCalledWith('hello there'));
@@ -72,7 +76,8 @@ describe('MessageComposer', () => {
     render(<MessageComposer onSend={onSend} />);
     const input = screen.getByTestId('kelta-message-composer-input');
 
-    await userEvent.type(input, 'line one');
+    fireEvent.change(input, { target: { value: 'line one' } });
+    await waitFor(() => expect(input).toHaveValue('line one'));
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
 
     expect(onSend).not.toHaveBeenCalled();
@@ -83,7 +88,8 @@ describe('MessageComposer', () => {
     render(<MessageComposer onSend={onSend} />);
     const input = screen.getByTestId('kelta-message-composer-input');
 
-    await userEvent.type(input, 'important note');
+    fireEvent.change(input, { target: { value: 'important note' } });
+    await waitFor(() => expect(input).toHaveValue('important note'));
     fireEvent.click(screen.getByTestId('kelta-message-composer-send'));
 
     await waitFor(() => expect(onSend).toHaveBeenCalled());

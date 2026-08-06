@@ -21,6 +21,8 @@ describe('selectLocalCommands', () => {
         'promote:execute',
         'sdk:types',
         'profile:list',
+        'token:list',
+        'token:revoke',
       ])
     );
     // hosted toolset territory stays remote

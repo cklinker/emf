@@ -51,7 +51,7 @@ class ConnectedAppRegistrarTest {
         // No refresh token by design: the access token only lives long enough to mint a PAT.
         assertThat(cli.getAuthorizationGrantTypes())
                 .doesNotContain(AuthorizationGrantType.REFRESH_TOKEN);
-        assertThat(cli.getRedirectUris()).containsExactly("http://127.0.0.1/callback");
+        assertThat(cli.getRedirectUris()).containsExactly("http://127.0.0.1/tenant/auth/callback");
         assertThat(cli.getClientSettings().isRequireProofKey()).isTrue();
         assertThat(cli.getClientSettings().isRequireAuthorizationConsent()).isFalse();
         assertThat(cli.getClientSecret()).isNull();
@@ -63,7 +63,7 @@ class ConnectedAppRegistrarTest {
         RegisteredClient existing = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId("kelta-cli")
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("http://127.0.0.1/callback")
+                .redirectUri("http://127.0.0.1/tenant/auth/callback")
                 .build();
         Mockito.when(clientRepository.findByClientId("kelta-cli")).thenReturn(existing);
 

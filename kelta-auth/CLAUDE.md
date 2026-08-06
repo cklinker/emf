@@ -36,12 +36,16 @@ io.kelta.auth/
    rotated on every use (`reuseRefreshTokens(false)`). Confidential clients that
    omit their secret are rejected, never silently authenticated.
 7. CLI login: `kelta-cli` (public client, PKCE, **no refresh grant**) uses an
-   RFC 8252 loopback redirect — `http://127.0.0.1:<any port>/callback` or
-   `[::1]` — accepted port-agnostically by `PlatformRedirectUriValidator` for
-   this client ONLY (loopback IP literals, never `localhost`; path exactly
-   `/callback`; no userinfo/query/fragment). The 15-min access token exists
-   solely for the CLI to mint a PAT (`POST /api/me/tokens`) and is then
-   discarded. Registered by `ConnectedAppRegistrar.registerCliClient()`.
+   RFC 8252 loopback redirect — `http://127.0.0.1:<any port>/<tenant-slug>/auth/callback`
+   (or `[::1]`) — accepted port-agnostically by `PlatformRedirectUriValidator`
+   for this client ONLY (loopback IP literals, never `localhost`; path must match
+   `/{slug}/auth/callback`; no userinfo/query/fragment). **The tenant slug in the
+   path is load-bearing, not cosmetic**: `TenantContextFilter` derives the login's
+   tenant from the `redirect_uri` path for every client, so a slug-less
+   `/callback` passes OAuth validation and then fails authentication with
+   "no tenant context in session" (`KeltaUserDetailsService`). The 15-min access
+   token exists solely for the CLI to mint a PAT (`POST /api/me/tokens`) and is
+   then discarded. Registered by `ConnectedAppRegistrar.registerCliClient()`.
    Spec: `specs/kelta-cli/2-browser-login.md`.
 
 ### Identity Brokering (SSO)

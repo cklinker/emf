@@ -71,7 +71,13 @@ describe('browserLogin', () => {
     expect(tokenBody.get('client_id')).toBe('kelta-cli');
     expect(tokenBody.get('code')).toBe('auth-code-1');
     expect(tokenBody.get('code_verifier')).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(tokenBody.get('redirect_uri')).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
+    // the tenant slug MUST ride in the callback path — kelta-auth's
+    // TenantContextFilter reads it from here to scope the login (regression:
+    // a slug-less /callback authorized fine then failed with "no tenant
+    // context in session")
+    expect(tokenBody.get('redirect_uri')).toMatch(
+      /^http:\/\/127\.0\.0\.1:\d+\/acme\/auth\/callback$/
+    );
 
     // PAT mint: tenant-scoped endpoint, JWT bearer, requested lifetime
     const [patUrl, patBody, patConfig] = post.mock.calls[1] as [
@@ -121,6 +127,25 @@ describe('browserLogin', () => {
     await expect(browserLogin({ ...PARAMS, navigate: completeInBrowser })).rejects.toMatchObject({
       code: 'PAT_MINT_FAILED',
     });
+  });
+
+  it('builds an authorize URL whose redirect_uri carries the tenant slug', async () => {
+    let authorizeUrl = '';
+    post
+      .mockResolvedValueOnce({ data: { access_token: 'jwt-1' } })
+      .mockResolvedValueOnce({ data: { token: 'klt_x1234567890' } });
+
+    await browserLogin({
+      ...PARAMS,
+      tenantSlug: 'couchpicks',
+      navigate: (url) => {
+        authorizeUrl = url;
+        completeInBrowser(url);
+      },
+    });
+
+    const redirectUri = new URL(authorizeUrl).searchParams.get('redirect_uri') ?? '';
+    expect(new URL(redirectUri).pathname).toBe('/couchpicks/auth/callback');
   });
 
   it('aborts on a forged state without calling the token endpoint', async () => {

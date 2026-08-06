@@ -17,12 +17,15 @@ export interface LoopbackServer {
 
 /**
  * One-shot RFC 8252 loopback listener. Binds 127.0.0.1 on an OS-assigned port
- * and waits for exactly one authorization callback on /callback. The state
- * parameter MUST match or the code is rejected (CSRF). Times out after
- * `timeoutMs` so an abandoned login never hangs the terminal.
+ * and waits for exactly one authorization callback on `callbackPath` — which is
+ * tenant-scoped (`/{slug}/auth/callback`) because kelta-auth derives the login's
+ * tenant from the redirect_uri path. The state parameter MUST match or the code
+ * is rejected (CSRF). Times out after `timeoutMs` so an abandoned login never
+ * hangs the terminal.
  */
 export function startLoopbackServer(
   expectedState: string,
+  callbackPath: string,
   timeoutMs = 120_000
 ): Promise<LoopbackServer> {
   return new Promise((resolveServer, rejectServer) => {
@@ -35,7 +38,7 @@ export function startLoopbackServer(
 
     const server: Server = createServer((req, res) => {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
-      if (url.pathname !== '/callback') {
+      if (url.pathname !== callbackPath) {
         res.writeHead(404).end();
         return;
       }

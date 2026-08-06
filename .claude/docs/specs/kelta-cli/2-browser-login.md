@@ -18,7 +18,10 @@ Flow (PR B):
 1. `kelta login --url https://api.kelta.io --tenant acme [--profile prod]` (flags optional
    when re-authenticating an existing profile).
 2. CLI binds a one-shot HTTP listener on `127.0.0.1:<random port>`, generates
-   `state` + PKCE verifier/S256 challenge.
+   `state` + PKCE verifier/S256 challenge. The callback path is
+   **`/{tenantSlug}/auth/callback`** — kelta-auth's `TenantContextFilter` derives the
+   login's tenant from the `redirect_uri` path, so a slug-less path authorizes and then
+   fails with "no tenant context in session".
 3. Opens `<authUrl>/oauth2/authorize?client_id=kelta-cli&redirect_uri=http://127.0.0.1:<port>/callback&code_challenge=…&state=…&scope=openid`
    via OS opener (`open`/`xdg-open`/`start`); prints the URL as fallback. MFA/SSO ride the
    normal browser session.
@@ -58,9 +61,10 @@ Opening browser… (or visit: https://auth.kelta.io/oauth2/authorize?…)
   credential), `requireProofKey(true)`, `requireAuthorizationConsent(false)`, redirect URI
   template `http://127.0.0.1/callback`.
 - `PlatformRedirectUriValidator`: for client `kelta-cli` **only**, accept
-  `http://127.0.0.1:<any port>/callback` and `http://[::1]:<any port>/callback` per
-  RFC 8252 §7.3 (exact path match, loopback literal only — **not** `localhost`, which can
-  be DNS-poisoned). All other clients keep exact-match semantics.
+  `http://127.0.0.1:<any port>/{slug}/auth/callback` and the `[::1]` equivalent per
+  RFC 8252 §7.3 (port ignored; loopback literal only — **not** `localhost`, which can
+  be DNS-poisoned; slug shape `[a-z][a-z0-9-]*` mirrors the gateway). All other clients
+  keep exact-match semantics.
 
 **PR B — CLI**: consumes existing `POST/GET/DELETE /api/me/tokens` (worker) through the
 gateway. No server change. Note: create requires the JWT path (`X-User-Id` derived by

@@ -116,13 +116,13 @@ class PlatformRedirectUriValidatorTest {
     @DisplayName("CLI client RFC 8252 loopback redirect")
     class CliLoopback {
 
-        private static final String CLI_REGISTERED_URI = "http://127.0.0.1/callback";
+        private static final String CLI_REGISTERED_URI = "http://127.0.0.1/tenant/auth/callback";
 
         @Test
         @DisplayName("accepts 127.0.0.1 with any OS-assigned port")
         void shouldAllowIpv4LoopbackAnyPort() {
             var context = buildContext("kelta-cli",
-                    "http://127.0.0.1:49152/callback", CLI_REGISTERED_URI);
+                    "http://127.0.0.1:49152/acme/auth/callback", CLI_REGISTERED_URI);
             assertThatCode(() -> validator.accept(context)).doesNotThrowAnyException();
         }
 
@@ -130,7 +130,7 @@ class PlatformRedirectUriValidatorTest {
         @DisplayName("accepts [::1] with any OS-assigned port")
         void shouldAllowIpv6LoopbackAnyPort() {
             var context = buildContext("kelta-cli",
-                    "http://[::1]:60321/callback", CLI_REGISTERED_URI);
+                    "http://[::1]:60321/acme/auth/callback", CLI_REGISTERED_URI);
             assertThatCode(() -> validator.accept(context)).doesNotThrowAnyException();
         }
 
@@ -138,7 +138,7 @@ class PlatformRedirectUriValidatorTest {
         @DisplayName("rejects the localhost hostname — DNS/hosts-file poisonable")
         void shouldRejectLocalhostHostname() {
             var context = buildContext("kelta-cli",
-                    "http://localhost:49152/callback", CLI_REGISTERED_URI);
+                    "http://localhost:49152/acme/auth/callback", CLI_REGISTERED_URI);
             assertThatThrownBy(() -> validator.accept(context))
                     .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);
         }
@@ -147,7 +147,7 @@ class PlatformRedirectUriValidatorTest {
         @DisplayName("rejects a non-loopback host")
         void shouldRejectNonLoopbackHost() {
             var context = buildContext("kelta-cli",
-                    "http://192.168.0.10:49152/callback", CLI_REGISTERED_URI);
+                    "http://192.168.0.10:49152/acme/auth/callback", CLI_REGISTERED_URI);
             assertThatThrownBy(() -> validator.accept(context))
                     .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);
         }
@@ -165,7 +165,7 @@ class PlatformRedirectUriValidatorTest {
         @DisplayName("rejects https-scheme loopback (RFC 8252 loopback is http)")
         void shouldRejectHttpsScheme() {
             var context = buildContext("kelta-cli",
-                    "https://127.0.0.1:49152/callback", CLI_REGISTERED_URI);
+                    "https://127.0.0.1:49152/acme/auth/callback", CLI_REGISTERED_URI);
             assertThatThrownBy(() -> validator.accept(context))
                     .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);
         }
@@ -174,9 +174,38 @@ class PlatformRedirectUriValidatorTest {
         @DisplayName("rejects userinfo, query, and fragment decorations")
         void shouldRejectDecoratedUris() {
             for (String uri : new String[]{
-                    "http://user@127.0.0.1:49152/callback",
-                    "http://127.0.0.1:49152/callback?x=1",
-                    "http://127.0.0.1:49152/callback#frag"}) {
+                    "http://user@127.0.0.1:49152/acme/auth/callback",
+                    "http://127.0.0.1:49152/acme/auth/callback?x=1",
+                    "http://127.0.0.1:49152/acme/auth/callback#frag"}) {
+                var context = buildContext("kelta-cli", uri, CLI_REGISTERED_URI);
+                assertThatThrownBy(() -> validator.accept(context))
+                        .as("should reject %s", uri)
+                        .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);
+            }
+        }
+
+        @Test
+        @DisplayName("rejects a slug-less /callback — TenantContextFilter would find no tenant")
+        void shouldRejectSlugLessCallback() {
+            // Regression: this shape authorized fine, then failed the actual
+            // login with "no tenant context in session" (the tenant is derived
+            // from the redirect_uri path).
+            var context = buildContext("kelta-cli",
+                    "http://127.0.0.1:49152/callback", CLI_REGISTERED_URI);
+            assertThatThrownBy(() -> validator.accept(context))
+                    .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);
+        }
+
+        @Test
+        @DisplayName("rejects malformed or traversing slugs")
+        void shouldRejectMalformedSlugs() {
+            for (String uri : new String[]{
+                    "http://127.0.0.1:49152//auth/callback",
+                    "http://127.0.0.1:49152/../auth/callback",
+                    "http://127.0.0.1:49152/Acme/auth/callback",
+                    "http://127.0.0.1:49152/9acme/auth/callback",
+                    "http://127.0.0.1:49152/acme/x/auth/callback",
+                    "http://127.0.0.1:49152/acme/auth/callback/extra"}) {
                 var context = buildContext("kelta-cli", uri, CLI_REGISTERED_URI);
                 assertThatThrownBy(() -> validator.accept(context))
                         .as("should reject %s", uri)
@@ -188,7 +217,7 @@ class PlatformRedirectUriValidatorTest {
         @DisplayName("the loopback rule does NOT apply to kelta-platform")
         void shouldNotApplyLoopbackRuleToPlatformClient() {
             var context = buildContext("kelta-platform",
-                    "http://127.0.0.1:49152/callback",
+                    "http://127.0.0.1:49152/acme/auth/callback",
                     "http://localhost:5173/auth/callback");
             assertThatThrownBy(() -> validator.accept(context))
                     .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);
@@ -198,7 +227,7 @@ class PlatformRedirectUriValidatorTest {
         @DisplayName("the loopback rule does NOT apply to arbitrary clients")
         void shouldNotApplyLoopbackRuleToOtherClients() {
             var context = buildContext("other-client",
-                    "http://127.0.0.1:49152/callback",
+                    "http://127.0.0.1:49152/acme/auth/callback",
                     "https://myapp.com/oauth/callback");
             assertThatThrownBy(() -> validator.accept(context))
                     .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);

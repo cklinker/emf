@@ -41,6 +41,7 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         registerPlatformClient();
+        registerCliClient();
         registerSupersetClient();
     }
 
@@ -102,6 +103,46 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
             log.info("Updated Platform OAuth2 client '{}' redirect URI to '{}' (was '{}')",
                     clientId, expectedRedirectUri, existing.getRedirectUris());
         }
+    }
+
+    /**
+     * Registers the kelta CLI as a public OAuth2 client (spec: specs/kelta-cli/2-browser-login.md).
+     * <p>
+     * The CLI runs authorization_code + PKCE with an RFC 8252 loopback redirect —
+     * {@code http://127.0.0.1:<os-assigned port>/callback} — validated port-agnostically by
+     * {@code PlatformRedirectUriValidator}; the URI registered here is only the
+     * template/documentation value. No refresh token is issued on purpose: the access token
+     * lives just long enough for the CLI to mint a PAT via {@code POST /api/me/tokens} and is
+     * then discarded, so the PAT is the only durable credential on the developer's machine.
+     */
+    private void registerCliClient() {
+        String clientId = "kelta-cli";
+
+        if (clientRepository.findByClientId(clientId) != null) {
+            log.info("CLI OAuth2 client '{}' already registered", clientId);
+            return;
+        }
+
+        RegisteredClient cliClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId(clientId)
+                .clientName("Kelta CLI")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("http://127.0.0.1/callback")
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .scope("email")
+                .clientSettings(ClientSettings.builder()
+                        .requireAuthorizationConsent(false)
+                        .requireProofKey(true)
+                        .build())
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofMinutes(15))
+                        .build())
+                .build();
+
+        clientRepository.save(cliClient);
+        log.info("Registered CLI OAuth2 client '{}' (PKCE public client, loopback redirect)", clientId);
     }
 
     private void registerSupersetClient() {

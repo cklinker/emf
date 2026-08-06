@@ -35,6 +35,14 @@ io.kelta.auth/
    authenticate it as method NONE; the refresh token is the credential and is
    rotated on every use (`reuseRefreshTokens(false)`). Confidential clients that
    omit their secret are rejected, never silently authenticated.
+7. CLI login: `kelta-cli` (public client, PKCE, **no refresh grant**) uses an
+   RFC 8252 loopback redirect — `http://127.0.0.1:<any port>/callback` or
+   `[::1]` — accepted port-agnostically by `PlatformRedirectUriValidator` for
+   this client ONLY (loopback IP literals, never `localhost`; path exactly
+   `/callback`; no userinfo/query/fragment). The 15-min access token exists
+   solely for the CLI to mint a PAT (`POST /api/me/tokens`) and is then
+   discarded. Registered by `ConnectedAppRegistrar.registerCliClient()`.
+   Spec: `specs/kelta-cli/2-browser-login.md`.
 
 ### Identity Brokering (SSO)
 - `DynamicClientRegistrationRepository` — loads OIDC provider configs from worker at runtime

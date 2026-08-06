@@ -657,3 +657,23 @@ Regression guard: `TenantAwareDataSourceTest` asserts tenant connections use tra
 - **Password reset sends no email** — `PasswordController.sendPasswordResetEmail` (line 212) calls `WorkerClient.sendTemplateEmail` with the `user.password_reset` template.
 - **Unhandled EmptyResultDataAccessException** — `PasswordController.changePassword` (line 82) catches `EmptyResultDataAccessException` and returns the generic 400 to prevent username enumeration.
 - **NPE on null `reset_token_expires_at`** — `PasswordController.resetPassword` (line 185) explicitly null-checks `expiresTs` before the `Timestamp.toInstant()` cast.
+
+## Frontend suite starves under concurrent image builds (2026-08-06)
+
+`Test Frontend` in Build-and-Deploy shares the runner with three concurrent GraalVM
+native image builds. Under that contention the suite reported `environment 594s`
+cumulative and a test **body** exceeded vitest's 5s default `testTimeout` —
+`Chat.test.tsx > MessageComposer` died on a `userEvent.type` of ~15 chars (~15 React
+renders). It failed 4 of 5 consecutive main runs and read like a deterministic break.
+
+**Operational severity is the real point:** `build-and-push` is gated on
+`test-frontend.result != 'failure'`, so a frontend flake silently stops every image
+build, the deploy job then correctly refuses to bump tags, and **nothing ships** —
+including urgent fixes. A red frontend suite on main is a deploy outage, not a test
+nuisance.
+
+Mitigations applied: `testTimeout`/`hookTimeout` raised to 20s (same rationale as the
+existing `asyncUtilTimeout: 5000` in `vitest.setup.ts`), and the composer tests use
+`fireEvent.change` + a committed-value assertion instead of per-keystroke typing.
+Still open: the underlying starvation (consider giving the frontend job its own runner
+or serialising it against the native builds).

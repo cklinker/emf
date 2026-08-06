@@ -55,10 +55,15 @@ export function deriveAuthUrl(apiUrl: string): string | undefined {
 export async function browserLogin(params: BrowserLoginParams): Promise<MintedPat> {
   const verifier = generateVerifier();
   const state = generateState();
-  const server = await startLoopbackServer(state, params.timeoutMs);
+  // The tenant slug MUST be in the callback path: kelta-auth's
+  // TenantContextFilter reads it from the redirect_uri to scope the user
+  // lookup. A slug-less path authorizes fine, then fails the actual login
+  // with "no tenant context in session".
+  const callbackPath = `/${params.tenantSlug}/auth/callback`;
+  const server = await startLoopbackServer(state, callbackPath, params.timeoutMs);
 
   try {
-    const redirectUri = `http://127.0.0.1:${String(server.port)}/callback`;
+    const redirectUri = `http://127.0.0.1:${String(server.port)}${callbackPath}`;
     const authorizeUrl =
       `${params.authUrl.replace(/\/$/, '')}/oauth2/authorize?` +
       new URLSearchParams({

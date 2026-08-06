@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 
 import java.net.URI;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 /**
  * Custom redirect URI validator for the multi-tenant platform.
@@ -26,6 +27,14 @@ public class PlatformRedirectUriValidator
         implements Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> {
 
     private static final Logger log = LoggerFactory.getLogger(PlatformRedirectUriValidator.class);
+
+    /**
+     * Loopback callback path for {@code kelta-cli}: {@code /{tenant-slug}/auth/callback}.
+     * The slug shape mirrors the gateway's TenantSlugExtractionFilter so a URI accepted
+     * here resolves to the same tenant everywhere else.
+     */
+    private static final Pattern LOOPBACK_CALLBACK_PATH =
+            Pattern.compile("^/[a-z][a-z0-9-]*/auth/callback$");
 
     private final AuthDomainResolver domainResolver;
 
@@ -141,18 +150,25 @@ public class PlatformRedirectUriValidator
 
     /**
      * RFC 8252 §7.3 loopback-interface redirect for the {@code kelta-cli} client:
-     * {@code http://127.0.0.1:<any port>/callback} or {@code http://[::1]:<any port>/callback}.
+     * {@code http://127.0.0.1:<any port>/<tenant-slug>/auth/callback} (or {@code [::1]}).
      * The port is deliberately not compared; host must be a loopback IP literal
-     * (NOT {@code localhost}); the path must be exactly {@code /callback}; and the
-     * URI must carry no userinfo, query, or fragment.
+     * (NOT {@code localhost}); and the URI must carry no userinfo, query, or fragment.
+     * <p>
+     * The path MUST carry the tenant slug in the same shape every other client uses
+     * ({@code /{slug}/auth/callback}), because {@link TenantContextFilter} derives the
+     * login's tenant from exactly that pattern. A slug-less {@code /callback} is
+     * accepted by OAuth but then fails at authentication with "no tenant context in
+     * session" — which is precisely the bug this shape prevents.
      */
     private boolean isLoopbackCallback(String requestedRedirectUri) {
         try {
             URI uri = URI.create(requestedRedirectUri);
             boolean loopbackHost = "127.0.0.1".equals(uri.getHost()) || "[::1]".equals(uri.getHost());
+            String path = uri.getPath();
             if ("http".equals(uri.getScheme())
                     && loopbackHost
-                    && "/callback".equals(uri.getPath())
+                    && path != null
+                    && LOOPBACK_CALLBACK_PATH.matcher(path).matches()
                     && uri.getUserInfo() == null
                     && uri.getQuery() == null
                     && uri.getFragment() == null) {

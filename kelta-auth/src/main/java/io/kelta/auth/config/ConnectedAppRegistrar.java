@@ -109,11 +109,15 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
      * Registers the kelta CLI as a public OAuth2 client (spec: specs/kelta-cli/2-browser-login.md).
      * <p>
      * The CLI runs authorization_code + PKCE with an RFC 8252 loopback redirect —
-     * {@code http://127.0.0.1:<os-assigned port>/callback} — validated port-agnostically by
-     * {@code PlatformRedirectUriValidator}; the URI registered here is only the
-     * template/documentation value. No refresh token is issued on purpose: the access token
-     * lives just long enough for the CLI to mint a PAT via {@code POST /api/me/tokens} and is
-     * then discarded, so the PAT is the only durable credential on the developer's machine.
+     * {@code http://127.0.0.1:<os-assigned port>/<tenant-slug>/auth/callback} — validated
+     * port-agnostically by {@code PlatformRedirectUriValidator}. The URI registered here is
+     * only a template: the validator's loopback branch does the real matching, so an existing
+     * registration from an earlier release keeps working without a migration. The tenant slug
+     * is part of the path because {@code TenantContextFilter} derives the login's tenant from
+     * exactly that shape, the same way it does for the SPA. No refresh token is issued on
+     * purpose: the access token lives just long enough for the CLI to mint a PAT via
+     * {@code POST /api/me/tokens} and is then discarded, so the PAT is the only durable
+     * credential on the developer's machine.
      */
     private void registerCliClient() {
         String clientId = "kelta-cli";
@@ -128,7 +132,7 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
                 .clientName("Kelta CLI")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("http://127.0.0.1/callback")
+                .redirectUri("http://127.0.0.1/tenant/auth/callback")
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope("email")

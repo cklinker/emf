@@ -23,6 +23,10 @@ export interface HandlerResult {
   message?: string;
   /** Explicit ids for --quiet; defaults to ids extracted from data. */
   ids?: string[];
+  /** Never flatten this data (raw pass-through commands like `kelta api`). */
+  verbatim?: boolean;
+  /** Prose output printed as-is in EVERY format (docs commands). */
+  text?: string;
 }
 
 /**
@@ -47,12 +51,14 @@ export function renderResult(result: HandlerResult, options: RenderOptions): str
     return ids.length > 0 ? ids.join('\n') + '\n' : '';
   }
 
+  if (result.text !== undefined) return result.text;
+
   if (result.data === undefined) {
     if (options.format === 'table') return result.message ? result.message + '\n' : '';
     return JSON.stringify({ message: result.message ?? 'ok' }) + '\n';
   }
 
-  const payload = options.raw ? result.data : flattenBody(result.data);
+  const payload = options.raw || result.verbatim ? result.data : flattenBody(result.data);
 
   switch (options.format) {
     case 'json':

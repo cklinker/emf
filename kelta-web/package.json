@@ -17,7 +17,8 @@
     "format": "prettier --write \"packages/**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"packages/**/*.{ts,tsx,json,md}\"",
     "typecheck": "tsc --noEmit",
-    "generate-types": "echo 'Install openapi-typescript: npm install -D openapi-typescript' && echo 'Then run: npx openapi-typescript ../kelta-control-plane/app/src/main/resources/openapi/control-plane-api.yaml -o packages/sdk/src/generated/api-types.ts'"
+    "generate-types": "echo 'Install openapi-typescript: npm install -D openapi-typescript' && echo 'Then run: npx openapi-typescript ../kelta-control-plane/app/src/main/resources/openapi/control-plane-api.yaml -o packages/sdk/src/generated/api-types.ts'",
+    "gen:docs": "npm run build -w packages/cli && node scripts/gen-docs.mjs"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",

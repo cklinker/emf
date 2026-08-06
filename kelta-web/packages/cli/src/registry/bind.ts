@@ -163,6 +163,7 @@ function groupSummary(group: string, defs: RegisteredCommand[]): string {
     sandbox: 'Create and manage sandbox environments',
     promote: 'Promote metadata between environments',
     sdk: 'Generate typed SDK artifacts from this tenant’s schema',
+    docs: 'Documentation for humans and agents',
   };
   return summaries[group] ?? defs.find((d) => d.group === group)?.summary ?? group;
 }

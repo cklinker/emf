@@ -11,19 +11,41 @@ Full machine-readable catalog: `kelta manifest`.
 
 ### `kelta auth login`
 
-Save API credentials for a profile (browser login lands in a later slice)
+Log in via the browser and store a PAT for a profile (--token for headless)
 
-- `--url <url>` — Kelta API URL (e.g., https://api.kelta.io)
-- `--tenant <slug>` — Tenant slug
-- `--token <token>` — Personal access token (klt_...) or JWT
+- `--url <url>` — Kelta API URL (default: from the profile)
+- `--tenant <slug>` — Tenant slug (default: from the profile)
+- `--auth-url <url>` — Auth server URL (default: profile value, or api.→auth. host derivation)
+- `--token <token>` — Skip the browser: store this PAT (klt_...) or JWT
+- `--expires-in <days>` — PAT lifetime in days (browser login) (default: "90")
+- `--no-browser` — Print the login URL instead of opening a browser
 
 ### `kelta auth logout`
 
-Remove the stored credential for the active profile
+Remove the stored credential for the active profile (--revoke also revokes it)
+
+- `--revoke` — Revoke the PAT server-side before removing it locally
 
 ### `kelta auth status`
 
 Show the resolved connection settings for the active profile
+
+## token
+
+### `kelta token list`
+
+List your active personal access tokens
+
+### `kelta token create`
+
+Create a personal access token (the full token is shown exactly once)
+
+- `--name <name>` — Token name
+- `--expires-in <days>` — Lifetime in days (1-365) (default: "90")
+
+### `kelta token revoke <tokenId>`
+
+Revoke a personal access token by id **(destructive — needs --yes off-TTY)**
 
 ## profile
 

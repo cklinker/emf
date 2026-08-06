@@ -1,18 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { CliError, EXIT } from './errors.js';
 
-/**
- * Parse a `--data` value: inline JSON, `@file`, or `-` for stdin. Returns the
- * parsed object; anything non-object (arrays included) is rejected — record
- * attributes are always a JSON object.
- */
-export function readDataArgument(value: string): Record<string, unknown> {
-  let text = value;
-  if (value === '-') {
-    text = readFileSync(0, 'utf-8');
-  } else if (value.startsWith('@')) {
+function readRaw(value: string): string {
+  if (value === '-') return readFileSync(0, 'utf-8');
+  if (value.startsWith('@')) {
     try {
-      text = readFileSync(value.slice(1), 'utf-8');
+      return readFileSync(value.slice(1), 'utf-8');
     } catch {
       throw new CliError(`Cannot read file "${value.slice(1)}"`, {
         code: 'FILE_NOT_FOUND',
@@ -20,15 +13,31 @@ export function readDataArgument(value: string): Record<string, unknown> {
       });
     }
   }
-  let parsed: unknown;
+  return value;
+}
+
+/**
+ * Parse a `--data` value (inline JSON, `@file`, or `-` for stdin) into ANY
+ * JSON value — the raw `kelta api` escape hatch takes bodies verbatim.
+ */
+export function readJsonArgument(value: string): unknown {
   try {
-    parsed = JSON.parse(text);
+    return JSON.parse(readRaw(value));
   } catch {
     throw new CliError('Invalid JSON in --data', {
       code: 'INVALID_JSON',
       exitCode: EXIT.USAGE,
     });
   }
+}
+
+/**
+ * Parse a `--data` value: inline JSON, `@file`, or `-` for stdin. Returns the
+ * parsed object; anything non-object (arrays included) is rejected — record
+ * attributes are always a JSON object.
+ */
+export function readDataArgument(value: string): Record<string, unknown> {
+  const parsed = readJsonArgument(value);
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new CliError('--data must be a JSON object of attributes', {
       code: 'INVALID_JSON',

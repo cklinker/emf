@@ -275,3 +275,11 @@ MCP admin tools expose camelCase, lowercase-friendly argument names to LLM calle
 - **Field types**: accept friendly aliases (`text`, `number`, `picklist`, `lookup`, …) and map to the uppercase `FieldType` enum the worker expects. Centralise the mapping in `FieldBodyBuilder.resolveNativeType` so `add_field` and `create_collection`'s nested field array stay in sync.
 - **Per-type payload**: picklist fields need `attributes.fieldTypeConfig = {picklistSourceType, picklistSourceId}`; reference/lookup fields need `relationships.referenceCollectionId.data.id` + `attributes.relationshipName` (and optional `relationshipType`). Build these in the same helper so the on-the-wire shape can be unit-tested with WireMock JSON path matchers.
 - **ID resolution**: accept either a UUID (`collectionId`, `referenceCollectionId`, `picklistSourceId`) or a friendly name (`collectionName`, `referenceCollection`) and resolve names via `GET /api/collections?filter[name][eq]=…`. UUIDs match `FieldBodyBuilder.UUID_PATTERN`; anything else triggers the lookup.
+
+## CLI output & error contract
+
+The `kelta` CLI's machine contract (output formats, JSON:API flattening, single-line
+stderr error envelope carrying the platform's stable `code`, exit codes 0/1/2/3/4/5,
+`--yes` gating for destructive commands) is owned by `specs/kelta-cli/README.md` →
+Shared contracts. Discovery surface: `kelta manifest` (versioned command catalog with
+JSON Schemas) and `packages/cli/AGENTS.md` (generated — `npm run gen:docs`).

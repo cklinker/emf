@@ -1,13 +1,17 @@
+import { apiCommands } from '../commands/api.js';
 import { auditCommands } from '../commands/audit.js';
 import { authCommands } from '../commands/auth.js';
 import { tokenCommands } from '../commands/token.js';
 import { collectionCommands } from '../commands/collections.js';
+import { docsCommands } from '../commands/docs.js';
 import { constraintCommands } from '../commands/constraints.js';
 import { environmentCommands } from '../commands/environments.js';
 import { fieldCommands } from '../commands/fields.js';
 import { flowCommands } from '../commands/flows.js';
 import { layoutCommands } from '../commands/layouts.js';
 import { limitCommands } from '../commands/limits.js';
+import { manifestCommands } from '../commands/manifest.js';
+import { mcpCommands } from '../commands/mcp.js';
 import { metadataCommands } from '../commands/metadata.js';
 import { picklistCommands } from '../commands/picklists.js';
 import { profileCommands } from '../commands/profile.js';
@@ -36,4 +40,8 @@ export const allCommands: RegisteredCommand[] = [
   ...metadataCommands,
   ...environmentCommands,
   ...sdkCommands,
+  ...manifestCommands,
+  ...mcpCommands,
+  ...apiCommands,
+  ...docsCommands,
 ];

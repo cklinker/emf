@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { readDataArgument } from '../data.js';
+import { CliError, EXIT } from '../errors.js';
 import { parseFilterSpec, parseList, parseSort } from '../query.js';
 import { defineCommand, type RegisteredCommand } from '../registry/types.js';
 
@@ -159,4 +160,94 @@ const remove = defineCommand({
   },
 });
 
-export const recordCommands: RegisteredCommand[] = [list, get, create, update, remove];
+const bulk = defineCommand({
+  group: 'records',
+  name: 'bulk',
+  summary: 'Apply a batch of atomic operations (all-or-nothing, max 100 ops)',
+  dangerous: true,
+  options: [
+    {
+      flag: '--data <json>',
+      description: 'Body as JSON, @file, or - : {"atomic:operations":[{op,data|ref},…]} (required)',
+    },
+  ],
+  input: z.object({ data: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    const body = readDataArgument(input.data);
+    if (!Array.isArray(body['atomic:operations'])) {
+      throw new CliError('--data must contain an "atomic:operations" array', {
+        code: 'INVALID_ARGUMENTS',
+        exitCode: EXIT.USAGE,
+      });
+    }
+    const response = await ctx.client.getAxiosInstance().post<unknown>('/api/operations', body);
+    return {
+      data: response.data,
+      message: `${String((body['atomic:operations'] as unknown[]).length)} operation(s) applied`,
+    };
+  },
+});
+
+const search = defineCommand({
+  group: 'records',
+  name: 'search',
+  summary: 'Full-text search across collections (query min 3 chars)',
+  positionals: [{ name: 'query', description: 'Search text', required: true }],
+  options: [{ flag: '--limit <n>', description: 'Max results (max 100)', default: '20' }],
+  input: z.object({
+    query: z.string().min(3),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+  }),
+  handler: async (ctx, input) => {
+    const response = await ctx.client
+      .getAxiosInstance()
+      .get<unknown>(
+        `/api/_search?q=${encodeURIComponent(input.query)}&limit=${String(input.limit)}`
+      );
+    return {
+      data: response.data,
+      columns: [
+        { key: 'collectionName', header: 'COLLECTION' },
+        { key: 'displayValue', header: 'RECORD' },
+        { key: 'id', header: 'ID' },
+        { key: 'rank', header: 'RANK' },
+      ],
+    };
+  },
+});
+
+const semanticSearch = defineCommand({
+  group: 'records',
+  name: 'semantic-search',
+  summary: 'Vector similarity search within one collection (needs a VECTOR field)',
+  positionals: [
+    { name: 'collection', description: 'Collection name', required: true },
+    { name: 'query', description: 'Query text', required: true },
+  ],
+  options: [{ flag: '--limit <n>', description: 'Max results', default: '10' }],
+  input: z.object({
+    collection: z.string().min(1),
+    query: z.string().min(1),
+    limit: z.coerce.number().int().positive().default(10),
+  }),
+  handler: async (ctx, input) => {
+    const response = await ctx.client
+      .getAxiosInstance()
+      .post<unknown>(`/api/${input.collection}/semantic-search`, {
+        query: input.query,
+        limit: input.limit,
+      });
+    return { data: response.data };
+  },
+});
+
+export const recordCommands: RegisteredCommand[] = [
+  list,
+  get,
+  create,
+  update,
+  remove,
+  bulk,
+  search,
+  semanticSearch,
+];

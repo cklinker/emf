@@ -72,8 +72,20 @@ profile file. `KELTA_CONFIG_DIR` relocates the config dir (CI/tests).
 kelta auth login --url https://api.kelta.io --tenant acme --token klt_… --profile prod
 kelta profile list|use|show|remove|rename
 kelta collections list --output json
+kelta collections create --name orders --display-name Orders
+kelta fields add orders --name total --type decimal --required
+kelta fields add orders --name status --type picklist --picklist order_statuses
+kelta fields add orders --name customer --type reference --reference customers
+kelta validation-rules create orders --name total_positive \
+  --formula 'total <= 0' --message 'Total must be positive'   # TRUE formula REJECTS the record
+kelta constraints create orders --fields customer,external_ref
+kelta flows execute <flowId> --input '{"dryRun":true}' --wait
 kelta records list invoices --filter status=open --filter amount.gte=100 --sort -createdAt
 kelta records create invoices --data @invoice.json     # or inline JSON, or - for stdin
+kelta records bulk --data @batch.json                  # /api/operations, all-or-nothing
+kelta records search "acme corp" && kelta records semantic-search notes "similar topics"
+kelta users portal-invite --email member@example.com
+kelta limits get && kelta audit security --since 2026-08-01T00:00:00Z
 kelta metadata export -n app -v 1.0 -o app.json        # file flag is -o/--out
 kelta sandbox create -n dev && kelta promote create -s <src> -t <dst>
 ```

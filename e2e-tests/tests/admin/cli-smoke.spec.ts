@@ -107,4 +107,51 @@ test.describe("kelta CLI smoke", () => {
     const payload = JSON.parse(result.stderr) as { error: { code: string } };
     expect(payload.error.code).toBe("CONFIRMATION_REQUIRED");
   });
+
+  test("admin round-trip: collection → field → validation rule → rejected record → delete", () => {
+    test.setTimeout(120_000);
+    const name = `e2e_cli_${String(Date.now())}`;
+    try {
+      const created = runCli([
+        "collections", "create", "--name", name, "--display-name", "CLI e2e", "--output", "json",
+      ]);
+      expect(created.status, created.stderr).toBe(0);
+
+      const field = runCli([
+        "fields", "add", name,
+        "--name", "amount", "--type", "number", "--required",
+        "--output", "json",
+      ]);
+      expect(field.status, field.stderr).toBe(0);
+
+      const rule = runCli([
+        "validation-rules", "create", name,
+        "--name", "amount_positive",
+        "--formula", "amount <= 0",
+        "--message", "Amount must be positive",
+        "--output", "json",
+      ]);
+      expect(rule.status, rule.stderr).toBe(0);
+
+      const fields = runCli(["fields", "list", name, "--output", "json"]);
+      expect(fields.status, fields.stderr).toBe(0);
+      const rows = JSON.parse(fields.stdout) as { name?: string }[];
+      expect(rows.some((row) => row.name === "amount")).toBe(true);
+
+      // the ERROR-condition semantics end to end: TRUE formula rejects the write
+      const rejected = runCli([
+        "records", "create", name, "--data", '{"amount": -5}', "--output", "json",
+      ]);
+      expect(rejected.status).toBe(1);
+      const error = JSON.parse(rejected.stderr) as { error: { detail?: string } };
+      expect(error.error.detail ?? "").toContain("Amount must be positive");
+
+      const accepted = runCli([
+        "records", "create", name, "--data", '{"amount": 5}', "--output", "json",
+      ]);
+      expect(accepted.status, accepted.stderr).toBe(0);
+    } finally {
+      runCli(["collections", "delete", name, "--yes", "--output", "json"]);
+    }
+  });
 });

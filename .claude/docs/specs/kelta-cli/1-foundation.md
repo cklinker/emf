@@ -39,7 +39,7 @@ NAME      URL                     TENANT     TOKEN      EXPIRES
 prod *    https://api.kelta.io    acme       klt_A1b2…  2026-11-04
 staging   https://api.stg.k.io    acme-stg   klt_C3d4…  2026-09-01
 
-$ kelta records list invoices --filter status=eq:open --sort -createdAt --output json | jq '.[0].id'
+$ kelta records list invoices --filter status=open --sort -createdAt --output json | jq '.[0].id'
 ```
 
 ## 3. Data & API contracts
@@ -91,7 +91,9 @@ All under `kelta-web/packages/cli/`:
 
 - `AdminClient` is a known oversized file (`concerns.md`) — the CLI consumes it, must not
   bloat it; any missing endpoint wrapper gets added surgically.
-- Flag-compat: `metadata`/`promote` flags are kept verbatim; `records --data` accepts both
-  inline JSON and `@file` going forward (additive).
+- Flag-compat: `metadata`/`promote` flags are kept verbatim with ONE exception — the file
+  flag on `metadata export`/`sdk types` is now `-o/--out` (`--output` belongs to the global
+  format flag; commander rejects the collision). `records --data` accepts inline JSON,
+  `@file`, and `-` (stdin) going forward (additive).
 - Renderer table output is for humans only — no format guarantee; machine consumers use
   json/ndjson (documented in help text so agents don't parse tables).

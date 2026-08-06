@@ -1,7 +1,7 @@
-import { Command } from 'commander';
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { AxiosInstance } from 'axios';
-import { createClient } from '../client.js';
+import { z } from 'zod';
+import { defineCommand, type RegisteredCommand } from '../registry/types.js';
 
 export interface ExportOptions {
   name: string;
@@ -58,50 +58,56 @@ async function uploadPackage(client: AxiosInstance, url: string, file: string) {
   return res;
 }
 
-/** Run an op and print its JSON result; exit non-zero with a message on failure. */
-async function emit(op: Promise<unknown>): Promise<void> {
-  try {
-    const result = await op;
-    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-  } catch (e) {
-    process.stderr.write(`${(e as Error).message}\n`);
-    process.exit(1);
-  }
-}
-
-export function registerMetadataCommands(program: Command): void {
-  const meta = program
-    .command('metadata')
-    .description('Export, diff, and apply tenant metadata (GitOps for config)');
-
-  meta
-    .command('export')
-    .description("Export this tenant's metadata as a package file")
-    .requiredOption('-n, --name <name>', 'Package name')
-    .requiredOption('-v, --version <version>', 'Package version')
-    .option('-o, --output <file>', 'Output file (default: <name>-<version>.json)')
-    .action(async (opts: ExportOptions) => {
-      try {
-        const path = await runExport(createClient(), opts);
-        process.stdout.write(`Exported package to ${path}\n`);
-      } catch (e) {
-        process.stderr.write(`${(e as Error).message}\n`);
-        process.exit(1);
-      }
+const exportCommand = defineCommand({
+  group: 'metadata',
+  name: 'export',
+  summary: "Export this tenant's metadata as a package file",
+  options: [
+    { flag: '-n, --name <name>', description: 'Package name' },
+    { flag: '-v, --version <version>', description: 'Package version' },
+    { flag: '-o, --out <file>', description: 'Output file (default: <name>-<version>.json)' },
+  ],
+  input: z.object({
+    name: z.string().min(1),
+    version: z.string().min(1),
+    out: z.string().optional(),
+  }),
+  handler: async (ctx, input) => {
+    const path = await runExport(ctx.client.getAxiosInstance(), {
+      name: input.name,
+      version: input.version,
+      output: input.out,
     });
+    return { data: { file: path }, message: `Exported package to ${path}` };
+  },
+});
 
-  meta
-    .command('diff <file>')
-    .description('Preview the changes a package file would make (no writes)')
-    .action(async (file: string) => {
-      await emit(runDiff(createClient(), file));
-    });
+const diff = defineCommand({
+  group: 'metadata',
+  name: 'diff',
+  summary: 'Preview the changes a package file would make (no writes)',
+  positionals: [{ name: 'file', description: 'Package file', required: true }],
+  input: z.object({ file: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    const result = await runDiff(ctx.client.getAxiosInstance(), input.file);
+    return { data: result };
+  },
+});
 
-  meta
-    .command('apply <file>')
-    .description('Apply a package file to this tenant')
-    .option('--dry-run', 'Validate without writing')
-    .action(async (file: string, opts: { dryRun?: boolean }) => {
-      await emit(runApply(createClient(), file, { dryRun: opts.dryRun }));
+const apply = defineCommand({
+  group: 'metadata',
+  name: 'apply',
+  summary: 'Apply a package file to this tenant',
+  dangerous: (input) => !input.dryRun,
+  positionals: [{ name: 'file', description: 'Package file', required: true }],
+  options: [{ flag: '--dry-run', description: 'Validate without writing' }],
+  input: z.object({ file: z.string().min(1), dryRun: z.boolean().default(false) }),
+  handler: async (ctx, input) => {
+    const result = await runApply(ctx.client.getAxiosInstance(), input.file, {
+      dryRun: input.dryRun,
     });
-}
+    return { data: result };
+  },
+});
+
+export const metadataCommands: RegisteredCommand[] = [exportCommand, diff, apply];

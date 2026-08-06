@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { registerAuthCommands } from './commands/auth.js';
-import { registerCollectionCommands } from './commands/collections.js';
-import { registerRecordCommands } from './commands/records.js';
-import { registerMetadataCommands } from './commands/metadata.js';
-import { registerEnvironmentCommands } from './commands/environments.js';
-import { registerSdkCommands } from './commands/sdk.js';
+import { bindCommands } from './registry/bind.js';
+import { allCommands } from './registry/registry.js';
+import { VERSION } from './version.js';
 
 const program = new Command();
 
 program
   .name('kelta')
   .description('Kelta Platform CLI — manage collections, records, and metadata')
-  .version('1.0.0');
+  .version(VERSION)
+  .option('--profile <name>', 'Connection profile to use (default: active profile)')
+  .option('--output <format>', 'Output format: table|json|yaml|csv|ndjson')
+  .option('--raw', 'Emit the unflattened JSON:API envelope')
+  .option('--quiet', 'Print ids only')
+  .option('--yes', 'Skip confirmation for destructive commands');
 
-registerAuthCommands(program);
-registerCollectionCommands(program);
-registerRecordCommands(program);
-registerMetadataCommands(program);
-registerEnvironmentCommands(program);
-registerSdkCommands(program);
+bindCommands(program, allCommands);
 
-program.parse();
+program.parseAsync(process.argv).catch((error: unknown) => {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+});

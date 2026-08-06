@@ -1,6 +1,6 @@
-import { Command } from 'commander';
 import type { AxiosInstance } from 'axios';
-import { createClient } from '../client.js';
+import { z } from 'zod';
+import { defineCommand, type RegisteredCommand } from '../registry/types.js';
 
 /** Default delay between polls for `--wait` commands. */
 const DEFAULT_POLL_INTERVAL_MS = 2000;
@@ -282,253 +282,247 @@ export async function runPromoteRollback(client: AxiosInstance, id: string): Pro
   if (!isSuccess(res.status)) throw requestError(res);
 }
 
-function fail(e: unknown): void {
-  process.stderr.write(`${(e as Error).message}\n`);
-  process.exit(1);
-}
-
-function printEnvironment(env: EnvironmentResource): void {
+function environmentHuman(env: EnvironmentResource): string {
   const attrs = env.attributes ?? {};
-  process.stdout.write(`Environment: ${attrs.name ?? env.id}\n`);
-  process.stdout.write(`  ID:     ${env.id}\n`);
-  process.stdout.write(`  Type:   ${attrs.type ?? ''}\n`);
-  process.stdout.write(`  Status: ${attrs.status ?? ''}\n`);
+  const lines = [
+    `Environment: ${attrs.name ?? env.id}`,
+    `  ID:     ${env.id}`,
+    `  Type:   ${attrs.type ?? ''}`,
+    `  Status: ${attrs.status ?? ''}`,
+  ];
+  return lines.join('\n') + '\n';
 }
 
-function printPromotion(promotion: PromotionResource): void {
+function promotionHuman(promotion: PromotionResource): string {
   const attrs = promotion.attributes ?? {};
-  process.stdout.write(`Promotion ${promotion.id}\n`);
-  process.stdout.write(`  Status:  ${attrs.status ?? ''}\n`);
-  process.stdout.write(
-    `  Type:    ${attrs.promotion_type ?? ''} (conflict: ${attrs.conflict_mode ?? ''})\n`
-  );
-  process.stdout.write(`  Source:  ${attrs.source_env_name ?? ''}\n`);
-  process.stdout.write(`  Target:  ${attrs.target_env_name ?? ''}\n`);
-  process.stdout.write(
+  const lines = [
+    `Promotion ${promotion.id}`,
+    `  Status:  ${attrs.status ?? ''}`,
+    `  Type:    ${attrs.promotion_type ?? ''} (conflict: ${attrs.conflict_mode ?? ''})`,
+    `  Source:  ${attrs.source_env_name ?? ''}`,
+    `  Target:  ${attrs.target_env_name ?? ''}`,
     `  Items:   ${String(attrs.items_promoted ?? 0)} promoted, ` +
-      `${String(attrs.items_skipped ?? 0)} skipped, ${String(attrs.items_failed ?? 0)} failed\n`
-  );
-  if (attrs.error_message) {
-    process.stdout.write(`  Error:   ${attrs.error_message}\n`);
-  }
+      `${String(attrs.items_skipped ?? 0)} skipped, ${String(attrs.items_failed ?? 0)} failed`,
+  ];
+  if (attrs.error_message) lines.push(`  Error:   ${attrs.error_message}`);
+  return lines.join('\n') + '\n';
 }
 
-function registerSandboxCommands(program: Command): void {
-  const sandbox = program.command('sandbox').description('Create and manage sandbox environments');
+const sandboxCreate = defineCommand({
+  group: 'sandbox',
+  name: 'create',
+  summary: 'Create a sandbox environment (prints one-time admin credentials)',
+  options: [
+    { flag: '-n, --name <name>', description: 'Environment name' },
+    { flag: '-d, --description <description>', description: 'Environment description' },
+  ],
+  input: z.object({ name: z.string().min(1), description: z.string().optional() }),
+  handler: async (ctx, input) => {
+    const env = await runSandboxCreate(ctx.client.getAxiosInstance(), input);
+    const attrs = env.attributes ?? {};
+    const lines = [
+      `Sandbox environment created (id: ${env.id}, status: ${attrs.status ?? 'PENDING'})`,
+    ];
+    if (attrs.sandboxSlug || attrs.adminUsername || attrs.adminInitialPassword) {
+      lines.push(
+        '',
+        'One-time admin credentials — store them now, they will NOT be shown again:',
+        `  Sandbox slug:   ${attrs.sandboxSlug ?? ''}`,
+        `  Admin username: ${attrs.adminUsername ?? ''}`,
+        `  Admin password: ${attrs.adminInitialPassword ?? ''}`
+      );
+    }
+    return { data: { data: env }, human: lines.join('\n') + '\n', ids: [env.id] };
+  },
+});
 
-  sandbox
-    .command('create')
-    .description('Create a sandbox environment (prints one-time admin credentials)')
-    .requiredOption('-n, --name <name>', 'Environment name')
-    .option('-d, --description <description>', 'Environment description')
-    .action(async (opts: SandboxCreateOptions) => {
-      try {
-        const env = await runSandboxCreate(createClient(), opts);
-        const attrs = env.attributes ?? {};
-        process.stdout.write(
-          `Sandbox environment created (id: ${env.id}, status: ${attrs.status ?? 'PENDING'})\n`
-        );
-        if (attrs.sandboxSlug || attrs.adminUsername || attrs.adminInitialPassword) {
-          process.stdout.write(
-            '\nOne-time admin credentials — store them now, they will NOT be shown again:\n'
-          );
-          process.stdout.write(`  Sandbox slug:   ${attrs.sandboxSlug ?? ''}\n`);
-          process.stdout.write(`  Admin username: ${attrs.adminUsername ?? ''}\n`);
-          process.stdout.write(`  Admin password: ${attrs.adminInitialPassword ?? ''}\n`);
-        }
-      } catch (e) {
-        fail(e);
-      }
+const sandboxList = defineCommand({
+  group: 'sandbox',
+  name: 'list',
+  summary: 'List environments',
+  input: z.object({}),
+  handler: async (ctx) => {
+    const envs = await runSandboxList(ctx.client.getAxiosInstance());
+    return {
+      data: { data: envs },
+      columns: [
+        { key: 'name', header: 'NAME' },
+        { key: 'type', header: 'TYPE' },
+        { key: 'status', header: 'STATUS' },
+        { key: 'sandbox_slug', header: 'SLUG' },
+      ],
+    };
+  },
+});
+
+const sandboxStatus = defineCommand({
+  group: 'sandbox',
+  name: 'status',
+  summary: 'Show environment status (with --wait, poll until ACTIVE or FAILED)',
+  positionals: [{ name: 'envId', description: 'Environment id', required: true }],
+  options: [{ flag: '--wait', description: 'Poll until the environment reaches ACTIVE or FAILED' }],
+  input: z.object({ envId: z.string().min(1), wait: z.boolean().default(false) }),
+  handler: async (ctx, input) => {
+    const env = await runSandboxStatus(ctx.client.getAxiosInstance(), input.envId, {
+      wait: input.wait,
     });
+    return { data: { data: env }, human: environmentHuman(env) };
+  },
+});
 
-  sandbox
-    .command('list')
-    .description('List environments')
-    .action(async () => {
-      try {
-        const envs = await runSandboxList(createClient());
-        if (envs.length === 0) {
-          process.stdout.write('No environments found.\n');
-          return;
-        }
-        process.stdout.write(
-          `${'Name'.padEnd(28)} ${'Type'.padEnd(12)} ${'Status'.padEnd(14)} Slug/Remote\n`
-        );
-        process.stdout.write('-'.repeat(80) + '\n');
-        for (const env of envs) {
-          const attrs = env.attributes ?? {};
-          const target =
-            attrs.sandbox_slug ?? attrs.remote_base_url ?? attrs.sandbox_tenant_id ?? '';
-          process.stdout.write(
-            `${(attrs.name ?? env.id).padEnd(28)} ${(attrs.type ?? '').padEnd(12)} ` +
-              `${(attrs.status ?? '').padEnd(14)} ${target}\n`
-          );
-        }
-      } catch (e) {
-        fail(e);
-      }
+const sandboxRefresh = defineCommand({
+  group: 'sandbox',
+  name: 'refresh',
+  summary: 'Refresh a sandbox environment from its source',
+  dangerous: true,
+  positionals: [{ name: 'envId', description: 'Environment id', required: true }],
+  input: z.object({ envId: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    await runSandboxRefresh(ctx.client.getAxiosInstance(), input.envId);
+    return { message: `Refresh started for environment ${input.envId}.` };
+  },
+});
+
+const promoteCreate = defineCommand({
+  group: 'promote',
+  name: 'create',
+  summary: 'Create a promotion from a source to a target environment',
+  options: [
+    { flag: '-s, --source <envId>', description: 'Source environment id' },
+    { flag: '-t, --target <envId>', description: 'Target environment id' },
+    { flag: '--type <type>', description: 'Promotion type: FULL or SELECTIVE', default: 'FULL' },
+    { flag: '--conflict <mode>', description: 'Conflict mode: skip or overwrite', default: 'skip' },
+    {
+      flag: '--item <spec>',
+      description: 'Item to promote as TYPE:name (repeatable, for SELECTIVE promotions)',
+      repeatable: true,
+    },
+  ],
+  input: z.object({
+    source: z.string().min(1),
+    target: z.string().min(1),
+    type: z.string().default('FULL'),
+    conflict: z.string().default('skip'),
+    item: z.array(z.string()).default([]),
+  }),
+  handler: async (ctx, input) => {
+    const promotion = await runPromoteCreate(ctx.client.getAxiosInstance(), {
+      sourceEnvId: input.source,
+      targetEnvId: input.target,
+      promotionType: normalizeChoice(input.type, PROMOTION_TYPES, 'promotion type'),
+      conflictMode: normalizeChoice(input.conflict, CONFLICT_MODES, 'conflict mode'),
+      items: input.item.map(parseItemSpec),
     });
+    return {
+      data: { data: promotion },
+      message: `Promotion created (id: ${promotion.id}, status: ${promotion.attributes?.status ?? 'PENDING'})`,
+      ids: [promotion.id],
+    };
+  },
+});
 
-  sandbox
-    .command('status <envId>')
-    .description('Show environment status (with --wait, poll until ACTIVE or FAILED)')
-    .option('--wait', 'Poll until the environment reaches ACTIVE or FAILED')
-    .action(async (envId: string, opts: { wait?: boolean }) => {
-      try {
-        const env = await runSandboxStatus(createClient(), envId, { wait: opts.wait });
-        printEnvironment(env);
-        if (env.attributes?.status === 'FAILED') {
-          process.exit(1);
-        }
-      } catch (e) {
-        fail(e);
-      }
+const promotePreview = defineCommand({
+  group: 'promote',
+  name: 'preview',
+  summary: 'Preview the changes a promotion from a source environment would make',
+  options: [{ flag: '-s, --source <envId>', description: 'Source environment id' }],
+  input: z.object({ source: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    const preview = await runPromotePreview(ctx.client.getAxiosInstance(), input.source);
+    const changes = preview.changes ?? [];
+    const lines =
+      changes.length === 0
+        ? ['No changes to promote.']
+        : [
+            `${String(changes.length)} change(s):`,
+            `  ${'Action'.padEnd(10)} ${'Type'.padEnd(18)} Name`,
+            `  ${'-'.repeat(60)}`,
+            ...changes.map(
+              (change) =>
+                `  ${(change.action ?? '').padEnd(10)} ${(change.type ?? '').padEnd(18)} ${change.name ?? ''}`
+            ),
+          ];
+    return { data: preview, human: lines.join('\n') + '\n' };
+  },
+});
+
+const promoteApprove = defineCommand({
+  group: 'promote',
+  name: 'approve',
+  summary: 'Approve a promotion (a promotion cannot be approved by its creator)',
+  positionals: [{ name: 'id', description: 'Promotion id', required: true }],
+  input: z.object({ id: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    const promotion = await runPromoteApprove(ctx.client.getAxiosInstance(), input.id);
+    const status = promotion?.attributes?.status;
+    return {
+      data: promotion ? { data: promotion } : undefined,
+      message: `Promotion ${input.id} approved${status ? ` (status: ${status})` : ''}.`,
+    };
+  },
+});
+
+const promoteExecute = defineCommand({
+  group: 'promote',
+  name: 'execute',
+  summary: 'Execute a promotion (with --wait, poll until COMPLETED or FAILED)',
+  dangerous: true,
+  positionals: [{ name: 'id', description: 'Promotion id', required: true }],
+  options: [
+    { flag: '--wait', description: 'Poll until the promotion reaches COMPLETED or FAILED' },
+  ],
+  input: z.object({ id: z.string().min(1), wait: z.boolean().default(false) }),
+  handler: async (ctx, input) => {
+    const promotion = await runPromoteExecute(ctx.client.getAxiosInstance(), input.id, {
+      wait: input.wait,
     });
+    if (!promotion) {
+      return {
+        data: { started: true, id: input.id },
+        message: `Execution started for promotion ${input.id}. Check progress with: kelta promote status ${input.id}`,
+      };
+    }
+    if (promotion.attributes?.status === 'FAILED') {
+      process.exitCode = 1;
+    }
+    return { data: { data: promotion }, human: promotionHuman(promotion) };
+  },
+});
 
-  sandbox
-    .command('refresh <envId>')
-    .description('Refresh a sandbox environment from its source')
-    .action(async (envId: string) => {
-      try {
-        await runSandboxRefresh(createClient(), envId);
-        process.stdout.write(`Refresh started for environment ${envId}.\n`);
-      } catch (e) {
-        fail(e);
-      }
-    });
-}
+const promoteStatus = defineCommand({
+  group: 'promote',
+  name: 'status',
+  summary: 'Show a promotion and its item counts',
+  positionals: [{ name: 'id', description: 'Promotion id', required: true }],
+  input: z.object({ id: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    const promotion = await runPromoteStatus(ctx.client.getAxiosInstance(), input.id);
+    return { data: { data: promotion }, human: promotionHuman(promotion) };
+  },
+});
 
-function registerPromoteCommands(program: Command): void {
-  const promote = program.command('promote').description('Promote metadata between environments');
+const promoteRollback = defineCommand({
+  group: 'promote',
+  name: 'rollback',
+  summary: 'Roll back an executed promotion',
+  dangerous: true,
+  positionals: [{ name: 'id', description: 'Promotion id', required: true }],
+  input: z.object({ id: z.string().min(1) }),
+  handler: async (ctx, input) => {
+    await runPromoteRollback(ctx.client.getAxiosInstance(), input.id);
+    return { message: `Rollback started for promotion ${input.id}.` };
+  },
+});
 
-  const collectItem = (value: string, previous: string[]): string[] => previous.concat([value]);
-
-  promote
-    .command('create')
-    .description('Create a promotion from a source to a target environment')
-    .requiredOption('-s, --source <envId>', 'Source environment id')
-    .requiredOption('-t, --target <envId>', 'Target environment id')
-    .option('--type <type>', 'Promotion type: FULL or SELECTIVE', 'FULL')
-    .option('--conflict <mode>', 'Conflict mode: skip or overwrite', 'skip')
-    .option(
-      '--item <spec>',
-      'Item to promote as TYPE:name (repeatable, for SELECTIVE promotions)',
-      collectItem,
-      [] as string[]
-    )
-    .action(
-      async (opts: {
-        source: string;
-        target: string;
-        type: string;
-        conflict: string;
-        item: string[];
-      }) => {
-        try {
-          const promotion = await runPromoteCreate(createClient(), {
-            sourceEnvId: opts.source,
-            targetEnvId: opts.target,
-            promotionType: normalizeChoice(opts.type, PROMOTION_TYPES, 'promotion type'),
-            conflictMode: normalizeChoice(opts.conflict, CONFLICT_MODES, 'conflict mode'),
-            items: opts.item.map(parseItemSpec),
-          });
-          process.stdout.write(
-            `Promotion created (id: ${promotion.id}, status: ${
-              promotion.attributes?.status ?? 'PENDING'
-            })\n`
-          );
-        } catch (e) {
-          fail(e);
-        }
-      }
-    );
-
-  promote
-    .command('preview')
-    .description('Preview the changes a promotion from a source environment would make')
-    .requiredOption('-s, --source <envId>', 'Source environment id')
-    .action(async (opts: { source: string }) => {
-      try {
-        const preview = await runPromotePreview(createClient(), opts.source);
-        const changes = preview.changes ?? [];
-        if (changes.length === 0) {
-          process.stdout.write('No changes to promote.\n');
-          return;
-        }
-        process.stdout.write(`${String(changes.length)} change(s):\n`);
-        process.stdout.write(`  ${'Action'.padEnd(10)} ${'Type'.padEnd(18)} Name\n`);
-        process.stdout.write(`  ${'-'.repeat(60)}\n`);
-        for (const change of changes) {
-          process.stdout.write(
-            `  ${(change.action ?? '').padEnd(10)} ${(change.type ?? '').padEnd(18)} ` +
-              `${change.name ?? ''}\n`
-          );
-        }
-      } catch (e) {
-        fail(e);
-      }
-    });
-
-  promote
-    .command('approve <id>')
-    .description('Approve a promotion (a promotion cannot be approved by its creator)')
-    .action(async (id: string) => {
-      try {
-        const promotion = await runPromoteApprove(createClient(), id);
-        const status = promotion?.attributes?.status;
-        process.stdout.write(`Promotion ${id} approved${status ? ` (status: ${status})` : ''}.\n`);
-      } catch (e) {
-        fail(e);
-      }
-    });
-
-  promote
-    .command('execute <id>')
-    .description('Execute a promotion (with --wait, poll until COMPLETED or FAILED)')
-    .option('--wait', 'Poll until the promotion reaches COMPLETED or FAILED')
-    .action(async (id: string, opts: { wait?: boolean }) => {
-      try {
-        const promotion = await runPromoteExecute(createClient(), id, { wait: opts.wait });
-        if (!promotion) {
-          process.stdout.write(
-            `Execution started for promotion ${id}. Check progress with: kelta promote status ${id}\n`
-          );
-          return;
-        }
-        printPromotion(promotion);
-        if (promotion.attributes?.status === 'FAILED') {
-          process.exit(1);
-        }
-      } catch (e) {
-        fail(e);
-      }
-    });
-
-  promote
-    .command('status <id>')
-    .description('Show a promotion and its item counts')
-    .action(async (id: string) => {
-      try {
-        printPromotion(await runPromoteStatus(createClient(), id));
-      } catch (e) {
-        fail(e);
-      }
-    });
-
-  promote
-    .command('rollback <id>')
-    .description('Roll back an executed promotion')
-    .action(async (id: string) => {
-      try {
-        await runPromoteRollback(createClient(), id);
-        process.stdout.write(`Rollback started for promotion ${id}.\n`);
-      } catch (e) {
-        fail(e);
-      }
-    });
-}
-
-export function registerEnvironmentCommands(program: Command): void {
-  registerSandboxCommands(program);
-  registerPromoteCommands(program);
-}
+export const environmentCommands: RegisteredCommand[] = [
+  sandboxCreate,
+  sandboxList,
+  sandboxStatus,
+  sandboxRefresh,
+  promoteCreate,
+  promotePreview,
+  promoteApprove,
+  promoteExecute,
+  promoteStatus,
+  promoteRollback,
+];

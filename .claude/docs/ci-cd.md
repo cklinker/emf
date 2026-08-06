@@ -45,6 +45,10 @@ Trigger: `push` → `main` (path-filtered), plus `workflow_dispatch`.
 5. **`rollback-on-smoke-failure`** — `git revert HEAD` in `homelab-argo` if smoke fails.
 6. **`e2e-test`** — Playwright against production (`app.kelta.io`, `api.kelta.io`) using
    E2E token + Authentik secrets. Timeout 25 min. Files failing-E2E bug tasks to `emf-queue`.
+   Also builds `@kelta/cli` (`kelta-web`: formula+sdk, then cli) so the CLI smoke spec
+   (`e2e-tests/tests/admin/cli-smoke.spec.ts`) can spawn the built binary entry against the
+   deployed stack via the pre-issued `E2E_API_TOKEN` (env-override auth path); the spec
+   self-skips when the dist is absent.
    Because ArgoCD rolls the worker out **asynchronously** after `deploy` commits the tag,
    this job first blocks until the `emf-worker` Deployment targets **this commit's**
    `main-<short-sha>` image and its rollout is fully complete (all pods on the new

@@ -65,6 +65,18 @@ public class PlatformRedirectUriValidator
             }
         }
 
+        // For the CLI client ONLY: RFC 8252 §7.3 loopback redirect. Native apps
+        // cannot pre-register a port, so the OS assigns one at login time and the
+        // port MUST be ignored during comparison. Everything else stays strict:
+        // scheme http, host a loopback IP LITERAL (never "localhost" — a hosts-file
+        // or DNS entry can point it anywhere), path exactly /callback, and no
+        // userinfo/query/fragment. No other client gets this rule.
+        if ("kelta-cli".equals(registeredClient.getClientId())) {
+            if (isLoopbackCallback(requestedRedirectUri)) {
+                return;
+            }
+        }
+
         // For connected apps with multiple redirect URIs, validate that the
         // requested URI matches a registered origin + exact path. This supports
         // apps that register multiple callback paths for different environments.
@@ -123,6 +135,32 @@ public class PlatformRedirectUriValidator
             }
         } catch (IllegalArgumentException e) {
             // Invalid URI
+        }
+        return false;
+    }
+
+    /**
+     * RFC 8252 §7.3 loopback-interface redirect for the {@code kelta-cli} client:
+     * {@code http://127.0.0.1:<any port>/callback} or {@code http://[::1]:<any port>/callback}.
+     * The port is deliberately not compared; host must be a loopback IP literal
+     * (NOT {@code localhost}); the path must be exactly {@code /callback}; and the
+     * URI must carry no userinfo, query, or fragment.
+     */
+    private boolean isLoopbackCallback(String requestedRedirectUri) {
+        try {
+            URI uri = URI.create(requestedRedirectUri);
+            boolean loopbackHost = "127.0.0.1".equals(uri.getHost()) || "[::1]".equals(uri.getHost());
+            if ("http".equals(uri.getScheme())
+                    && loopbackHost
+                    && "/callback".equals(uri.getPath())
+                    && uri.getUserInfo() == null
+                    && uri.getQuery() == null
+                    && uri.getFragment() == null) {
+                log.debug("Allowing RFC 8252 loopback redirect_uri for kelta-cli: {}", requestedRedirectUri);
+                return true;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // fall through to false
         }
         return false;
     }

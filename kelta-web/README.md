@@ -68,8 +68,18 @@ machine-readable manifest and local MCP tools all derive from it. HTTP goes thro
 Precedence: flags > env (`KELTA_PROFILE`, `KELTA_URL`, `KELTA_TENANT`, `KELTA_TOKEN`) >
 profile file. `KELTA_CONFIG_DIR` relocates the config dir (CI/tests).
 
+`kelta auth login` (no `--token`) runs the RFC 8252 browser flow: a one-shot loopback
+listener on `127.0.0.1`, authorization_code + PKCE against kelta-auth (client `kelta-cli`),
+then a PAT is minted via `POST /api/me/tokens` (`--expires-in`, default 90 days) and stored;
+the short-lived JWT is discarded. MFA/SSO ride the normal browser session. The auth server
+resolves as: saved profile value > `--auth-url` > `api.` → `auth.` host derivation.
+`--no-browser` prints the URL for manual navigation; `--token klt_…` stays the headless path.
+
 ```bash
-kelta auth login --url https://api.kelta.io --tenant acme --token klt_… --profile prod
+kelta auth login --url https://api.kelta.io --tenant acme --profile prod   # browser + PKCE
+kelta auth login --url https://api.kelta.io --tenant acme --token klt_…    # headless/CI
+kelta auth logout --revoke        # revoke the PAT server-side, then remove it locally
+kelta token list|create|revoke    # PAT lifecycle (create shows the token exactly once)
 kelta profile list|use|show|remove|rename
 kelta collections list --output json
 kelta collections create --name orders --display-name Orders

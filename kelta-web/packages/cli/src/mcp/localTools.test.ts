@@ -99,8 +99,15 @@ describe('runLocalCommand', () => {
 });
 
 describe('deriveMcpUrl', () => {
-  it('swaps api. for mcp. and rejects non-conventional hosts', () => {
-    expect(deriveMcpUrl('https://api.kelta.io')).toBe('https://mcp.kelta.io');
-    expect(deriveMcpUrl('https://gateway.internal')).toBeUndefined();
+  it('uses the API origin — the gateway routes /{slug}/mcp/{toolset}', () => {
+    // Regression: an earlier version swapped api.->mcp., a host that does not
+    // exist. Every bridge request 404'd and the server silently degraded to
+    // local-only tools.
+    expect(deriveMcpUrl('https://api.kelta.io')).toBe('https://api.kelta.io');
+    expect(deriveMcpUrl('https://api.kelta.io/some/path')).toBe('https://api.kelta.io');
+    expect(deriveMcpUrl('http://localhost:8080')).toBe('http://localhost:8080');
+    // any reachable API origin works — no host-name convention is assumed
+    expect(deriveMcpUrl('https://gateway.internal')).toBe('https://gateway.internal');
+    expect(deriveMcpUrl('not a url')).toBeUndefined();
   });
 });

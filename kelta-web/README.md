@@ -100,6 +100,12 @@ kelta metadata export -n app -v 1.0 -o app.json        # file flag is -o/--out
 kelta sandbox create -n dev && kelta promote create -s <src> -t <dst>
 ```
 
+**Local MCP** — `kelta mcp serve` bridges the hosted kelta-mcp toolsets (via the gateway at
+`{apiUrl}/{slug}/mcp/{user|admin}`; override with `--mcp-url`) and adds `cli_`-prefixed local
+tools from the registry. `kelta mcp install claude-desktop|claude-code|cursor|generic` prints
+client config using the **resolved absolute binary path** — GUI clients are launched by the OS,
+not a login shell, so a bare `kelta` on PATH does not resolve.
+
 **Self-update & distribution** — released binaries (`kelta-cli-downloads` image,
 downloads.kelta.io) embed version/sha/target and self-update with `kelta update`
 (sha256-verified atomic swap; `--check` reports only; `KELTA_UPDATE_URL` overrides the

@@ -16,21 +16,22 @@ interface JsonRpcResponse {
 }
 
 /**
- * Derive the hosted MCP base URL from the API URL by swapping a leading
- * `api.` host label for `mcp.` (api.kelta.io → mcp.kelta.io).
+ * Hosted MCP base URL for a profile: **the API origin itself**.
+ *
+ * kelta-mcp is not a separate public host — the gateway routes the MCP paths
+ * (`Host(api.…) && PathRegexp(^/[a-z][a-z0-9-]+/mcp/(user|admin)…)`), so
+ * `{apiUrl}/{slug}/mcp/{toolset}` is the real endpoint. An earlier version
+ * invented an `api.` → `mcp.` host swap by symmetry with the auth URL; that
+ * host does not exist, so every bridge request 404'd and the server silently
+ * degraded to local-only tools. Override with `--mcp-url` when a deployment
+ * really does front kelta-mcp on its own host.
  */
 export function deriveMcpUrl(apiUrl: string): string | undefined {
   try {
-    const url = new URL(apiUrl);
-    if (url.hostname.startsWith('api.')) {
-      url.hostname = 'mcp.' + url.hostname.slice(4);
-      url.pathname = '';
-      return url.origin;
-    }
+    return new URL(apiUrl).origin;
   } catch {
-    // fall through
+    return undefined;
   }
-  return undefined;
 }
 
 /**

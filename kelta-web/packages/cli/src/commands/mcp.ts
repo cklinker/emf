@@ -5,8 +5,21 @@ import { CliError, EXIT } from '../errors.js';
 import { deriveMcpUrl, RemoteEndpoint, type Toolset } from '../mcp/remote.js';
 import { buildMcpServer, connectServer, type McpSource } from '../mcp/server.js';
 import { defineCommand, type RegisteredCommand } from '../registry/types.js';
+import { BUILD_TARGET } from '../version.js';
 
 const TOOLSETS: Toolset[] = ['user', 'admin'];
+
+/**
+ * Command a GUI MCP client should launch. Desktop clients (Claude Desktop,
+ * Cursor) are started by the OS launcher, NOT a login shell, so they do not
+ * inherit `~/.local/bin` on PATH — a bare `kelta` fails to spawn with no
+ * useful error. A released binary knows its own absolute path; a dev build
+ * (node running dist/) falls back to the bare name, since execPath there is
+ * the node interpreter.
+ */
+function launcherCommand(): string {
+  return BUILD_TARGET === 'dev' ? 'kelta' : process.execPath;
+}
 
 function resolveToolsets(toolset: string): Toolset[] {
   return toolset === 'all' ? TOOLSETS : [toolset as Toolset];
@@ -132,14 +145,15 @@ const install = defineCommand({
       return Promise.resolve({ text });
     }
 
+    const command = launcherCommand();
     const stdioConfig = JSON.stringify(
-      { mcpServers: { [name]: { command: 'kelta', args: serveArgs } } },
+      { mcpServers: { [name]: { command, args: serveArgs } } },
       null,
       2
     );
     const text =
       input.client === 'claude-code'
-        ? `claude mcp add ${name} -- kelta ${serveArgs.join(' ')}\n`
+        ? `claude mcp add ${name} -- ${command} ${serveArgs.join(' ')}\n`
         : input.client === 'claude-desktop'
           ? `# Merge into claude_desktop_config.json (Claude Desktop → Settings → Developer):\n${stdioConfig}\n`
           : input.client === 'cursor'

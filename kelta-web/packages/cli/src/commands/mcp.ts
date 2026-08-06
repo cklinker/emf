@@ -50,6 +50,7 @@ const serve = defineCommand({
   name: 'serve',
   summary: 'Run a stdio MCP server: hosted kelta-mcp tools bridged + cli_ local tools',
   requiresAuth: false, // source=local works offline; remote sources check the profile themselves
+  ownsStdout: true, // stdout carries JSON-RPC frames only
   options: [
     { flag: '--toolset <set>', description: 'user|admin|all', default: 'all' },
     { flag: '--source <source>', description: 'auto|remote|local', default: 'auto' },

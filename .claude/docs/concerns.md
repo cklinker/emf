@@ -757,11 +757,20 @@ cleanable). The page-builder wizard specs leak the same way.
 Fixes applied: the cli-smoke round-trip now refuses to create schema unless the
 tenant slug is disposable (`/e2e|test|sandbox|ci/`) or
 `KELTA_E2E_ALLOW_SCHEMA_MUTATION=1` is set, and its teardown deletes data
-records before the collection. Still open (needs backend work / DB access, not
-freelanced against prod):
-1. Give the child-table FKs `ON DELETE CASCADE` (or add a cascade path to
-   `deleteCollection`) so a collection can be torn down. Audit the 15 above.
-2. Point the deploy-pipeline e2e at a disposable tenant, not `default`/a product
-   tenant, so the guard above doesn't just skip the round-trip in CI.
-3. Clean the 10 stuck collections already in couchpicks — requires the cascade
-   fix or direct control-plane DB deletion.
+records before the collection.
+1. **DONE (V181 + V182).** All owning `collection(id)` FKs now `ON DELETE CASCADE`
+   (V181 did 18; V182 added the one it missed, `record_version` — see the "FIXED (V181…)"
+   entry earlier).
+2. **DONE (force-delete teardown).** The deploy e2e still runs against `default` (a product
+   tenant — a dedicated disposable tenant would need its own `E2E_API_TOKEN` secret), but the
+   specs now clean up after themselves rather than leaking: `DataFactory.cleanup()` deletes
+   collections with `?force=true` (so the `CollectionDeletionGuardHook` lets it through and the
+   FK cascade removes the children) and surfaces failures via `console.warn` instead of
+   swallowing them. UI-created collections (the wizard spec had **no** teardown, the source of
+   the `e2e_wizard_*` litter) are registered with `DataFactory.trackCollectionByName(name)` so
+   the same force-delete cleans them. A dedicated disposable e2e tenant is still the ideal
+   (preserves the ability to run destructive specs without any product-tenant blast radius);
+   deferred on the secret.
+3. **DONE (2026-08-08).** The 11 stuck `e2e_*` collections (10 `e2e_test_*` + 1 `e2e_cli_*`,
+   plus 2 more that leaked mid-cleanup) were force-deleted from couchpicks once V181+V182 and
+   the guard were live; only the 14 real domain collections remain.

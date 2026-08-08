@@ -583,12 +583,71 @@ export class DataFactory {
 
   async cleanup(): Promise<void> {
     for (const entity of this.createdEntities.reverse()) {
+      // Collections accumulate child rows (field_history, record_version, attachments…)
+      // that the server's CollectionDeletionGuardHook refuses to destroy without
+      // ?force=true — and that, before the V181/V182 FK cascades, made a used collection
+      // undeletable outright. An unforced (or silently swallowed) delete here leaked
+      // e2e_test_* collections into the target tenant — the litter that piled up in the
+      // couchpicks product tenant. Force the collection delete, and surface a failure
+      // instead of hiding it so a future leak is visible in the test log.
+      const path =
+        entity.type === "collections"
+          ? `/api/collections/${entity.id}?force=true`
+          : `/api/${entity.type}/${entity.id}`;
       try {
-        await this.request("DELETE", `/api/${entity.type}/${entity.id}`);
-      } catch {
-        // Ignore cleanup failures
+        await this.request("DELETE", path);
+      } catch (err) {
+        if (entity.type === "collections") {
+          console.warn(
+            `[data-factory] failed to delete collection ${entity.id} during cleanup — it may leak: ${String(err)}`,
+          );
+        }
+        // Non-collection cleanup failures are non-fatal and ignored.
       }
     }
     this.createdEntities = [];
+  }
+
+  /**
+   * Register an externally-created collection (e.g. one created through the admin UI
+   * in a wizard test) for force-delete at {@link cleanup}, resolving its id from the
+   * LIST endpoint by name. UI-created collections are not otherwise tracked, so without
+   * this they have no teardown and leak into the target tenant.
+   */
+  async trackCollectionByName(
+    name: string,
+    timeoutMs = STORAGE_READY_TIMEOUT_MS,
+  ): Promise<void> {
+    const url = `${this.api.baseUrl}/${this.api.tenantSlug}/api/collections?page[size]=1000`;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/vnd.api+json",
+            Authorization: `Bearer ${this.currentToken}`,
+          },
+        });
+        if (response.ok) {
+          const body = (await response.json()) as JsonApiResponse;
+          const data = Array.isArray(body.data) ? body.data : [body.data];
+          const match = data.find((r) => r?.attributes?.name === name);
+          if (match?.id) {
+            this.createdEntities.push({ type: "collections", id: match.id });
+            return;
+          }
+        }
+      } catch {
+        // Network error — keep retrying
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, STORAGE_READY_POLL_MS),
+      );
+    }
+    console.warn(
+      `[data-factory] trackCollectionByName('${name}') did not resolve an id within ${timeoutMs}ms — it may leak`,
+    );
   }
 }

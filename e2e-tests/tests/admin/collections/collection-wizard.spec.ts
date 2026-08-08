@@ -136,5 +136,10 @@ test.describe("Collection Wizard", () => {
 
     // Should redirect to collection detail or list page
     await expect(page).toHaveURL(new RegExp(`/${tenantSlug}/collections`));
+
+    // The wizard creates the collection through the UI, so nothing tracks it for
+    // teardown — that is what leaked e2e_wizard_* collections into the target tenant.
+    // Register it so the data-factory cleanup force-deletes it after the test.
+    await dataFactory.trackCollectionByName(uniqueName);
   });
 });

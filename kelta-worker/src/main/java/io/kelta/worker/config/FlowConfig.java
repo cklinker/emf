@@ -602,6 +602,22 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Owner guard for the {@code wins} collection (consumer-alerting slice 9). Same shape as
+     * {@link io.kelta.worker.listener.WatchGuardHook} — locks the generic route so a member
+     * cannot create, re-own, publish, or delete another member's win.
+     */
+    @Bean
+    public io.kelta.worker.listener.WinGuardHook winGuardHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.runtime.router.UserIdResolver userIdResolver,
+            JdbcTemplate jdbcTemplate) {
+        io.kelta.worker.listener.WinGuardHook hook =
+                new io.kelta.worker.listener.WinGuardHook(userIdResolver, jdbcTemplate);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public BillingPlanRefreshHook billingPlanRefreshHook(
             BeforeSaveHookRegistry hookRegistry,

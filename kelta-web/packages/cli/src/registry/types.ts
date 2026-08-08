@@ -58,6 +58,13 @@ export interface CommandDef<I = unknown> {
   dangerous?: boolean | ((input: I) => boolean);
   /** Default true; false for local-only commands (profile, login). */
   requiresAuth?: boolean;
+  /**
+   * This command writes its own protocol bytes to stdout (the stdio MCP
+   * server). The dispatcher must NOT render a result or print any hint —
+   * a single stray line corrupts the JSON-RPC stream and the client rejects
+   * the connection.
+   */
+  ownsStdout?: boolean;
   // method syntax (not a property) — bivariant, so CommandDef<Specific>
   // stays assignable to the erased RegisteredCommand below
   handler(ctx: CommandContext, input: I): Promise<HandlerResult>;
@@ -78,6 +85,7 @@ export interface RegisteredCommand {
   input: { parse(raw: unknown): unknown };
   dangerous?: boolean | ((input: never) => boolean);
   requiresAuth?: boolean;
+  ownsStdout?: boolean;
   handler(ctx: CommandContext, input: never): Promise<HandlerResult>;
 }
 

@@ -81,11 +81,13 @@ export async function dispatch(
     if (isDangerous) await confirmDangerous(def, global);
     const ctx: CommandContext = buildContext(global);
     const result = await def.handler(ctx, input as never);
+    // stdout-owning commands (the stdio MCP server) carry protocol bytes: a
+    // rendered result or an update hint would corrupt the JSON-RPC stream and
+    // the client rejects the whole connection.
+    if (def.ownsStdout) return;
     const format = pickFormat(global.output, process.stdout.isTTY ?? false);
     process.stdout.write(renderResult(result, { format, raw: global.raw, quiet: global.quiet }));
-    // stdio MCP servers must never write hints; everything else may nudge once/day
-    if (def.group !== 'mcp')
-      await maybeNotifyUpdate((message) => process.stderr.write(message + '\n'));
+    await maybeNotifyUpdate((message) => process.stderr.write(message + '\n'));
   } catch (error) {
     const mapped = mapError(error);
     const format = pickFormat(global.output, process.stderr.isTTY ?? false);

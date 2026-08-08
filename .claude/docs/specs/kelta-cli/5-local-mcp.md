@@ -10,6 +10,9 @@ a stdio MCP server (TypeScript `@modelcontextprotocol/sdk`) composing two tool s
 
 - **Remote bridge (default for platform tools)**: forwards JSON-RPC messages to hosted
   kelta-mcp at `{mcpUrl}/{tenantSlug}/mcp/{user|admin}` with the profile PAT as bearer.
+  **`mcpUrl` defaults to the profile's API origin** — kelta-mcp is not a separate public
+  host; the gateway routes `^/[a-z][a-z0-9-]+/mcp/(user|admin)` on the `api.*` host.
+  `--mcp-url` overrides it for deployments that do front kelta-mcp separately.
   The hosted server is **stateless HTTP** (one POST per message, no session) — the bridge
   is a thin per-message forwarder; pod restarts are invisible by design. `tools/list` is
   fetched from the remote and merged. This keeps the 38 platform tools single-sourced in

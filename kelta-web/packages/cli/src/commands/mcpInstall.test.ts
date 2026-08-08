@@ -6,6 +6,7 @@ import { setConfigDirForTesting, setLegacyRcForTesting } from '../config/paths.j
 import { saveConfig, setToken } from '../config/store.js';
 import type { CommandContext, RegisteredCommand } from '../registry/types.js';
 import { mcpCommands } from './mcp.js';
+import { BUILD_TARGET } from '../version.js';
 
 const TOKEN = 'klt_install1234567890';
 
@@ -44,7 +45,24 @@ async function run(input: Record<string, unknown>) {
 describe('kelta mcp install', () => {
   it('claude-code default recommends the stdio bridge', async () => {
     const result = await run({ client: 'claude-code' });
-    expect(result.text).toContain('claude mcp add kelta-prod -- kelta mcp serve --profile prod');
+    expect(result.text).toContain('claude mcp add kelta-prod --');
+    expect(result.text).toContain('mcp serve --profile prod');
+  });
+
+  it('emits a launcher GUI clients can actually spawn (absolute path when released)', async () => {
+    // Regression: desktop clients are started by the OS launcher, not a login
+    // shell, so ~/.local/bin is not on PATH and a bare `kelta` fails to spawn.
+    const desktop = await run({ client: 'claude-desktop' });
+    const parsed = JSON.parse(desktop.text?.slice(desktop.text.indexOf('{')) ?? '{}') as {
+      mcpServers: Record<string, { command: string }>;
+    };
+    const command = parsed.mcpServers['kelta-prod'].command;
+    if (BUILD_TARGET === 'dev') {
+      expect(command).toBe('kelta');
+    } else {
+      expect(command).toBe(process.execPath);
+      expect(command.startsWith('/')).toBe(true);
+    }
   });
 
   it('claude-desktop and cursor print mergeable stdio JSON', async () => {
@@ -68,7 +86,8 @@ describe('kelta mcp install', () => {
 
   it('--direct emits the hosted HTTP endpoint with a PAT placeholder, never the token', async () => {
     const result = await run({ client: 'claude-code', direct: true, toolset: 'user' });
-    expect(result.text).toContain('https://mcp.kelta.io/acme/mcp/user');
+    // gateway-routed, not a separate mcp.* host
+    expect(result.text).toContain('https://api.kelta.io/acme/mcp/user');
     expect(result.text).toContain('<YOUR_PAT>');
     expect(result.text).not.toContain(TOKEN);
   });

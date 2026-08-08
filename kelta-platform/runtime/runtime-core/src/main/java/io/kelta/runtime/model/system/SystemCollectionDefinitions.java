@@ -128,6 +128,11 @@ public final class SystemCollectionDefinitions {
         definitions.add(watchTargets());
         definitions.add(watches());
 
+        // Analytics capture (consumer-alerting slice 8)
+        definitions.add(analyticsEvents());
+        // Win tracking + live ticker (consumer-alerting slice 9)
+        definitions.add(wins());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -536,6 +541,84 @@ public final class SystemCollectionDefinitions {
                 .withDefault("ACTIVE")
                 .withEnumValues(List.of("ACTIVE", "PAUSED", "EXPIRED", "FULFILLED")))
             .addField(FieldDefinition.datetime("expiresAt").withColumnName("expires_at"))
+            .build();
+    }
+
+    /**
+     * The questions a consumer product's users ask, plus lightweight usage/acquisition
+     * events (consumer-alerting slice 8). Read-only over the generic API — rows are written
+     * only by the capture paths ({@code SearchController} auto-capture and the authenticated
+     * {@code POST /api/analytics/events} ingest), never through generic CRUD.
+     *
+     * <p>The corpus behind the demand-mining loop (parent §5.2) and the later Q&amp;A/SEO page
+     * generation and demand clustering. High-volume by design: age-based retention ships in the
+     * same slice ({@code AnalyticsRetentionSweep}).
+     *
+     * <p>{@code eventType} has no DB CHECK on purpose — a new client event kind must not need a
+     * migration. {@code matchedTargetId}/{@code memberId} are plain ids with NO FK: analytics
+     * history outlives the target/user it references, and a deletion is honored by the
+     * retention/erasure path rather than a cascade. Geo is coarse (country/region) only.
+     */
+    public static CollectionDefinition analyticsEvents() {
+        return readOnlySystemBuilder("analytics-events", "Analytics Events", "analytics_event")
+            .tenantScoped(true)
+            .displayFieldName("eventType")
+            .addField(FieldDefinition.requiredString("eventType", 30)
+                .withColumnName("event_type"))
+            .addField(FieldDefinition.text("query"))
+            .addField(FieldDefinition.bool("zeroResult")
+                .withColumnName("zero_result"))
+            .addField(FieldDefinition.string("matchedTargetId", 36)
+                .withColumnName("matched_target_id"))
+            .addField(FieldDefinition.string("path", 500))
+            .addField(FieldDefinition.string("referrer", 500))
+            .addField(FieldDefinition.json("utm").withDefault(Map.of()))
+            .addField(FieldDefinition.string("sessionId", 64)
+                .withColumnName("session_id"))
+            .addField(FieldDefinition.string("memberId", 36)
+                .withColumnName("member_id"))
+            .addField(FieldDefinition.string("geoCountry", 2)
+                .withColumnName("geo_country"))
+            .addField(FieldDefinition.string("geoRegion", 80)
+                .withColumnName("geo_region"))
+            .addField(FieldDefinition.json("metadata").withDefault(Map.of()))
+            .addField(FieldDefinition.datetime("occurredAt")
+                .withColumnName("occurred_at"))
+            .build();
+    }
+
+    /**
+     * A member's confirmed win — "I got the spot" (consumer-alerting slice 9). The
+     * social-proof + retention engine: claim confirmations feed per-target success stats and
+     * the live-wins ticker.
+     *
+     * <p>Written through the owner-scoped {@code WinController} (generic route owner-guarded by
+     * {@code WinGuardHook}). {@code targetId}/{@code watchId}/{@code alertId} are plain ids with
+     * NO FK — a win outlives the target/watch/alert it references, and the alert ledger is
+     * pruned by retention. {@code isPublic} gates whether a win appears on the ticker;
+     * {@code claimantName} is a server-set FIRST NAME only (never more) so the public feed can
+     * name a claimant without exposing member PII.
+     */
+    public static CollectionDefinition wins() {
+        return systemBuilder("wins", "Wins", "win")
+            .displayFieldName("summary")
+            .addField(FieldDefinition.lookup("memberId", "users", "Member")
+                .withColumnName("member_id"))
+            .addField(FieldDefinition.string("targetId", 36)
+                .withColumnName("target_id"))
+            .addField(FieldDefinition.string("watchId", 36)
+                .withColumnName("watch_id"))
+            .addField(FieldDefinition.string("alertId", 36)
+                .withColumnName("alert_id"))
+            .addField(FieldDefinition.string("category", 50))
+            .addField(FieldDefinition.requiredString("summary", 280))
+            .addField(FieldDefinition.integer("quantity"))
+            .addField(FieldDefinition.bool("isPublic", false)
+                .withColumnName("is_public"))
+            .addField(FieldDefinition.string("claimantName", 80)
+                .withColumnName("claimant_name"))
+            .addField(FieldDefinition.datetime("claimedAt")
+                .withColumnName("claimed_at"))
             .build();
     }
 

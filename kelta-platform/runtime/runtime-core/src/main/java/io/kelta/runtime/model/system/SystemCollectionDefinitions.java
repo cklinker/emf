@@ -584,6 +584,10 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.json("metadata").withDefault(Map.of()))
             .addField(FieldDefinition.datetime("occurredAt")
                 .withColumnName("occurred_at"))
+            .build();
+    }
+
+    /**
      * A member's confirmed win — "I got the spot" (consumer-alerting slice 9). The
      * social-proof + retention engine: claim confirmations feed per-target success stats and
      * the live-wins ticker.

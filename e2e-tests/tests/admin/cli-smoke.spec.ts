@@ -108,7 +108,26 @@ test.describe("kelta CLI smoke", () => {
     expect(payload.error.code).toBe("CONFIRMATION_REQUIRED");
   });
 
+  // This round-trip CREATES a collection, adds a field + validation rule, and
+  // WRITES records. It must never touch a real product tenant: the platform
+  // cannot delete a collection once it has been used (child rows in tables like
+  // field_history / validation_rule reference collection(id) with no
+  // ON DELETE CASCADE and no delete API), so teardown is inherently
+  // best-effort and any run leaves a permanent, undeletable collection behind.
+  // An earlier version ran against `couchpicks` and littered it with
+  // undeletable e2e_cli_* / e2e_test_* collections.
+  //
+  // Guard: run only against a tenant whose slug is clearly disposable, or when
+  // the operator explicitly opts in. Default is skip.
+  const disposableTenant = /(^|[-_])(e2e|test|sandbox|ci)([-_]|$)/i.test(TENANT ?? "");
+  const mutationOptIn = process.env.KELTA_E2E_ALLOW_SCHEMA_MUTATION === "1";
+  const mayMutate = disposableTenant || mutationOptIn;
+
   test("admin round-trip: collection → field → validation rule → rejected record → delete", () => {
+    test.skip(
+      !mayMutate,
+      `refusing to create schema in tenant "${TENANT ?? "?"}" — set KELTA_E2E_ALLOW_SCHEMA_MUTATION=1 or use a disposable tenant`
+    );
     test.setTimeout(120_000);
     const name = `e2e_cli_${String(Date.now())}`;
     try {
@@ -151,6 +170,13 @@ test.describe("kelta CLI smoke", () => {
       ]);
       expect(accepted.status, accepted.stderr).toBe(0);
     } finally {
+      // Best-effort teardown in dependency order. The collection itself may
+      // survive (see the guard comment above) — clear what the API allows so a
+      // disposable tenant stays as clean as possible.
+      const ids = runCli(["records", "list", name, "--quiet"]).stdout.split("\n").filter(Boolean);
+      for (const id of ids) {
+        runCli(["records", "delete", name, id, "--yes", "--output", "json"]);
+      }
       runCli(["collections", "delete", name, "--yes", "--output", "json"]);
     }
   });

@@ -133,6 +133,9 @@ public final class SystemCollectionDefinitions {
         // Win tracking + live ticker (consumer-alerting slice 9)
         definitions.add(wins());
 
+        // SEO page generation (consumer-alerting slice 11)
+        definitions.add(seoPages());
+
         // Integration
         definitions.add(connectedApps());
         definitions.add(connectedAppTokens());
@@ -619,6 +622,41 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("claimant_name"))
             .addField(FieldDefinition.datetime("claimedAt")
                 .withColumnName("claimed_at"))
+            .build();
+    }
+
+    /**
+     * Per-target generated stat block for the SEO/content engine (consumer-alerting slice 11).
+     * Read-only — rows are written only by the nightly {@code SeoPageGenerationService}, never
+     * through generic CRUD.
+     *
+     * <p><b>Aggregate only — deliberately no member data.</b> A page carries the target's public
+     * metadata (name, category) plus AGGREGATE counts ({@code watcherCount}, {@code winCount},
+     * {@code lastWinAt}). It is the one collection safe to read with a build-time service token,
+     * which is how a static content site renders these pages — there is still no anonymous bulk
+     * API (parent Key Decisions). {@code published} gates the §6.3 quality guardrail: a page with
+     * too little real data behind it stays unpublished (noindex) rather than becoming thin
+     * programmatic spam.
+     */
+    public static CollectionDefinition seoPages() {
+        return readOnlySystemBuilder("seo-pages", "SEO Pages", "seo_page")
+            .tenantScoped(true)
+            .displayFieldName("title")
+            .addField(FieldDefinition.string("targetId", 36)
+                .withColumnName("target_id"))
+            .addField(FieldDefinition.requiredString("slug", 200))
+            .addField(FieldDefinition.requiredString("title", 255))
+            .addField(FieldDefinition.string("category", 50))
+            .addField(FieldDefinition.integer("watcherCount")
+                .withColumnName("watcher_count"))
+            .addField(FieldDefinition.integer("winCount")
+                .withColumnName("win_count"))
+            .addField(FieldDefinition.datetime("lastWinAt")
+                .withColumnName("last_win_at"))
+            .addField(FieldDefinition.json("stats").withDefault(Map.of()))
+            .addField(FieldDefinition.bool("published", false))
+            .addField(FieldDefinition.datetime("generatedAt")
+                .withColumnName("generated_at"))
             .build();
     }
 

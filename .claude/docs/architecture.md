@@ -396,6 +396,14 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   aggregate COUNT. The realtime ticker reuses the existing `kelta.record.changed.<tenant>.wins`
   bridge (invalidation → refetch `/recent`) — no new subject. Anonymous ticker access is
   deferred to the public read-surface slice.
+- **SEO read surface** (consumer-alerting slice 11): the `seo-pages` read-only aggregate
+  collection (`SeoPageGenerationService` nightly sweep) is served by its ordinary authenticated
+  `/api/seo-pages` dynamic route — **no new gateway route, and no anonymous endpoint**. A static
+  content site reads it at **build time with a service PAT** on a read-only profile scoped to
+  `seo-pages`; that token scope is the security boundary (never an admin PAT, never one that can
+  reach watch/billing/member data). This is the spec's "build-time authenticated reads / no open
+  bulk API" decision — `PublicSurfaceTest` still guarantees nothing here is anonymously reachable.
+  Rows are aggregate-only (target metadata + watcher/win counts), never member data.
 - **Portal self-signup** (consumer-alerting slice 5): `POST /portal/api/signup` on **kelta-auth**
   (not gateway-routed). Always answers **202** — distinguishing created/exists/staff would make
   an unauthenticated endpoint an account-enumeration oracle. The only client-visible failure is

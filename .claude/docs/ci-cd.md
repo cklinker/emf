@@ -88,3 +88,13 @@ target), and nginx serves `/cli/manifest.json`, `/cli/latest.txt`,
 Service, asserts the manifest version equals this run's, downloads the linux binary, and
 executes `kelta version` — warning-skipping only while the homelab-argo manifests don't
 exist yet. Ingress/Service/Deployment live in homelab-argo (`downloads.kelta.io`).
+
+**Smoke waits for ArgoCD (do not revert to a one-shot check).** ArgoCD applies the image
+bump asynchronously, so `kubectl rollout status` returns immediately against the still-old
+ReplicaSet and a single version check races the sync — a stale-version false failure that
+auto-rollback then turns into a needless revert of a good deploy (happened repeatedly:
+runs 31110044147, 31116131086, 31276755616). The step now **polls `/cli/manifest.json`
+until it reports `1.0.<run_number>` (≤5 min)** before asserting, and runs **only when
+`cli_downloads == 'true'`** (the image is only rebuilt then; the old `|| workflows == 'true'`
+ran the strict `EXPECT == run_number` check on runs where the image was not rebuilt, so it
+could never match).

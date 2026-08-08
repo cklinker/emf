@@ -1,6 +1,5 @@
 package io.kelta.worker.service.analytics;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.AnalyticsEventRepository;
 import io.kelta.worker.repository.AnalyticsEventRepository.AnalyticsEvent;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

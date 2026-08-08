@@ -1,6 +1,5 @@
 package io.kelta.worker.service.analytics;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kelta.runtime.context.GeoContext;
 import io.kelta.runtime.context.GeoStamp;
 import io.kelta.runtime.context.TenantContext;
@@ -11,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -151,7 +151,9 @@ public class AnalyticsCaptureService {
         }
         try {
             return objectMapper.writeValueAsString(map);
-        } catch (RuntimeException | com.fasterxml.jackson.core.JsonProcessingException ex) {
+        } catch (RuntimeException ex) {
+            // Jackson 3 (tools.jackson) throws unchecked JacksonException; never let a
+            // serialization hiccup break capture.
             return null;
         }
     }

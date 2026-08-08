@@ -2,6 +2,7 @@ package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.service.SearchIndexService;
+import io.kelta.worker.service.analytics.AnalyticsCaptureService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -30,9 +31,12 @@ public class SearchController {
     private static final int MIN_QUERY_LENGTH = 3;
 
     private final SearchIndexService searchIndexService;
+    private final AnalyticsCaptureService analyticsCaptureService;
 
-    public SearchController(SearchIndexService searchIndexService) {
+    public SearchController(SearchIndexService searchIndexService,
+                           AnalyticsCaptureService analyticsCaptureService) {
         this.searchIndexService = searchIndexService;
+        this.analyticsCaptureService = analyticsCaptureService;
     }
 
     /**
@@ -46,6 +50,7 @@ public class SearchController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> search(
             @RequestHeader("X-Tenant-ID") String tenantId,
+            @RequestHeader(value = "X-User-Id", required = false) String memberId,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "20") int limit) {
 
@@ -81,6 +86,15 @@ public class SearchController {
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("data", data);
             response.put("meta", Map.of("total", data.size()));
+
+            // Capture the query for the demand-mining corpus (consumer-alerting slice 8).
+            // Best-effort: an empty result set is the highest-value signal (unmet demand), and a
+            // capture failure must never affect the search response.
+            try {
+                analyticsCaptureService.captureSearch(q.trim(), data.isEmpty(), null, memberId);
+            } catch (RuntimeException captureError) {
+                log.debug("search analytics capture failed: {}", captureError.toString());
+            }
 
             return ResponseEntity.ok(response);
         } finally {

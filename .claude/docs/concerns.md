@@ -265,6 +265,20 @@ ids raw when they're not in the live page's `lookupDisplayMap` (no write-time di
   arming, and watch `pg_stat_activity` on the first armed cycle. Related, still open: the
   `record_version` growth concern above, which this sweep does **not** address.
 
+- **`analytics_event` is a new high-volume table — retention shipped with it (consumer-alerting
+  slice 8), DRY-RUN by default.** The analytics-capture corpus (`analytics_event`, V183) is
+  write-heavy by design (one row per search plus every client-emitted page-view / assistant
+  question). It ships with `AnalyticsRetentionSweep` from day one — the same posture and
+  guardrails as `FlowLogRetentionSweep` (@Scheduled hourly, `FOR UPDATE SKIP LOCKED`, batched,
+  metric `kelta_worker_analytics_purged`) pruning rows older than
+  `kelta.analytics.retention.max-age-days` (default 90). **It is DRY-RUN by default**
+  (`kelta.analytics.retention.dry-run:true`) so, exactly like the flow-log sweep, it is not
+  actually pruning until an operator arms it — **a growth concern in any environment left in
+  dry-run**. If a single tenant's rate outgrows row-at-a-time inserts, batch the ingest writes
+  and consider native partitioning by `occurred_at` month — deliberately deferred until real
+  volume justifies it (no speculative partitioning). Privacy note: `member_id` deletion on
+  account close must purge/anonymize these rows — owed with the later rollup/erasure slice.
+
 ## Known Bugs
 
 (No open bugs from the original audit. See Resolved → Bugs.)

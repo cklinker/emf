@@ -158,11 +158,22 @@ const remove = defineCommand({
   summary: 'Delete a collection and its data',
   dangerous: true,
   positionals: [{ name: 'collection', description: 'Collection name or id', required: true }],
-  input: z.object({ collection: z.string().min(1) }),
+  options: [
+    {
+      flag: '--force',
+      description:
+        'Confirm deletion of a collection that still has dependent data (attachments, ' +
+        'layouts, reports, validation rules, field history, record versions, …); the ' +
+        'server blocks the delete without this.',
+    },
+  ],
+  input: z.object({ collection: z.string().min(1), force: z.boolean().default(false) }),
   handler: async (ctx, input) => {
     const axios = ctx.client.getAxiosInstance();
     const id = await collectionIdByName(axios, input.collection);
-    await axios.delete(`/api/collections/${id}`);
+    await axios.delete(`/api/collections/${id}`, {
+      params: input.force ? { force: true } : undefined,
+    });
     return {
       data: { deleted: true, collection: input.collection, id },
       message: `Collection "${input.collection}" deleted`,

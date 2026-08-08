@@ -289,11 +289,42 @@ collection B pointing at A) already had `ON DELETE SET NULL` — left as-is (nul
 target beats silently deleting B's field). Regression guard:
 `CollectionDeletionScenarioTest` (kelta-test-harness) writes a record (→ field_history) +
 a list view, then deletes the collection end to end and asserts the cascade.
+**FOLLOW-UP (V182 + `CollectionDeletionGuardHook`) — V181 missed `record_version`, and the
+cascade needed a guard.** Three things:
+
+1. **`record_version` was still bare (V182).** V181's audit listed 14 direct FKs and fixed
+   them, but `record_version` (V174, collection-level versioning) was not among them.
+   `RecordVersionHook` writes a snapshot on **every** create/update/delete once
+   `collection.track_history` is on, so a versioned collection was *still* undeletable after
+   V181 with the identical 23503 → 409 symptom. This is the **third** occurrence of the
+   class (V173 → `field(id)`, V181 → `collection(id)`, V182 → the one V181 missed), and V174
+   introduced its bare FK one migration *after* V173 fixed the same class. Mechanical guard
+   now: `CollectionDeletionGuardSchemaTest` parses the shipped migration DDL (in Flyway
+   **version** order — lexicographic sorting puts `V181` before `V1__baseline`) and fails the
+   build on any FK to `collection(id)` left with no `ON DELETE` action. A fourth cannot ship
+   silently.
+2. **S3 purge closed.** `file_attachment` **and** `bulk_job` both carry storage keys (the
+   original note named only the former). The keys are collected and the objects deleted in
+   **`beforeDelete`** — `afterDelete` is too late, because the DB cascade has already removed
+   the rows and the keys are unrecoverable, the same constraint already documented on
+   `AttachmentCleanupHook` (which covers the parent-*record* case and never sees a collection
+   delete).
+3. **Blast radius guarded.** The broken FK was accidentally a safety net; with the cascade in
+   place one `DELETE /api/collections/{id}` destroys attachments, layouts, reports, rules,
+   history and versions. The delete is now rejected 400 (a hook validation error) naming the
+   counts unless the caller passes **`?force=true`** (surfaced as `--force` on
+   `kelta collections delete`). Callers with no HTTP request context (flows, NATS, schedulers)
+   cannot force and fail closed. Note the child tables are **not** uniformly shaped — `report`
+   keys on `primary_collection_id`, `layout_related_list` on `related_collection_id`, and
+   `script_trigger` has no `tenant_id` at all; the schema test pins each, because the hook's
+   Mockito tests stub `JdbcTemplate` by SQL substring and pass either way.
+
 **Residual open gap:** collection delete still does **not** `DROP` the physical user-data
 table (no `DROP TABLE` exists in `src/main`; `CollectionLifecycleManager.teardownCollection`
-is explicit that "data is not dropped"), nor does it purge S3 objects behind cascaded
-`file_attachment` rows — both leak storage after a delete. Tracked as follow-up (needs an
-ordered teardown in the delete service, not an FK).
+is explicit that "data is not dropped"), so it leaks a table per deleted collection. Latent
+before V181 (deletes never succeeded), real now. Needs an ordered teardown in the delete
+service — a `TableRef` captured in `beforeDelete` (the `collection` row is gone by
+`afterDelete`) plus a drop path on `PhysicalTableStorageAdapter` — not an FK.
 
 **FIXED (fix/gateway-rate-limiter-fixed-window) — gateway rate limiter never reset its
 window under continuous traffic → tenant-wide self-sustaining 429 lockout; root cause of

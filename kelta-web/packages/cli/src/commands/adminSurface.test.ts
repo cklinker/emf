@@ -80,11 +80,19 @@ describe('collections create/update/delete', () => {
     });
   });
 
-  it('delete is dangerous and deletes by resolved id', async () => {
+  it('delete is dangerous and deletes by resolved id (no force by default)', async () => {
     const axios = fakeAxios(COLLECTION_ROUTE);
     expect(command(collectionCommands, 'delete').dangerous).toBe(true);
     await run(collectionCommands, 'delete', { collection: 'invoices' }, axios);
-    expect(axios.delete).toHaveBeenCalledWith(`/api/collections/${CID}`);
+    expect(axios.delete).toHaveBeenCalledWith(`/api/collections/${CID}`, { params: undefined });
+  });
+
+  it('delete --force sends ?force=true so the server guard lets a used collection through', async () => {
+    const axios = fakeAxios(COLLECTION_ROUTE);
+    await run(collectionCommands, 'delete', { collection: 'invoices', force: true }, axios);
+    expect(axios.delete).toHaveBeenCalledWith(`/api/collections/${CID}`, {
+      params: { force: true },
+    });
   });
 });
 

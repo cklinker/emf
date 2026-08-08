@@ -35,6 +35,7 @@ every child references it.
 | 5 — Portal member surface | `5-portal-member-surface.md` | **backend + auth, security** (self-signup, watch API) |
 | 6 — Web Push (VAPID) | `6-web-push.md` | backend (notification channel) |
 | 7 — Public-traffic hardening | `7-public-traffic-hardening.md` | **gateway + edge, security** |
+| 9 — Win tracking + live ticker | `9-win-tracking.md` | backend (collection, member API) |
 
 External tracks (contracts owned here, code outside this repo): an **availability poller**
 (separate service; see [Poller contract](#poller-contract)) and a **consumer frontend**

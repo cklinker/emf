@@ -245,6 +245,9 @@ public class RouteConfigService {
                 {"images", "/api/images/**", "images"},
                 {"operations", "/api/operations/**", "operations"},
                 {"devices", "/api/devices/**", "devices"},
+                // Win tracking + live ticker (consumer-alerting slice 9) — API_ACCESS only;
+                // member scoping + ticker redaction enforced in WinController.
+                {"wins", "/api/wins/**", "wins"},
                 // SCIM 2.0 provisioning
                 {"scim", "/scim/v2/**", "scim"},
         };

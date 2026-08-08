@@ -339,6 +339,15 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   errors are mapped to caller-safe statuses (401 → 409 "not configured", anything else → 502)
   and the processor's own message is logged, never returned, since it can name account
   internals.
+- **Analytics capture ingest** (consumer-alerting slice 8): `POST /api/analytics/events` is on
+  the new `static-analytics` route (`/api/analytics/**`), so the gateway applies only
+  `API_ACCESS` and **scoping is server-side**: every event is owner-stamped from the caller's
+  `X-User-Id` and any `memberId`/`tenantId` in the body is ignored — there is no id to tamper
+  with and no cross-member write to guard. The read side is the **read-only** `analytics-events`
+  system collection on its generic dynamic route (`/api/analytics-events`, which the ingest
+  prefix does not shadow — hyphen, not slash); portal profiles get no read permission on it,
+  the same default-deny stance the watch/billing collections take. Anonymous (unauthenticated)
+  ingest is intentionally NOT offered until the public-traffic hardening controls can gate it.
 - **Per-member record quotas** (consumer-alerting slice 1B): `MemberEntitlementQuotaHook` is a
   **wildcard** `BeforeSaveHook` (order -90) — it runs on every record create in the system, so
   its fast path (cached empty rule list) does no query and no allocation. Note

@@ -443,6 +443,31 @@ guard.
 | Pruning | 404/410 ⇒ `PushDeliveryException(invalidToken=true)` ⇒ the device row is deleted, exactly as for a stale FCM/APNs token. Other non-2xx are transient and keep the device. A missing/unparseable VAPID key fails **without** pruning — an operator config gap must not wipe every subscription |
 | Rotation | Changing the VAPID pair invalidates every existing browser subscription; clients must re-subscribe |
 
+## SMS (Twilio)
+
+One `SmsProvider` SPI. `kelta.sms.provider` selects **one** implementation — `log` (default,
+`LogOnlySmsProvider`) or `twilio` (`TwilioSmsProvider`) — via mutually-exclusive
+`@ConditionalOnProperty`, so single-typed injection into `DefaultSmsService` /
+`AlertDispatchService` never sees two candidates (`SmsProviderWiringTest` pins this). Used for
+**MFA verification codes** (`DefaultSmsService`) and, since consumer-alerting slice 10,
+**availability alerts** (`AlertDispatchService` `sms` channel → member's
+`platform_user.phone_number`).
+
+`TwilioSmsProvider` calls the Twilio Messages API directly — a form-encoded POST on Spring's
+`RestClient` (Basic auth = account SID : auth token), deliberately **not** the `twilio-java`
+SDK, whose reflective model surface is the same native-image hazard the payment client avoids.
+It **constructs even with blank credentials** (validates on `send`), so selecting
+`provider=twilio` without a secret can never stop the worker booting — a missing credential is a
+FAILED SMS delivery, not a dead service.
+
+| Piece | Detail |
+|---|---|
+| Config | `kelta.sms.provider` (`log`\|`twilio`); `kelta.sms.twilio.{account-sid,auth-token,from-number}` (env `TWILIO_*`, from the deployment secret; `from-number` E.164) |
+| Send | `POST https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json`, `application/x-www-form-urlencoded` `From`/`To`/`Body`, HTTP Basic auth. Non-2xx → `SmsDeliveryException` carrying Twilio's error body (never the token) |
+| Alert channel | `sms` must be in the watch channels ∩ the member's plan entitlement (keep `sms` a paid-tier entitlement so free members can't burn credits); one alert per opening bounds volume |
+| Recipient | `platform_user.phone_number`; no number on file ⇒ FAILED sms delivery, other channels unaffected |
+| Owed | Live round-trip verification needs a real Twilio account (native-image `RestClient` + Basic-auth path is what CI can't reach); per-tenant Twilio credentials would move to the credential vault (`StripeCredentialType` precedent) |
+
 Per-tenant VAPID overrides could ride `TenantPushSettings` (as APNs/FCM overrides already
 do) but are platform-level in v1.
 

@@ -37,6 +37,7 @@ every child references it.
 | 7 — Public-traffic hardening | `7-public-traffic-hardening.md` | **gateway + edge, security** |
 | 8 — Analytics capture | `8-analytics-capture.md` | backend (capture + retention) |
 | 9 — Win tracking + live ticker | `9-win-tracking.md` | backend (collection, member API) |
+| 10 — SMS alert channel (Twilio) | `10-sms-channel.md` | backend (notification channel) |
 
 External tracks (contracts owned here, code outside this repo): an **availability poller**
 (separate service; see [Poller contract](#poller-contract)) and a **consumer frontend**

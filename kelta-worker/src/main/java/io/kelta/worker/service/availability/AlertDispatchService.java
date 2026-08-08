@@ -5,6 +5,8 @@ import io.kelta.worker.repository.AlertDeliveryRepository;
 import io.kelta.worker.service.billing.EntitlementService;
 import io.kelta.runtime.module.integration.spi.EmailService;
 import io.kelta.worker.service.push.DefaultPushService;
+import io.kelta.worker.service.sms.SmsMessage;
+import io.kelta.worker.service.sms.SmsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,9 +38,11 @@ import java.util.Set;
  * without anyone editing their watches. An empty intersection is not an error —
  * it just means nothing is owed.
  *
- * <p>SMS is a deliberate seam: the channel is accepted and recorded, but there is
- * no sender wired yet, so it fails loudly as an unsupported channel rather than
- * silently reporting success.
+ * <p>SMS is delivered through the {@link SmsProvider} SPI (consumer-alerting slice 10) — the
+ * default {@code LogOnlySmsProvider} logs, and {@code TwilioSmsProvider} sends for real once
+ * {@code kelta.sms.provider=twilio} and the Twilio secret are configured. A member with no phone
+ * number on file records a FAILED SMS delivery, exactly like a stale push token — never a
+ * rollback.
  */
 @Service
 public class AlertDispatchService {
@@ -60,6 +64,7 @@ public class AlertDispatchService {
     private final AlertDeliveryRepository deliveryRepository;
     private final DefaultPushService pushService;
     private final EmailService emailService;
+    private final SmsProvider smsProvider;
     private final EntitlementService entitlementService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -67,12 +72,14 @@ public class AlertDispatchService {
     public AlertDispatchService(AlertDeliveryRepository deliveryRepository,
                                 DefaultPushService pushService,
                                 EmailService emailService,
+                                SmsProvider smsProvider,
                                 EntitlementService entitlementService,
                                 JdbcTemplate jdbcTemplate,
                                 ObjectMapper objectMapper) {
         this.deliveryRepository = deliveryRepository;
         this.pushService = pushService;
         this.emailService = emailService;
+        this.smsProvider = smsProvider;
         this.entitlementService = entitlementService;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -133,8 +140,15 @@ public class AlertDispatchService {
                         .orElseThrow(() -> new IllegalStateException(
                                 "email template '" + EMAIL_TEMPLATE + "' not found"));
             }
-            case CHANNEL_SMS -> throw new UnsupportedOperationException(
-                    "sms channel is not wired yet");
+            case CHANNEL_SMS -> {
+                String phone = memberPhone(tenantId, alert.watch().memberId());
+                if (phone == null || phone.isBlank()) {
+                    throw new IllegalStateException("member has no phone number");
+                }
+                // One-line, book-now text. describeWindow already reads naturally.
+                String sms = title + " — " + describeWindow(alert) + " just opened. Book now.";
+                smsProvider.send(new SmsMessage(phone, sms));
+            }
             default -> throw new IllegalArgumentException("unknown channel: " + channel);
         }
     }
@@ -192,6 +206,16 @@ public class AlertDispatchService {
         return TenantContext.callWithTenant(tenantId, () -> {
             List<String> rows = jdbcTemplate.queryForList(
                     "SELECT email FROM platform_user WHERE id = ? AND tenant_id = ?",
+                    String.class, memberId, tenantId);
+            return rows.isEmpty() ? null : rows.get(0);
+        });
+    }
+
+    /** The member's phone number (E.164) for SMS, or null when none is on file. */
+    private String memberPhone(String tenantId, String memberId) {
+        return TenantContext.callWithTenant(tenantId, () -> {
+            List<String> rows = jdbcTemplate.queryForList(
+                    "SELECT phone_number FROM platform_user WHERE id = ? AND tenant_id = ?",
                     String.class, memberId, tenantId);
             return rows.isEmpty() ? null : rows.get(0);
         });

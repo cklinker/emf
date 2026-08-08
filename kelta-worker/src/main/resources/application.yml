@@ -63,6 +63,15 @@ kelta:
   auth:
     issuer-uri: ${KELTA_AUTH_ISSUER_URI:https://auth.kelta.io}
   external-base-url: ${EXTERNAL_BASE_URL:http://localhost:8080}
+  # SMS delivery (MFA verification codes + availability alerts). The default provider only
+  # logs; set provider=twilio and the twilio.* secret to send for real (consumer-alerting
+  # slice 10). Selecting twilio without the secret still boots — sends fail as FAILED deliveries.
+  sms:
+    provider: ${KELTA_SMS_PROVIDER:log}   # log | twilio
+    twilio:
+      account-sid: ${TWILIO_ACCOUNT_SID:}
+      auth-token: ${TWILIO_AUTH_TOKEN:}
+      from-number: ${TWILIO_FROM_NUMBER:}
   worker:
     id: ${WORKER_ID:}
     cerbos-cb-threshold: ${CERBOS_CB_THRESHOLD:3}

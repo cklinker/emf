@@ -6,6 +6,9 @@ import io.kelta.worker.repository.Watch;
 import io.kelta.worker.repository.WatchTarget;
 import io.kelta.worker.service.billing.EntitlementService;
 import io.kelta.worker.service.push.DefaultPushService;
+import io.kelta.worker.service.sms.SmsDeliveryException;
+import io.kelta.worker.service.sms.SmsMessage;
+import io.kelta.worker.service.sms.SmsProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,7 +25,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,6 +43,7 @@ class AlertDispatchServiceTest {
     private AlertDeliveryRepository deliveryRepository;
     private DefaultPushService pushService;
     private EmailService emailService;
+    private SmsProvider smsProvider;
     private EntitlementService entitlementService;
     private JdbcTemplate jdbcTemplate;
     private AlertDispatchService service;
@@ -47,10 +53,11 @@ class AlertDispatchServiceTest {
         deliveryRepository = mock(AlertDeliveryRepository.class);
         pushService = mock(DefaultPushService.class);
         emailService = mock(EmailService.class);
+        smsProvider = mock(SmsProvider.class);
         entitlementService = mock(EntitlementService.class);
         jdbcTemplate = mock(JdbcTemplate.class);
         service = new AlertDispatchService(deliveryRepository, pushService, emailService,
-                entitlementService, jdbcTemplate, new ObjectMapper());
+                smsProvider, entitlementService, jdbcTemplate, new ObjectMapper());
 
         when(entitlementService.listLimit(anyString(), anyString(), anyString()))
                 .thenReturn(List.of("push", "email"));
@@ -216,10 +223,42 @@ class AlertDispatchServiceTest {
         }
 
         @Test
-        @DisplayName("sms is recorded but fails loudly rather than silently succeeding")
-        void smsIsAnHonestSeam() {
+        @DisplayName("sms is sent to the member's phone and marked SENT")
+        void smsIsSent() {
             when(entitlementService.listLimit(anyString(), anyString(), anyString()))
                     .thenReturn(List.of("sms"));
+            // The member's phone lookup returns a number (the shared jdbc stub returns a value).
+            when(jdbcTemplate.queryForList(contains("phone_number"), eq(String.class), any(), any()))
+                    .thenReturn(List.of("+14155550123"));
+
+            service.dispatch(TENANT, alert("[\"sms\"]"));
+
+            verify(smsProvider).send(any(SmsMessage.class));
+            verify(deliveryRepository).markSent(eq("delivery-sms"), any());
+        }
+
+        @Test
+        @DisplayName("a member with no phone number fails only the sms channel")
+        void smsMissingPhone() {
+            when(entitlementService.listLimit(anyString(), anyString(), anyString()))
+                    .thenReturn(List.of("sms"));
+            when(jdbcTemplate.queryForList(contains("phone_number"), eq(String.class), any(), any()))
+                    .thenReturn(List.of());
+
+            service.dispatch(TENANT, alert("[\"sms\"]"));
+
+            verify(smsProvider, never()).send(any());
+            verify(deliveryRepository).markFailed(eq("delivery-sms"), anyString());
+        }
+
+        @Test
+        @DisplayName("an sms provider failure is marked FAILED, not propagated")
+        void smsProviderFailureIsIsolated() {
+            when(entitlementService.listLimit(anyString(), anyString(), anyString()))
+                    .thenReturn(List.of("sms"));
+            when(jdbcTemplate.queryForList(contains("phone_number"), eq(String.class), any(), any()))
+                    .thenReturn(List.of("+14155550123"));
+            doThrow(new SmsDeliveryException("twilio 401")).when(smsProvider).send(any());
 
             service.dispatch(TENANT, alert("[\"sms\"]"));
 

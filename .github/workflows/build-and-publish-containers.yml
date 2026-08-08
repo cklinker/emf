@@ -489,8 +489,12 @@ jobs:
       # The runner itself runs in-cluster, so it can hit the Service directly,
       # download the linux binary, and execute it — proving the whole chain:
       # compile → manifest → serve → self-describing binary.
+      # Only when the cli-downloads image was actually rebuilt this run. EXPECT is
+      # 1.0.<run_number>, which only matches a fresh build — on a workflows-only change the
+      # image is not rebuilt and the served version would never equal EXPECT (that stale
+      # `|| workflows` condition guaranteed a false failure + auto-rollback).
       - name: Verify CLI downloads service (when built)
-        if: needs.changes.outputs.cli_downloads == 'true' || needs.changes.outputs.workflows == 'true'
+        if: needs.changes.outputs.cli_downloads == 'true'
         run: |
           NS=${{ steps.k8s.outputs.ns }}
           DEPLOY=emf-cli-downloads
@@ -498,17 +502,32 @@ jobs:
             echo "::warning::${DEPLOY} not deployed in ${NS} yet (argo manifests pending) — skipping CLI downloads smoke."
             exit 0
           fi
-          kubectl -n ${NS} rollout status deploy/${DEPLOY} --timeout=180s
           BASE="http://${DEPLOY}.${NS}.svc.cluster.local"
           EXPECT="1.0.${{ github.run_number }}"
 
-          curl -fsS "${BASE}/health" | grep -q '"status":"UP"'
-          MANIFEST=$(curl -fsS "${BASE}/cli/manifest.json")
-          GOT=$(echo "${MANIFEST}" | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1)
+          # ArgoCD applies the image bump we just pushed asynchronously, so `rollout status`
+          # returns immediately against the still-old ReplicaSet and a one-shot version check
+          # races the sync. Poll the served manifest until it reports EXPECT (i.e. ArgoCD has
+          # rolled the new image) before asserting — up to ~5 min.
+          DEADLINE=$(( $(date +%s) + 300 ))
+          GOT=""
+          until [ "$(date +%s)" -ge "${DEADLINE}" ]; do
+            MANIFEST=$(curl -fsS "${BASE}/cli/manifest.json" 2>/dev/null || true)
+            GOT=$(echo "${MANIFEST}" | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1)
+            if [ "${GOT}" = "${EXPECT}" ]; then
+              break
+            fi
+            echo "waiting for ArgoCD to serve ${EXPECT} (currently '${GOT:-unreachable}')…"
+            sleep 10
+          done
           if [ "${GOT}" != "${EXPECT}" ]; then
-            echo "::error::Manifest version ${GOT} != expected ${EXPECT} — stale image served?"
+            echo "::error::Manifest version ${GOT:-unreachable} != expected ${EXPECT} after 5m — ArgoCD sync stalled or stale image served."
             exit 1
           fi
+
+          # Version has converged; the deployment is now the new ReplicaSet.
+          kubectl -n ${NS} rollout status deploy/${DEPLOY} --timeout=180s
+          curl -fsS "${BASE}/health" | grep -q '"status":"UP"'
 
           curl -fsS "${BASE}/cli/releases/${EXPECT}/kelta-linux-x64" -o /tmp/kelta-smoke
           chmod +x /tmp/kelta-smoke

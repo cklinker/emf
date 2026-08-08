@@ -677,3 +677,34 @@ existing `asyncUtilTimeout: 5000` in `vitest.setup.ts`), and the composer tests 
 `fireEvent.change` + a committed-value assertion instead of per-keystroke typing.
 Still open: the underlying starvation (consider giving the frontend job its own runner
 or serialising it against the native builds).
+
+## Collections become undeletable once used; e2e leaked litter into a product tenant (2026-08-06)
+
+`PhysicalTableStorageAdapter.delete` issues a raw `DELETE` on the `collection`
+row and maps Postgres FK violation 23503 to 409 `REFERENCED_RECORD`. **15 tables
+reference `collection(id)` with NO `ON DELETE CASCADE`** — `field_history`,
+`file_attachment`, `bulk_job`, `validation_rule`, `list_view`, `page_layout`,
+`record_type`, `report`, `note`, `script_trigger`, `layout_assignment`,
+`layout_related_list`, `email_template.related_collection_id`,
+`approval_process`, `field.reference_collection_id`. Several (`field_history`,
+`file_attachment`, `script_trigger`, `bulk_job`) have **no delete API**. So once
+a collection has been used — any record write creates `field_history` rows — it
+can no longer be deleted through the API/CLI at all. (`field.collection_id`,
+`collection_version`, `search_index`, profile permissions DO cascade.)
+
+Surfaced when the CLI e2e round-trip (`e2e-tests/tests/admin/cli-smoke.spec.ts`)
+ran against the **couchpicks product tenant** and left 10 undeletable
+`e2e_cli_*` / `e2e_test_*` collections (plus 5 `e2e_wizard_*` that were
+cleanable). The page-builder wizard specs leak the same way.
+
+Fixes applied: the cli-smoke round-trip now refuses to create schema unless the
+tenant slug is disposable (`/e2e|test|sandbox|ci/`) or
+`KELTA_E2E_ALLOW_SCHEMA_MUTATION=1` is set, and its teardown deletes data
+records before the collection. Still open (needs backend work / DB access, not
+freelanced against prod):
+1. Give the child-table FKs `ON DELETE CASCADE` (or add a cascade path to
+   `deleteCollection`) so a collection can be torn down. Audit the 15 above.
+2. Point the deploy-pipeline e2e at a disposable tenant, not `default`/a product
+   tenant, so the guard above doesn't just skip the round-trip in CI.
+3. Clean the 10 stuck collections already in couchpicks — requires the cascade
+   fix or direct control-plane DB deletion.

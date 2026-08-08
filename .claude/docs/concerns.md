@@ -286,9 +286,16 @@ intermediate children on the delete tree so the recursive cascade completes
 (approval_instance→approval_process, dashboard_component→report,
 layout_assignment→{page_layout,record_type}). `field.reference_collection_id` (a lookup in
 collection B pointing at A) already had `ON DELETE SET NULL` — left as-is (nulling the
-target beats silently deleting B's field). Regression guard:
-`CollectionDeletionScenarioTest` (kelta-test-harness) writes a record (→ field_history) +
-a list view, then deletes the collection end to end and asserts the cascade.
+target beats silently deleting B's field). **Follow-up V182__record_version_fk_cascade:**
+V181's enumeration predated one FK — `record_version.collection_id` (added by record
+versioning #1266) — so a collection with `trackHistory` on stayed undeletable (a
+`record_version` snapshot row per record write, no delete API). V182 gives it
+`ON DELETE CASCADE` (owned by the collection, same bucket as `field_history`; it is a leaf,
+so no intermediate edges). Regression guard: a second test in `CollectionDeletionScenarioTest`
+(kelta-test-harness) creates a collection with `trackHistory=true`, writes a record (→ a
+`record_version` snapshot), then deletes the collection and asserts the version rows cascaded.
+It needs its own collection because collection-level history supersedes per-field
+`field_history` (`FieldHistoryHook`), so one collection can't exercise both FKs at once.
 **Residual open gap:** collection delete still does **not** `DROP` the physical user-data
 table (no `DROP TABLE` exists in `src/main`; `CollectionLifecycleManager.teardownCollection`
 is explicit that "data is not dropped"), nor does it purge S3 objects behind cascaded
@@ -726,11 +733,15 @@ cleanable). The page-builder wizard specs leak the same way.
 Fixes applied: the cli-smoke round-trip now refuses to create schema unless the
 tenant slug is disposable (`/e2e|test|sandbox|ci/`) or
 `KELTA_E2E_ALLOW_SCHEMA_MUTATION=1` is set, and its teardown deletes data
-records before the collection. Still open (needs backend work / DB access, not
-freelanced against prod):
-1. Give the child-table FKs `ON DELETE CASCADE` (or add a cascade path to
-   `deleteCollection`) so a collection can be torn down. Audit the 15 above.
+records before the collection.
+1. **DONE (V181 + V182).** All owning FKs now `ON DELETE CASCADE` (V181 covered 13 +
+   `email_template` SET NULL + 4 intermediate edges; V182 added the one V181's hand-count
+   missed, `record_version.collection_id` from #1266). Note the audit above was written from
+   memory and is wrong in two ways — trust the catalog, not this prose: `field.reference_collection_id`
+   was already `SET NULL` (never a blocker), and `record_version` was omitted. See the
+   canonical "FIXED (V181…)" entry earlier in this doc.
 2. Point the deploy-pipeline e2e at a disposable tenant, not `default`/a product
-   tenant, so the guard above doesn't just skip the round-trip in CI.
-3. Clean the 10 stuck collections already in couchpicks — requires the cascade
-   fix or direct control-plane DB deletion.
+   tenant, so the guard above doesn't just skip the round-trip in CI. *(still open)*
+3. **DONE (2026-08-08).** The 11 stuck `e2e_cli_*` / `e2e_test_*` collections were cleaned
+   from couchpicks via the CLI once V181+V182 deployed (no raw prod DELETE) — the 14 real
+   domain collections remain.

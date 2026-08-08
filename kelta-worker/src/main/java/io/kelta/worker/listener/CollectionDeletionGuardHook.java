@@ -30,8 +30,8 @@ import java.util.stream.Collectors;
  *   <li><b>Blast radius.</b> The broken FK was accidentally acting as a safety net. Now a
  *       single {@code DELETE /api/collections/{id}} destroys attachments, layouts, reports,
  *       validation rules, field history and record versions. So a delete that would destroy
- *       children is rejected with a 409 naming the counts unless the caller opts in with
- *       {@code ?force=true}.</li>
+ *       children is rejected with a 400 (a hook validation error) naming the counts unless
+ *       the caller opts in with {@code ?force=true}.</li>
  *   <li><b>Orphaned S3 objects.</b> {@code file_attachment} and {@code bulk_job} carry
  *       storage keys. A database-level cascade removes the rows and would leak every
  *       underlying object silently. The keys are therefore collected and deleted here in
@@ -42,7 +42,7 @@ import java.util.stream.Collectors;
  *
  * <p>Calls with no HTTP request context (flows, NATS listeners, schedulers, tests) cannot
  * pass {@code force}. They are treated as <b>not</b> forced, so an automated caller can
- * never destroy authored metadata by accident; such a delete fails closed with the same 409.
+ * never destroy authored metadata by accident; such a delete fails closed with the same 400.
  *
  * @since 1.0.0
  */
@@ -65,7 +65,7 @@ public class CollectionDeletionGuardHook implements BeforeSaveHook {
      * confirmation message. {@code CollectionDeletionGuardSchemaTest} pins every entry
      * against the shipped migrations.
      *
-     * @param label human-facing noun used in the 409 message
+     * @param label human-facing noun used in the guard's rejection message
      * @param table physical table name
      * @param collectionColumn the FK column referencing {@code collection(id)}
      * @param tenantScoped whether the table carries a {@code tenant_id} column

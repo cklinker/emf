@@ -100,6 +100,8 @@ Update a collection (name or id)
 
 Delete a collection and its data **(destructive — needs --yes off-TTY)**
 
+- `--force` — Confirm deletion of a collection that still has dependent data (attachments, layouts, reports, validation rules, field history, record versions, …); the server blocks the delete without this.
+
 ## fields
 
 ### `kelta fields list <collection>`

@@ -311,8 +311,9 @@ cascade needed a guard.** Three things:
    delete).
 3. **Blast radius guarded.** The broken FK was accidentally a safety net; with the cascade in
    place one `DELETE /api/collections/{id}` destroys attachments, layouts, reports, rules,
-   history and versions. The delete is now rejected 409 naming the counts unless the caller
-   passes **`?force=true`**. Callers with no HTTP request context (flows, NATS, schedulers)
+   history and versions. The delete is now rejected 400 (a hook validation error) naming the
+   counts unless the caller passes **`?force=true`** (surfaced as `--force` on
+   `kelta collections delete`). Callers with no HTTP request context (flows, NATS, schedulers)
    cannot force and fail closed. Note the child tables are **not** uniformly shaped — `report`
    keys on `primary_collection_id`, `layout_related_list` on `related_collection_id`, and
    `script_trigger` has no `tenant_id` at all; the schema test pins each, because the hook's

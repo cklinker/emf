@@ -269,6 +269,32 @@ ids raw when they're not in the live page's `lookupDisplayMap` (no write-time di
 
 (No open bugs from the original audit. See Resolved → Bugs.)
 
+**FIXED (V181__collection_fk_cascade) — collections became permanently undeletable once
+used.** Deleting a collection is a generic record delete against the `collection` table
+(`DynamicCollectionRouter` → `QueryEngine.delete`); `PhysicalTableStorageAdapter` maps
+Postgres FK violation 23503 to a 409 `REFERENCED_RECORD`. 14 tables referenced
+`collection(id)` with **no** `ON DELETE` action (approval_process, bulk_job, field_history,
+file_attachment, layout_assignment, layout_related_list.related_collection_id, list_view,
+note, page_layout, record_type, report.primary_collection_id, script_trigger,
+validation_rule, email_template.related_collection_id). Several (field_history,
+file_attachment, bulk_job, script_trigger) have no delete API, so once a collection had any
+record written that emitted a `field_history` row it could never be deleted via API/CLI.
+V181 sets `ON DELETE CASCADE` on the 13 that are *owned by* the collection (same semantics
+as the V173 field-delete cascade), `ON DELETE SET NULL` on `email_template.related_collection_id`
+(a reusable template only tagged against the collection; nullable), and cascades four
+intermediate children on the delete tree so the recursive cascade completes
+(approval_instance→approval_process, dashboard_component→report,
+layout_assignment→{page_layout,record_type}). `field.reference_collection_id` (a lookup in
+collection B pointing at A) already had `ON DELETE SET NULL` — left as-is (nulling the
+target beats silently deleting B's field). Regression guard:
+`CollectionDeletionScenarioTest` (kelta-test-harness) writes a record (→ field_history) +
+a list view, then deletes the collection end to end and asserts the cascade.
+**Residual open gap:** collection delete still does **not** `DROP` the physical user-data
+table (no `DROP TABLE` exists in `src/main`; `CollectionLifecycleManager.teardownCollection`
+is explicit that "data is not dropped"), nor does it purge S3 objects behind cascaded
+`file_attachment` rows — both leak storage after a delete. Tracked as follow-up (needs an
+ordered teardown in the delete service, not an FK).
+
 **FIXED (fix/gateway-rate-limiter-fixed-window) — gateway rate limiter never reset its
 window under continuous traffic → tenant-wide self-sustaining 429 lockout; root cause of
 the "storage-ready" e2e flake (found 2026-07-11 from PR #1240's failing run).**

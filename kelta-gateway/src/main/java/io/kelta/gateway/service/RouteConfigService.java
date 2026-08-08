@@ -248,6 +248,9 @@ public class RouteConfigService {
                 // Analytics capture ingest (consumer-alerting slice 8) — API_ACCESS only,
                 // owner-stamped from X-User-Id in the worker controller.
                 {"analytics", "/api/analytics/**", "analytics"},
+                // Win tracking + live ticker (consumer-alerting slice 9) — API_ACCESS only;
+                // member scoping + ticker redaction enforced in WinController.
+                {"wins", "/api/wins/**", "wins"},
                 // SCIM 2.0 provisioning
                 {"scim", "/scim/v2/**", "scim"},
         };

@@ -102,6 +102,69 @@ class PhysicalTableStorageAdapterTest {
     }
     
     @Nested
+    @DisplayName("dropCollection Tests")
+    class DropCollectionTests {
+
+        private boolean tableExists(String table) {
+            Integer n = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM information_schema.tables WHERE upper(table_name) = upper(?)",
+                    Integer.class, table);
+            return n != null && n > 0;
+        }
+
+        @Test
+        @DisplayName("drops a user collection's table")
+        void dropsUserTable() {
+            adapter.initializeCollection(testCollection);
+            assertTrue(tableExists("test_products"), "table should exist before the drop");
+
+            adapter.dropCollection(testCollection);
+
+            assertFalse(tableExists("test_products"),
+                    "collection delete must not leak the physical table");
+        }
+
+        @Test
+        @DisplayName("REFUSES to drop a system collection's Flyway-owned table")
+        void refusesToDropSystemTable() {
+            // Dropping one of these would destroy platform metadata for EVERY tenant, so this
+            // is the single most important property of dropCollection. Mirrors the same
+            // systemCollection() guard initializeCollection uses to skip creation.
+            adapter.initializeCollection(testCollection);
+            assertTrue(tableExists("test_products"));
+
+            adapter.dropCollection(asSystemCollection(testCollection));
+
+            assertTrue(tableExists("test_products"),
+                    "a system collection's table is Flyway-owned and must survive");
+        }
+
+        @Test
+        @DisplayName("a missing table is a no-op, not an error")
+        void missingTableIsNoOp() {
+            // Runs after the metadata delete has committed, so it must never throw.
+            assertFalse(tableExists("test_products"));
+            adapter.dropCollection(testCollection);
+        }
+
+        @Test
+        @DisplayName("a null definition is a no-op")
+        void nullDefinitionIsNoOp() {
+            adapter.dropCollection(null);
+        }
+
+        private CollectionDefinition asSystemCollection(CollectionDefinition source) {
+            return new CollectionDefinition(
+                    source.name(), source.displayName(), source.description(), source.fields(),
+                    source.storageConfig(), source.apiConfig(), source.authzConfig(),
+                    source.version(), source.createdAt(), source.updatedAt(),
+                    true, source.tenantScoped(), source.readOnly(), source.immutableFields(),
+                    source.columnMapping(), source.displayFieldName(), source.tenantId(),
+                    source.trackHistory(), source.captureGeo());
+        }
+    }
+
+    @Nested
     @DisplayName("JSON Storage Conversion Tests")
     class JsonStorageConversionTests {
 

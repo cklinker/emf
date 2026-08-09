@@ -59,7 +59,30 @@ public interface StorageAdapter {
      * @throws StorageException if storage initialization fails
      */
     void initializeCollection(CollectionDefinition definition);
-    
+
+    /**
+     * Drops the storage backing a collection, undoing {@link #initializeCollection}.
+     *
+     * <p>Called when a collection is deleted. Without it the metadata row goes away but the
+     * physical table survives, leaking one table per deleted collection — latent until V181
+     * made collection deletes actually succeed.
+     *
+     * <p><b>The default is a deliberate no-op.</b> An adapter fronting a store the platform
+     * did not create (see {@link ExternalStorageAdapter}) must never drop the customer's
+     * table: we un-map it, we do not destroy it. Only adapters that created the storage
+     * themselves override this.
+     *
+     * <p>Implementations should be idempotent and must not throw on a missing table — the
+     * caller invokes this <em>after</em> the metadata delete has committed, so a failure
+     * here cannot roll anything back and must degrade to a logged leak.
+     *
+     * @param definition the collection whose storage should be dropped
+     * @since 1.0.0
+     */
+    default void dropCollection(CollectionDefinition definition) {
+        // No-op: storage this adapter did not create is not ours to drop.
+    }
+
     /**
      * Updates storage schema when a collection definition changes.
      * 

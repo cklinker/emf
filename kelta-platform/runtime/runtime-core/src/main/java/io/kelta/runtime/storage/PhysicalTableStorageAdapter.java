@@ -299,6 +299,45 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
     }
 
+    /**
+     * Drops the collection's physical table.
+     *
+     * <p>Mirrors {@link #initializeCollection}: system collections are skipped because Flyway
+     * owns those tables, and dropping one would take out platform metadata for every tenant.
+     *
+     * <p>Deliberately <b>not</b> {@code CASCADE}. A master-detail child table holds a real FK
+     * to its parent's table, so a plain {@code DROP} of the parent fails loudly while
+     * {@code CASCADE} would silently destroy the child's constraint. Callers should delete
+     * child collections first; a blocked drop is logged and leaks the table, which is the
+     * pre-existing behaviour and strictly better than unannounced data loss.
+     *
+     * @param definition the collection whose table should be dropped
+     */
+    @Override
+    public void dropCollection(CollectionDefinition definition) {
+        if (definition == null) {
+            return;
+        }
+        if (definition.systemCollection()) {
+            log.warn("Refusing to drop table for system collection '{}' — Flyway owns it",
+                    definition.name());
+            return;
+        }
+
+        String qualifiedName = getTableRef(definition).toSql();
+        try {
+            jdbcTemplate.execute("DROP TABLE IF EXISTS " + qualifiedName);
+            log.info("Dropped table {} for deleted collection '{}'", qualifiedName, definition.name());
+        } catch (RuntimeException e) {
+            // The metadata delete has already committed — never throw from here. A dependent
+            // object (typically a master-detail child's FK) leaves the table behind; surface
+            // it loudly so the leak is actionable rather than invisible.
+            log.error("Failed to drop table {} for deleted collection '{}' — the table is now "
+                            + "orphaned and must be dropped manually: {}",
+                    qualifiedName, definition.name(), e.getMessage());
+        }
+    }
+
     @Override
     public void updateCollectionSchema(CollectionDefinition oldDefinition, CollectionDefinition newDefinition) {
         // Delegate schema migration to the migration engine

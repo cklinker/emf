@@ -351,12 +351,32 @@ cascade needed a guard.** Three things:
    `script_trigger` has no `tenant_id` at all; the schema test pins each, because the hook's
    Mockito tests stub `JdbcTemplate` by SQL substring and pass either way.
 
-**Residual open gap:** collection delete still does **not** `DROP` the physical user-data
-table (no `DROP TABLE` exists in `src/main`; `CollectionLifecycleManager.teardownCollection`
-is explicit that "data is not dropped"), so it leaks a table per deleted collection. Latent
-before V181 (deletes never succeeded), real now. Needs an ordered teardown in the delete
-service — a `TableRef` captured in `beforeDelete` (the `collection` row is gone by
-`afterDelete`) plus a drop path on `PhysicalTableStorageAdapter` — not an FK.
+**FIXED (physical table drop) — the last leak on the collection-delete path.** There was no
+production `DROP TABLE` anywhere in `src/main`, and `CollectionLifecycleManager.teardownCollection`
+only unregisters in-memory state, so every deleted collection left its tenant data table
+behind. Latent until V181 (deletes never succeeded), real after it. Now:
+
+- `StorageAdapter.dropCollection(definition)` is a **default no-op**. Storage the platform
+  did not create is not ours to destroy — an `ExternalStorageAdapter` fronting a customer's
+  database un-maps the collection and leaves the table alone. Only adapters that created the
+  storage override this.
+- `PhysicalTableStorageAdapter.dropCollection` issues `DROP TABLE IF EXISTS`, guarded by the
+  same `systemCollection()` check `initializeCollection` uses to *skip* creation — dropping a
+  Flyway-owned table would take out platform metadata for every tenant. Covered by
+  `PhysicalTableStorageAdapterTest → DropCollectionTests`, including that refusal.
+- `DispatchingStorageAdapter` must route it (it overrides), or the default no-op silently
+  wins and nothing is ever dropped.
+- `CollectionDeletionGuardHook` resolves the definition in `beforeDelete` and drops in
+  `afterDelete`, because the `collection` row — hence the name, hence the table name — is gone
+  once the delete commits. The stash carries the collection id so a stale `ThreadLocal` on a
+  pooled thread can never drop the wrong table.
+
+**Deliberately not `CASCADE`.** A master-detail child table holds a real FK to its parent's
+table, so dropping a parent whose children still exist fails; the error is logged and the
+table is left behind (the pre-existing behaviour) rather than `CASCADE` silently destroying
+the child's constraint. Delete child collections first. The drop runs **after** the metadata
+delete has committed, so it never throws — a failure degrades to a logged, actionable leak,
+never a 500 on a delete that already happened.
 
 **FIXED (fix/gateway-rate-limiter-fixed-window) — gateway rate limiter never reset its
 window under continuous traffic → tenant-wide self-sustaining 429 lockout; root cause of

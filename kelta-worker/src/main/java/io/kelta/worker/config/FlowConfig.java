@@ -782,9 +782,12 @@ public class FlowConfig {
     public io.kelta.worker.listener.CollectionDeletionGuardHook collectionDeletionGuardHook(
             BeforeSaveHookRegistry hookRegistry,
             JdbcTemplate jdbcTemplate,
-            io.kelta.worker.service.S3StorageService storageService) {
+            io.kelta.worker.service.S3StorageService storageService,
+            CollectionRegistry collectionRegistry,
+            io.kelta.runtime.storage.StorageAdapter storageAdapter) {
         io.kelta.worker.listener.CollectionDeletionGuardHook hook =
-                new io.kelta.worker.listener.CollectionDeletionGuardHook(jdbcTemplate, storageService);
+                new io.kelta.worker.listener.CollectionDeletionGuardHook(
+                        jdbcTemplate, storageService, collectionRegistry, storageAdapter);
         hookRegistry.register(hook);
         return hook;
     }

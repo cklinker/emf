@@ -20,6 +20,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,12 +39,16 @@ class CollectionDeletionGuardHookTest {
 
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private S3StorageService storageService;
+    @Mock private io.kelta.runtime.registry.CollectionRegistry collectionRegistry;
+    @Mock private io.kelta.runtime.storage.StorageAdapter storageAdapter;
+    @Mock private io.kelta.runtime.model.CollectionDefinition definition;
 
     private CollectionDeletionGuardHook hook;
 
     @BeforeEach
     void setUp() {
-        hook = new CollectionDeletionGuardHook(jdbcTemplate, storageService);
+        hook = new CollectionDeletionGuardHook(
+                jdbcTemplate, storageService, collectionRegistry, storageAdapter);
         // Default: every child table is empty.
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(COLLECTION_ID), eq(TENANT)))
                 .thenReturn(0);
@@ -53,6 +58,17 @@ class CollectionDeletionGuardHookTest {
     @AfterEach
     void tearDown() {
         RequestContextHolder.resetRequestAttributes();
+        // The pending-drop stash is a ThreadLocal; a leaked entry would bleed across tests.
+        hook.afterDelete("collections", "drain", TENANT);
+    }
+
+    /** Makes the collection row resolve to a registered definition. */
+    private void stubResolvableCollection() {
+        when(jdbcTemplate.queryForObject(
+                argThat(sql -> sql != null && sql.contains("SELECT name FROM collection")),
+                eq(String.class), eq(COLLECTION_ID), eq(TENANT)))
+                .thenReturn("widgets");
+        when(collectionRegistry.get("widgets")).thenReturn(definition);
     }
 
     /** Makes one child table report {@code count} rows. */
@@ -194,6 +210,75 @@ class CollectionDeletionGuardHookTest {
 
             assertThat(delete().isSuccess()).isTrue();
             verify(storageService, never()).deleteObject(anyString());
+        }
+
+        @Test
+        @DisplayName("the physical table is dropped after the metadata delete commits")
+        void dropsTableAfterDelete() {
+            stubResolvableCollection();
+            bindRequest(null);
+
+            assertThat(delete().isSuccess()).isTrue();
+            verify(storageAdapter, never()).dropCollection(any()); // not until afterDelete
+
+            hook.afterDelete("collections", COLLECTION_ID, TENANT);
+
+            verify(storageAdapter).dropCollection(definition);
+        }
+
+        @Test
+        @DisplayName("a blocked delete drops nothing")
+        void blockedDeleteDropsNoTable() {
+            stubChildCount("report", 1);
+            stubResolvableCollection();
+            bindRequest(null);
+
+            assertThat(delete().hasErrors()).isTrue();
+            hook.afterDelete("collections", COLLECTION_ID, TENANT);
+
+            verify(storageAdapter, never()).dropCollection(any());
+        }
+
+        @Test
+        @DisplayName("an unresolvable collection leaks the table rather than dropping the wrong one")
+        void unresolvedCollectionDropsNothing() {
+            when(jdbcTemplate.queryForObject(
+                    argThat(sql -> sql != null && sql.contains("SELECT name FROM collection")),
+                    eq(String.class), eq(COLLECTION_ID), eq(TENANT)))
+                    .thenReturn("widgets");
+            when(collectionRegistry.get("widgets")).thenReturn(null);
+            bindRequest(null);
+
+            assertThat(delete().isSuccess()).isTrue();
+            hook.afterDelete("collections", COLLECTION_ID, TENANT);
+
+            verify(storageAdapter, never()).dropCollection(any());
+        }
+
+        @Test
+        @DisplayName("a stale stash never drops a different collection's table")
+        void staleStashDoesNotDropWrongTable() {
+            stubResolvableCollection();
+            bindRequest(null);
+            assertThat(delete().isSuccess()).isTrue();
+
+            // Same pooled thread, different collection reaching afterDelete.
+            hook.afterDelete("collections", "some-other-collection", TENANT);
+
+            verify(storageAdapter, never()).dropCollection(any());
+        }
+
+        @Test
+        @DisplayName("a failing drop does not propagate — the delete already committed")
+        void dropFailureIsSwallowed() {
+            stubResolvableCollection();
+            when(definition.name()).thenReturn("widgets");
+            org.mockito.Mockito.doThrow(new RuntimeException("dependent object"))
+                    .when(storageAdapter).dropCollection(definition);
+            bindRequest(null);
+
+            assertThat(delete().isSuccess()).isTrue();
+            hook.afterDelete("collections", COLLECTION_ID, TENANT);  // must not throw
         }
 
         @Test

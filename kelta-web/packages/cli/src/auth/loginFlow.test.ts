@@ -63,6 +63,9 @@ describe('browserLogin', () => {
     expect(minted.token).toBe('klt_new1234567890');
     expect(minted.expiresAt).toBe('2026-11-01T00:00:00Z');
     expect(minted.name).toContain(hostname());
+    // second-precision stamp — (user, name) is unique server-side, so a
+    // date-only name 409s on the second login of the day
+    expect(minted.name).toMatch(/ \d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$/);
 
     // token exchange: form-encoded PKCE request to the auth server
     const [tokenUrl, tokenBody] = post.mock.calls[0] as [string, URLSearchParams];

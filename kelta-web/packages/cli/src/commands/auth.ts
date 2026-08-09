@@ -68,13 +68,23 @@ const login = defineCommand({
   handler: async (ctx, input) => {
     const name = activeProfileName(ctx);
     const existing = loadConfig().profiles[name];
-    const apiUrl = input.url ?? existing?.apiUrl;
+    let apiUrl = input.url ?? existing?.apiUrl;
     const tenantSlug = input.tenant ?? existing?.tenantSlug;
     if (!apiUrl || !tenantSlug) {
       throw new CliError(`Profile "${name}" has no saved connection — pass --url and --tenant`, {
         code: 'MISSING_CONNECTION',
         exitCode: EXIT.USAGE,
       });
+    }
+    // The API URL must be an origin: the CLI prepends /<tenant> itself, so a
+    // path here (e.g. --url https://api.kelta.io/spotopened) doubles the slug
+    // and 404s at the gateway.
+    const parsedApiUrl = new URL(apiUrl);
+    if (parsedApiUrl.pathname !== '/' && parsedApiUrl.pathname !== '') {
+      ctx.log(
+        `Ignoring path "${parsedApiUrl.pathname}" in the API URL — the tenant slug comes from --tenant`
+      );
+      apiUrl = parsedApiUrl.origin;
     }
 
     // Headless path: store the supplied token verbatim, exactly as before.

@@ -173,16 +173,37 @@ public class WatchController implements SelfScopedController {
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("data", created));
     }
 
-    /** Updates criteria, channels, or status (pause/resume) on the caller's own watch. */
+    /**
+     * Updates target, criteria, channels, or status (pause/resume) on a watch.
+     *
+     * <p>Normally the caller's own watch; support staff holding
+     * {@link #SUPPORT_PERMISSION} may name a member, exactly as {@code list} and
+     * {@code create} already allow. Without that, correcting a member's watch
+     * needs direct database access, which skips the entitlement and validation
+     * guards below.
+     */
     @PatchMapping("/{id}")
     public Map<String, Object> update(@PathVariable String id,
                                       @RequestBody UpdateWatchRequest body,
                                       HttpServletRequest request) {
         String tenantId = requireTenant();
-        String subject = requireActor(request, tenantId);
+        String subject = resolveSubject(request, tenantId,
+                body == null ? null : body.memberId());
         Watch existing = requireOwnWatch(tenantId, id, subject);
 
         Map<String, Object> data = new LinkedHashMap<>();
+        if (body != null && body.targetId() != null && !body.targetId().isBlank()) {
+            // Same checks as create: an unknown or retired target must not be
+            // reachable by re-pointing an existing watch either.
+            WatchTarget target = targetRepository.findById(tenantId, body.targetId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "Unknown target"));
+            if (!target.active()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Target is not currently watchable");
+            }
+            data.put("targetId", target.id());
+        }
         if (body != null && body.criteria() != null) {
             data.put("criteria", criteriaStructure(validateCriteria(body.criteria())));
         }
@@ -202,11 +223,13 @@ public class WatchController implements SelfScopedController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
     }
 
-    /** Deletes the caller's own watch. */
+    /** Deletes a watch — the caller's own, or a named member's for support staff. */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable String id, HttpServletRequest request) {
+    public ResponseEntity<Void> delete(@PathVariable String id,
+                                       @RequestParam(required = false) String memberId,
+                                       HttpServletRequest request) {
         String tenantId = requireTenant();
-        String subject = requireActor(request, tenantId);
+        String subject = resolveSubject(request, tenantId, memberId);
         requireOwnWatch(tenantId, id, subject);
 
         queryEngine.delete(definition(), id);
@@ -402,6 +425,7 @@ public class WatchController implements SelfScopedController {
     }
 
     /** Request body for {@code PATCH /api/watches/{id}}. */
-    public record UpdateWatchRequest(Object criteria, List<String> channels, String status) {
+    public record UpdateWatchRequest(String targetId, Object criteria, List<String> channels,
+                                     String status, String memberId) {
     }
 }

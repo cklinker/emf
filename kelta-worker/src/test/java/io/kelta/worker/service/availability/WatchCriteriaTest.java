@@ -237,4 +237,15 @@ class WatchCriteriaTest {
             assertThat(json).isEqualTo("{\"v\":1}");
         }
     }
+
+    @Test
+    @DisplayName("unwraps a legacy double-encoded criteria string (storage regression)")
+    void unwrapsDoubleEncodedCriteria() {
+        // Rows written before the storage fix hold the object as a JSON *string*.
+        String legacy = "\"{\\\"v\\\":1,\\\"dateStart\\\":\\\"2026-09-01\\\"}\"";
+        WatchCriteria.ParseResult result = WatchCriteria.parse(legacy, objectMapper);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.criteria().dateStart()).isEqualTo(java.time.LocalDate.of(2026, 9, 1));
+    }
 }

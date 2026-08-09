@@ -82,6 +82,13 @@ public class DispatchingStorageAdapter implements StorageAdapter {
     }
 
     @Override
+    public void dropCollection(CollectionDefinition definition) {
+        // Must route: the StorageAdapter default is a no-op, so without this a collection
+        // delete would silently drop nothing and keep leaking a table per deletion.
+        adapterFor(definition).dropCollection(definition);
+    }
+
+    @Override
     public void updateCollectionSchema(CollectionDefinition oldDefinition, CollectionDefinition newDefinition) {
         adapterFor(newDefinition).updateCollectionSchema(oldDefinition, newDefinition);
     }

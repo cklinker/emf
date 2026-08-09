@@ -1,5 +1,8 @@
 package io.kelta.worker.listener;
 
+import io.kelta.runtime.model.CollectionDefinition;
+import io.kelta.runtime.registry.CollectionRegistry;
+import io.kelta.runtime.storage.StorageAdapter;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
 import io.kelta.worker.service.S3StorageService;
@@ -102,10 +105,28 @@ public class CollectionDeletionGuardHook implements BeforeSaveHook {
 
     private final JdbcTemplate jdbcTemplate;
     private final S3StorageService storageService;
+    private final CollectionRegistry collectionRegistry;
+    private final StorageAdapter storageAdapter;
 
-    public CollectionDeletionGuardHook(JdbcTemplate jdbcTemplate, S3StorageService storageService) {
+    /**
+     * The definition captured in {@link #beforeDelete} so {@link #afterDelete} can drop its
+     * table. The {@code collection} row is gone by the time afterDelete runs, so the table
+     * name cannot be resolved there — the same recover-it-first constraint that forces the S3
+     * purge to happen early. Carries the collection id so a stale entry left on a pooled
+     * thread (delete threw between the two callbacks) can never drop the wrong table.
+     */
+    private static final ThreadLocal<PendingDrop> PENDING_DROP = new ThreadLocal<>();
+
+    private record PendingDrop(String collectionId, CollectionDefinition definition) {
+    }
+
+    public CollectionDeletionGuardHook(JdbcTemplate jdbcTemplate, S3StorageService storageService,
+                                       CollectionRegistry collectionRegistry,
+                                       StorageAdapter storageAdapter) {
         this.jdbcTemplate = jdbcTemplate;
         this.storageService = storageService;
+        this.collectionRegistry = collectionRegistry;
+        this.storageAdapter = storageAdapter;
     }
 
     @Override
@@ -124,6 +145,7 @@ public class CollectionDeletionGuardHook implements BeforeSaveHook {
 
     @Override
     public BeforeSaveResult beforeDelete(String collectionName, String id, String tenantId) {
+        PENDING_DROP.remove();
         if (!COLLECTIONS.equals(collectionName) || id == null || tenantId == null) {
             return BeforeSaveResult.ok();
         }
@@ -146,7 +168,63 @@ public class CollectionDeletionGuardHook implements BeforeSaveHook {
         if (hasChildren) {
             purgeStorageObjects(id, tenantId);
         }
+        captureTableForDrop(id, tenantId);
         return BeforeSaveResult.ok();
+    }
+
+    /**
+     * Drops the collection's physical table once the metadata delete has committed.
+     *
+     * <p>Before this, a deleted collection left its tenant data table behind forever — no
+     * production {@code DROP TABLE} existed, and
+     * {@code CollectionLifecycleManager.teardownCollection} only unregisters in-memory state.
+     * The leak was latent until V181 made collection deletes actually succeed.
+     *
+     * <p>Runs after the commit, so it never throws: the adapter logs and leaks rather than
+     * failing a delete that has already happened.
+     */
+    @Override
+    public void afterDelete(String collectionName, String id, String tenantId) {
+        PendingDrop pending = PENDING_DROP.get();
+        PENDING_DROP.remove();
+        if (pending == null || !pending.collectionId().equals(id)) {
+            return;
+        }
+        try {
+            storageAdapter.dropCollection(pending.definition());
+        } catch (RuntimeException e) {
+            log.error("Table drop failed for deleted collection '{}' (id {}): {}",
+                    pending.definition().name(), id, e.getMessage());
+        }
+    }
+
+    /**
+     * Resolves and stashes the definition whose table {@link #afterDelete} will drop.
+     *
+     * <p>Looked up here because the {@code collection} row — and therefore the collection's
+     * name, and therefore its table name — is gone once the delete commits. A definition that
+     * cannot be resolved simply means no drop is attempted (the old leaking behaviour), which
+     * is why this never fails the delete.
+     */
+    private void captureTableForDrop(String collectionId, String tenantId) {
+        try {
+            String name = jdbcTemplate.queryForObject(
+                    "SELECT name FROM collection WHERE id = ? AND tenant_id = ?",
+                    String.class, collectionId, tenantId);
+            if (name == null || name.isBlank()) {
+                return;
+            }
+            CollectionDefinition definition = collectionRegistry.get(name);
+            if (definition == null) {
+                log.warn("Collection '{}' (id {}) is not in the registry — its table will not "
+                        + "be dropped and may be orphaned", name, collectionId);
+                return;
+            }
+            PENDING_DROP.set(new PendingDrop(collectionId, definition));
+        } catch (Exception e) {
+            log.warn("Could not resolve collection {} for table drop: {}",
+                    collectionId, e.getMessage());
+        }
     }
 
     /**

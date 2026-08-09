@@ -75,6 +75,33 @@ sniff placeholder strings like `***`. Masked values are always JSON strings.
 distinguishable error would itself be a value-probing oracle. Do not "improve"
 it with specifics.
 
+#### Immutable fields on update
+
+Immutability is declared two ways and **both are loud** — an update that would
+change an immutable field fails with a `VALIDATION_FAILED` envelope naming the
+field (`constraint: "immutable"`), never a 200 for a write that did not happen
+(#1330):
+
+- **Field-level** (`FieldDefinition.immutable()`) — rejected by
+  `DefaultValidationEngine` whenever the field is present in an UPDATE payload.
+- **Collection-level** (`CollectionDefinition.immutableFields()`, e.g.
+  `watch-targets.source`/`externalId`) — rejected by `DefaultQueryEngine.update`
+  when the submitted value **differs** from the stored one. Re-sending the value
+  the record already holds is accepted and dropped from the patch, so a
+  full-record round-trip (read → edit one field → write the whole map back)
+  still works. A `null`/blank submission is treated as "not supplied", not as a
+  clear — generic forms coerce untouched inputs to `null`, and an immutable
+  field cannot be emptied anyway.
+
+Collection-level immutability is **not** exposed on the schema/describe API, so a
+generic client cannot pre-disable those inputs — it finds out by being rejected.
+A relationship field that is immutable also cannot be re-parented:
+`RecordMergeService` skips it and returns it under `skippedImmutable` instead of
+counting a write it cannot make.
+
+Prefer the field-level flag for new fields in the declared field list;
+collection-level covers fields outside it (`tenantId`, join keys).
+
 ### Javadoc
 - Required for public classes and methods
 - Include `@param`, `@returns`, `@throws`

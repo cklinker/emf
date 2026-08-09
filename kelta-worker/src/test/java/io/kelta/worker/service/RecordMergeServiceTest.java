@@ -134,6 +134,41 @@ class RecordMergeServiceTest {
     }
 
     @Test
+    @DisplayName("skips an immutable inbound FK instead of counting a write it cannot make")
+    void skipsImmutableInboundReference() {
+        // Same topology, except orders.contact is immutable on the orders collection.
+        CollectionDefinition immutableOrdersDef = CollectionDefinition.builder()
+                .name("orders")
+                .storageConfig(StorageConfig.physicalTable("orders"))
+                .addField(FieldDefinition.string("total"))
+                .addField(new FieldDefinition(
+                        "contact", FieldType.MASTER_DETAIL, false, false, false,
+                        null, null, null, ReferenceConfig.masterDetail("contacts", "Contact"), null))
+                .addImmutableField("contact")
+                .build();
+
+        when(collectionRegistry.get("contacts")).thenReturn(contactsDef);
+        when(collectionRegistry.get("orders")).thenReturn(immutableOrdersDef);
+        when(collectionRegistry.getAllCollectionNames()).thenReturn(Set.of("contacts", "orders"));
+        when(queryEngine.getById(any(), anyString()))
+                .thenAnswer(inv -> Optional.of(Map.of("id", inv.getArgument(1))));
+        when(queryEngine.delete(any(), anyString())).thenReturn(true);
+
+        Result result = service.merge("contacts", "master", List.of("dup1"), Map.of());
+
+        // No scan, no update attempt — the write would be rejected as immutable.
+        verify(queryEngine, never()).executeQuery(eq(immutableOrdersDef), any(QueryRequest.class));
+        verify(queryEngine, never()).update(eq(immutableOrdersDef), anyString(), any());
+
+        assertThat(result.reparentedRecords()).isZero();
+        assertThat(result.reparented()).isEmpty();
+        assertThat(result.skippedImmutable()).singleElement().satisfies(s -> {
+            assertThat(s.collection()).isEqualTo("orders");
+            assertThat(s.field()).isEqualTo("contact");
+        });
+    }
+
+    @Test
     @DisplayName("rejects blank master, empty duplicates, and the master listed as a duplicate")
     void inputValidation() {
         assertThatThrownBy(() -> service.merge("contacts", " ", List.of("d1"), Map.of()))

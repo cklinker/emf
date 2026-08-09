@@ -101,6 +101,14 @@ public class RecordMergeController {
                 rm.put("count", r.count());
                 return rm;
             }).toList());
+            // Relationships the merge could not move because the field is immutable —
+            // reported so the caller does not read a 200 as "everything was re-parented".
+            out.put("skippedImmutable", result.skippedImmutable().stream().map(s -> {
+                Map<String, Object> sm = new LinkedHashMap<>();
+                sm.put("collection", s.collection());
+                sm.put("field", s.field());
+                return sm;
+            }).toList());
             return ResponseEntity.ok(out);
         } catch (IllegalArgumentException | InvalidQueryException e) {
             // Unknown collection, missing record, or an invalid field → 400 (client error).

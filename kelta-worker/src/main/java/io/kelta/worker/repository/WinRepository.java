@@ -94,12 +94,12 @@ public class WinRepository {
     }
 
     /**
-     * The member's first name (falling back to display name) for the public claimant label set
+     * The member's first name (falling back to username) for the public claimant label set
      * server-side at create time. Empty when the user has neither.
      */
     public Optional<String> findMemberDisplayFirstName(String tenantId, String memberId) {
         List<String> names = jdbc.query(
-                "SELECT COALESCE(NULLIF(first_name, ''), display_name) AS label"
+                "SELECT COALESCE(NULLIF(first_name, ''), username) AS label"
                         + " FROM platform_user WHERE tenant_id = ? AND id = ?",
                 (rs, i) -> rs.getString("label"), tenantId, memberId);
         return names.isEmpty() ? Optional.empty() : Optional.ofNullable(names.get(0));

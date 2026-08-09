@@ -7,27 +7,66 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Thread-safe in-memory registry for route definitions.
- * 
+ *
  * Routes are indexed by their path pattern for efficient lookup.
  * All operations are thread-safe using ConcurrentHashMap.
- * 
+ *
  * This registry is updated dynamically through:
  * - Initial bootstrap from the worker service
  * - Real-time NATS events for configuration changes
  */
 @Component
 public class RouteRegistry {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(RouteRegistry.class);
-    
+
+    /**
+     * Member-facing paths served by a dedicated controller (API_ACCESS-only at the
+     * gateway; the controller owner-scopes the data). Each ALSO backs a system
+     * collection whose auto-registered generic route shares this exact path — and,
+     * being loaded after the static routes, would overwrite the static override in
+     * {@link #routes} (keyed by path) and force per-resource collection Cerbos. A
+     * portal member holds no collection role, so that check denies with 403 and the
+     * member can never reach their own watches/wins/devices/billing (the dedicated
+     * controller they were meant to hit).
+     *
+     * <p>These paths are therefore authoritative: only a {@code static-} route may
+     * occupy them; a dynamic collection route for the same path is ignored. This is
+     * deliberately NOT a blanket "static always wins" — config collections
+     * (flows, reports, dashboards, …) are also registered as {@code static-} bootstrap
+     * routes yet rely on their generic route's per-resource Cerbos for protection, and
+     * must keep it. Only the member-controller routes below invert that.
+     */
+    private static final Set<String> AUTHORITATIVE_STATIC_PATHS = Set.of(
+            "/api/watches/**", "/api/wins/**", "/api/devices/**", "/api/billing/**");
+
     private final ConcurrentHashMap<String, RouteDefinition> routes;
-    
+
     public RouteRegistry() {
         this.routes = new ConcurrentHashMap<>();
+    }
+
+    private static boolean isStaticRoute(RouteDefinition route) {
+        return route.getId() != null && route.getId().startsWith("static-");
+    }
+
+    /**
+     * A dynamic (non-{@code static-}) route targeting an authoritative member path is
+     * a shadow of the intended controller override and must be dropped. Returns true
+     * when {@code route} should be ignored.
+     */
+    private boolean shadowsAuthoritativeStaticRoute(RouteDefinition route) {
+        if (AUTHORITATIVE_STATIC_PATHS.contains(route.getPath()) && !isStaticRoute(route)) {
+            logger.info("Ignoring dynamic route '{}' for authoritative member path '{}' — "
+                    + "the static controller route owns it", route.getId(), route.getPath());
+            return true;
+        }
+        return false;
     }
     
     /**
@@ -46,7 +85,11 @@ public class RouteRegistry {
             logger.error("Cannot add route with null or empty path: {}", route);
             return;
         }
-        
+
+        if (shadowsAuthoritativeStaticRoute(route)) {
+            return;
+        }
+
         RouteDefinition previous = routes.put(route.getPath(), route);
         if (previous != null) {
             logger.info("Updated existing route for path '{}': {}", route.getPath(), route);
@@ -95,6 +138,10 @@ public class RouteRegistry {
         }
         if (route.getPath() == null || route.getPath().isEmpty()) {
             logger.error("Cannot update route with null or empty path: {}", route);
+            return;
+        }
+
+        if (shadowsAuthoritativeStaticRoute(route)) {
             return;
         }
 

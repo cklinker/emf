@@ -283,6 +283,24 @@ ids raw when they're not in the live page's `lookupDisplayMap` (no write-time di
 
 (No open bugs from the original audit. See Resolved → Bugs.)
 
+**FIXED (RouteRegistry authoritative member paths) — member-controller static routes were
+shadowed by their backing collection's generic route, 403-ing portal members.** A member
+resource served by a dedicated controller (e.g. `/api/watches` → `WatchController`, "API_ACCESS
+only, controller owner-scopes") is registered as a `static-` route so the gateway skips
+per-resource Cerbos (`RouteAuthorizationFilter` line ~153). But `watches`/`wins`/`devices`/
+`billing` are ALSO system collections, and each auto-registers a generic route at the **same
+path**. `RouteRegistry` keys by path (last-write-wins), and the collection route loads *after* the
+static routes, so it overwrote `static-watches` with a UUID-id route → per-resource collection
+Cerbos ran → a portal member (no collection role; base `resource_collection` policy is
+`roles:["*"]`, matches nothing) got `403 "Insufficient permissions for read on watches"`, breaking
+the whole consumer app. Never caught because the scenario tests exercise the DB/RLS layer, not the
+gateway authz path. Fix: `RouteRegistry.AUTHORITATIVE_STATIC_PATHS` (`/api/watches|wins|devices|
+billing/**`) — only a `static-` route may occupy those; a dynamic collection route for the same
+path is ignored. Deliberately NOT a blanket "static wins": config collections (flows, reports, …)
+are also `static-` bootstrap routes yet **rely** on their generic route's per-resource Cerbos and
+must keep it. Any NEW member-controller route that shares a path with a system collection must be
+added to that set.
+
 **FIXED (V181__collection_fk_cascade) — collections became permanently undeletable once
 used.** Deleting a collection is a generic record delete against the `collection` table
 (`DynamicCollectionRouter` → `QueryEngine.delete`); `PhysicalTableStorageAdapter` maps

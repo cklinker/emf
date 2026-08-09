@@ -25,6 +25,33 @@ interface ListEnvelope {
   [key: string]: unknown;
 }
 
+/**
+ * Warns when a list response did not come from the generic collection route.
+ *
+ * Some collections are served by a hand-written controller mounted at the same
+ * path — `/api/watches` is `WatchController`, which scopes rows to the calling
+ * user. A tenant admin listing that collection gets an empty array even when it
+ * is full, and the CLI renders that identically to a genuinely empty collection,
+ * so `0 rows` reads as fact. Operators have acted on that false negative.
+ *
+ * The two cases are distinguishable on the wire: the generic route always
+ * carries pagination metadata, even for an empty result, while these controllers
+ * return a bare `{ data: [...] }`. Absence of that metadata is the signal.
+ */
+export function warnIfCallerScoped(
+  body: ListEnvelope,
+  collection: string,
+  log: (message: string) => void
+): void {
+  if (!Array.isArray(body.data)) return;
+  if (body.metadata !== undefined || body.meta !== undefined) return;
+  log(
+    `Note: "${collection}" is served by a caller-scoped endpoint, so these results are ` +
+      `limited to what the signed-in user owns. An empty result does not mean the ` +
+      `collection is empty.`
+  );
+}
+
 const list = defineCommand({
   group: 'records',
   name: 'list',
@@ -59,6 +86,7 @@ const list = defineCommand({
         page: input.page,
         size: input.size,
       })) as ListEnvelope;
+      warnIfCallerScoped(body, input.collection, ctx.log);
       return { data: body };
     }
 
@@ -70,6 +98,7 @@ const list = defineCommand({
         page,
         size: MAX_HTTP_PAGE_SIZE,
       })) as ListEnvelope;
+      if (page === 1) warnIfCallerScoped(body, input.collection, ctx.log);
       const batch = Array.isArray(body.data) ? body.data : [];
       rows.push(...batch);
       if (batch.length < MAX_HTTP_PAGE_SIZE) break;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { CommandContext } from '../registry/types.js';
-import { recordCommands } from './records.js';
+import { recordCommands, warnIfCallerScoped } from './records.js';
 
 function command(name: string) {
   const def = recordCommands.find((c) => c.name === name);
@@ -118,5 +118,87 @@ describe('records get/create/update/delete', () => {
     const result = await def.handler(ctx, def.input.parse({ collection: 'x', id: 'n1' }) as never);
     expect(del).toHaveBeenCalledWith('n1');
     expect(result.ids).toEqual(['n1']);
+  });
+});
+
+describe('warnIfCallerScoped', () => {
+  const paginated = { metadata: { totalCount: 0 }, data: [], meta: { totalCount: 0 }, links: {} };
+
+  it('warns when the response carries no pagination metadata', () => {
+    const log = vi.fn();
+    warnIfCallerScoped({ data: [] }, 'watches', log);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0][0]).toContain('watches');
+    expect(log.mock.calls[0][0]).toContain('caller-scoped');
+  });
+
+  it('warns even when the caller-scoped endpoint returned rows', () => {
+    // The view is partial whether or not it is empty; an operator paging through
+    // "all" the rows of a scoped endpoint is just as misled.
+    const log = vi.fn();
+    warnIfCallerScoped({ data: [{ id: '1' }] }, 'watches', log);
+    expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays quiet for a genuinely empty generic-route result', () => {
+    // This is the case that must not be flagged: totalCount 0 with a full
+    // envelope really does mean the collection is empty.
+    const log = vi.fn();
+    warnIfCallerScoped(paginated, 'watch-targets', log);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('stays quiet for a populated generic-route result', () => {
+    const log = vi.fn();
+    warnIfCallerScoped({ ...paginated, data: [{ id: '1' }] }, 'watch-targets', log);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('accepts either metadata key as proof of the generic route', () => {
+    const log = vi.fn();
+    warnIfCallerScoped({ data: [], metadata: { totalCount: 0 } }, 'x', log);
+    warnIfCallerScoped({ data: [], meta: { totalCount: 0 } }, 'x', log);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('ignores responses whose data is not an array', () => {
+    const log = vi.fn();
+    warnIfCallerScoped({ data: undefined }, 'x', log);
+    warnIfCallerScoped({ data: { id: '1' } as unknown as unknown[] }, 'x', log);
+    expect(log).not.toHaveBeenCalled();
+  });
+});
+
+describe('records list caller-scope warning', () => {
+  it('fires for a bare envelope', async () => {
+    const list = vi.fn().mockResolvedValue({ data: [] });
+    const { ctx } = fakeCtx({ list });
+    const def = command('list');
+    await def.handler(ctx, def.input.parse({ collection: 'watches', filter: [] }) as never);
+    expect(ctx.log).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire for a paginated envelope', async () => {
+    const list = vi.fn().mockResolvedValue({ data: [], metadata: { totalCount: 0 } });
+    const { ctx } = fakeCtx({ list });
+    const def = command('list');
+    await def.handler(ctx, def.input.parse({ collection: 'watch-targets', filter: [] }) as never);
+    expect(ctx.log).not.toHaveBeenCalled();
+  });
+
+  it('warns once under --all, not once per page', async () => {
+    const page = Array.from({ length: 200 }, (_, i) => ({ id: String(i) }));
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce({ data: page })
+      .mockResolvedValueOnce({ data: [{ id: 'last' }] });
+    const { ctx } = fakeCtx({ list });
+    const def = command('list');
+    await def.handler(
+      ctx,
+      def.input.parse({ collection: 'watches', filter: [], all: true }) as never
+    );
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(ctx.log).toHaveBeenCalledTimes(1);
   });
 });

@@ -462,8 +462,8 @@ FAILED SMS delivery, not a dead service.
 
 | Piece | Detail |
 |---|---|
-| Config | `kelta.sms.provider` (`log`\|`twilio`); `kelta.sms.twilio.{account-sid,auth-token,from-number}` (env `TWILIO_*`, from the deployment secret; `from-number` E.164) |
-| Send | `POST https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json`, `application/x-www-form-urlencoded` `From`/`To`/`Body`, HTTP Basic auth. Non-2xx → `SmsDeliveryException` carrying Twilio's error body (never the token) |
+| Config | `kelta.sms.provider` (`log`\|`twilio`); `kelta.sms.twilio.{account-sid,key-sid,auth-token,from-number}` (env `TWILIO_*`, from the deployment secret; `from-number` E.164). **Two auth modes:** API key (recommended, revocable) = `key-sid` (`SK…`) + `auth-token` (the key secret); or account = leave `key-sid` blank, `auth-token` = the account Auth Token. `account-sid` (`AC…`) is always required |
+| Send | `POST https://api.twilio.com/2010-04-01/Accounts/{account-sid}/Messages.json`, `application/x-www-form-urlencoded` `From`/`To`/`Body`, HTTP Basic auth (**user = `key-sid` if set, else `account-sid`**; password = `auth-token`). Non-2xx → `SmsDeliveryException` carrying Twilio's error body (never the token) |
 | Alert channel | `sms` must be in the watch channels ∩ the member's plan entitlement (keep `sms` a paid-tier entitlement so free members can't burn credits); one alert per opening bounds volume |
 | Recipient | `platform_user.phone_number`; no number on file ⇒ FAILED sms delivery, other channels unaffected |
 | Owed | Live round-trip verification needs a real Twilio account (native-image `RestClient` + Basic-auth path is what CI can't reach); per-tenant Twilio credentials would move to the credential vault (`StripeCredentialType` precedent) |

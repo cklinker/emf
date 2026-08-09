@@ -38,8 +38,9 @@ Config keys (from the deployment secret):
 | Key | Meaning |
 |-----|---------|
 | `kelta.sms.provider` | `log` (default) or `twilio` |
-| `kelta.sms.twilio.account-sid` | Twilio Account SID |
-| `kelta.sms.twilio.auth-token` | Twilio auth token |
+| `kelta.sms.twilio.account-sid` | Twilio Account SID (`AC…`) — always used in the request URL |
+| `kelta.sms.twilio.key-sid` | API Key SID (`SK…`), Basic-auth user — recommended; blank ⇒ use the account SID |
+| `kelta.sms.twilio.auth-token` | API Key secret (with `key-sid`) or the account Auth Token (without) |
 | `kelta.sms.twilio.from-number` | Sending number (E.164) |
 
 ## 4. DB migrations

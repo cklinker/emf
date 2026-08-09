@@ -8,7 +8,6 @@ import com.nimbusds.jwt.SignedJWT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -49,7 +48,6 @@ import java.util.Date;
  * as it does for a stale FCM/APNs token.
  */
 @Component
-@ConditionalOnProperty(name = "kelta.push.vapid.public-key")
 public class WebPushProvider implements PushProvider {
 
     private static final Logger log = LoggerFactory.getLogger(WebPushProvider.class);
@@ -76,13 +74,25 @@ public class WebPushProvider implements PushProvider {
         this.publicKey = publicKey;
         this.subject = subject == null || subject.isBlank() ? "mailto:admin@kelta.io" : subject;
         this.privateKey = parsePrivateKey(privateKey);
-        log.info("WebPushProvider active (VAPID subject {})", this.subject);
+        // Always a bean: on the native image @ConditionalOnProperty is fixed at
+        // AOT build time, so a key configured at deploy time could never enable
+        // web push. Configuration is judged at runtime instead (supports()).
+        if (configured()) {
+            log.info("WebPushProvider active (VAPID subject {})", this.subject);
+        } else {
+            log.info("WebPushProvider idle — no VAPID key pair configured");
+        }
     }
 
-    /** Only handles browser subscriptions; native platforms fall through. */
+    /** True when a usable VAPID key pair is present. */
+    private boolean configured() {
+        return publicKey != null && !publicKey.isBlank() && privateKey != null;
+    }
+
+    /** Only handles browser subscriptions, and only once a key pair is configured. */
     @Override
     public boolean supports(String platform) {
-        return PLATFORM.equalsIgnoreCase(platform);
+        return PLATFORM.equalsIgnoreCase(platform) && configured();
     }
 
     /** The key a frontend passes to {@code pushManager.subscribe}. */

@@ -69,12 +69,18 @@ class PushProviderWiringTest {
     }
 
     @Test
-    @DisplayName("web push stays absent when no VAPID key is configured")
-    void webProviderAbsentWithoutKeys() {
+    @DisplayName("web push stays inert when no VAPID key is configured")
+    void webProviderInertWithoutKeys() {
+        // The bean must exist unconditionally — on the native image a
+        // @ConditionalOnProperty is fixed at AOT build time and a deploy-time
+        // key could never enable it — but an unconfigured provider must not
+        // claim web devices or advertise a public key.
         runner.run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context).doesNotHaveBean(WebPushProvider.class);
-            assertThat(context.getBeansOfType(PushProvider.class)).hasSize(1);
+            assertThat(context).hasSingleBean(WebPushProvider.class);
+            WebPushProvider web = context.getBean(WebPushProvider.class);
+            assertThat(web.supports("web")).isFalse();
+            assertThat(web.publicKey()).isEmpty();
         });
     }
 

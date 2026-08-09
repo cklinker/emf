@@ -68,6 +68,16 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
             return body;
         }
 
+        // A controller that scopes its own data to the caller is exempt: portal
+        // members hold no record grants, so the filter below would empty their own
+        // watches/wins/devices/billing while every write still succeeded. Checked on
+        // the handler, not the path, so the generic collection route on those same
+        // paths keeps full record-level filtering.
+        if (returnType != null
+                && SelfScopedController.class.isAssignableFrom(returnType.getContainingClass())) {
+            return body;
+        }
+
         HttpServletRequest httpRequest = servletRequest.getServletRequest();
         String path = httpRequest.getRequestURI();
 

@@ -307,6 +307,54 @@ class BillingWebhookServiceTest {
         }
 
         @Test
+        @DisplayName("reads current_period_end from the item when the event omits it top-level")
+        void readsPeriodEndFromItem() {
+            when(planRepository.findByStripePriceId(TENANT, "price_1"))
+                    .thenReturn(Optional.of(plan("plan-paid", "paid", null)));
+            when(planRepository.findById(TENANT, "plan-paid"))
+                    .thenReturn(Optional.of(plan("plan-paid", "paid", null)));
+
+            // Stripe moved the field onto items in 2025-03-31.basil, and webhook
+            // payloads render with the ACCOUNT's version, not the pinned client
+            // version — so a live account emits this shape and the old reader left
+            // the column null.
+            service.process(TENANT, """
+                    {"id":"evt_period_item","type":"customer.subscription.updated","data":{"object":{
+                      "id":"sub_9","customer":"cus_9","status":"active",
+                      "cancel_at_period_end":false,
+                      "metadata":{"userId":"user-1"},
+                      "items":{"data":[{"price":{"id":"price_1"},
+                        "current_period_end":1788969546}]}}}}
+                    """);
+
+            verify(subscriptionRepository).upsert(eq(TENANT), eq(USER), eq("plan-paid"),
+                    eq("sub_9"), eq("cus_9"), eq("active"),
+                    eq(Instant.ofEpochSecond(1788969546L)), eq(false), eq(null));
+        }
+
+        @Test
+        @DisplayName("takes the latest item period when items differ")
+        void takesLatestItemPeriod() {
+            when(planRepository.findByStripePriceId(TENANT, "price_1"))
+                    .thenReturn(Optional.of(plan("plan-paid", "paid", null)));
+            when(planRepository.findById(TENANT, "plan-paid"))
+                    .thenReturn(Optional.of(plan("plan-paid", "paid", null)));
+
+            service.process(TENANT, """
+                    {"id":"evt_period_multi","type":"customer.subscription.updated","data":{"object":{
+                      "id":"sub_10","customer":"cus_10","status":"active",
+                      "cancel_at_period_end":false,
+                      "metadata":{"userId":"user-1"},
+                      "items":{"data":[{"price":{"id":"price_1"},"current_period_end":1788969546},
+                                       {"price":{"id":"price_2"},"current_period_end":1790000000}]}}}}
+                    """);
+
+            verify(subscriptionRepository).upsert(eq(TENANT), eq(USER), eq("plan-paid"),
+                    eq("sub_10"), eq("cus_10"), eq("active"),
+                    eq(Instant.ofEpochSecond(1790000000L)), eq(false), eq(null));
+        }
+
+        @Test
         @DisplayName("an unmapped price still mirrors the subscription with a null plan")
         void unmappedPriceStillMirrors() {
             when(planRepository.findByStripePriceId(anyString(), any()))

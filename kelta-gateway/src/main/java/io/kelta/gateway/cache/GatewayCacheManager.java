@@ -12,11 +12,15 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Centralized cache manager for the gateway, backed by Caffeine caches.
@@ -58,6 +62,12 @@ public class GatewayCacheManager {
      * Matches GovernorLimits.defaults().apiCallsPerDay().
      */
     private static final int DEFAULT_API_CALLS_PER_DAY = 100_000;
+
+    /** Bound on a lazy worker lookup made while a request waits on it. */
+    private static final Duration SLUG_MAP_TIMEOUT = Duration.ofSeconds(2);
+
+    /** In-flight lazy slug-map fetch, shared so concurrent misses issue one worker call. */
+    private final AtomicReference<Mono<Map<String, String>>> inFlightSlugMapFetch = new AtomicReference<>();
 
     private final Cache<String, String> tenantSlugCache;
     private final Cache<String, Integer> governorLimitCache;
@@ -112,46 +122,102 @@ public class GatewayCacheManager {
         if (slug == null || slug.isBlank()) {
             return Optional.empty();
         }
-        String cached = tenantSlugCache.getIfPresent(slug);
+        Optional<String> cached = cachedTenantSlug(slug);
         if (cached != null) {
-            return SLUG_NOT_FOUND.equals(cached) ? Optional.empty() : Optional.of(cached);
+            return cached;
         }
-
-        // Cache miss. The scheduled refresh may not have run yet (cold start, or a refresh that
-        // failed while the worker was briefly unreachable), or this is a brand-new tenant. Without a
-        // fallback, a VALID tenant 404s for up to one refresh interval — every request to
-        // /{slug}/api/** fails, so the UI can't even load. Lazily pull the slug→tenant map from the
-        // worker, merge it, and re-check (mirrors resolveCustomDomain's lazy lookup).
-        Map<String, String> mapping = fetchTenantSlugMap();
-        if (mapping != null && !mapping.isEmpty()) {
-            tenantSlugCache.putAll(mapping);
-            String resolved = mapping.get(slug);
-            if (resolved != null) {
-                return Optional.of(resolved);
-            }
-            // Fetched successfully but the slug genuinely isn't a tenant — negative-cache so an
-            // unknown slug doesn't re-fetch on every request (cleared by the next full refresh).
-            tenantSlugCache.put(slug, SLUG_NOT_FOUND);
+        if (Schedulers.isInNonBlockingThread()) {
+            // A reactive caller must use resolveTenantSlugReactive — blocking here throws, and the
+            // resulting "not found" would 404 a valid tenant. Answer from cache only.
+            log.warn("resolveTenantSlug('{}') missed the cache on a non-blocking thread; "
+                    + "use resolveTenantSlugReactive so the lazy lookup can run", slug);
+            return Optional.empty();
         }
-        // On a fetch error we intentionally do NOT negative-cache: a transient worker blip must not
-        // pin a valid tenant to "not found" — the next request retries.
-        return Optional.empty();
+        return resolveTenantSlugReactive(slug).block(SLUG_MAP_TIMEOUT.plusSeconds(1));
     }
 
     /**
-     * Fetches the slug→tenantId map from the worker (bounded). Returns null on any failure so a
-     * transient error never poisons the cache.
+     * Resolves a tenant slug to a tenant ID without blocking — the variant reactive callers
+     * (the gateway filter chain) must use.
+     *
+     * <p>On a cache miss the slug→tenant map is pulled from the worker and merged. The scheduled
+     * refresh may not have run yet (cold start, or a refresh that failed while the worker was
+     * briefly unreachable), or this may be a brand-new tenant; without the lazy lookup a VALID
+     * tenant 404s for up to one refresh interval and the UI cannot even load. Concurrent misses
+     * share one in-flight fetch.
+     *
+     * @param slug the tenant slug from the URL path
+     * @return the tenant ID if the slug is known, empty otherwise
      */
-    private Map<String, String> fetchTenantSlugMap() {
-        try {
-            return webClient.get()
-                    .uri("/internal/tenants/slug-map")
-                    .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
-                    .block(Duration.ofSeconds(2));
-        } catch (Exception e) {
-            log.warn("Lazy tenant slug-map fetch failed: {}", e.getMessage());
+    public Mono<Optional<String>> resolveTenantSlugReactive(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return Mono.just(Optional.empty());
+        }
+        Optional<String> cached = cachedTenantSlug(slug);
+        if (cached != null) {
+            return Mono.just(cached);
+        }
+        return sharedTenantSlugMapFetch()
+                .map(mapping -> {
+                    if (mapping.isEmpty()) {
+                        return Optional.<String>empty();
+                    }
+                    // Merge only — never clear, or a concurrent request misses a slug we hold.
+                    tenantSlugCache.putAll(mapping);
+                    String resolved = mapping.get(slug);
+                    if (resolved != null) {
+                        return Optional.of(resolved);
+                    }
+                    // Fetched successfully but the slug genuinely isn't a tenant — negative-cache so
+                    // an unknown slug doesn't re-fetch on every request (cleared by the next refresh).
+                    tenantSlugCache.put(slug, SLUG_NOT_FOUND);
+                    return Optional.<String>empty();
+                })
+                // On a fetch error we intentionally do NOT negative-cache: a transient worker blip
+                // must not pin a valid tenant to "not found" — the next request retries.
+                .onErrorResume(e -> {
+                    log.warn("Lazy tenant slug-map fetch failed: {}", e.getMessage());
+                    return Mono.just(Optional.empty());
+                });
+    }
+
+    /**
+     * Reads the slug straight from the cache.
+     *
+     * @return the resolution if the cache holds one (possibly {@link Optional#empty()} for a
+     *         negative entry), or {@code null} on a cache miss
+     */
+    private Optional<String> cachedTenantSlug(String slug) {
+        String cached = tenantSlugCache.getIfPresent(slug);
+        if (cached == null) {
             return null;
+        }
+        return SLUG_NOT_FOUND.equals(cached) ? Optional.empty() : Optional.of(cached);
+    }
+
+    /**
+     * Fetches the slug→tenantId map from the worker (bounded), collapsing concurrent callers onto a
+     * single in-flight request so a cold cache cannot stampede the worker. Never emits null.
+     */
+    private Mono<Map<String, String>> sharedTenantSlugMapFetch() {
+        while (true) {
+            Mono<Map<String, String>> existing = inFlightSlugMapFetch.get();
+            if (existing != null) {
+                return existing;
+            }
+            // defer so an assembly-time failure surfaces as onError rather than being thrown at the
+            // caller — the resolve path treats any fetch failure as "unknown, retry next request".
+            Mono<Map<String, String>> fetch = Mono.defer(() -> webClient.get()
+                            .uri("/internal/tenants/slug-map")
+                            .retrieve()
+                            .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {}))
+                    .timeout(SLUG_MAP_TIMEOUT)
+                    .defaultIfEmpty(Map.of())
+                    .doFinally(signal -> inFlightSlugMapFetch.set(null))
+                    .cache();
+            if (inFlightSlugMapFetch.compareAndSet(null, fetch)) {
+                return fetch;
+            }
         }
     }
 
@@ -175,9 +241,23 @@ public class GatewayCacheManager {
      * @param slugMap map of slug to tenantId
      */
     public void refreshTenantSlugs(Map<String, String> slugMap) {
-        tenantSlugCache.invalidateAll();
-        tenantSlugCache.putAll(slugMap);
+        replaceTenantSlugs(slugMap);
         log.info("Refreshed tenant slug cache: {} entries", slugMap.size());
+    }
+
+    /**
+     * Swaps the slug cache over to {@code slugMap} without ever leaving it empty.
+     *
+     * <p>{@code invalidateAll()} followed by {@code putAll(...)} opens a window — sub-millisecond,
+     * but every refresh tick — in which a request for a perfectly valid tenant misses the cache and
+     * 404s with {@code TENANT_NOT_FOUND} (#1334). Writing the new entries first and only then
+     * dropping the ones that are gone means a slug present in both the old and new map is never
+     * absent. Stale entries (including negative {@code SLUG_NOT_FOUND} markers) still disappear, so
+     * a renamed or deleted tenant stops resolving as before.
+     */
+    private void replaceTenantSlugs(Map<String, String> slugMap) {
+        tenantSlugCache.putAll(slugMap);
+        tenantSlugCache.asMap().keySet().removeIf(slug -> !slugMap.containsKey(slug));
     }
 
     /**
@@ -195,8 +275,7 @@ public class GatewayCacheManager {
                     .block();
 
             if (mapping != null && !mapping.isEmpty()) {
-                tenantSlugCache.invalidateAll();
-                tenantSlugCache.putAll(mapping);
+                replaceTenantSlugs(mapping);
                 log.info("Refreshed tenant slug cache: {} entries", mapping.size());
             } else {
                 log.warn("Tenant slug-map returned empty; keeping existing cache ({} entries)",
@@ -397,32 +476,80 @@ public class GatewayCacheManager {
      * @return the tenant slug if the domain is registered, empty otherwise
      */
     public Optional<String> resolveCustomDomain(String domain) {
-        String cached = customDomainCache.getIfPresent(domain);
+        Optional<String> cached = cachedCustomDomain(domain);
         if (cached != null) {
-            if (DOMAIN_NOT_FOUND.equals(cached)) {
-                return Optional.empty();
-            }
-            return Optional.of(cached);
+            return cached;
         }
-
-        // Try loading from worker on cache miss
-        try {
-            String resolved = webClient.get()
-                    .uri("/internal/domains/resolve?domain={domain}", domain)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block(Duration.ofSeconds(2));
-            if (resolved != null && !resolved.isBlank()) {
-                customDomainCache.put(domain, resolved);
-                return Optional.of(resolved);
-            }
-        } catch (Exception e) {
-            log.debug("Custom domain lookup failed for {}: {}", domain, e.getMessage());
+        if (Schedulers.isInNonBlockingThread()) {
+            // See resolveTenantSlug: a reactive caller must use resolveCustomDomainReactive.
+            log.warn("resolveCustomDomain('{}') missed the cache on a non-blocking thread; "
+                    + "use resolveCustomDomainReactive so the lookup can run", domain);
+            return Optional.empty();
         }
+        return resolveCustomDomainReactive(domain).block(SLUG_MAP_TIMEOUT.plusSeconds(1));
+    }
 
-        // Cache the negative result to avoid calling the worker on every request
-        customDomainCache.put(domain, DOMAIN_NOT_FOUND);
-        return Optional.empty();
+    /**
+     * Resolves a custom domain to a tenant slug without blocking — the variant reactive callers
+     * (the gateway filter chain) must use.
+     *
+     * <p>Three-tier lookup: local cache → worker API → not found. A definitive "no such domain"
+     * from the worker is negative-cached so an unregistered host does not call the worker on every
+     * request; a lookup that *failed* is not, because pinning a valid domain to "not found" for the
+     * cache TTL would black-hole a live tenant (#1334).
+     *
+     * @param domain the custom domain (e.g., "app.acme.com")
+     * @return the tenant slug if the domain is registered, empty otherwise
+     */
+    public Mono<Optional<String>> resolveCustomDomainReactive(String domain) {
+        if (domain == null || domain.isBlank()) {
+            return Mono.just(Optional.empty());
+        }
+        Optional<String> cached = cachedCustomDomain(domain);
+        if (cached != null) {
+            return Mono.just(cached);
+        }
+        return Mono.defer(() -> webClient.get()
+                        .uri("/internal/domains/resolve?domain={domain}", domain)
+                        .retrieve()
+                        .bodyToMono(String.class))
+                .timeout(SLUG_MAP_TIMEOUT)
+                .defaultIfEmpty("")
+                .map(resolved -> {
+                    if (!resolved.isBlank()) {
+                        customDomainCache.put(domain, resolved);
+                        return Optional.of(resolved);
+                    }
+                    // The worker answered, and the answer is "not a custom domain".
+                    customDomainCache.put(domain, DOMAIN_NOT_FOUND);
+                    return Optional.<String>empty();
+                })
+                .onErrorResume(e -> {
+                    if (e instanceof WebClientResponseException response
+                            && response.getStatusCode().value() == 404) {
+                        // The worker answered, and the answer is "no such domain" — cache it.
+                        customDomainCache.put(domain, DOMAIN_NOT_FOUND);
+                        return Mono.just(Optional.<String>empty());
+                    }
+                    // Timeout, connection failure, 5xx: no answer at all. Do NOT negative-cache, or
+                    // a live tenant is black-holed for the cache TTL.
+                    log.debug("Custom domain lookup failed for {}: {}", domain, e.getMessage());
+                    return Mono.just(Optional.<String>empty());
+                });
+    }
+
+    /**
+     * Reads the domain straight from the cache.
+     *
+     * @return the resolution if the cache holds one (possibly {@link Optional#empty()} for a
+     *         negative entry), or {@code null} on a cache miss
+     */
+    private Optional<String> cachedCustomDomain(String domain) {
+        String cached = customDomainCache.getIfPresent(domain);
+        if (cached == null) {
+            return null;
+        }
+        return DOMAIN_NOT_FOUND.equals(cached) ? Optional.empty() : Optional.of(cached);
     }
 
     /**

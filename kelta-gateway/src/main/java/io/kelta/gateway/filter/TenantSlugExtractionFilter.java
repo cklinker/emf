@@ -133,8 +133,22 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
             strippedPath = "/";
         }
 
-        // Resolve slug to tenant ID
-        Optional<String> tenantId = cacheManager.resolveTenantSlug(firstSegment);
+        // Resolve slug to tenant ID. Reactive: the lazy worker lookup behind a cache miss cannot
+        // block this thread (it would throw and 404 a valid tenant — #1334).
+        String slugSegment = firstSegment;
+        String finalStrippedPath = strippedPath;
+        return cacheManager.resolveTenantSlugReactive(slugSegment)
+                .flatMap(tenantId -> continueWithTenant(exchange, chain, path, slugSegment,
+                        finalStrippedPath, tenantId));
+    }
+
+    /**
+     * Applies the resolution: sets tenant attributes when the slug is known, strips the segment
+     * either way so downstream route matching sees a bare path.
+     */
+    private Mono<Void> continueWithTenant(ServerWebExchange exchange, WebFilterChain chain,
+                                          String path, String firstSegment, String strippedPath,
+                                          Optional<String> tenantId) {
         if (tenantId.isEmpty()) {
             metrics.recordTenantResolution("slug", "not_found");
             if (requirePrefix) {

@@ -15,6 +15,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
 import java.util.List;
@@ -504,6 +505,34 @@ class TenantSlugExtractionFilterTest {
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(exchange.getResponse().getHeaders().getContentType().toString())
                 .contains("application/json");
+    }
+
+    // --- Reactive resolution (#1334) ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldResolveASlugMissingFromTheCacheWhileRunningOnAnEventLoopThread() {
+        // The real filter chain runs on a reactor-http-epoll thread. The lazy slug lookup used to
+        // block there, which threw, and the swallowed exception 404'd a live tenant (#1334).
+        when(webClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri("/internal/tenants/slug-map")).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
+                .thenReturn(Mono.just(Map.of("acme", "tenant-uuid-123")));
+
+        TenantSlugExtractionFilter filter = createFilter(true, true);
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/acme/api/users"));
+
+        // Cold cache + a non-blocking scheduler == the production failure conditions.
+        StepVerifier.create(filter.filter(exchange, chain).subscribeOn(Schedulers.parallel()))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode())
+                .as("a valid tenant must not 404 just because the cache was cold")
+                .isNotEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exchange.getAttributes().get(TenantResolutionFilter.TENANT_ID_ATTR))
+                .isEqualTo("tenant-uuid-123");
     }
 
     // --- Helpers ---

@@ -72,6 +72,20 @@ public record WatchCriteria(
             errors.add("criteria is not valid JSON");
             return new ParseResult(ANY, errors);
         }
+        // Legacy rows carry the object as a JSON string (see the storage note in
+        // WatchController) — unwrap once so their date windows still match. Only
+        // when an object actually falls out: a plain string stays the malformed
+        // input it always was.
+        if (node.isTextual()) {
+            try {
+                JsonNode unwrapped = objectMapper.readTree(node.stringValue());
+                if (unwrapped.isObject()) {
+                    node = unwrapped;
+                }
+            } catch (RuntimeException e) {
+                // Not JSON inside — leave it textual for the object check below.
+            }
+        }
         if (!node.isObject()) {
             errors.add("criteria must be a JSON object");
             return new ParseResult(ANY, errors);

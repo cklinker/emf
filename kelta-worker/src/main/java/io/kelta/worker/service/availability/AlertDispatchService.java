@@ -186,6 +186,12 @@ public class AlertDispatchService {
         }
         try {
             JsonNode node = objectMapper.readTree(json);
+            // Rows written before the storage fix hold a JSON string wrapping the
+            // array; unwrap one level so an existing watch keeps its channels
+            // instead of silently falling back to the full entitlement.
+            if (node.isTextual()) {
+                node = objectMapper.readTree(node.stringValue());
+            }
             if (!node.isArray()) {
                 return List.of();
             }

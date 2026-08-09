@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
@@ -159,8 +160,8 @@ public class WatchController implements SelfScopedController {
         data.put("tenantId", tenantId);
         data.put("memberId", subject);
         data.put("targetId", target.id());
-        data.put("criteria", criteria);
-        data.put("channels", toJsonArray(channels));
+        data.put("criteria", criteriaStructure(criteria));
+        data.put("channels", channels);
         data.put("status", Watch.STATUS_ACTIVE);
         if (body.expiresAt() != null) {
             data.put("expiresAt", body.expiresAt());
@@ -183,11 +184,11 @@ public class WatchController implements SelfScopedController {
 
         Map<String, Object> data = new LinkedHashMap<>();
         if (body != null && body.criteria() != null) {
-            data.put("criteria", validateCriteria(body.criteria()));
+            data.put("criteria", criteriaStructure(validateCriteria(body.criteria())));
         }
         if (body != null && body.channels() != null) {
-            data.put("channels", toJsonArray(
-                    intersectChannels(tenantId, existing.memberId(), body.channels())));
+            data.put("channels",
+                    intersectChannels(tenantId, existing.memberId(), body.channels()));
         }
         if (body != null && body.status() != null) {
             data.put("status", requirePausableStatus(body.status()));
@@ -347,10 +348,23 @@ public class WatchController implements SelfScopedController {
         return item;
     }
 
-    private String toJsonArray(List<String> values) {
-        var array = objectMapper.createArrayNode();
-        values.forEach(array::add);
-        return array.toString();
+    /**
+     * Criteria as a structure, not JSON text. The storage adapter JSON-encodes
+     * whatever it is handed, so passing the serialized form stored a JSON *string*
+     * wrapping the object — which then read back as a textual node, silently
+     * defeating criteria matching and channel selection.
+     */
+    private Map<String, Object> criteriaStructure(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() { });
+        } catch (RuntimeException e) {
+            // validateCriteria already re-serialized this from a parsed structure,
+            // so failing here means a bug, not bad input.
+            throw new IllegalStateException("criteria could not be re-read as a structure", e);
+        }
     }
 
     private CollectionDefinition definition() {

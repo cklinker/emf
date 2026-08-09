@@ -3,6 +3,7 @@ package io.kelta.worker.controller;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.service.push.DefaultPushService;
 import io.kelta.worker.service.push.WebPushProvider;
+import io.kelta.worker.interceptor.SelfScopedController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -23,7 +24,7 @@ import java.util.Map;
  * @since 1.0.0
  */
 @RestController
-public class PushDeviceController {
+public class PushDeviceController implements SelfScopedController {
 
     private static final Logger log = LoggerFactory.getLogger(PushDeviceController.class);
     private static final int ADMIN_NOTIFICATION_RATE_LIMIT = 10; // per hour

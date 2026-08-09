@@ -13,6 +13,7 @@ import io.kelta.worker.repository.WatchTarget;
 import io.kelta.worker.repository.WatchTargetRepository;
 import io.kelta.worker.service.availability.WatchCriteria;
 import io.kelta.worker.service.billing.EntitlementService;
+import io.kelta.worker.interceptor.SelfScopedController;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +60,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/watches")
-public class WatchController {
+public class WatchController implements SelfScopedController {
 
     private static final Logger log = LoggerFactory.getLogger(WatchController.class);
 

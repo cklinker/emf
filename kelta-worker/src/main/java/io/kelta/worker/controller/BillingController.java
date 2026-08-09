@@ -11,6 +11,7 @@ import io.kelta.worker.repository.BillingSubscriptionRepository;
 import io.kelta.worker.service.billing.BillingCheckoutService;
 import io.kelta.worker.service.billing.EntitlementService;
 import io.kelta.worker.service.billing.MemberEntitlements;
+import io.kelta.worker.interceptor.SelfScopedController;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,7 +44,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/billing")
-public class BillingController {
+public class BillingController implements SelfScopedController {
 
     private final BillingPlanRepository planRepository;
     private final BillingSubscriptionRepository subscriptionRepository;

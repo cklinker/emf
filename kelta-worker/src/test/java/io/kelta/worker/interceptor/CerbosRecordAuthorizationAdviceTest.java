@@ -7,6 +7,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -47,6 +48,62 @@ class CerbosRecordAuthorizationAdviceTest {
         lenient().when(permissionResolver.getProfileId(request)).thenReturn("profile-1");
         lenient().when(permissionResolver.getTenantId(request)).thenReturn("tenant-1");
         return new ServletServerHttpRequest(request);
+    }
+
+    @Nested
+    @DisplayName("self-scoped controllers")
+    class SelfScoped {
+
+        /** Stands in for WatchController/WinController/PushDeviceController/BillingController. */
+        static class MemberController implements SelfScopedController {
+            public Map<String, Object> list() {
+                return Map.of();
+            }
+        }
+
+        static class GenericController {
+            public Map<String, Object> list() {
+                return Map.of();
+            }
+        }
+
+        private MethodParameter returnTypeOf(Class<?> controller) throws Exception {
+            return new MethodParameter(controller.getDeclaredMethod("list"), -1);
+        }
+
+        @Test
+        @DisplayName("keeps a member's own records — the filter would otherwise empty them")
+        void keepsSelfScopedRecords() throws Exception {
+            // A portal member holds no record grants, so Cerbos denies every record.
+            var request = createRequest("/api/watches");
+            Map<String, Object> body = Map.of("data",
+                    List.of(Map.of("id", "watch-1", "targetId", "t-1")));
+
+            Object result = advice.beforeBodyWrite(body, returnTypeOf(MemberController.class),
+                    MediaType.APPLICATION_JSON, null, request, null);
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> data = (List<Map<String, Object>>) ((Map<String, Object>) result).get("data");
+            assertThat(data).hasSize(1);
+            verifyNoInteractions(authzService);
+        }
+
+        @Test
+        @DisplayName("still filters the generic collection route on the same path")
+        void filtersGenericRouteOnSamePath() throws Exception {
+            var request = createRequest("/api/watches");
+            when(authzService.batchCheckRecordAccess(any(), any(), any(), any(), anyList(), eq("read")))
+                    .thenReturn(Set.of());
+            Map<String, Object> body = Map.of("data",
+                    List.of(Map.of("id", "watch-1", "targetId", "t-1")));
+
+            Object result = advice.beforeBodyWrite(body, returnTypeOf(GenericController.class),
+                    MediaType.APPLICATION_JSON, null, request, null);
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> data = (List<Map<String, Object>>) ((Map<String, Object>) result).get("data");
+            assertThat(data).isEmpty();
+        }
     }
 
     @Test

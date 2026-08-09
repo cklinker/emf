@@ -7,6 +7,7 @@ import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.router.UserIdResolver;
 import io.kelta.worker.repository.WinRepository;
 import io.kelta.worker.repository.WinRepository.Win;
+import io.kelta.worker.interceptor.SelfScopedController;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +44,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/wins")
-public class WinController {
+public class WinController implements SelfScopedController {
 
     private static final Logger log = LoggerFactory.getLogger(WinController.class);
 

@@ -59,12 +59,19 @@ public class SecurityConfig {
                     "Set it to your UI domain (e.g., 'https://app.example.com'). " +
                     "Wildcard '*' is not permitted with allowCredentials=true.");
         }
-        if ("*".equals(corsAllowedOriginPattern)) {
-            log.warn("CORS_ALLOWED_ORIGIN_PATTERN is set to '*' which allows any origin " +
+        // Comma-separated so several product frontends (e.g. app.kelta.io +
+        // app.spotopened.com) can each call the gateway from the browser. Each
+        // trimmed entry is a Spring allowedOriginPattern.
+        List<String> originPatterns = Arrays.stream(corsAllowedOriginPattern.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList();
+        if (originPatterns.contains("*")) {
+            log.warn("CORS_ALLOWED_ORIGIN_PATTERN includes '*' which allows any origin " +
                     "to make credentialed requests. This is insecure for production.");
         }
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(corsAllowedOriginPattern));
+        configuration.setAllowedOriginPatterns(originPatterns);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of(
                 "Authorization", "Content-Type", "Accept", "X-Correlation-ID",

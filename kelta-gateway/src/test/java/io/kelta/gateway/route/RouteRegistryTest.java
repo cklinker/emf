@@ -390,6 +390,41 @@ class RouteRegistryTest {
         assertFalse(registry.findByPath("/api/inventory/1/2").isPresent());
     }
 
+    @Test
+    void dynamicCollectionRouteDoesNotShadowMemberStaticRoute() {
+        // Member-facing static route registered first (bootstrap)…
+        registry.addRoute(createRoute("static-watches", "/api/watches/**"));
+        // …then the 'watches' system collection's generic route tries to take the
+        // same path. It must be ignored so the API_ACCESS-only controller route wins
+        // (otherwise per-resource Cerbos runs and a portal member gets 403).
+        registry.addRoute(createRoute("3307cdef-collection-uuid", "/api/watches/**"));
+
+        RouteDefinition resolved = registry.findByPath("/api/watches").orElseThrow();
+        assertEquals("static-watches", resolved.getId(),
+            "the static member route must own /api/watches, not the collection route");
+    }
+
+    @Test
+    void updateRouteAlsoRejectsShadowOfMemberStaticRoute() {
+        registry.addRoute(createRoute("static-wins", "/api/wins/**"));
+        // NATS collection-update path must not clobber it either.
+        registry.updateRoute(createRoute("wins-collection-uuid", "/api/wins/**"));
+
+        assertEquals("static-wins", registry.findByPath("/api/wins").orElseThrow().getId());
+    }
+
+    @Test
+    void nonMemberStaticRouteIsStillOverwritableByCollectionRoute() {
+        // A config collection (e.g. flows) relies on its generic route's per-resource
+        // Cerbos check — the dynamic route may still replace the bootstrap static one.
+        registry.addRoute(createRoute("static-flows", "/api/flows/**"));
+        registry.addRoute(createRoute("flows-collection-uuid", "/api/flows/**"));
+
+        RouteDefinition resolved = registry.findByPath("/api/flows").orElseThrow();
+        assertEquals("flows-collection-uuid", resolved.getId(),
+            "non-member static routes keep last-write-wins so per-resource Cerbos still applies");
+    }
+
     private RouteDefinition createRoute(String id, String path) {
         return new RouteDefinition(
             id,

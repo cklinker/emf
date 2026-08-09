@@ -69,7 +69,10 @@ kelta:
   sms:
     provider: ${KELTA_SMS_PROVIDER:log}   # log | twilio
     twilio:
-      account-sid: ${TWILIO_ACCOUNT_SID:}
+      account-sid: ${TWILIO_ACCOUNT_SID:}   # AC… — always used in the request URL
+      # API key (recommended, revocable): key-sid = SK… + auth-token = its secret.
+      # Or leave key-sid blank and set auth-token to the account Auth Token.
+      key-sid: ${TWILIO_KEY_SID:}
       auth-token: ${TWILIO_AUTH_TOKEN:}
       from-number: ${TWILIO_FROM_NUMBER:}
   worker:

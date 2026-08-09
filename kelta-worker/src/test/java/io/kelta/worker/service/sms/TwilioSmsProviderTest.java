@@ -23,9 +23,13 @@ class TwilioSmsProviderTest {
     }
 
     private Harness twilio(String sid, String token, String from) {
+        return twilioWithKey(sid, "", token, from);
+    }
+
+    private Harness twilioWithKey(String sid, String keySid, String token, String from) {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        return new Harness(new TwilioSmsProvider(builder.build(), sid, token, from), server);
+        return new Harness(new TwilioSmsProvider(builder.build(), sid, keySid, token, from), server);
     }
 
     @Test
@@ -43,6 +47,24 @@ class TwilioSmsProviderTest {
                         .body("{\"sid\":\"SM1\"}").contentType(MediaType.APPLICATION_JSON));
 
         h.provider().send(new SmsMessage("+14155551234", "A spot just opened. Book now."));
+
+        h.server().verify();
+    }
+
+    @Test
+    @DisplayName("uses the API Key SID as the Basic-auth user when key-sid is configured")
+    void usesApiKeyForBasicAuth() {
+        Harness h = twilioWithKey(SID, "SKtestkey", "keysecret", FROM);
+        String expected = "Basic " + java.util.Base64.getEncoder()
+                .encodeToString("SKtestkey:keysecret".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        // The URL still carries the Account SID; only the Basic-auth user switches to the key.
+        h.server().expect(requestTo(
+                        "https://api.twilio.com/2010-04-01/Accounts/" + SID + "/Messages.json"))
+                .andExpect(header("Authorization", expected))
+                .andRespond(withStatus(HttpStatus.CREATED)
+                        .body("{\"sid\":\"SM1\"}").contentType(MediaType.APPLICATION_JSON));
+
+        h.provider().send(new SmsMessage("+14155551234", "hi"));
 
         h.server().verify();
     }

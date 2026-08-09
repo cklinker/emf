@@ -124,7 +124,10 @@ async function exchangeCode(
 }
 
 async function mintPat(params: BrowserLoginParams, accessToken: string): Promise<MintedPat> {
-  const name = `kelta-cli ${hostname()} ${new Date().toISOString().slice(0, 10)}`;
+  // Second-precision timestamp: PAT names are unique per (user, name), so a
+  // date-only name collides on the second login of the day (worker 409s).
+  const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+  const name = `kelta-cli ${hostname()} ${stamp}`;
   const response = await axios.post<{ token?: string; tokenPrefix?: string; expiresAt?: string }>(
     `${params.apiUrl.replace(/\/$/, '')}/${params.tenantSlug}/api/me/tokens`,
     { name, expiresInDays: params.expiresInDays },

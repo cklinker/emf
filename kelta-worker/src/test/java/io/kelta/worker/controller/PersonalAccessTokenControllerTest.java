@@ -2,10 +2,12 @@ package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.router.UserIdResolver;
+import io.kelta.runtime.storage.UniqueConstraintViolationException;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -93,6 +96,22 @@ class PersonalAccessTokenControllerTest {
             String token = (String) body.get("token");
             assertThat(token).startsWith("klt_");
             assertThat(token).hasSize(44); // "klt_" + 40 chars
+        }
+
+        @Test
+        void shouldThrowUniqueViolationWhenNameAlreadyExists() {
+            when(jdbcTemplate.queryForList(contains("platform_user"), eq("user-1"), eq("tenant-1")))
+                    .thenReturn(List.of(Map.of("email", "user@test.com")));
+            when(jdbcTemplate.queryForList(contains("COUNT"), eq("user-1"), eq("tenant-1")))
+                    .thenReturn(List.of(Map.of("cnt", 0L)));
+            when(jdbcTemplate.update(contains("INSERT INTO user_api_token"), any(Object[].class)))
+                    .thenThrow(new DuplicateKeyException(
+                            "duplicate key value violates unique constraint \"uq_user_api_token_name_per_user\""));
+
+            assertThatThrownBy(() -> controller.createToken("user-1",
+                    Map.of("name", "My Token", "expiresInDays", 90)))
+                    .isInstanceOf(UniqueConstraintViolationException.class)
+                    .hasMessageContaining("name");
         }
 
         @Test

@@ -100,6 +100,33 @@ describe('auth login — browser flow', () => {
     expect(JSON.stringify(result)).not.toContain('klt_minted1234567890');
   });
 
+  it('strips a path from --url with a warning — the CLI prepends the tenant slug itself', async () => {
+    browserLoginMock.mockResolvedValue({
+      token: 'klt_minted1234567890',
+      tokenPrefix: 'klt_mint',
+      expiresAt: '2026-11-04T00:00:00Z',
+      name: 'n',
+    });
+
+    const context = ctx('prod');
+    const def = command(authCommands, 'login');
+    await def.handler(
+      context,
+      def.input.parse({
+        url: 'https://api.kelta.io/acme',
+        tenant: 'acme',
+        expiresIn: '30',
+        browser: true,
+      }) as never
+    );
+
+    expect(browserLoginMock).toHaveBeenCalledWith(
+      expect.objectContaining({ apiUrl: 'https://api.kelta.io' })
+    );
+    expect(loadConfig().profiles.prod?.apiUrl).toBe('https://api.kelta.io');
+    expect(vi.mocked(context.log).mock.calls.flat().join('\n')).toContain('Ignoring path "/acme"');
+  });
+
   it('re-authenticates an existing profile with no flags', async () => {
     saveConfig({
       version: 1,

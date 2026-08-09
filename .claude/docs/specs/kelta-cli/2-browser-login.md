@@ -27,7 +27,10 @@ Flow (PR B):
    normal browser session.
 4. Callback → verify `state` → exchange code at `/oauth2/token` (public client, PKCE).
 5. With the access JWT: `POST {apiUrl}/{tenant}/api/me/tokens`
-   `{ name: "kelta-cli <hostname> <yyyy-mm-dd>", expiresInDays: <--expires-in, default 90> }`
+   `{ name: "kelta-cli <hostname> <yyyy-mm-ddThh-mm-ss>", expiresInDays: <--expires-in, default 90> }`
+   (second-precision stamp — `(user_id, name)` is unique on `user_api_token`, so a
+   date-only name collided on the second login of the day; the worker returns 409
+   `UNIQUE_VIOLATION` on a duplicate name instead of 500)
    → store returned `klt_` token + `tokenPrefix` + `expiresAt` in the profile; drop JWT.
 6. Browser tab shows a static "you can close this window" page; CLI prints profile summary.
 

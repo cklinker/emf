@@ -2,9 +2,11 @@ package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.router.UserIdResolver;
+import io.kelta.runtime.storage.UniqueConstraintViolationException;
 import io.kelta.worker.service.SecurityAuditLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -155,12 +157,16 @@ public class PersonalAccessTokenController {
                 : List.of("api");
         String scopesJson = "[" + String.join(",", scopes.stream().map(s -> "\"" + s + "\"").toList()) + "]";
 
-        // Insert token
-        jdbcTemplate.update(
-                "INSERT INTO user_api_token (user_id, tenant_id, name, token_prefix, token_hash, scopes, expires_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?)",
-                userId, tenantId, name.trim(), tokenPrefixDisplay, tokenHash, scopesJson,
-                Timestamp.from(expiresAt));
+        // Insert token — uq_user_api_token_name_per_user makes (user_id, name) unique
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO user_api_token (user_id, tenant_id, name, token_prefix, token_hash, scopes, expires_at) " +
+                            "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?)",
+                    userId, tenantId, name.trim(), tokenPrefixDisplay, tokenHash, scopesJson,
+                    Timestamp.from(expiresAt));
+        } catch (DuplicateKeyException e) {
+            throw new UniqueConstraintViolationException("user_api_token", "name", name.trim());
+        }
 
         // Cache token metadata in Redis for gateway validation
         try {

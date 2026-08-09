@@ -349,14 +349,35 @@ public class DefaultQueryEngine implements QueryEngine {
         recordData.remove("createdAt");
         recordData.remove("createdBy");
 
-        // Strip immutable fields from update data
+        // Reject writes that would change a collection-level immutable field.
+        // These used to be stripped silently, which returned 200 for a write that
+        // never happened (#1330). Only a real change is an error: a caller
+        // re-sending the value the record already holds — any full-record
+        // round-trip — still succeeds. Either way the field leaves the patch, so
+        // the stored value is never rewritten.
         if (!definition.immutableFields().isEmpty()) {
-            for (String immutableField : definition.immutableFields()) {
-                if (recordData.containsKey(immutableField)) {
-                    logger.debug("Stripping immutable field '{}' from update on collection '{}'",
-                            immutableField, definition.name());
-                    recordData.remove(immutableField);
+            List<FieldError> immutableErrors = new ArrayList<>();
+            Map<String, Object> existingRecord = existing.get();
+            // Sorted so a multi-field rejection reads the same on every call —
+            // immutableFields() is an unordered Set.
+            for (String immutableField : new TreeSet<>(definition.immutableFields())) {
+                if (!recordData.containsKey(immutableField)) {
+                    continue;
                 }
+                Object submitted = recordData.remove(immutableField);
+                if (isBlank(submitted)) {
+                    // An empty submission is not a change request. Forms round-trip a
+                    // whole record and coerce untouched inputs to null/"", and an
+                    // immutable field cannot be cleared anyway — failing here would
+                    // reject edits that never touched the field.
+                    continue;
+                }
+                if (!sameStoredValue(existingRecord.get(immutableField), submitted)) {
+                    immutableErrors.add(FieldError.immutable(immutableField));
+                }
+            }
+            if (!immutableErrors.isEmpty()) {
+                throw new ValidationException(ValidationResult.failure(immutableErrors));
             }
         }
 
@@ -672,6 +693,29 @@ public class DefaultQueryEngine implements QueryEngine {
             }
         }
         return changedFields;
+    }
+
+    /**
+     * Compares a submitted value against the value already stored, tolerantly
+     * enough that re-sending an unchanged field is not read as a change.
+     *
+     * <p>A read-back value does not always come back in the type it was written
+     * as — an id column may surface as a {@code UUID}, a timestamp as an
+     * {@code Instant} — so equal string forms count as equal. Only used to
+     * decide whether an immutable field is actually being changed.
+     */
+    private boolean isBlank(Object value) {
+        return value == null || (value instanceof String s && s.isBlank());
+    }
+
+    private boolean sameStoredValue(Object stored, Object submitted) {
+        if (Objects.equals(stored, submitted)) {
+            return true;
+        }
+        if (stored == null || submitted == null) {
+            return false;
+        }
+        return String.valueOf(stored).equals(String.valueOf(submitted));
     }
 
     /**

@@ -5,6 +5,8 @@ import io.kelta.runtime.model.CollectionDefinitionBuilder;
 import io.kelta.runtime.model.FieldDefinition;
 import io.kelta.runtime.model.FieldType;
 import io.kelta.runtime.storage.StorageAdapter;
+import io.kelta.runtime.validation.FieldError;
+import io.kelta.runtime.validation.ValidationException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,19 +18,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for read-only collection enforcement and immutable field stripping
+ * Tests for read-only collection enforcement and immutable field handling
  * in DefaultQueryEngine.
  *
  * <p>Verifies that:
  * <ul>
  *   <li>Read-only collections reject create, update, and delete operations</li>
  *   <li>Read-only collections still allow query (read) operations</li>
- *   <li>Immutable fields are stripped from update data before persisting</li>
+ *   <li>An update that would change an immutable field is rejected, not silently dropped</li>
+ *   <li>An unchanged immutable field is accepted and left out of the persisted patch</li>
  *   <li>Non-immutable fields pass through normally</li>
  * </ul>
  */
@@ -164,15 +168,15 @@ class ReadOnlyCollectionTest {
         }
     }
 
-    // ==================== Immutable Field Stripping Tests ====================
+    // ==================== Immutable Field Tests ====================
 
     @Nested
-    @DisplayName("Immutable Field Stripping")
+    @DisplayName("Immutable Field Enforcement")
     class ImmutableFieldTests {
 
         @Test
-        @DisplayName("Should strip immutable fields from update data")
-        void update_stripsImmutableFields_fromUpdateData() {
+        @DisplayName("Should reject an update that changes immutable fields, naming each one")
+        void update_rejectsChangedImmutableFields() {
             CollectionDefinition usersDef = buildCollectionWithImmutableFields();
             String id = "user-1";
 
@@ -184,9 +188,44 @@ class ReadOnlyCollectionTest {
 
             // Attempt to update email (immutable), tenantId (immutable), and name (mutable)
             Map<String, Object> updateData = new HashMap<>();
-            updateData.put("email", "jane@example.com");      // immutable - should be stripped
-            updateData.put("tenantId", "tenant-2");            // immutable - should be stripped
-            updateData.put("name", "Jane");                     // mutable - should be kept
+            updateData.put("email", "jane@example.com");      // immutable - should be rejected
+            updateData.put("tenantId", "tenant-2");            // immutable - should be rejected
+            updateData.put("name", "Jane");                     // mutable
+
+            when(storageAdapter.getById(usersDef, id)).thenReturn(Optional.of(existingRecord));
+
+            ValidationException exception = assertThrows(ValidationException.class,
+                    () -> queryEngine.update(usersDef, id, updateData));
+
+            List<String> failedFields = exception.getValidationResult().errors().stream()
+                    .map(FieldError::fieldName)
+                    .toList();
+            assertTrue(failedFields.containsAll(List.of("email", "tenantId")),
+                    "Both immutable fields should be named in the error, was " + failedFields);
+            assertTrue(exception.getValidationResult().errors().stream()
+                            .allMatch(error -> "immutable".equals(error.constraint())),
+                    "Errors should carry the immutable constraint");
+
+            verify(storageAdapter, never()).update(eq(usersDef), eq(id), any());
+        }
+
+        @Test
+        @DisplayName("Should accept an unchanged immutable field and leave it out of the patch")
+        void update_acceptsUnchangedImmutableField() {
+            CollectionDefinition usersDef = buildCollectionWithImmutableFields();
+            String id = "user-1";
+
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("email", "john@example.com");
+            existingRecord.put("name", "John");
+            existingRecord.put("tenantId", "tenant-1");
+
+            // A full-record round-trip: immutable fields resent with the values they already hold
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("email", "john@example.com");
+            updateData.put("tenantId", "tenant-1");
+            updateData.put("name", "Jane");
 
             when(storageAdapter.getById(usersDef, id)).thenReturn(Optional.of(existingRecord));
             when(storageAdapter.update(eq(usersDef), eq(id), any()))
@@ -194,19 +233,91 @@ class ReadOnlyCollectionTest {
 
             queryEngine.update(usersDef, id, updateData);
 
-            // Capture the data passed to storageAdapter.update()
             ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
             verify(storageAdapter).update(eq(usersDef), eq(id), dataCaptor.capture());
 
             Map<String, Object> persistedData = dataCaptor.getValue();
-
             assertFalse(persistedData.containsKey("email"),
-                    "Immutable field 'email' should be stripped from update data");
+                    "Unchanged immutable field should not be rewritten");
             assertFalse(persistedData.containsKey("tenantId"),
-                    "Immutable field 'tenantId' should be stripped from update data");
-            assertTrue(persistedData.containsKey("name"),
-                    "Mutable field 'name' should be present in update data");
+                    "Unchanged immutable field should not be rewritten");
             assertEquals("Jane", persistedData.get("name"));
+        }
+
+        @Test
+        @DisplayName("Should treat a stored value that reads back as another type as unchanged")
+        void update_acceptsImmutableField_whenStoredTypeDiffers() {
+            CollectionDefinition usersDef = buildCollectionWithImmutableFields();
+            String id = "user-1";
+            UUID tenantId = UUID.fromString("11111111-2222-3333-4444-555555555555");
+
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("email", "john@example.com");
+            existingRecord.put("tenantId", tenantId);          // reads back as a UUID
+
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("tenantId", tenantId.toString());   // resent as a String
+            updateData.put("name", "Jane");
+
+            when(storageAdapter.getById(usersDef, id)).thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.update(eq(usersDef), eq(id), any()))
+                    .thenAnswer(invocation -> Optional.of(invocation.getArgument(2)));
+
+            assertDoesNotThrow(() -> queryEngine.update(usersDef, id, updateData));
+        }
+
+        @Test
+        @DisplayName("Should ignore a blank submission for an immutable field")
+        void update_ignoresBlankImmutableField() {
+            CollectionDefinition usersDef = buildCollectionWithImmutableFields();
+            String id = "user-1";
+
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("email", "john@example.com");
+            existingRecord.put("tenantId", "tenant-1");
+
+            // A form round-trip that coerced untouched inputs to null / ""
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("email", null);
+            updateData.put("tenantId", "");
+            updateData.put("name", "Jane");
+
+            when(storageAdapter.getById(usersDef, id)).thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.update(eq(usersDef), eq(id), any()))
+                    .thenAnswer(invocation -> Optional.of(invocation.getArgument(2)));
+
+            assertDoesNotThrow(() -> queryEngine.update(usersDef, id, updateData));
+
+            ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+            verify(storageAdapter).update(eq(usersDef), eq(id), dataCaptor.capture());
+
+            Map<String, Object> persistedData = dataCaptor.getValue();
+            assertFalse(persistedData.containsKey("email"),
+                    "A blank submission must not clear an immutable field");
+            assertFalse(persistedData.containsKey("tenantId"),
+                    "A blank submission must not clear an immutable field");
+            assertEquals("Jane", persistedData.get("name"));
+        }
+
+        @Test
+        @DisplayName("Should reject setting an immutable field that is currently null")
+        void update_rejectsImmutableField_whenStoredValueIsNull() {
+            CollectionDefinition usersDef = buildCollectionWithImmutableFields();
+            String id = "user-1";
+
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "John");
+
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("email", "jane@example.com");
+
+            when(storageAdapter.getById(usersDef, id)).thenReturn(Optional.of(existingRecord));
+
+            assertThrows(ValidationException.class, () -> queryEngine.update(usersDef, id, updateData));
+            verify(storageAdapter, never()).update(eq(usersDef), eq(id), any());
         }
 
         @Test

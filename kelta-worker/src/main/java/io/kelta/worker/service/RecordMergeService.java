@@ -37,6 +37,10 @@ import java.util.Set;
  *   <li><b>Delete</b> the duplicate records.</li>
  * </ol>
  *
+ * <p>An inbound field its own collection declares immutable cannot be re-parented — an update
+ * naming it is rejected, not applied. Those relationships are skipped and returned in
+ * {@link Result#skippedImmutable()} rather than counted as moved.
+ *
  * <p>The whole operation is expected to run inside the caller's transaction so a mid-merge failure
  * rolls back cleanly (see {@code RecordMergeController}).
  *
@@ -60,11 +64,16 @@ public class RecordMergeService {
     public record ReparentedField(String collection, String field, int count) {
     }
 
+    /** An inbound relationship the merge could not re-parent because the field is immutable. */
+    public record SkippedField(String collection, String field) {
+    }
+
     /** Merge outcome: the surviving master, what was deleted, and the re-parenting breakdown. */
     public record Result(String masterId,
                          List<String> deletedIds,
                          int reparentedRecords,
-                         List<ReparentedField> reparented) {
+                         List<ReparentedField> reparented,
+                         List<SkippedField> skippedImmutable) {
     }
 
     /** A field in another collection whose LOOKUP/MASTER_DETAIL relationship targets the merged collection. */
@@ -127,8 +136,17 @@ public class RecordMergeService {
         // 2. Re-parent inbound FKs from each duplicate onto the master (before delete — see class doc).
         List<InboundRef> inbound = findInboundReferences(collectionName);
         List<ReparentedField> reparented = new ArrayList<>();
+        List<SkippedField> skippedImmutable = new ArrayList<>();
         int totalReparented = 0;
         for (InboundRef ref : inbound) {
+            // A field the owning collection declares immutable cannot be re-pointed by an
+            // update. That was always true — the write used to be dropped silently and
+            // still counted as re-parented (#1330). Report it instead of miscounting; the
+            // caller has to fix those children another way before deleting the duplicate.
+            if (ref.definition().immutableFields().contains(ref.fieldName())) {
+                skippedImmutable.add(new SkippedField(ref.definition().name(), ref.fieldName()));
+                continue;
+            }
             int fieldCount = 0;
             for (String dupId : dupes) {
                 fieldCount += reparent(ref, dupId, masterId);
@@ -147,7 +165,7 @@ public class RecordMergeService {
             }
         }
 
-        return new Result(masterId, deleted, totalReparented, reparented);
+        return new Result(masterId, deleted, totalReparented, reparented, skippedImmutable);
     }
 
     /**

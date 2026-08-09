@@ -199,7 +199,7 @@ public class BillingWebhookService {
         String status = text(subscription, "status");
         subscriptionRepository.upsert(tenantId, userId, planId, stripeSubscriptionId,
                 stripeCustomerId, status,
-                epochSeconds(subscription, "current_period_end"),
+                currentPeriodEnd(subscription),
                 subscription.path("cancel_at_period_end").asBoolean(false),
                 epochSeconds(subscription, "canceled_at"));
 
@@ -289,6 +289,33 @@ public class BillingWebhookService {
         }
         String s = value.stringValue();
         return s.isBlank() ? null : s;
+    }
+
+    /**
+     * The subscription's period end, from wherever the event renders it.
+     *
+     * <p>Stripe moved {@code current_period_end} off the subscription and onto
+     * each subscription item in 2025-03-31.basil. Webhook payloads are rendered
+     * with the <b>account's</b> API version (or the endpoint's), not the version
+     * this client pins for its own calls, so both shapes reach us and reading only
+     * the old one silently left the column null — which is what the member-facing
+     * "renews on" and "cancels on" lines read.
+     */
+    private static Instant currentPeriodEnd(JsonNode subscription) {
+        Instant topLevel = epochSeconds(subscription, "current_period_end");
+        if (topLevel != null) {
+            return topLevel;
+        }
+        // Items can carry different periods; the subscription's own period end is
+        // the latest of them.
+        Instant latest = null;
+        for (JsonNode item : subscription.path("items").path("data")) {
+            Instant itemEnd = epochSeconds(item, "current_period_end");
+            if (itemEnd != null && (latest == null || itemEnd.isAfter(latest))) {
+                latest = itemEnd;
+            }
+        }
+        return latest;
     }
 
     private static Instant epochSeconds(JsonNode node, String field) {

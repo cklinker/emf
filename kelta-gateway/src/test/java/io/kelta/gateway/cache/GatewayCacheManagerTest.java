@@ -10,12 +10,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -300,6 +306,97 @@ class GatewayCacheManagerTest {
             stubRefreshResponse(Mono.just(Map.of("acme", "tenant-id-1")));
             assertThat(cacheManager.isKnownSlug("acme")).isTrue();
         }
+
+        @Test
+        void refreshNeverLeavesAnUnchangedSlugUnresolvable() throws Exception {
+            // #1334: invalidateAll() + putAll() opened a window in which a live tenant 404'd.
+            // Deliberately NO worker stub: the lazy fetch must not paper over the window, or this
+            // test passes against the very bug it exists to catch.
+            Map<String, String> slugMap = Map.of("acme", "tenant-id-1", "globex", "tenant-id-2");
+            cacheManager.refreshTenantSlugs(slugMap);
+
+            AtomicBoolean running = new AtomicBoolean(true);
+            AtomicInteger misses = new AtomicInteger();
+            // A miss here is exactly what becomes a TENANT_NOT_FOUND response.
+            Thread reader = new Thread(() -> {
+                while (running.get()) {
+                    if (cacheManager.resolveTenantSlug("acme").isEmpty()) {
+                        misses.incrementAndGet();
+                    }
+                }
+            });
+            reader.start();
+            try {
+                for (int i = 0; i < 2_000; i++) {
+                    cacheManager.refreshTenantSlugs(slugMap);
+                }
+            } finally {
+                running.set(false);
+                reader.join(5_000);
+            }
+
+            assertThat(misses.get())
+                    .as("a slug present before and after the refresh must never miss")
+                    .isZero();
+        }
+
+        @Test
+        void refreshStillDropsSlugsThatDisappeared() {
+            cacheManager.refreshTenantSlugs(Map.of("acme", "tenant-id-1", "globex", "tenant-id-2"));
+
+            // acme was deleted/renamed upstream — it must stop resolving.
+            cacheManager.refreshTenantSlugs(Map.of("globex", "tenant-id-2"));
+
+            stubRefreshResponse(Mono.just(Map.of("globex", "tenant-id-2")));
+            assertThat(cacheManager.resolveTenantSlug("acme")).isEmpty();
+            assertThat(cacheManager.resolveTenantSlug("globex")).contains("tenant-id-2");
+            assertThat(cacheManager.tenantSlugCacheSize()).isEqualTo(2); // globex + negative acme
+        }
+
+        @Test
+        void resolveOnANonBlockingThreadAnswersFromCacheInsteadOfThrowing() {
+            // The blocking variant used to be called from the reactive filter chain, where
+            // block() throws — the caught exception became a 404 for a valid tenant (#1334).
+            cacheManager.refreshTenantSlugs(Map.of("acme", "tenant-id-1"));
+
+            Optional<String> hit = Mono.fromSupplier(() -> cacheManager.resolveTenantSlug("acme"))
+                    .subscribeOn(Schedulers.parallel())
+                    .block(Duration.ofSeconds(5));
+            assertThat(hit).contains("tenant-id-1");
+        }
+
+        @Test
+        void reactiveResolveWorksOnANonBlockingThread() {
+            stubRefreshResponse(Mono.just(Map.of("couchpicks", "tenant-cp")));
+
+            Optional<String> resolved = Mono.defer(() -> cacheManager.resolveTenantSlugReactive("couchpicks"))
+                    .subscribeOn(Schedulers.parallel())
+                    .block(Duration.ofSeconds(5));
+
+            assertThat(resolved)
+                    .as("the lazy lookup must run on a reactive thread, not blow up on block()")
+                    .contains("tenant-cp");
+        }
+
+        @Test
+        void concurrentMissesShareOneWorkerFetch() {
+            AtomicInteger fetches = new AtomicInteger();
+            stubRefreshResponse(Mono.fromSupplier(() -> {
+                fetches.incrementAndGet();
+                return Map.of("acme", "tenant-id-1");
+            }).delayElement(Duration.ofMillis(50)));
+
+            List<Mono<Optional<String>>> lookups = IntStream.range(0, 8)
+                    .mapToObj(i -> cacheManager.resolveTenantSlugReactive("acme")
+                            .subscribeOn(Schedulers.parallel()))
+                    .toList();
+            List<Optional<String>> results = Flux.merge(lookups).collectList().block(Duration.ofSeconds(5));
+
+            assertThat(results).allSatisfy(r -> assertThat(r).contains("tenant-id-1"));
+            assertThat(fetches.get())
+                    .as("a cold cache must not stampede the worker")
+                    .isEqualTo(1);
+        }
     }
 
     // ── Governor Limit Cache Tests ────────────────────────────────────
@@ -518,6 +615,32 @@ class GatewayCacheManagerTest {
 
             // Verify no more interactions with webClient
             verifyNoInteractions(webClient);
+        }
+
+        @Test
+        void resolveCustomDomain_doesNotNegativeCacheOnTransportFailure() {
+            // #1334: a timeout/connection failure is not an answer. Negative-caching it black-holed
+            // a live custom domain for the 10-minute cache TTL.
+            stubCustomDomainResolveResponse("app.acme.com",
+                    Mono.error(new RuntimeException("connection reset")));
+            assertThat(cacheManager.resolveCustomDomain("app.acme.com")).isEmpty();
+
+            // Worker recovers — the very next request resolves.
+            stubCustomDomainResolveResponse("app.acme.com", Mono.just("acme"));
+            assertThat(cacheManager.resolveCustomDomain("app.acme.com")).contains("acme");
+        }
+
+        @Test
+        void resolveCustomDomain_worksOnANonBlockingThread() {
+            stubCustomDomainResolveResponse("app.acme.com", Mono.just("acme"));
+
+            Optional<String> resolved = Mono.defer(() -> cacheManager.resolveCustomDomainReactive("app.acme.com"))
+                    .subscribeOn(Schedulers.parallel())
+                    .block(Duration.ofSeconds(5));
+
+            assertThat(resolved)
+                    .as("the reactive filter chain must be able to resolve a custom domain")
+                    .contains("acme");
         }
 
         @Test

@@ -10,7 +10,6 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -65,21 +64,23 @@ public class CustomDomainFilter implements WebFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        // Look up custom domain in cache
-        Optional<String> tenantSlug = cacheManager.resolveCustomDomain(domain);
-        if (tenantSlug.isEmpty()) {
-            return chain.filter(exchange); // Fall through to slug resolution
-        }
+        // Look up the custom domain. Reactive: the worker lookup behind a cache miss cannot block
+        // this thread (it would throw, and the domain would resolve to nothing — #1334).
+        return cacheManager.resolveCustomDomainReactive(domain)
+                .flatMap(tenantSlug -> {
+                    if (tenantSlug.isEmpty()) {
+                        return chain.filter(exchange); // Fall through to slug resolution
+                    }
 
-        // Resolve tenant from custom domain
-        String slug = tenantSlug.get();
-        log.debug("Custom domain {} resolved to tenant {}", domain, slug);
+                    String slug = tenantSlug.get();
+                    log.debug("Custom domain {} resolved to tenant {}", domain, slug);
 
-        // Set tenant attributes (same as TenantSlugExtractionFilter would)
-        exchange.getAttributes().put(TenantResolutionFilter.TENANT_SLUG_ATTR, slug);
-        exchange.getAttributes().put(CUSTOM_DOMAIN_RESOLVED, true);
+                    // Set tenant attributes (same as TenantSlugExtractionFilter would)
+                    exchange.getAttributes().put(TenantResolutionFilter.TENANT_SLUG_ATTR, slug);
+                    exchange.getAttributes().put(CUSTOM_DOMAIN_RESOLVED, true);
 
-        return chain.filter(exchange);
+                    return chain.filter(exchange);
+                });
     }
 
     /**

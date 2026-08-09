@@ -28,8 +28,10 @@ import org.springframework.web.client.RestClientResponseException;
  * {@link #send}, not at construction. If it threw in the constructor, selecting
  * {@code provider=twilio} without secrets would leave no {@code SmsProvider} bean and the whole
  * worker would fail to boot — a missing credential must degrade to a failed SMS delivery, not a
- * dead service. To go live, set {@code kelta.sms.twilio.account-sid}, {@code .auth-token}, and
- * {@code .from-number} (E.164) from the deployment secret.
+ * dead service. To go live, set {@code kelta.sms.twilio.account-sid} ({@code AC…}),
+ * {@code .from-number} (E.164), and either an API key ({@code .key-sid} = {@code SK…} +
+ * {@code .auth-token} = its secret, recommended) or the account Auth Token ({@code .auth-token},
+ * leaving {@code .key-sid} blank) — from the deployment secret.
  */
 @Component
 @ConditionalOnProperty(name = "kelta.sms.provider", havingValue = "twilio")
@@ -42,6 +44,7 @@ public class TwilioSmsProvider implements SmsProvider {
 
     private final RestClient restClient;
     private final String accountSid;
+    private final String keySid;
     private final String authToken;
     private final String fromNumber;
 
@@ -50,19 +53,27 @@ public class TwilioSmsProvider implements SmsProvider {
      * a second (test-seam) constructor, and with more than one candidate Spring will not guess —
      * it falls back to a no-arg constructor and fails bean creation outright (the same trap the
      * payment client documents).
+     *
+     * <p><b>Two auth modes, both supported.</b> The URL always carries the {@code account-sid}
+     * ({@code AC…}). Basic auth uses {@code key-sid} ({@code SK…}) + {@code auth-token} = the API
+     * Key Secret when a {@code key-sid} is set (the recommended, revocable path), else the
+     * {@code account-sid} + {@code auth-token} = the account Auth Token.
      */
     @Autowired
     public TwilioSmsProvider(
             @Value("${kelta.sms.twilio.account-sid:}") String accountSid,
+            @Value("${kelta.sms.twilio.key-sid:}") String keySid,
             @Value("${kelta.sms.twilio.auth-token:}") String authToken,
             @Value("${kelta.sms.twilio.from-number:}") String fromNumber) {
-        this(RestClient.create(), accountSid, authToken, fromNumber);
+        this(RestClient.create(), accountSid, keySid, authToken, fromNumber);
     }
 
     /** Test seam: lets a unit test bind a mock-server-backed client. */
-    TwilioSmsProvider(RestClient restClient, String accountSid, String authToken, String fromNumber) {
+    TwilioSmsProvider(RestClient restClient, String accountSid, String keySid, String authToken,
+                      String fromNumber) {
         this.restClient = restClient;
         this.accountSid = accountSid;
+        this.keySid = keySid;
         this.authToken = authToken;
         this.fromNumber = fromNumber;
     }
@@ -86,7 +97,7 @@ public class TwilioSmsProvider implements SmsProvider {
         try {
             restClient.post()
                     .uri(BASE_URL + MESSAGES_PATH, accountSid)
-                    .headers(h -> h.setBasicAuth(accountSid, authToken))
+                    .headers(h -> h.setBasicAuth(basicAuthUser(), authToken))
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(form)
                     .retrieve()
@@ -99,6 +110,11 @@ public class TwilioSmsProvider implements SmsProvider {
         } catch (RuntimeException e) {
             throw new SmsDeliveryException("Twilio send failed: " + e.getMessage(), e);
         }
+    }
+
+    /** Basic-auth username: the API Key SID when configured (recommended), else the Account SID. */
+    private String basicAuthUser() {
+        return isBlank(keySid) ? accountSid : keySid;
     }
 
     private static boolean isBlank(String value) {

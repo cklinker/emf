@@ -120,10 +120,19 @@ public enum FieldType {
 
     /**
      * Returns true if this type has a physical column in the database.
-     * ROLLUP_SUMMARY is computed on read; FORMULA fields have a materialized DB column.
+     * FORMULA and ROLLUP_SUMMARY are computed on read.
+     *
+     * <p>Both are evaluated after retrieval by {@code DefaultQueryEngine.computeDerivedFields},
+     * so neither needs storage. Returning true for FORMULA makes
+     * {@code PhysicalTableStorageAdapter.initializeCollection} create a column that is written
+     * on insert and then overwritten by the read-time evaluation — dead storage that can hold a
+     * stale value after an expression change, plus a spurious ALTER TABLE per FORMULA field in
+     * {@code SchemaMigrationEngine}. It also breaks {@code FormulaRecomputeService}, whose
+     * per-row UPDATE is deliberately the {@code SET updated_at = updated_at} no-op it documents
+     * *because* there is no column to refresh.
      */
     public boolean hasPhysicalColumn() {
-        return this != ROLLUP_SUMMARY;
+        return this != FORMULA && this != ROLLUP_SUMMARY;
     }
 
     /**

@@ -55,6 +55,11 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
         jdbcTemplate = mock(JdbcTemplate.class);
         migrationEngine = mock(SchemaMigrationEngine.class);
         adapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, new tools.jackson.databind.ObjectMapper());
+        // Before writing a FK the adapter locates the target table (it may live in the tenant
+        // schema or, for a system collection, in public). Default to "found" so FK tests
+        // exercise the ADD CONSTRAINT path rather than the skip path.
+        when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), any(Object[].class)))
+                .thenReturn(true);
     }
 
     // ==================== Helper Methods ====================
@@ -242,6 +247,111 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
             inOrder.verify(jdbcTemplate).execute(argThat((String sql) ->
                     sql.contains("FOREIGN KEY") && sql.contains("parent_ref")));
         }
+
+        @Test
+        @DisplayName("Should quote column names so reserved words like `user` are legal fields")
+        void initializeCollection_quotesReservedWordColumns() {
+            // `user` is a PostgreSQL reserved word. Emitted bare, the whole CREATE TABLE dies
+            // with `syntax error at or near "user"` — so the collection never gets a table and
+            // never reconciles, however many times the worker restarts.
+            CollectionDefinition withReservedWord = new CollectionDefinitionBuilder()
+                    .name("watchlists")
+                    .displayName("Watchlists")
+                    .addField(FieldDefinition.requiredString("user"))
+                    .addField(FieldDefinition.requiredString("notes"))
+                    .build();
+
+            adapter.initializeCollection(withReservedWord);
+
+            verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("CREATE TABLE IF NOT EXISTS")
+                            && sql.contains("\"user\" TEXT")
+                            && !sql.contains(", user TEXT")));
+        }
+
+        @Test
+        @DisplayName("Should fall back to the public schema when the FK target is a system collection")
+        void initializeCollection_resolvesForeignKeyTarget_inPublicSchema() {
+            // A tenant collection may point a LOOKUP at a system collection, whose table is
+            // Flyway-managed and lives in public — not alongside the source. Assuming
+            // co-location produced `relation "<tenant>.users" does not exist` and aborted
+            // initialization for the entire collection.
+            reset(jdbcTemplate);
+            // The tenant-schema existence pre-check, then the two FK target probes:
+            // absent from the tenant schema, present in public.
+            when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                    .thenReturn(1);
+            when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), any(Object[].class)))
+                    .thenReturn(false)
+                    .thenReturn(true);
+
+            io.kelta.runtime.context.TenantContext.runWithTenant("tenant-1", "acme", () ->
+                    adapter.initializeCollection(buildCollectionWithLookupTo("users")));
+
+            verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("FOREIGN KEY") && sql.contains("REFERENCES users")));
+        }
+
+        @Test
+        @DisplayName("Should skip — not fail — a FK whose target table exists nowhere")
+        void initializeCollection_skipsForeignKey_whenTargetMissing() {
+            reset(jdbcTemplate);
+            when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), any(Object[].class)))
+                    .thenReturn(false);
+
+            assertDoesNotThrow(() ->
+                    adapter.initializeCollection(buildCollectionWithLookupTo("ghosts")));
+
+            // The table itself is still created; only the dangling constraint is skipped.
+            verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("CREATE TABLE IF NOT EXISTS")));
+            verify(jdbcTemplate, never()).execute(argThat((String sql) ->
+                    sql.contains("FOREIGN KEY")));
+        }
+
+        @Test
+        @DisplayName("Should add FKs NOT VALID, then validate, so legacy orphans can't block the deploy")
+        void initializeCollection_addsForeignKeyNotValid_thenValidates() {
+            // One orphaned row otherwise fails ADD CONSTRAINT on every single boot, forever,
+            // leaving the column with no referential integrity at all. NOT VALID enforces the
+            // FK for every subsequent write immediately; VALIDATE then promotes it when the
+            // existing rows turn out to be clean.
+            adapter.initializeCollection(buildCollectionWithLookupTo("users"));
+
+            InOrder inOrder = inOrder(jdbcTemplate);
+            inOrder.verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("ADD CONSTRAINT") && sql.contains("NOT VALID")));
+            inOrder.verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("VALIDATE CONSTRAINT")));
+        }
+
+        @Test
+        @DisplayName("Should keep the FK enforced when validation fails on existing rows")
+        void initializeCollection_toleratesValidateFailure_onOrphanedRows() {
+            doThrow(new org.springframework.dao.DataIntegrityViolationException(
+                    "insert or update on table violates foreign key constraint"))
+                    .when(jdbcTemplate).execute(argThat((String sql) ->
+                            sql != null && sql.contains("VALIDATE CONSTRAINT")));
+
+            assertDoesNotThrow(() ->
+                    adapter.initializeCollection(buildCollectionWithLookupTo("users")));
+
+            verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("ADD CONSTRAINT") && sql.contains("NOT VALID")));
+        }
+    }
+
+    /** A non-system collection with a single LOOKUP field pointing at {@code target}. */
+    private CollectionDefinition buildCollectionWithLookupTo(String target) {
+        return new CollectionDefinitionBuilder()
+                .name("watchlists")
+                .displayName("Watchlists")
+                .addField(new FieldDefinitionBuilder()
+                        .name("owner")
+                        .type(FieldType.LOOKUP)
+                        .referenceConfig(ReferenceConfig.lookup(target, "Owner"))
+                        .build())
+                .build();
     }
 
     // ==================== Column Name Mapping Tests (via create) ====================

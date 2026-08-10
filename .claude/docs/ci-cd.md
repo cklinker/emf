@@ -74,6 +74,13 @@ auto-merged** (see `SECURITY.md`).
 - Registry: `harbor.rzware.com/emf/emf-<service>`.
 - Manifests: `homelab-argo` (kustomize), synced by **ArgoCD** to the local K8s cluster,
   namespace **`kelta`**. In-cluster service DNS is `emf-<service>` (e.g. `emf-gateway`).
+- **Schema gate.** `emf/worker-migrate-job.yaml` is an ArgoCD `PreSync` hook with
+  `backoffLimit: 0`, so the sync halts before any Deployment is touched if it fails. It runs, in
+  order: Flyway migrations → `SystemCollectionSeeder` (`@Order(5)`) → `SchemaBootstrapRunner`
+  (`@Order(10)`, applies every active collection's DDL) → `MigrateShutdownRunner`
+  (`@Order(MAX_VALUE)`, `System.exit(0)`). A schema failure throws before that exit, so the Job
+  exits non-zero and workers never roll out against an incomplete schema. Worker pods themselves
+  run no Flyway and no collection DDL.
 - Local dev never touches CI: `make up` / `docker-compose.yml`. CI overrides live in
   `docker-compose.ci.yml` (no fixed host ports, JVM Dockerfiles, CI-only cerbos image).
 

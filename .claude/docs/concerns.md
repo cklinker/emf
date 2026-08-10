@@ -507,6 +507,32 @@ keep the raw name via `TableRef` quoting. Watch-out for future DDL: never pass a
 name into `sanitizeIdentifier` directly — names go through `identifierPart`, references
 through `TableRef`.
 
+**FIXED (fix/schema-bootstrap-in-migrate-job) — three ways `initializeCollection` could abort a
+collection permanently.** All three were found in Loki: seven couchpicks collections threw
+`StorageException: Failed to initialize table` on *every* worker boot for months. Because the
+throw happens before `reconcileSchema`, an affected collection never picks up later field
+additions either — the physical table silently drifts from its metadata.
+- **(a) Column identifiers were emitted unquoted.** A field named `user` (or `order`, `group`,
+  `default`, …) produced `ERROR: syntax error at or near "user"` and killed the whole
+  `CREATE TABLE`. Fix: `PhysicalTableStorageAdapter.quoteIdentifier` — used for column
+  *references* in DDL **and** DML (and mirrored in `SchemaMigrationEngine` +
+  `CompositeUniqueConstraintService`). Constraint/index *names* keep bare `sanitizeIdentifier`:
+  they are matched against `pg_constraint.conname` as string literals. Column names are already
+  lower-cased by `toSnakeCase`, so quoting changes nothing for non-reserved names.
+- **(b) FK targets were assumed to live in the source's schema.** A tenant collection with a
+  LOOKUP to a *system* collection resolved to `"<tenant>"."users"` → `relation does not exist`.
+  Fix: `resolveTargetTable` probes the source schema then `public` via `to_regclass`, and a
+  target found in neither is skipped with a warning instead of failing the collection.
+- **(c) One orphaned row blocked the FK forever.** `ADD CONSTRAINT` validated existing rows, so a
+  single dangling reference failed the statement on every boot — leaving the column with *no*
+  integrity at all. Fix: add `NOT VALID` (enforced for all new writes immediately), then a
+  separate `VALIDATE CONSTRAINT` that only warns, naming the table and the exact fix-up command.
+
+**Test-harness note:** the runtime-core storage tests now build H2 with `DATABASE_TO_LOWER=TRUE`
+(as `ExternalJdbcStorageAdapterTest` already did). H2 folds unquoted identifiers to *upper* case
+while PostgreSQL folds to *lower*; without the flag, quoted-lowercase DDL wouldn't match the
+column H2 creates unquoted — a test-only divergence that made the suite disagree with production.
+
 **FIXED (PR #1174) — record-policy `collectionId` was UUID-keyed but checked by name.**
 `CerbosPolicyGenerator.generateRecordPolicy` emitted `R.attr.collectionId == "<UUID>"` (from
 `profile_object_permission.collection_id` + `collection.id`, both UUIDs), but

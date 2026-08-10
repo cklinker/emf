@@ -156,7 +156,48 @@ public class CollectionLifecycleManager {
      * @param collectionId the collection ID to initialize
      */
     public void initializeCollection(String collectionId) {
-        log.info("Initializing collection: {}", collectionId);
+        initializeCollection(collectionId, true);
+    }
+
+    /**
+     * Initializes a collection on this worker, optionally skipping the storage (DDL) half.
+     *
+     * <p>{@code applySchema=false} registers the definition and its validation rules in this
+     * pod's in-memory state without touching the database schema. Startup bootstrap uses it so
+     * that N worker replicas don't each run {@code CREATE TABLE}/{@code reconcileSchema} for
+     * every collection against the same database — concurrent DDL that the storage adapter can
+     * only paper over after the fact (see its {@code DuplicateKeyException} race handling). The
+     * schema is applied once, ahead of the rollout, by the migrate Job.
+     *
+     * <p>Runtime paths (NATS config events, read-after-write refresh) keep {@code true}: a
+     * collection created after deploy has no Job to lean on and needs its table immediately.
+     *
+     * @param collectionId the collection ID to initialize
+     * @param applySchema whether to create/reconcile the physical table
+     */
+    public void initializeCollection(String collectionId, boolean applySchema) {
+        try {
+            initializeCollectionOrThrow(collectionId, applySchema);
+        } catch (Exception e) {
+            log.error("Failed to initialize collection {}: {}", collectionId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Same as {@link #initializeCollection(String, boolean)} but propagates failures instead of
+     * logging them.
+     *
+     * <p>Used by the migrate Job's schema bootstrap, where a failed {@code CREATE TABLE} must
+     * abort the Job so the ArgoCD PreSync hook fails and the worker rollout never starts. On
+     * the request-serving pods the swallowing variant is still right — one broken collection
+     * must not stop the pod from serving the other few hundred.
+     *
+     * @param collectionId the collection ID to initialize
+     * @param applySchema whether to create/reconcile the physical table
+     * @throws RuntimeException if the definition cannot be loaded or the schema cannot be applied
+     */
+    public void initializeCollectionOrThrow(String collectionId, boolean applySchema) {
+        log.info("Initializing collection: {} (applySchema={})", collectionId, applySchema);
 
         if (metricsConfig != null) {
             metricsConfig.getInitializingCount().incrementAndGet();
@@ -194,14 +235,16 @@ public class CollectionLifecycleManager {
             // Register in local registry (makes it available to DynamicCollectionRouter)
             collectionRegistry.register(definition);
 
-            // Set tenant context so the storage adapter uses the correct schema
-            setTenantContextFromRow(collectionRow);
-            try {
-                // Initialize storage (creates database table if needed)
-                // System collections have Flyway-managed tables, so initializeCollection is a no-op for them
-                storageAdapter.initializeCollection(definition);
-            } finally {
-                TenantContext.clear();
+            if (applySchema) {
+                // Set tenant context so the storage adapter uses the correct schema
+                setTenantContextFromRow(collectionRow);
+                try {
+                    // Initialize storage (creates database table if needed)
+                    // System collections have Flyway-managed tables, so initializeCollection is a no-op for them
+                    storageAdapter.initializeCollection(definition);
+                } finally {
+                    TenantContext.clear();
+                }
             }
 
             // Load and register validation rules from DB
@@ -212,8 +255,6 @@ public class CollectionLifecycleManager {
 
             log.info("Successfully initialized collection '{}' (id={})", collectionName, collectionId);
 
-        } catch (Exception e) {
-            log.error("Failed to initialize collection {}: {}", collectionId, e.getMessage(), e);
         } finally {
             if (metricsConfig != null) {
                 metricsConfig.getInitializingCount().decrementAndGet();

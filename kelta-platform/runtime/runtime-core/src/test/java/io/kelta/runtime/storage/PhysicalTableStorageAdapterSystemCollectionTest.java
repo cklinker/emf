@@ -326,6 +326,21 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
         }
 
         @Test
+        @DisplayName("Should scope the FK existence check to this table, not the whole database")
+        void initializeCollection_scopesForeignKeyExistenceCheck_toTable() {
+            // conname is unique per table, not per database, and generated FK names derive from
+            // collection + field names — which repeat across tenants. An unqualified
+            // `WHERE conname = ...` matched another tenant's constraint and skipped creating
+            // this one, so only the first tenant to initialize ever got its foreign key.
+            adapter.initializeCollection(buildCollectionWithLookupTo("users"));
+
+            verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("ADD CONSTRAINT")
+                            && sql.contains("conname = 'fk_watchlists_owner'")
+                            && sql.contains("conrelid = to_regclass(")));
+        }
+
+        @Test
         @DisplayName("Should keep the FK enforced when validation fails on existing rows")
         void initializeCollection_toleratesValidateFailure_onOrphanedRows() {
             doThrow(new org.springframework.dao.DataIntegrityViolationException(

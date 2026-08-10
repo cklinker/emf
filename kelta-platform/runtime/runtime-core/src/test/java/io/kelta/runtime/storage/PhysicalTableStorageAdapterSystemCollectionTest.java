@@ -270,7 +270,7 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
         }
 
         @Test
-        @DisplayName("Should fall back to the public schema when the FK target is a system collection")
+        @DisplayName("Should fall back to the public schema when the target is not in the tenant's")
         void initializeCollection_resolvesForeignKeyTarget_inPublicSchema() {
             // A tenant collection may point a LOOKUP at a system collection, whose table is
             // Flyway-managed and lives in public — not alongside the source. Assuming
@@ -285,11 +285,54 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
                     .thenReturn(false)
                     .thenReturn(true);
 
+            // A non-system target, so the raw name is the table name in both schemas.
+            io.kelta.runtime.context.TenantContext.runWithTenant("tenant-1", "acme", () ->
+                    adapter.initializeCollection(buildCollectionWithLookupTo("archived_orders")));
+
+            verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("FOREIGN KEY") && sql.contains("REFERENCES archived_orders")));
+        }
+
+        @Test
+        @DisplayName("Should map a system-collection FK target to its real table (users → platform_user)")
+        void initializeCollection_resolvesSystemCollectionTarget_toItsPhysicalTable() {
+            // ReferenceConfig names the target COLLECTION, not its table. Tenant collections make
+            // those identical, but a system collection maps onto its Flyway-managed table, so
+            // `users` is stored in `platform_user` — a table named `users` exists nowhere. Taking
+            // the collection name as the table name left every LOOKUP at a system collection
+            // pointing at a table that never existed.
+            reset(jdbcTemplate);
+            when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                    .thenReturn(1);
+            when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), any(Object[].class)))
+                    .thenReturn(false)   // no tenant-local `users` collection…
+                    .thenReturn(true);   // …so the system mapping in public wins
+
             io.kelta.runtime.context.TenantContext.runWithTenant("tenant-1", "acme", () ->
                     adapter.initializeCollection(buildCollectionWithLookupTo("users")));
 
             verify(jdbcTemplate).execute(argThat((String sql) ->
-                    sql.contains("FOREIGN KEY") && sql.contains("REFERENCES users")));
+                    sql.contains("FOREIGN KEY") && sql.contains("REFERENCES platform_user")));
+        }
+
+        @Test
+        @DisplayName("Should prefer a tenant's own table over the system mapping of the same name")
+        void initializeCollection_prefersTenantTable_overSystemMapping() {
+            // A tenant collection is allowed to be called `users`; its own table must win in its
+            // own schema rather than being redirected to the platform's user table.
+            reset(jdbcTemplate);
+            when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                    .thenReturn(1);
+            when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), any(Object[].class)))
+                    .thenReturn(true);   // first candidate = tenant schema, raw name
+
+            io.kelta.runtime.context.TenantContext.runWithTenant("tenant-1", "acme", () ->
+                    adapter.initializeCollection(buildCollectionWithLookupTo("users")));
+
+            verify(jdbcTemplate).execute(argThat((String sql) ->
+                    sql.contains("FOREIGN KEY")
+                            && sql.contains("REFERENCES \"acme\".\"users\"")
+                            && !sql.contains("platform_user")));
         }
 
         @Test

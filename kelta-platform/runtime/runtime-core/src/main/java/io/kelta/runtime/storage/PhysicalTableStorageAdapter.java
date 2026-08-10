@@ -76,6 +76,19 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         "record_type_id", "created_geo", "updated_geo"
     );
 
+    /**
+     * Physical table name for each system collection, keyed by collection name.
+     *
+     * <p>Only system collections need this: a tenant collection's storage config always names the
+     * table after the collection, whereas a system collection maps onto its Flyway-managed table
+     * ({@code users} → {@code platform_user}). Used to resolve foreign keys whose target is a
+     * system collection — see {@link #resolveTargetTable}.
+     */
+    private static final Map<String, String> SYSTEM_COLLECTION_TABLES =
+            io.kelta.runtime.model.system.SystemCollectionDefinitions.byName().entrySet().stream()
+                    .collect(Collectors.toUnmodifiableMap(
+                            Map.Entry::getKey, e -> getBaseTableName(e.getValue())));
+
     private final JdbcTemplate jdbcTemplate;
     private final SchemaMigrationEngine migrationEngine;
     private final tools.jackson.databind.ObjectMapper objectMapper;
@@ -388,14 +401,37 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     }
 
     /**
-     * Locates the table a foreign key should reference: the source's own schema first, then
-     * {@code public} (where system collections live). Returns {@code null} when neither holds it.
+     * Locates the table a foreign key should reference.
+     *
+     * <p>A {@code ReferenceConfig} names the target <em>collection</em>, not its table. For tenant
+     * collections those are always the same string, but a **system** collection stores in a
+     * Flyway-managed table whose name usually differs — {@code users} lives in
+     * {@code platform_user}, {@code page-layouts} in {@code page_layout}, and so on for 40-odd
+     * others. Taking the collection name as the table name meant any LOOKUP pointing at a system
+     * collection resolved to a table that has never existed.
+     *
+     * <p>Candidates are tried in order:
+     * <ol>
+     *   <li>the source's own schema under the raw target name — a tenant collection that happens
+     *       to share a name with a system one must still win in its own schema;</li>
+     *   <li>{@code public} under the system collection's real table name, when the target is a
+     *       known system collection;</li>
+     *   <li>{@code public} under the raw name, covering system collections whose name already
+     *       matches their table and sources that live in public themselves.</li>
+     * </ol>
+     *
+     * @return the first candidate that exists, or {@code null} when none do
      */
     private TableRef resolveTargetTable(PendingForeignKey fk) {
-        List<TableRef> candidates = fk.sourceRef().isPublicSchema()
-                ? List.of(TableRef.publicSchema(fk.targetTableName()))
-                : List.of(TableRef.tenantSchema(fk.sourceRef().schema(), fk.targetTableName()),
-                          TableRef.publicSchema(fk.targetTableName()));
+        List<TableRef> candidates = new ArrayList<>();
+        if (!fk.sourceRef().isPublicSchema()) {
+            candidates.add(TableRef.tenantSchema(fk.sourceRef().schema(), fk.targetTableName()));
+        }
+        String systemTable = SYSTEM_COLLECTION_TABLES.get(fk.targetTableName());
+        if (systemTable != null && !systemTable.equals(fk.targetTableName())) {
+            candidates.add(TableRef.publicSchema(systemTable));
+        }
+        candidates.add(TableRef.publicSchema(fk.targetTableName()));
 
         for (TableRef candidate : candidates) {
             Boolean exists = jdbcTemplate.queryForObject(

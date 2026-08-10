@@ -146,6 +146,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         sql.append("record_type_id VARCHAR(36)");
 
         List<String> postCreateStatements = new ArrayList<>();
+        List<PendingForeignKey> pendingForeignKeys = new ArrayList<>();
 
         for (FieldDefinition field : definition.fields()) {
             if (!field.type().hasPhysicalColumn()) {
@@ -161,7 +162,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
             String sqlType = mapFieldTypeToSql(field.type(), field);
             sql.append(", ");
-            sql.append(sanitizeIdentifier(columnName)).append(" ").append(sqlType);
+            sql.append(quoteIdentifier(columnName)).append(" ").append(sqlType);
 
             if (!field.nullable()) {
                 sql.append(" NOT NULL");
@@ -174,11 +175,11 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             // Companion columns (use resolved column name for consistency)
             if (field.type() == FieldType.CURRENCY) {
                 sql.append(", ");
-                sql.append(sanitizeIdentifier(columnName + "_currency_code")).append(" VARCHAR(3)");
+                sql.append(quoteIdentifier(columnName + "_currency_code")).append(" VARCHAR(3)");
             }
             if (field.type() == FieldType.GEOLOCATION) {
                 sql.append(", ");
-                sql.append(sanitizeIdentifier(columnName + "_longitude")).append(" DOUBLE PRECISION");
+                sql.append(quoteIdentifier(columnName + "_longitude")).append(" DOUBLE PRECISION");
             }
 
             // Unique index for EXTERNAL_ID
@@ -188,7 +189,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                         sanitizeIdentifier(columnName));
                 postCreateStatements.add(
                     "CREATE UNIQUE INDEX IF NOT EXISTS " + idxName
-                    + " ON " + qualifiedName + "(" + sanitizeIdentifier(columnName) + ")"
+                    + " ON " + qualifiedName + "(" + quoteIdentifier(columnName) + ")"
                 );
             }
 
@@ -209,25 +210,15 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 // Raw name: kebab-case targets are legal — TableRef validates and
                 // quotes the reference. Only the generated fk NAME must be strict.
                 String targetTableName = field.referenceConfig().targetCollection();
-                // Target table is in the same schema as the source table
-                TableRef targetRef = tableRef.isPublicSchema()
-                        ? TableRef.publicSchema(targetTableName)
-                        : TableRef.tenantSchema(tableRef.schema(), targetTableName);
-                String targetCol = sanitizeIdentifier(field.referenceConfig().targetField());
+                String targetCol = quoteIdentifier(field.referenceConfig().targetField());
                 String fkName = buildBoundedIdentifier(
                         "fk_", identifierPart(baseName), sanitizeIdentifier(columnName));
                 String onDelete = field.type() == FieldType.MASTER_DETAIL
                         ? "ON DELETE CASCADE" : "ON DELETE SET NULL";
 
-                postCreateStatements.add(
-                    "DO $$ BEGIN " +
-                    "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '" + fkName + "') THEN " +
-                    "ALTER TABLE " + qualifiedName +
-                    " ADD CONSTRAINT " + fkName +
-                    " FOREIGN KEY (" + sanitizeIdentifier(columnName) + ")" +
-                    " REFERENCES " + targetRef.toSql() + "(" + targetCol + ") " + onDelete + "; " +
-                    "END IF; END $$"
-                );
+                pendingForeignKeys.add(new PendingForeignKey(
+                        fkName, qualifiedName, quoteIdentifier(columnName),
+                        tableRef, targetTableName, targetCol, onDelete));
             }
         }
 
@@ -289,6 +280,10 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 jdbcTemplate.execute(stmt);
             }
 
+            for (PendingForeignKey fk : pendingForeignKeys) {
+                applyForeignKey(fk, definition.name());
+            }
+
             // Record the migration in history
             migrationEngine.recordMigration(definition.name(),
                 SchemaMigrationEngine.MigrationType.CREATE_TABLE, sql.toString());
@@ -297,6 +292,101 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         } catch (DataAccessException e) {
             throw new StorageException("Failed to initialize table for collection: " + definition.name(), e);
         }
+    }
+
+    /**
+     * A LOOKUP/MASTER_DETAIL foreign key whose target table must be located before the
+     * constraint can be written. Held until after {@code CREATE TABLE} + schema reconcile,
+     * because resolving the target needs a DB round-trip and the referencing column has to
+     * exist first.
+     *
+     * @param fkName the generated (length-bounded, unquoted) constraint name
+     * @param sourceTable the schema-qualified table the constraint is added to
+     * @param sourceColumn the quoted referencing column
+     * @param sourceRef the source table's ref, used to derive the candidate target schema
+     * @param targetTableName the target collection's raw (possibly kebab-case) table name
+     * @param targetColumn the quoted referenced column, typically {@code "id"}
+     * @param onDelete the {@code ON DELETE …} clause
+     */
+    private record PendingForeignKey(
+            String fkName,
+            String sourceTable,
+            String sourceColumn,
+            TableRef sourceRef,
+            String targetTableName,
+            String targetColumn,
+            String onDelete) {
+    }
+
+    /**
+     * Adds one foreign key, resolving the target table's schema first.
+     *
+     * <p><b>Schema resolution.</b> The target is <em>not</em> necessarily co-located with the
+     * source: a tenant collection may hold a LOOKUP to a <em>system</em> collection, whose
+     * Flyway-managed table lives in {@code public}. Assuming the source's schema produced
+     * {@code relation "<tenant>.users" does not exist} and aborted initialization for the whole
+     * collection. So try the source schema first, then fall back to {@code public}, and skip
+     * the constraint with an actionable warning when the target exists in neither — a dangling
+     * reference is a metadata problem to fix, not a reason to leave the collection tableless.
+     *
+     * <p><b>{@code NOT VALID}.</b> The constraint is added without validating rows already in
+     * the table. A single orphaned legacy row would otherwise fail the {@code ALTER TABLE} on
+     * every worker boot, forever, leaving the column with <em>no</em> referential integrity at
+     * all. {@code NOT VALID} enforces the FK for all subsequent inserts and updates
+     * immediately; the follow-up {@code VALIDATE CONSTRAINT} then promotes it to fully valid
+     * when the existing data is clean, and only warns (naming the table) when it is not.
+     */
+    private void applyForeignKey(PendingForeignKey fk, String collectionName) {
+        TableRef targetRef = resolveTargetTable(fk);
+        if (targetRef == null) {
+            log.warn("Skipping foreign key '{}' on collection '{}': target table '{}' does not exist "
+                    + "in schema '{}' or 'public'. The reference field points at a collection with no "
+                    + "physical table — fix or remove the reference; the rest of the collection is "
+                    + "initialized normally.",
+                    fk.fkName(), collectionName, fk.targetTableName(), fk.sourceRef().schema());
+            return;
+        }
+
+        jdbcTemplate.execute(
+                "DO $$ BEGIN "
+                + "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '" + fk.fkName() + "') THEN "
+                + "ALTER TABLE " + fk.sourceTable()
+                + " ADD CONSTRAINT " + fk.fkName()
+                + " FOREIGN KEY (" + fk.sourceColumn() + ")"
+                + " REFERENCES " + targetRef.toSql() + "(" + fk.targetColumn() + ") "
+                + fk.onDelete() + " NOT VALID; "
+                + "END IF; END $$");
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + fk.sourceTable()
+                    + " VALIDATE CONSTRAINT " + fk.fkName());
+        } catch (DataAccessException e) {
+            log.warn("Foreign key '{}' on '{}' is enforced for new writes but could not be validated "
+                    + "against existing rows — the table holds orphaned references to '{}'. Clean them "
+                    + "up (or null them out), then run: ALTER TABLE {} VALIDATE CONSTRAINT {}. Cause: {}",
+                    fk.fkName(), fk.sourceTable(), fk.targetTableName(),
+                    fk.sourceTable(), fk.fkName(), e.getMostSpecificCause().getMessage());
+        }
+    }
+
+    /**
+     * Locates the table a foreign key should reference: the source's own schema first, then
+     * {@code public} (where system collections live). Returns {@code null} when neither holds it.
+     */
+    private TableRef resolveTargetTable(PendingForeignKey fk) {
+        List<TableRef> candidates = fk.sourceRef().isPublicSchema()
+                ? List.of(TableRef.publicSchema(fk.targetTableName()))
+                : List.of(TableRef.tenantSchema(fk.sourceRef().schema(), fk.targetTableName()),
+                          TableRef.publicSchema(fk.targetTableName()));
+
+        for (TableRef candidate : candidates) {
+            Boolean exists = jdbcTemplate.queryForObject(
+                    "SELECT to_regclass(?) IS NOT NULL", Boolean.class, candidate.toSql());
+            if (Boolean.TRUE.equals(exists)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /**
@@ -411,7 +501,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                                                      int limit,
                                                      List<FilterCondition> filters) {
         TableRef tableRef = getTableRef(definition);
-        String vectorIdent = sanitizeIdentifier(vectorColumn);
+        String vectorIdent = quoteIdentifier(vectorColumn);
         List<Object> params = new ArrayList<>();
 
         // Cosine distance (<=>) to the query vector; bound first so its '?' precedes any filter '?'.
@@ -452,11 +542,11 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         for (int i = 0; i < specs.size(); i++) {
             AggregationSpec spec = specs.get(i);
             if (i > 0) selectList.append(", ");
-            String aliasIdent = sanitizeIdentifier(spec.alias());
+            String aliasIdent = quoteIdentifier(spec.alias());
             if ("COUNT".equals(spec.function())) {
                 selectList.append("COUNT(*) AS ").append(aliasIdent);
             } else {
-                String columnName = sanitizeIdentifier(resolveColumnName(definition, spec.field()));
+                String columnName = quoteIdentifier(resolveColumnName(definition, spec.field()));
                 selectList.append(spec.function()).append("(").append(columnName).append(") AS ").append(aliasIdent);
             }
         }
@@ -590,18 +680,18 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 if (SYSTEM_COLUMNS.contains(columnName)) {
                     continue; // Already handled as a system field above
                 }
-                columns.add(sanitizeIdentifier(columnName));
+                columns.add(quoteIdentifier(columnName));
                 placeholders.add(castPlaceholder(field.type()));
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
 
                 // Handle companion columns
                 if (field.type() == FieldType.CURRENCY && data.containsKey(field.name() + "_currency_code")) {
-                    columns.add(sanitizeIdentifier(columnName + "_currency_code"));
+                    columns.add(quoteIdentifier(columnName + "_currency_code"));
                     placeholders.add("?");
                     values.add(data.get(field.name() + "_currency_code"));
                 }
                 if (field.type() == FieldType.GEOLOCATION && data.get(field.name()) instanceof Map<?,?> geo) {
-                    columns.add(sanitizeIdentifier(columnName + "_longitude"));
+                    columns.add(quoteIdentifier(columnName + "_longitude"));
                     placeholders.add("?");
                     values.add(((Number) geo.get("longitude")).doubleValue());
                 }
@@ -709,7 +799,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 if (SYSTEM_COLUMNS.contains(columnName)) {
                     continue; // Already handled as a system field above
                 }
-                setClauses.add(sanitizeIdentifier(columnName) + " = " + castPlaceholder(field.type()));
+                setClauses.add(quoteIdentifier(columnName) + " = " + castPlaceholder(field.type()));
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
             }
         }
@@ -789,7 +879,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ");
         sql.append(tableRef.toSql());
-        sql.append(" WHERE ").append(sanitizeIdentifier(columnName)).append(" = ?");
+        sql.append(" WHERE ").append(quoteIdentifier(columnName)).append(" = ?");
 
         List<Object> params = new ArrayList<>();
         params.add(value);
@@ -826,7 +916,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             return 0;
         }
         TableRef tableRef = getTableRef(definition);
-        String col = sanitizeIdentifier(resolveColumnName(definition, fieldName));
+        String col = quoteIdentifier(resolveColumnName(definition, fieldName));
 
         StringBuilder sql = new StringBuilder("UPDATE ");
         sql.append(tableRef.toSql());
@@ -911,7 +1001,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     static String buildHnswIndexStatement(String idxName, String qualifiedName, String column) {
         return "CREATE INDEX IF NOT EXISTS " + idxName
                 + " ON " + qualifiedName
-                + " USING hnsw (" + sanitizeIdentifier(column) + " vector_cosine_ops)";
+                + " USING hnsw (" + quoteIdentifier(column) + " vector_cosine_ops)";
     }
 
     /**
@@ -967,6 +1057,29 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             throw new IllegalArgumentException("Invalid identifier: " + identifier);
         }
         return identifier;
+    }
+
+    /**
+     * Sanitizes a column identifier and wraps it in double quotes for use as a column
+     * <em>reference</em> in DDL or DML.
+     *
+     * <p>Without the quotes, a field whose name collides with a PostgreSQL reserved word
+     * ({@code user}, {@code order}, {@code group}, {@code default}, …) produces
+     * {@code syntax error at or near "user"} — which aborts {@code CREATE TABLE} for the
+     * whole collection, so it never gets a table and never reconciles. Column names always
+     * arrive lower-cased (via {@link #toSnakeCase} or an explicit {@code columnName}
+     * mapping), so quoting is semantically identical to the previous bare rendering for
+     * every non-reserved name — it only stops the parser from claiming the reserved ones.
+     *
+     * <p>Use {@link #sanitizeIdentifier} instead for generated constraint/index
+     * <em>names</em>: those are matched against {@code pg_constraint.conname} as string
+     * literals and must stay unquoted.
+     *
+     * @param identifier the column name to sanitize and quote
+     * @return the double-quoted identifier, e.g. {@code "user"}
+     */
+    static String quoteIdentifier(String identifier) {
+        return "\"" + sanitizeIdentifier(identifier) + "\"";
     }
 
     /**
@@ -1120,8 +1233,10 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
         for (String field : fields) {
             String columnName = resolveColumnName(definition, field);
+            // Dedupe against the bare system-column names added above, but emit the
+            // quoted form so reserved-word columns (user, order, …) parse.
             if (!selectFields.contains(columnName)) {
-                selectFields.add(sanitizeIdentifier(columnName));
+                selectFields.add(quoteIdentifier(columnName));
             }
         }
 
@@ -1153,7 +1268,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      */
     private String buildFilterCondition(FilterCondition filter, CollectionDefinition definition,
                                          List<Object> params) {
-        String fieldName = sanitizeIdentifier(resolveColumnName(definition, filter.fieldName()));
+        String fieldName = quoteIdentifier(resolveColumnName(definition, filter.fieldName()));
         FilterOperator operator = filter.operator();
         Object value = filter.value();
 
@@ -1288,7 +1403,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      */
     private String buildOrderByClause(List<SortField> sorting, CollectionDefinition definition) {
         return sorting.stream()
-            .map(sort -> sanitizeIdentifier(resolveColumnName(definition, sort.fieldName()))
+            .map(sort -> quoteIdentifier(resolveColumnName(definition, sort.fieldName()))
                     + " " + sort.direction().name())
             .collect(Collectors.joining(", "));
     }

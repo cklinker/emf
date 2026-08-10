@@ -65,8 +65,10 @@ public class CompositeUniqueConstraintService {
         String baseTable = PhysicalTableStorageAdapter.getBaseTableName(definition);
         String indexName = buildIndexName(baseTable, columns);
 
+        // Quote the column refs (reserved words like `user` are legal field names);
+        // the index NAME stays unquoted so catalog lookups by name still match.
         String columnList = columns.stream()
-                .map(PhysicalTableStorageAdapter::sanitizeIdentifier)
+                .map(PhysicalTableStorageAdapter::quoteIdentifier)
                 .reduce((a, b) -> a + ", " + b)
                 .orElseThrow();
 

@@ -69,6 +69,18 @@ Use the next sequential `V<n>__description.sql` — check the highest existing v
 ls kelta-worker/src/main/resources/db/migration | sort -V | tail -3
 ```
 
+### Deploy-time schema (migrate profile)
+Flyway **and** collection DDL run in the `migrate` profile only — the ArgoCD `PreSync` Job. Pods
+run neither. `runner/SchemaBootstrapRunner` (`@Profile("migrate")`, `@Order(10)`) applies every
+active collection's `CREATE TABLE`/reconcile once and throws on failure, which fails the Job and
+stops the rollout. Two rules follow:
+- **Don't put work in an `ApplicationRunner` ordered at/after `MigrateShutdownRunner`**
+  (`@Order(Integer.MAX_VALUE)`) — its `System.exit(0)` means anything after it never runs, and
+  `ApplicationReadyEvent` listeners never fire in the Job at all.
+- **Keep `applySchema=true` on runtime paths.** `CollectionLifecycleManager.initializeCollection`
+  defaults to applying DDL; only `WorkerBootstrapService` passes `false`. A collection created
+  after deploy has no Job to lean on and needs its table from the NATS `collection.changed` path.
+
 ### Error Handling
 - `ScimException` → SCIM endpoints (400, 404, 409 with scimType)
 - `EmailDeliveryException` → Email send failures

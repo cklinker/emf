@@ -8,8 +8,6 @@ import io.kelta.runtime.storage.SchemaMigrationEngine;
 import io.kelta.runtime.storage.StorageAdapter;
 import org.junit.jupiter.api.*;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
-import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
 import javax.sql.DataSource;
 import java.time.Instant;
@@ -47,9 +45,12 @@ class AutomaticTableCreationTest {
     @BeforeEach
     void setUp() {
         // Set up embedded H2 database
-        dataSource = new EmbeddedDatabaseBuilder()
-            .setType(EmbeddedDatabaseType.H2)
-            .build();
+        // DATABASE_TO_LOWER makes H2 fold unquoted identifiers to lower case the way
+        // PostgreSQL does. Without it, DDL that quotes a lower-case column name (needed so
+        // reserved words like `user` parse) would not match the upper-cased column H2
+        // creates for the same name unquoted — a divergence from production, not a real bug.
+        dataSource = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+            "jdbc:h2:mem:autotable;DATABASE_TO_LOWER=TRUE;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
         jdbcTemplate = new JdbcTemplate(dataSource);
         
         // Initialize components
@@ -116,15 +117,17 @@ class AutomaticTableCreationTest {
             storageAdapter.initializeCollection(projects);
             
             // Verify system columns exist by querying metadata
+            // Identifiers land lower-cased in the catalog (DATABASE_TO_LOWER, matching
+            // PostgreSQL); compare case-insensitively so the assertion holds on either.
             List<Map<String, Object>> columns = jdbcTemplate.queryForList(
-                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                "WHERE TABLE_NAME = 'TBL_PROJECTS_SYSTEM' " +
+                "SELECT COLUMN_NAME AS col FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE UPPER(TABLE_NAME) = 'TBL_PROJECTS_SYSTEM' " +
                 "ORDER BY COLUMN_NAME");
-            
+
             List<String> columnNames = columns.stream()
-                .map(col -> (String) col.get("COLUMN_NAME"))
+                .map(col -> ((String) col.values().iterator().next()).toUpperCase())
                 .toList();
-            
+
             assertTrue(columnNames.contains("ID"), "Should have ID column");
             assertTrue(columnNames.contains("CREATED_AT"), "Should have CREATED_AT column");
             assertTrue(columnNames.contains("UPDATED_AT"), "Should have UPDATED_AT column");
@@ -210,7 +213,7 @@ class AutomaticTableCreationTest {
             // Verify project_id column exists in tasks table
             List<Map<String, Object>> columns = jdbcTemplate.queryForList(
                 "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                "WHERE TABLE_NAME = 'TBL_TASKS_FK' AND COLUMN_NAME = 'PROJECT_ID'");
+                "WHERE UPPER(TABLE_NAME) = 'TBL_TASKS_FK' AND UPPER(COLUMN_NAME) = 'PROJECT_ID'");
             
             assertEquals(1, columns.size(), "project_id column should exist");
         }

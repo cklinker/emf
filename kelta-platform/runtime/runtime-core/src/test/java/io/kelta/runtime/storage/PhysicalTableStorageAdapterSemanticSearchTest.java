@@ -65,8 +65,8 @@ class PhysicalTableStorageAdapterSemanticSearchTest {
         verify(jdbcTemplate).queryForList(sql.capture(), params.capture());
 
         assertThat(sql.getValue())
-                .contains("embedding <=> CAST(? AS vector)) AS _distance")
-                .contains("WHERE embedding IS NOT NULL")
+                .contains("\"embedding\" <=> CAST(? AS vector)) AS _distance")
+                .contains("WHERE \"embedding\" IS NOT NULL")
                 .contains("ORDER BY _distance ASC LIMIT ?");
         // Vector literal is bound before the limit (and before any filter params).
         assertThat(params.getValue()).containsExactly("[0.1,0.2]", 5);
@@ -80,7 +80,7 @@ class PhysicalTableStorageAdapterSemanticSearchTest {
                 "hnsw_docs_embedding", "public.docs", "embedding");
         assertThat(ddl).isEqualTo(
                 "CREATE INDEX IF NOT EXISTS hnsw_docs_embedding ON public.docs"
-                        + " USING hnsw (embedding vector_cosine_ops)");
+                        + " USING hnsw (\"embedding\" vector_cosine_ops)");
     }
 
     @Test

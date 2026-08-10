@@ -11,8 +11,6 @@ import io.kelta.runtime.validation.DefaultValidationEngine;
 import io.kelta.runtime.validation.ValidationEngine;
 import org.junit.jupiter.api.*;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
-import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
 import javax.sql.DataSource;
 import java.util.HashMap;
@@ -41,9 +39,12 @@ class KeltaRuntimeIntegrationTest {
     @BeforeEach
     void setUp() {
         // Set up embedded database
-        dataSource = new EmbeddedDatabaseBuilder()
-            .setType(EmbeddedDatabaseType.H2)
-            .build();
+        // DATABASE_TO_LOWER makes H2 fold unquoted identifiers to lower case the way
+        // PostgreSQL does. Without it, DDL that quotes a lower-case column name (needed so
+        // reserved words like `user` parse) would not match the upper-cased column H2
+        // creates for the same name unquoted — a divergence from production, not a real bug.
+        dataSource = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+            "jdbc:h2:mem:runtimeint;DATABASE_TO_LOWER=TRUE;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
         jdbcTemplate = new JdbcTemplate(dataSource);
         
         // Initialize components

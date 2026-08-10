@@ -160,6 +160,12 @@ kelta:
       exclude-paths: /actuator,/health
   storage:
     mode: PHYSICAL_TABLES
+    schema-bootstrap:
+      # Whether worker pods apply collection DDL (CREATE TABLE / reconcile) at startup.
+      # Off by default: the migrate Job (PreSync hook, `migrate` profile) owns that work and
+      # runs it once, before any pod rolls out — N replicas doing it concurrently is the same
+      # work N times over, racing itself. Turn on only where no migrate Job runs.
+      enabled: ${KELTA_SCHEMA_BOOTSTRAP_ENABLED:false}
     s3:
       enabled: ${KELTA_S3_ENABLED:false}
       endpoint: ${KELTA_S3_ENDPOINT:http://localhost:3900}

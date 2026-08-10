@@ -355,7 +355,7 @@ public class SchemaMigrationEngine {
             }
             String sql = "ALTER TABLE " + tableRef.toSql()
                 + " ADD CONSTRAINT " + uniqueConstraintName(tableRef.tableName(), columnName)
-                + " UNIQUE (" + columnName + ")";
+                + " UNIQUE (" + quoteIdentifier(columnName) + ")";
             try {
                 jdbcTemplate.execute(sql);
             } catch (DataAccessException e) {
@@ -827,6 +827,18 @@ public class SchemaMigrationEngine {
         }
         return identifier;
     }
+
+    /**
+     * Sanitizes and double-quotes a column name for use as a column <em>reference</em> in DDL.
+     * Mirrors {@link PhysicalTableStorageAdapter#quoteIdentifier} — without it, an
+     * {@code ALTER TABLE … ADD COLUMN user …} is a syntax error, so a collection that
+     * initialized fine would fail to reconcile the moment such a field is added.
+     * Constraint/index <em>names</em> and values compared against catalog strings keep using
+     * {@link #sanitizeIdentifier}.
+     */
+    private String quoteIdentifier(String identifier) {
+        return PhysicalTableStorageAdapter.quoteIdentifier(identifier);
+    }
     
     /**
      * Maps a field's type to its PostgreSQL column type. The {@code field} argument
@@ -919,7 +931,7 @@ public class SchemaMigrationEngine {
         StringBuilder sql = new StringBuilder("ALTER TABLE ");
         sql.append(tableIdentifier);
         sql.append(" ADD COLUMN IF NOT EXISTS ");
-        sql.append(sanitizeIdentifier(columnName));
+        sql.append(quoteIdentifier(columnName));
         sql.append(" ");
         sql.append(mapFieldTypeToSql(field.type(), field));
 
@@ -933,12 +945,12 @@ public class SchemaMigrationEngine {
         // Companion columns
         if (field.type() == FieldType.CURRENCY) {
             sql.append("; ALTER TABLE ").append(tableIdentifier);
-            sql.append(" ADD COLUMN IF NOT EXISTS ").append(sanitizeIdentifier(columnName + "_currency_code"));
+            sql.append(" ADD COLUMN IF NOT EXISTS ").append(quoteIdentifier(columnName + "_currency_code"));
             sql.append(" VARCHAR(3)");
         }
         if (field.type() == FieldType.GEOLOCATION) {
             sql.append("; ALTER TABLE ").append(tableIdentifier);
-            sql.append(" ADD COLUMN IF NOT EXISTS ").append(sanitizeIdentifier(columnName + "_longitude"));
+            sql.append(" ADD COLUMN IF NOT EXISTS ").append(quoteIdentifier(columnName + "_longitude"));
             sql.append(" DOUBLE PRECISION");
         }
 
@@ -957,7 +969,7 @@ public class SchemaMigrationEngine {
         String sql = String.format(
             "COMMENT ON COLUMN %s.%s IS 'DEPRECATED: This column is no longer in use as of %s'",
             tableIdentifier,
-            sanitizeIdentifier(columnName),
+            quoteIdentifier(columnName),
             Instant.now().toString()
         );
 
@@ -982,16 +994,16 @@ public class SchemaMigrationEngine {
         StringBuilder sql = new StringBuilder("ALTER TABLE ");
         sql.append(tableIdentifier);
         sql.append(" DROP COLUMN IF EXISTS ");
-        sql.append(sanitizeIdentifier(columnName));
+        sql.append(quoteIdentifier(columnName));
 
         // Companion columns mirror createAddColumnMigration so no orphan column survives a drop.
         if (field.type() == FieldType.CURRENCY) {
             sql.append("; ALTER TABLE ").append(tableIdentifier);
-            sql.append(" DROP COLUMN IF EXISTS ").append(sanitizeIdentifier(columnName + "_currency_code"));
+            sql.append(" DROP COLUMN IF EXISTS ").append(quoteIdentifier(columnName + "_currency_code"));
         }
         if (field.type() == FieldType.GEOLOCATION) {
             sql.append("; ALTER TABLE ").append(tableIdentifier);
-            sql.append(" DROP COLUMN IF EXISTS ").append(sanitizeIdentifier(columnName + "_longitude"));
+            sql.append(" DROP COLUMN IF EXISTS ").append(quoteIdentifier(columnName + "_longitude"));
         }
 
         return new MigrationAction(definition.name(), MigrationType.DROP_COLUMN, sql.toString());
@@ -1010,9 +1022,9 @@ public class SchemaMigrationEngine {
         String sql = String.format(
             "ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s",
             tableIdentifier,
-            sanitizeIdentifier(columnName),
+            quoteIdentifier(columnName),
             newSqlType,
-            sanitizeIdentifier(columnName),
+            quoteIdentifier(columnName),
             newSqlType
         );
 

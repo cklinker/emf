@@ -272,7 +272,16 @@ Java tests: surefire runs `*Test`/`*Tests`/`*Properties` in parallel; failsafe r
 - Location: `kelta-worker/src/main/resources/db/migration/`
 - Naming: `V<n>__<snake_description>.sql`. **Baseline file is V1__baseline (#1189 flatten) — deployed flyway_schema_history retains pre-flatten numbering, so a lower-numbered migration is silently skipped on existing databases.** The directory head moves often; always take head+1.
   Check the directory for the true highest number before creating one — never reuse/skip.
-- Flyway runs at worker startup. Migrations execute under the platform sentinel tenant.
+- Flyway runs in the **migrate Job**, not in worker pods (`spring.flyway.enabled=false` in the
+  default profile; `application-migrate.yml` re-enables it). Migrations execute under the platform
+  sentinel tenant.
+- **Collection DDL is deploy-time, not pod-startup.** The same Job (ArgoCD `PreSync` hook,
+  `backoffLimit: 0`) also runs `SchemaBootstrapRunner`, which applies every active collection's
+  `CREATE TABLE`/reconcile once and **throws on failure** — failing the hook so the worker rollout
+  never starts against a half-applied schema. Worker pods only *register* collections at startup
+  (`kelta.storage.schema-bootstrap.enabled=false`); N replicas each running the same DDL was
+  duplicated work racing itself. Collections created **at runtime** still get their table on the
+  pod, via the NATS `collection.changed` path.
 
 ---
 

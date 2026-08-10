@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -33,7 +34,9 @@ class WorkerBootstrapServiceTest {
     @BeforeEach
     void setUp() {
         when(workerProperties.getId()).thenReturn("worker-1");
-        service = new WorkerBootstrapService(workerProperties, jdbcTemplate, lifecycleManager);
+        // Production default: pods register collections but do not apply DDL — the migrate
+        // Job owns that, once, before the rollout.
+        service = new WorkerBootstrapService(workerProperties, jdbcTemplate, lifecycleManager, false);
     }
 
     @Test
@@ -46,8 +49,8 @@ class WorkerBootstrapServiceTest {
 
         service.onApplicationReady();
 
-        verify(lifecycleManager).initializeCollection("col-1");
-        verify(lifecycleManager).initializeCollection("col-2");
+        verify(lifecycleManager).initializeCollection("col-1", false);
+        verify(lifecycleManager).initializeCollection("col-2", false);
     }
 
     @Test
@@ -57,7 +60,7 @@ class WorkerBootstrapServiceTest {
 
         service.onApplicationReady();
 
-        verify(lifecycleManager, never()).initializeCollection(anyString());
+        verify(lifecycleManager, never()).initializeCollection(anyString(), anyBoolean());
     }
 
     @Test
@@ -67,12 +70,12 @@ class WorkerBootstrapServiceTest {
                 Map.of("id", "col-1", "name", "accounts"),
                 Map.of("id", "col-2", "name", "contacts")
         ));
-        doThrow(new RuntimeException("init failed")).when(lifecycleManager).initializeCollection("col-1");
+        doThrow(new RuntimeException("init failed")).when(lifecycleManager).initializeCollection("col-1", false);
 
         service.onApplicationReady();
 
-        verify(lifecycleManager).initializeCollection("col-1");
-        verify(lifecycleManager).initializeCollection("col-2");
+        verify(lifecycleManager).initializeCollection("col-1", false);
+        verify(lifecycleManager).initializeCollection("col-2", false);
     }
 
     @Test
@@ -85,7 +88,22 @@ class WorkerBootstrapServiceTest {
 
         service.onApplicationReady();
 
-        verify(lifecycleManager, never()).initializeCollection(anyString());
+        verify(lifecycleManager, never()).initializeCollection(anyString(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("applies schema at startup only when schema-bootstrap is explicitly enabled")
+    void appliesSchemaWhenEnabled() {
+        // Escape hatch for deployments with no migrate Job (single pod, local runs).
+        WorkerBootstrapService schemaApplying =
+                new WorkerBootstrapService(workerProperties, jdbcTemplate, lifecycleManager, true);
+        when(jdbcTemplate.queryForList(anyString())).thenReturn(List.of(
+                Map.of("id", "col-1", "name", "accounts")
+        ));
+
+        schemaApplying.onApplicationReady();
+
+        verify(lifecycleManager).initializeCollection("col-1", true);
     }
 
     @Test
@@ -96,6 +114,6 @@ class WorkerBootstrapServiceTest {
 
         service.onApplicationReady();
 
-        verify(lifecycleManager, never()).initializeCollection(anyString());
+        verify(lifecycleManager, never()).initializeCollection(anyString(), anyBoolean());
     }
 }

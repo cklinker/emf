@@ -21,7 +21,10 @@ import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -89,6 +92,63 @@ class PatAuthenticationFilterTest {
         // Filter must complete cleanly — no exception bubbling out.
         StepVerifier.create(filter.filter(exchange, filterChain))
                 .verifyComplete();
+    }
+
+    @Nested
+    @DisplayName("Recognised vs unknown PAT")
+    class TokenRecognition {
+
+        private static final String TOKEN = "klt_valid_token";
+        private static final String HASH = PatAuthenticationFilter.sha256(TOKEN);
+        private static final String PAT_JSON = """
+                {"userId":"u-1","tenantId":"t-1","email":"a@b.c","scopes":"[\\"api\\"]"}""";
+
+        private MockServerWebExchange exchangeFor(String path) {
+            return MockServerWebExchange.from(MockServerHttpRequest
+                    .get(path)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                    .build());
+        }
+
+        @Test
+        @DisplayName("a cache hit authenticates and records no auth failure")
+        void cacheHitDoesNotReportUnknownPat() {
+            // Regression: authenticateWithPat ends in chain.filter(...), a Mono<Void> that
+            // always completes empty, so a switchIfEmpty hung off it fired on every SUCCESSFUL
+            // request — ~10k bogus "Unknown PAT" warnings a day, each recording an unknown_pat
+            // auth failure and poisoning the metric that security alerting keys on.
+            when(redisTemplate.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get("pat:revoked:" + HASH)).thenReturn(Mono.empty());
+            when(valueOps.get("pat:" + HASH)).thenReturn(Mono.just(PAT_JSON));
+
+            MockServerWebExchange exchange = exchangeFor("/api/titles");
+
+            StepVerifier.create(filter.filter(exchange, filterChain)).verifyComplete();
+
+            verify(filterChain).filter(any(ServerWebExchange.class));
+            verify(metrics, never()).recordAuthFailure(any(), eq("unknown_pat"));
+            assertThat(exchange.getResponse().getStatusCode()).isNull();
+            assertThat(exchange.getAttributes()).containsKey("gateway.principal");
+        }
+
+        @Test
+        @DisplayName("a token in neither Redis nor the worker is rejected as unknown")
+        void unknownTokenIsRejected() {
+            when(redisTemplate.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get("pat:revoked:" + HASH)).thenReturn(Mono.empty());
+            // Empty cache; the worker fallback also yields nothing (WebClient points at a
+            // dead local port, and fetchFromWorker maps any error to empty).
+            when(valueOps.get("pat:" + HASH)).thenReturn(Mono.empty());
+
+            MockServerWebExchange exchange = exchangeFor("/api/titles");
+
+            StepVerifier.create(filter.filter(exchange, filterChain)).verifyComplete();
+
+            verify(filterChain, never()).filter(any(ServerWebExchange.class));
+            verify(metrics).recordAuthFailure(any(), eq("unknown_pat"));
+            assertThat(exchange.getResponse().getStatusCode())
+                    .isEqualTo(org.springframework.http.HttpStatus.UNAUTHORIZED);
+        }
     }
 
     @Nested

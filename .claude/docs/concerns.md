@@ -555,12 +555,19 @@ time of the fix. Fix: `AND conrelid = to_regclass('<qualified source table>')`. 
 created automatically on the next migrate-Job run. The validate-failure warning also now only
 blames orphaned rows when the cause is genuinely a `DataIntegrityViolationException`.
 
-**Open (not a regression) — the `users` system collection has no physical table.** Six couchpicks
-reference fields (`alerts.user`, `watchlists.user`, `click-events.user`, `search-queries.user`,
-`editorial-lists.curator`, `title-matches.reviewer`) point at the `users` system collection, whose
-table exists in no schema — the platform's user table is `platform_user`. Their FKs are now
-skipped with a warning rather than failing the collection, but they will never be created until
-the collection's `storageConfig.tableName` maps to the real table or the references are repointed.
+**FIXED (fix/fk-target-system-collection-table) — FK targets used the collection name as the table
+name.** `ReferenceConfig` names the target *collection*; the adapter passed that straight through
+as a table name. For tenant collections the two are always identical
+(`CollectionLifecycleManager` builds `StorageConfig.physicalTable(collectionName)`), but a
+**system** collection maps onto its Flyway table — `users` → `platform_user`, `page-layouts` →
+`page_layout`, and ~40 more. So *any* LOOKUP at a system collection resolved to a table that has
+never existed. Symptom: six couchpicks fields (`alerts.user`, `watchlists.user`,
+`click-events.user`, `search-queries.user`, `editorial-lists.curator`, `title-matches.reviewer`)
+logged `target table 'users' does not exist` on every migrate-Job run. Fix:
+`SYSTEM_COLLECTION_TABLES`, built once from `SystemCollectionDefinitions.byName()`, resolves the
+real table. **Candidate order matters and is tested** — tenant schema under the raw name is tried
+*first*, so a tenant collection legitimately named `users` still wins in its own schema instead of
+being redirected to `platform_user`.
 
 **Test-harness note:** the runtime-core storage tests now build H2 with `DATABASE_TO_LOWER=TRUE`
 (as `ExternalJdbcStorageAdapterTest` already did). H2 folds unquoted identifiers to *upper* case

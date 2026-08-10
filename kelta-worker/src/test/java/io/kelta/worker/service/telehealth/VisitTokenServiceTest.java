@@ -6,12 +6,26 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("VisitTokenService")
 class VisitTokenServiceTest {
 
     private final VisitTokenService service = new VisitTokenService("unit-test-secret");
     private final Instant now = Instant.parse("2026-07-10T12:00:00Z");
+
+    @Test
+    @DisplayName("refuses to start without a secret rather than falling back to a shared default")
+    void failsFastWhenSecretMissing() {
+        // A hardcoded fallback here signed production visit links with a value published in this
+        // repository for months; the only signal was a startup warning nobody read. A visit token
+        // can be exchanged for a portal login, so an unset key must stop the pod.
+        for (String missing : new String[] {null, "", "   "}) {
+            assertThatThrownBy(() -> new VisitTokenService(missing))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("KELTA_TELEHEALTH_VISIT_SECRET");
+        }
+    }
 
     @Test
     @DisplayName("round-trips a claim while unexpired")

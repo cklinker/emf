@@ -43,8 +43,15 @@ public record CampaignProperties(
             trackingBaseUrl = "http://localhost:8080";
         }
         if (trackingSecret == null || trackingSecret.isBlank()) {
-            // Dev default — deployments MUST override CAMPAIGN_TRACKING_SECRET.
-            trackingSecret = "kelta-dev-campaign-tracking-secret-change-me";
+            // Fatal, not defaulted. This key signs open-pixel, click-redirect and unsubscribe
+            // tokens; a hardcoded fallback here meant production ran on a value published in
+            // this repository, with only a startup warning to say so. Unlike the other fields
+            // above, there is no safe default for a signing key.
+            throw new IllegalStateException(
+                    "kelta.campaigns.tracking-secret is not set. It signs campaign tracking and "
+                            + "unsubscribe links, so there is no safe default. Set "
+                            + "CAMPAIGN_TRACKING_SECRET to a random high-entropy value "
+                            + "(openssl rand -base64 48) in every environment, including local dev.");
         }
     }
 }

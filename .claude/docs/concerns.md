@@ -507,6 +507,20 @@ keep the raw name via `TableRef` quoting. Watch-out for future DDL: never pass a
 name into `sanitizeIdentifier` directly — names go through `identifierPart`, references
 through `TableRef`.
 
+**FIXED (fix/runtime-core-forcing-jdbc-debug) — a library jar was setting production log levels.**
+`runtime-core/src/main/resources/application.properties` is packaged *inside the jar*, so Spring
+Boot loads it as application configuration for every service that depends on runtime-core —
+**kelta-worker, kelta-ai, kelta-mcp, kelta-auth** (kelta-gateway does not depend on it). It
+carried `logging.level.org.springframework.jdbc=DEBUG`, which put every prepared statement and
+connection fetch into production logs: **493k lines/day on kelta-worker, ~92% of the platform's
+entire log volume**, with full SQL text landing in Loki. It read as a worker problem for months
+precisely because the setting isn't in kelta-worker — worker's own `logback-spring.xml` says
+`<root level="INFO">` and its `application.yml` sets no `logging.*` at all. Gateway looked healthy
+for the same reason: no runtime-core dependency. Guarded by
+`RuntimeCoreDefaultPropertiesTest`. **Never put operational settings in that file** — it still
+ships datasource credentials, Hikari pool sizes, Redis host and actuator exposure, every one of
+which silently becomes a consuming service's value unless that service overrides it.
+
 **FIXED (fix/schema-bootstrap-in-migrate-job) — three ways `initializeCollection` could abort a
 collection permanently.** All three were found in Loki: seven couchpicks collections threw
 `StorageException: Failed to initialize table` on *every* worker boot for months. Because the

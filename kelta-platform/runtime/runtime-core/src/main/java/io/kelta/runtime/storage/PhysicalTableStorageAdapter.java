@@ -16,6 +16,7 @@ import io.kelta.runtime.validation.TypeCoercionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -347,9 +348,17 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             return;
         }
 
+        // The existence check MUST be scoped to this table. `conname` is unique per table, not
+        // per database, and generated FK names are derived from collection + field names — which
+        // repeat across tenants (every tenant with an `orders` collection and a `customer` field
+        // generates fk_orders_customer). An unqualified `WHERE conname = ...` matched some other
+        // tenant's constraint and skipped creating this one, so only the first tenant to
+        // initialize ever got its foreign key; every tenant after it silently ran with no
+        // referential integrity on that column.
         jdbcTemplate.execute(
                 "DO $$ BEGIN "
-                + "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '" + fk.fkName() + "') THEN "
+                + "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '" + fk.fkName() + "'"
+                + " AND conrelid = to_regclass('" + fk.sourceTable() + "')) THEN "
                 + "ALTER TABLE " + fk.sourceTable()
                 + " ADD CONSTRAINT " + fk.fkName()
                 + " FOREIGN KEY (" + fk.sourceColumn() + ")"
@@ -361,11 +370,20 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             jdbcTemplate.execute("ALTER TABLE " + fk.sourceTable()
                     + " VALIDATE CONSTRAINT " + fk.fkName());
         } catch (DataAccessException e) {
-            log.warn("Foreign key '{}' on '{}' is enforced for new writes but could not be validated "
-                    + "against existing rows — the table holds orphaned references to '{}'. Clean them "
-                    + "up (or null them out), then run: ALTER TABLE {} VALIDATE CONSTRAINT {}. Cause: {}",
-                    fk.fkName(), fk.sourceTable(), fk.targetTableName(),
-                    fk.sourceTable(), fk.fkName(), e.getMostSpecificCause().getMessage());
+            // Only an integrity violation means orphaned rows; anything else (a missing
+            // constraint, a lock timeout) would be misdiagnosed by that advice.
+            String cause = e.getMostSpecificCause().getMessage();
+            if (e instanceof DataIntegrityViolationException) {
+                log.warn("Foreign key '{}' on '{}' is enforced for new writes but could not be "
+                        + "validated against existing rows — the table holds orphaned references "
+                        + "to '{}'. Clean them up (or null them out), then run: "
+                        + "ALTER TABLE {} VALIDATE CONSTRAINT {}. Cause: {}",
+                        fk.fkName(), fk.sourceTable(), fk.targetTableName(),
+                        fk.sourceTable(), fk.fkName(), cause);
+            } else {
+                log.warn("Could not validate foreign key '{}' on '{}': {}",
+                        fk.fkName(), fk.sourceTable(), cause);
+            }
         }
     }
 

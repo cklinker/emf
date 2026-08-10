@@ -528,6 +528,26 @@ additions either — the physical table silently drifts from its metadata.
   integrity at all. Fix: add `NOT VALID` (enforced for all new writes immediately), then a
   separate `VALIDATE CONSTRAINT` that only warns, naming the table and the exact fix-up command.
 
+**FIXED (fix/fk-existence-check-scoped-to-table) — FK existence check was global, so only the
+first tenant with a given collection+field pair ever got its foreign key.** The idempotence guard
+was `IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '<fk>')` — unqualified, so it
+searched every schema. `conname` is unique per *table*, not per database, and generated FK names
+derive from collection + field names, which repeat across tenants: every tenant with an `orders`
+collection and a `customer` field generates `fk_orders_customer`. The first tenant to initialize
+claimed the name; every tenant after it matched that row and silently skipped its own
+`ADD CONSTRAINT`. Surfaced by the `VALIDATE CONSTRAINT` step added above, which then failed with
+`constraint … does not exist` — a **25-constraint** gap across 5 tenants in the homelab at the
+time of the fix. Fix: `AND conrelid = to_regclass('<qualified source table>')`. Missing FKs are
+created automatically on the next migrate-Job run. The validate-failure warning also now only
+blames orphaned rows when the cause is genuinely a `DataIntegrityViolationException`.
+
+**Open (not a regression) — the `users` system collection has no physical table.** Six couchpicks
+reference fields (`alerts.user`, `watchlists.user`, `click-events.user`, `search-queries.user`,
+`editorial-lists.curator`, `title-matches.reviewer`) point at the `users` system collection, whose
+table exists in no schema — the platform's user table is `platform_user`. Their FKs are now
+skipped with a warning rather than failing the collection, but they will never be created until
+the collection's `storageConfig.tableName` maps to the real table or the references are repointed.
+
 **Test-harness note:** the runtime-core storage tests now build H2 with `DATABASE_TO_LOWER=TRUE`
 (as `ExternalJdbcStorageAdapterTest` already did). H2 folds unquoted identifiers to *upper* case
 while PostgreSQL folds to *lower*; without the flag, quoted-lowercase DDL wouldn't match the

@@ -15,6 +15,7 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -96,20 +97,38 @@ public class PatAuthenticationFilter implements GlobalFilter, Ordered {
                         metrics.recordAuthFailure(tenantSlug, "revoked_pat");
                         return unauthorized(exchange, "Token has been revoked");
                     }
-                    // Try Redis first, fall back to worker
+                    // Try Redis first, fall back to worker.
+                    //
+                    // The "unknown token" branch keys off whether the *lookup* produced JSON,
+                    // never off whether the downstream Mono emitted. authenticateWithPat ends in
+                    // chain.filter(...), a Mono<Void> that always completes empty — so hanging a
+                    // switchIfEmpty off it fired on every successful request, logging "Unknown
+                    // PAT" ~10k times a day and recording an unknown_pat auth failure for each,
+                    // which made the metric useless for spotting real ones. (The bogus 401 that
+                    // followed was swallowed only because the response was already committed.)
                     return redisTemplate.opsForValue().get(PAT_KEY_PREFIX + tokenHash)
                             .switchIfEmpty(fetchFromWorker(tokenHash))
-                            .flatMap(patJson -> authenticateWithPat(patJson, exchange, chain, path, tenantSlug))
-                            .switchIfEmpty(Mono.defer(() -> {
+                            .flatMap(patJson ->
+                                    authenticateWithPat(patJson, exchange, chain, path, tenantSlug)
+                                            .thenReturn(Boolean.TRUE))
+                            .defaultIfEmpty(Boolean.FALSE)
+                            .flatMap(recognized -> {
+                                if (Boolean.TRUE.equals(recognized)) {
+                                    return Mono.empty();
+                                }
                                 log.warn("Unknown PAT used for path: {}", path);
                                 metrics.recordAuthFailure(tenantSlug, "unknown_pat");
                                 return unauthorized(exchange, "Invalid or expired token");
-                            }));
+                            });
                 });
     }
 
     /**
      * Fallback: call the worker's PAT validation endpoint.
+     *
+     * <p>A 404 is the worker's normal answer for a token it doesn't know, so it stays at debug.
+     * Anything else — worker down, timeout, 5xx — makes every cache-missing PAT look invalid to
+     * the caller, which is an incident rather than a bad token, so it is logged at warn.
      */
     private Mono<String> fetchFromWorker(String tokenHash) {
         return workerClient.get()
@@ -117,7 +136,13 @@ public class PatAuthenticationFilter implements GlobalFilter, Ordered {
                 .retrieve()
                 .bodyToMono(String.class)
                 .onErrorResume(e -> {
-                    log.debug("Worker PAT validation fallback failed: {}", e.getMessage());
+                    if (e instanceof WebClientResponseException.NotFound) {
+                        log.debug("Worker does not recognise this PAT hash");
+                    } else {
+                        log.warn("Worker PAT validation is failing — PATs missing from the Redis "
+                                + "cache will be rejected as invalid until it recovers: {}",
+                                e.toString());
+                    }
                     return Mono.empty();
                 });
     }

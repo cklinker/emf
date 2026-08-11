@@ -62,11 +62,41 @@ Order values below are the live `getOrder()` returns from source (lower runs fir
 | 50 | HeaderTransformationFilter | Inject `X-Tenant-*` headers for worker |
 | 100 | SecurityHeadersFilter | Response security headers |
 | 200 | SecurityAuditFilter | Record final response status |
+| 9000 | QueryBracketEncodingFilter | Percent-encode literal `[`/`]` in the query so Spring Cloud Gateway forwards the rest of it verbatim (see below) |
 
 Cross-cutting (off main path): `ObservabilityContextFilter (-90)`, `HttpBodyCaptureFilter
 (-80)`, `SystemCollectionResponseCacheFilter (-10)`, `RequestLoggingFilter (MAX)`. `?include=`
 resolution is done by `IncludeResolver` (`jsonapi` package), not a numbered filter; read-side
 FLS is enforced in the worker (`CerbosFieldSecurityAdvice`), not the gateway.
+
+### Query encoding across the gateway hop
+
+Spring Cloud Gateway's `RouteToRequestUrlFilter` (order 10000) asks
+`ServerWebExchangeUtils.containsEncodedParts(uri)` whether the incoming URI is already
+encoded, and **re-encodes the whole query when the answer is no**. That check runs
+`UriComponentsBuilder.fromUri(uri).build(true)`, which rejects a raw `[` or `]` — RFC 3986
+reserves those gen-delims for IPv6 literals in the authority.
+
+JSON:API puts brackets in nearly every query Kelta serves (`page[size]`, `fields[type]`,
+`filter[field][op]`), so any request that *also* carried a correctly percent-encoded value
+reached the worker double-encoded — `%2C` arrived as `%252C`, and the worker's parameter
+binding decoded it back to the literal text `%2C`:
+
+```
+GET /api/things?sort=a%2Cb              → worker sees "a,b"     ✅
+GET /api/things?sort=a%2Cb&page[size]=1 → worker sees "a%2Cb"   ❌ 400 "Sort field does not exist"
+```
+
+This corrupted **any** encoded value, not just the comma-separated `sort`/`fields` lists that
+surfaced it: a filter value containing a space, `&`, `+`, `#`, or `/` arrived mangled and
+silently failed to match.
+
+`QueryBracketEncodingFilter` (order 9000) rewrites literal `[`/`]` to `%5B`/`%5D` before
+`RouteToRequestUrlFilter` runs, which makes the URI strictly encoded so the query passes
+through verbatim. The worker's servlet container decodes `%5B` back to `[` before parameter
+binding, so `page[size]` binds exactly as it always did. **Any new gateway filter that
+rewrites the request URI must preserve raw encoding** (`UriComponentsBuilder…build(true)`) —
+building with `build()` re-encodes and reintroduces this bug.
 
 ### Gateway startup & readiness
 

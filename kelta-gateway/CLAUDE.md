@@ -79,6 +79,7 @@ All handled by `error/GlobalErrorHandler`.
 | Pattern | File |
 |---------|------|
 | Reactive filter | `filter/TenantResolutionFilter.java` |
+| Request-URI rewrite (must preserve raw encoding) | `filter/QueryBracketEncodingFilter.java` |
 | Principal extraction | `auth/GatewayPrincipal.java` |
 | Cerbos integration | `authz/cerbos/CerbosAuthorizationService.java` |
 | Route data model | `route/RouteDefinition.java` |

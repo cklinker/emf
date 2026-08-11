@@ -86,8 +86,14 @@ export function FieldPermissionEditor({
   readOnly = false,
   testId = 'field-permission-editor',
 }: FieldPermissionEditorProps): React.ReactElement {
+  /**
+   * Radix throws on a <SelectItem value="" />, which takes down the whole page
+   * through the error boundary. Drop id-less collections instead.
+   */
+  const selectableCollections = useMemo(() => collections.filter((c) => c.id !== ''), [collections])
+
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>(
-    collections.length > 0 ? collections[0].id : ''
+    selectableCollections.length > 0 ? selectableCollections[0].id : ''
   )
 
   /** Build a lookup map of fieldId -> visibility */
@@ -131,8 +137,8 @@ export function FieldPermissionEditor({
 
   /** Get the selected collection name */
   const selectedCollection = useMemo(
-    () => collections.find((c) => c.id === selectedCollectionId),
-    [collections, selectedCollectionId]
+    () => selectableCollections.find((c) => c.id === selectedCollectionId),
+    [selectableCollections, selectedCollectionId]
   )
 
   return (
@@ -149,7 +155,7 @@ export function FieldPermissionEditor({
           <Select
             value={selectedCollectionId}
             onValueChange={setSelectedCollectionId}
-            disabled={collections.length === 0}
+            disabled={selectableCollections.length === 0}
           >
             <SelectTrigger
               id="collection-selector"
@@ -159,7 +165,7 @@ export function FieldPermissionEditor({
               <SelectValue placeholder="Select a collection" />
             </SelectTrigger>
             <SelectContent>
-              {collections.map((col) => (
+              {selectableCollections.map((col) => (
                 <SelectItem key={col.id} value={col.id}>
                   {col.name}
                 </SelectItem>
@@ -190,7 +196,7 @@ export function FieldPermissionEditor({
       </div>
 
       {/* Field permissions table */}
-      {collections.length === 0 ? (
+      {selectableCollections.length === 0 ? (
         <div
           className="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground"
           data-testid={`${testId}-no-collections`}

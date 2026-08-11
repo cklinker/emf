@@ -141,8 +141,43 @@ const mockCollections = {
   number: 0,
 }
 
-function setupMocks(profileAttrs = mockProfileAttrs) {
+/**
+ * Field pages as the gateway actually serves them: `collectionId` lives in
+ * `relationships`, never in `attributes`, and the HTTP page size clamps at 200
+ * so a large tenant spans several pages.
+ */
+interface MockFieldPage {
+  metadata: { totalPages: number }
+  data: Array<Record<string, unknown>>
+}
+
+function makeField(id: string, name: string, collectionId: string | null): Record<string, unknown> {
+  return {
+    type: 'fields',
+    id,
+    attributes: { name, type: 'TEXT' },
+    relationships: {
+      collectionId: collectionId
+        ? { data: { type: 'collections', id: collectionId } }
+        : { data: null },
+    },
+  }
+}
+
+const mockFieldPages: MockFieldPage[] = [
+  { metadata: { totalPages: 2 }, data: [makeField('f1', 'email', 'col1')] },
+  { metadata: { totalPages: 2 }, data: [makeField('f2', 'phone', 'col1')] },
+]
+
+function setupMocks(profileAttrs = mockProfileAttrs, fieldPages: MockFieldPage[] = []) {
   mockAxios.get.mockImplementation((url: string) => {
+    if (url.includes('/api/fields')) {
+      const match = /page\[number\]=(\d+)/.exec(url)
+      const pageNumber = match ? Number(match[1]) : 1
+      return Promise.resolve({
+        data: fieldPages[pageNumber - 1] ?? { metadata: { totalPages: 1 } },
+      })
+    }
     if (url.includes('/api/collections')) return Promise.resolve({ data: mockCollections })
     if (url.includes('/api/profiles/'))
       return Promise.resolve({ data: makeProfileResponse(profileAttrs) })
@@ -301,5 +336,58 @@ describe('ProfileDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('object-permissions-section')).toBeInTheDocument()
     })
+  })
+
+  it('reads each field collection from the JSON:API relationship, not attributes', async () => {
+    setupMocks(mockProfileAttrs, mockFieldPages)
+    render(<ProfileDetailPage />, { wrapper: createTestWrapper() })
+    await waitFor(() => {
+      expect(screen.getByTestId('field-permissions-section')).toBeInTheDocument()
+    })
+    // A field whose collectionId only exists as a relationship must still land in
+    // a real collection — an empty id would blow up the Radix <SelectItem />.
+    expect(screen.getByTestId('field-permissions-collection-select')).toBeInTheDocument()
+    expect(screen.queryByTestId('field-permissions-no-collections')).not.toBeInTheDocument()
+    expect(screen.getByText('email')).toBeInTheDocument()
+  })
+
+  it('walks every page of fields instead of relying on an oversized page size', async () => {
+    setupMocks(mockProfileAttrs, mockFieldPages)
+    render(<ProfileDetailPage />, { wrapper: createTestWrapper() })
+    await waitFor(() => {
+      expect(screen.getByTestId('field-permissions-section')).toBeInTheDocument()
+    })
+    // `phone` only exists on page 2 — a single clamped request would drop it.
+    await waitFor(() => {
+      expect(screen.getByText('phone')).toBeInTheDocument()
+    })
+    const fieldRequests = mockAxios.get.mock.calls
+      .map((call) => call[0] as string)
+      .filter((url) => url.includes('/api/fields'))
+    expect(fieldRequests).toHaveLength(2)
+    expect(fieldRequests[0]).toContain('page[size]=200')
+    expect(fieldRequests[1]).toContain('page[number]=2')
+  })
+
+  it('drops fields that carry no collection id', async () => {
+    setupMocks(mockProfileAttrs, [
+      {
+        metadata: { totalPages: 1 },
+        data: [
+          {
+            type: 'fields',
+            id: 'f-orphan',
+            attributes: { name: 'orphan', type: 'TEXT' },
+            relationships: { collectionId: { data: null } },
+          },
+        ],
+      },
+    ])
+    render(<ProfileDetailPage />, { wrapper: createTestWrapper() })
+    await waitFor(() => {
+      expect(screen.getByText('Standard User')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('field-permissions-section')).not.toBeInTheDocument()
+    expect(screen.queryByText('orphan')).not.toBeInTheDocument()
   })
 })

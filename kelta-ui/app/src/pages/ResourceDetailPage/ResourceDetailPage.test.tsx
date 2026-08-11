@@ -28,7 +28,8 @@ import {
   createAxiosError,
 } from '../../test/testUtils'
 import { ResourceDetailPage } from './ResourceDetailPage'
-import type { CollectionSchema, Resource } from './ResourceDetailPage'
+import type { Resource } from './ResourceDetailPage'
+import type { CollectionSchema } from '../../hooks/useCollectionSchema'
 
 // Mock the I18nContext
 vi.mock('../../context/I18nContext', () => ({
@@ -257,6 +258,7 @@ function toJsonApiWithFields(schema: {
   id: string
   name: string
   displayName: string
+  trackHistory?: boolean
   fields: ReadonlyArray<Record<string, unknown> | object>
 }) {
   return {
@@ -266,6 +268,7 @@ function toJsonApiWithFields(schema: {
       attributes: {
         name: schema.name,
         displayName: schema.displayName,
+        trackHistory: schema.trackHistory ?? false,
       },
     },
     included: (schema.fields || []).map((rawF, i) => {
@@ -772,6 +775,51 @@ describe('ResourceDetailPage', () => {
         expect(screen.getByTestId('record-header')).toBeInTheDocument()
         expect(screen.getByTestId('resource-id')).toHaveTextContent('prod-789')
       })
+    })
+  })
+
+  // Regression guard: the page used to fork its own CollectionSchema/fetcher,
+  // both of which dropped `trackHistory`, leaving the History tab permanently
+  // dead. It now consumes the shared useCollectionSchema hook.
+  describe('History Tab', () => {
+    function mockApiWithSchema(schema: CollectionSchema) {
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(schema) })
+        }
+        if (
+          url.includes('/api/notes') ||
+          url.includes('/api/attachments') ||
+          url.includes('/api/record-shares')
+        ) {
+          return Promise.resolve({ data: [] })
+        }
+        if (url.includes('/api/')) {
+          return Promise.resolve({ data: mockResource })
+        }
+        return Promise.resolve({ data: [] })
+      })
+    }
+
+    it('should show the History tab when the collection has trackHistory enabled', async () => {
+      mockApiWithSchema({ ...mockSchema, trackHistory: true })
+
+      renderWithProviders(<ResourceDetailPage />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('detail-tab-history')).toBeInTheDocument()
+      })
+    })
+
+    it('should hide the History tab when trackHistory is disabled', async () => {
+      mockApiWithSchema({ ...mockSchema, trackHistory: false })
+
+      renderWithProviders(<ResourceDetailPage />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('detail-tab-system')).toBeInTheDocument()
+      })
+      expect(screen.queryByTestId('detail-tab-history')).not.toBeInTheDocument()
     })
   })
 

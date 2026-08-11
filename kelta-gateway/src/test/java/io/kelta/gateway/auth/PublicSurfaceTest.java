@@ -47,9 +47,18 @@ class PublicSurfaceTest {
             "/api/telehealth/webhooks",     // LiveKit webhook (signed JWT + body digest)
             "/api/billing/webhooks");       // payment-processor webhook (HMAC)
 
-    /** GET/HEAD-only bootstrap data the UI needs before anyone has signed in. */
+    /**
+     * GET/HEAD-only bootstrap data the UI needs before anyone has signed in — exactly the
+     * requests {@code kelta-ui/app/src/utils/bootstrapCache.ts} issues with no token.
+     * All of it is tenant-scoped presentation metadata, none of it is tenant-private
+     * business data; writes stay authenticated because this list is GET/HEAD only.
+     */
     private static final List<String> EXPECTED_PUBLIC_GET = List.of(
-            "/api/ui-pages", "/api/ui-menus", "/api/oidc-providers", "/api/tenants");
+            "/api/ui-pages",                // page structure
+            "/api/ui-menus",                // nav structure
+            "/api/ui-translations",         // tenant UI label overlay (i18n), rendered pre-login
+            "/api/oidc-providers",          // which login buttons to render
+            "/api/tenants");                // the tenant record behind the slug
 
     private static Properties shippedConfig() {
         YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();

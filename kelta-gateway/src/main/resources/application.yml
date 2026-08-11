@@ -127,7 +127,13 @@ kelta:
       permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}   # Redis cache TTL for resolved permissions
       # Paths accessible without authentication (GET/HEAD only).
       # Matched as prefixes against the slug-stripped path.
-      public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
+      # These are exactly the endpoints the UI bootstrap fetches before a session exists
+      # (kelta-ui/app/src/utils/bootstrapCache.ts) — tenant-scoped presentation metadata:
+      # page/menu structure, the tenant's UI translation overlay, the IdP list to render a
+      # login button, and the tenant record itself. Writes stay authenticated: this list is
+      # GET/HEAD only. Adding a path here also bypasses TenantIpAllowlistFilter, so keep it
+      # to metadata that is safe to serve to an anonymous visitor of that tenant.
+      public-paths: /api/ui-pages,/api/ui-menus,/api/ui-translations,/api/oidc-providers,/api/tenants
       # Paths accessible without authentication for ALL HTTP methods.
       # Used for endpoints receiving data from unauthenticated sources (e.g., browser OTEL SDK,
       # campaign open-pixel / click-redirect / unsubscribe links authenticated by HMAC token,

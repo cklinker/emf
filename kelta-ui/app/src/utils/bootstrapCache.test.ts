@@ -1,8 +1,9 @@
 /**
- * Unit tests for the bootstrap menu-item tree assembly (submenus via parentId).
+ * Unit tests for the bootstrap menu-item tree assembly (submenus via parentId)
+ * and for the failure-tolerant tenant-translation fetch.
  */
-import { describe, it, expect } from 'vitest'
-import { buildItemTree } from './bootstrapCache'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { buildItemTree, clearBootstrapCache, fetchBootstrapConfig } from './bootstrapCache'
 
 const item = (id: string, parentId?: string | null) => ({
   id,
@@ -38,5 +39,45 @@ describe('buildItemTree', () => {
   it('ignores a self-referencing parentId', () => {
     const tree = buildItemTree([item('a', 'a')])
     expect(tree.map((i) => i.id)).toEqual(['a'])
+  })
+})
+
+describe('fetchBootstrapConfig — tenant translations', () => {
+  afterEach(() => {
+    clearBootstrapCache()
+    vi.restoreAllMocks()
+  })
+
+  const ok = (data: unknown[]) =>
+    Promise.resolve({ ok: true, status: 200, json: async () => ({ data }) } as Response)
+
+  /** Every bootstrap call succeeds except ui-translations, which answers with `status`. */
+  const stubFetch = (status: number) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        url.includes('/api/ui-translations')
+          ? Promise.resolve({ ok: false, status, json: async () => ({}) } as Response)
+          : ok([])
+      )
+    )
+
+  it('warns and falls back to built-in strings when translations are rejected', async () => {
+    // 401 is what a missing gateway public-paths prefix produces. The overlay must
+    // degrade rather than fail, but it must not degrade silently.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubFetch(401)
+
+    const config = (await fetchBootstrapConfig()) as { translations: Record<string, unknown> }
+
+    expect(config.translations).toEqual({})
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('HTTP 401'))
+  })
+
+  it('does not fail the whole bootstrap when translations are unavailable', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubFetch(500)
+
+    await expect(fetchBootstrapConfig()).resolves.toBeDefined()
   })
 })

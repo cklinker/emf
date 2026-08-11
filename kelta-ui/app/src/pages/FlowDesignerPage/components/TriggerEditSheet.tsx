@@ -17,7 +17,6 @@ import {
   NatsTriggerForm,
 } from '@/components/flows'
 import { useApi } from '@/context/ApiContext'
-import type { CreateFlowRequest } from '@kelta/sdk'
 import { useToast } from '@/components'
 import type { Flow, TriggerConfig } from '../types'
 
@@ -90,7 +89,7 @@ export function TriggerEditSheet({ open, onOpenChange, flow }: TriggerEditSheetP
         definition,
         triggerConfig: config,
         runAsUserId: runAsUserId === RUN_AS_OWNER ? null : runAsUserId,
-      } as Partial<CreateFlowRequest>)
+      })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flow', flow.id] })

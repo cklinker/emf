@@ -118,6 +118,7 @@ export type {
   ApprovalProcess,
   ApprovalInstance,
   CreateApprovalProcessRequest,
+  JsonObjectField,
   FlowDefinition,
   FlowExecution,
   CreateFlowRequest,

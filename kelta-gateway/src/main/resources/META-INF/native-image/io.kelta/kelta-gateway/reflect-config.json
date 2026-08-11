@@ -36,6 +36,12 @@
     "allDeclaredFields": true
   },
   {
+    "name": "com.maxmind.db.Metadata",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "io.kelta.gateway.geo.model.GeoCityData",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,

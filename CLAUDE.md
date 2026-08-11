@@ -138,7 +138,7 @@ visual system.
 | Cache | Redis | 7 | `docker-compose.yml` |
 | Messaging | NATS JetStream | 2.10 | `docker-compose.yml` |
 | Authz | Cerbos PDP | 0.40.0 (SDK 0.12.0) | `docker-compose.yml`, poms |
-| Search/Audit | OpenSearch | 2.17.1 | `integrations.md` |
+| Search/Audit | PostgreSQL (`tsvector` full-text, `pgvector` semantic, audit tables) | — | `integrations.md` |
 | AI | `anthropic-java` SDK | 2.18.0 (model via `AI_DEFAULT_MODEL`) | `kelta-ai/pom.xml`, `application.yml` |
 | Frontend | React | 19.2 | `kelta-ui/app/package.json` |
 | Frontend build | Vite / Vitest | web 5.1/1.3, ui 7.2/4.0 | package.json (npm, Node 18 in CI) |

@@ -741,7 +741,7 @@ strategy — preserving data on the disk while hiding it from the API.
 4. CollectionLifecycleManager refreshes definition
 5. Schema migration triggered (ALTER TABLE)
 6. CollectionRegistry updated
-7. Downstream: SearchIndexListener syncs OpenSearch, SvixWebhookPublisher notifies
+7. Downstream: SearchIndexListener refreshes the Postgres `tsvector` search index, SvixWebhookPublisher notifies
 
 **Config-change NATS subjects** (broadcast, every pod consumes):
 

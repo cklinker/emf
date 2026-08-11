@@ -116,3 +116,12 @@ until it reports `1.0.<run_number>` (≤5 min)** before asserting, and runs **on
 `cli_downloads == 'true'`** (the image is only rebuilt then; the old `|| workflows == 'true'`
 ran the strict `EXPECT == run_number` check on runs where the image was not rebuilt, so it
 could never match).
+
+**Two keys, and they can disagree.** The served version is `1.0.<run_number>` (baked in at
+build time) but the rollout is triggered by the image tag `main-<short-sha>`. A rebuild at an
+already-deployed commit — `workflow_dispatch` with `force_build_all=true`, or a re-run —
+pushes an identical tag, so ArgoCD applies nothing, the pod keeps serving the version from the
+run that first built that tag, and `EXPECT` can never arrive. The step compares the running tag
+to the pushed tag before polling and asserts against the **served** version when they match
+(run 31510066633 is the case that proved it). Do not reintroduce a bare
+`1.0.<run_number>` assertion.

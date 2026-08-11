@@ -221,6 +221,31 @@ jobs:
         working-directory: kelta-ui/app
         run: npm run typecheck
 
+      - name: Lint kelta-ui
+        working-directory: kelta-ui/app
+        run: npm run lint
+
+      - name: Format check kelta-ui
+        working-directory: kelta-ui/app
+        run: npm run format:check
+
+      # kelta-ui/app's 2657 unit tests (221 files) had never run in CI — the job's
+      # `defaults.run.working-directory: kelta-web` meant every step above only ever
+      # covered the SDK workspace. Like the typecheck, this must stay after the
+      # kelta-web package build: components imported from a stale @kelta/components
+      # dist render as `undefined` and 27 test files fail on "Element type is invalid".
+      #
+      # Gates the job (a failure here is a red CI run). Local wall time is ~1 min, but
+      # this job shares the runner with the Java matrix and the e2e image builds, and
+      # the frontend suite has starved under that kind of contention before
+      # (concerns.md → "Frontend suite starves under concurrent image builds"), so the
+      # step timeout is deliberately generous. kelta-ui/app already sets a 30s
+      # testTimeout/hookTimeout in vitest.config.ts, which covers the per-test half.
+      - name: Test kelta-ui
+        working-directory: kelta-ui/app
+        run: npm run test:run
+        timeout-minutes: 15
+
       - name: Upload coverage report
         continue-on-error: true
         if: always()

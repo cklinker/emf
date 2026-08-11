@@ -505,6 +505,37 @@ jobs:
           BASE="http://${DEPLOY}.${NS}.svc.cluster.local"
           EXPECT="1.0.${{ github.run_number }}"
 
+          # The served version and the thing that triggers a rollout are keyed on different
+          # values: CLI_VERSION is baked in as 1.0.<run_number>, but ArgoCD only rolls when
+          # the image *tag* (main-<sha>) changes. A rebuild at a commit whose tag is already
+          # running therefore pushes an identical tag — ArgoCD has nothing to apply, the pod
+          # keeps serving the version from the run that first built it, and EXPECT can never
+          # arrive. That is not a bad deploy, but the poll below would time out and hand the
+          # auto-rollback a healthy release to revert. It did exactly that to run 31510066633,
+          # reverting a gateway+worker bump whose own health checks had already passed.
+          PUSHED_TAG="main-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          RUNNING_TAG=$(kubectl -n ${NS} get deploy ${DEPLOY} \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | sed 's/.*://')
+          if [ "${RUNNING_TAG}" = "${PUSHED_TAG}" ]; then
+            echo "::notice::${DEPLOY} is already running ${PUSHED_TAG} — this run rebuilt an" \
+                 "unchanged commit, so ArgoCD will not roll and the served version stays at the" \
+                 "run that first built this tag. Verifying what is served instead of ${EXPECT}."
+            SERVED=$(curl -fsS "${BASE}/cli/manifest.json" 2>/dev/null \
+              | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1)
+            if [ -z "${SERVED}" ]; then
+              echo "::error::${DEPLOY} is running ${PUSHED_TAG} but served no manifest version."
+              exit 1
+            fi
+            curl -fsS "${BASE}/health" | grep -q '"status":"UP"'
+            curl -fsS "${BASE}/cli/releases/${SERVED}/kelta-linux-x64" -o /tmp/kelta-smoke
+            chmod +x /tmp/kelta-smoke
+            /tmp/kelta-smoke version --output json | grep -q "\"version\": \"${SERVED}\"" || {
+              echo "::error::Downloaded binary does not report the served version ${SERVED}"; exit 1;
+            }
+            echo "CLI downloads smoke OK: ${SERVED} served and executable (tag unchanged)."
+            exit 0
+          fi
+
           # ArgoCD applies the image bump we just pushed asynchronously, so `rollout status`
           # returns immediately against the still-old ReplicaSet and a one-shot version check
           # races the sync. Poll the served manifest until it reports EXPECT (i.e. ArgoCD has

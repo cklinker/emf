@@ -41,8 +41,19 @@ Trigger: `push` → `main` (path-filtered), plus `workflow_dispatch`.
 3. **`deploy`** — checks out `homelab-argo`, runs kustomize to bump image tags (verifies
    each image exists on Harbor first), commits to `homelab-argo`. ArgoCD then syncs.
 4. **`smoke-test`** — waits for k8s rollouts; `curl .../actuator/health/liveness` on gateway
-   + worker.
+   + worker; then (only when cli-downloads was rebuilt) downloads and executes the CLI binary.
+   **The CLI check keys on two different values and they can disagree:** `CLI_VERSION` is baked
+   in as `1.0.<run_number>`, but ArgoCD only rolls when the image *tag* `main-<short-sha>`
+   changes. A rebuild at an already-deployed commit (`workflow_dispatch` with
+   `force_build_all=true`, a re-run) pushes an identical tag, so nothing rolls, the pod keeps
+   serving the earlier run's version, and the version poll times out on a perfectly good
+   deploy. The step now compares the running tag to the pushed tag first and asserts against
+   the *served* version when they match. Don't reintroduce a bare `1.0.<run_number>` assertion.
 5. **`rollback-on-smoke-failure`** — `git revert HEAD` in `homelab-argo` if smoke fails.
+   **It reverts the whole image bump, not just the failing service** — a false failure in one
+   smoke step rolls back every service in that commit. Run 31510066633 reverted a gateway +
+   worker bump whose own health steps had already passed, because the cli-downloads version
+   check timed out on an unchanged tag.
 6. **`e2e-test`** — Playwright against production (`app.kelta.io`, `api.kelta.io`) using
    E2E token + Authentik secrets. Timeout 25 min. Files failing-E2E bug tasks to `emf-queue`.
    Also builds `@kelta/cli` (`kelta-web`: formula+sdk, then cli) so the CLI smoke spec
@@ -105,3 +116,12 @@ until it reports `1.0.<run_number>` (≤5 min)** before asserting, and runs **on
 `cli_downloads == 'true'`** (the image is only rebuilt then; the old `|| workflows == 'true'`
 ran the strict `EXPECT == run_number` check on runs where the image was not rebuilt, so it
 could never match).
+
+**Two keys, and they can disagree.** The served version is `1.0.<run_number>` (baked in at
+build time) but the rollout is triggered by the image tag `main-<short-sha>`. A rebuild at an
+already-deployed commit — `workflow_dispatch` with `force_build_all=true`, or a re-run —
+pushes an identical tag, so ArgoCD applies nothing, the pod keeps serving the version from the
+run that first built that tag, and `EXPECT` can never arrive. The step compares the running tag
+to the pushed tag before polling and asserts against the **served** version when they match
+(run 31510066633 is the case that proved it). Do not reintroduce a bare
+`1.0.<run_number>` assertion.

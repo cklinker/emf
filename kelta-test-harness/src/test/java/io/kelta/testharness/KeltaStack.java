@@ -52,6 +52,14 @@ public final class KeltaStack {
     private static final String INTERNAL_TOKEN = "harness-internal-token";
 
     /**
+     * HMAC signing keys the worker refuses to start without — there is deliberately no
+     * fallback, since an unset key would sign real visit and campaign links with a value
+     * published in this repository. Harness-local literals, never a deployed value.
+     */
+    private static final String VISIT_SECRET = "harness-visit-secret";
+    private static final String CAMPAIGN_TRACKING_SECRET = "harness-campaign-tracking-secret";
+
+    /**
      * Datasource configuration for the worker + auth services. Built once from env
      * via {@link HarnessDbConfig#resolve}: external when {@code CI_DB_JDBC_URL}
      * is set (shared {@code kelta-ci-db} pool, schema-isolated per CI run), otherwise
@@ -147,6 +155,8 @@ public final class KeltaStack {
             .withEnv("CERBOS_GRPC_PORT",           "3593")
             .withEnv("KELTA_ENCRYPTION_KEY",       ENCRYPTION_KEY)
             .withEnv("KELTA_INTERNAL_TOKEN",       INTERNAL_TOKEN)
+            .withEnv("KELTA_TELEHEALTH_VISIT_SECRET", VISIT_SECRET)
+            .withEnv("CAMPAIGN_TRACKING_SECRET",   CAMPAIGN_TRACKING_SECRET)
             .withEnv("EMAIL_ENABLED",              "false")
             .withEnv("SMTP_AUTH",                  "false")
             .withEnv("SMTP_STARTTLS",              "false")

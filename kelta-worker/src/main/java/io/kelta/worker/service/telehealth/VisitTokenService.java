@@ -43,14 +43,22 @@ public class VisitTokenService {
 
     private final byte[] secret;
 
+    /**
+     * @throws IllegalStateException if no secret is configured — deliberately fatal. The previous
+     *     behaviour fell back to a hardcoded default and logged a warning, which meant production
+     *     signed real visit links with a key published in this repository for months while the
+     *     warning scrolled past on every boot. A token signed with a known key can be exchanged
+     *     for a portal login, so refusing to start is the only safe response.
+     */
     public VisitTokenService(@Value("${kelta.telehealth.visit-secret:}") String secret) {
-        String effective = secret;
-        if (effective == null || effective.isBlank()) {
-            effective = "kelta-dev-visit-secret";
-            log.warn("kelta.telehealth.visit-secret is not set — using the DEV default. "
-                    + "Set KELTA_TELEHEALTH_VISIT_SECRET in every non-dev environment.");
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "kelta.telehealth.visit-secret is not set. Visit links are HMAC-signed and "
+                            + "exchangeable for a portal login, so there is no safe default. Set "
+                            + "KELTA_TELEHEALTH_VISIT_SECRET to a random high-entropy value "
+                            + "(openssl rand -base64 48) in every environment, including local dev.");
         }
-        this.secret = effective.getBytes(StandardCharsets.UTF_8);
+        this.secret = secret.getBytes(StandardCharsets.UTF_8);
     }
 
     public String sign(String tenantId, String appointmentId, String portalUserId, Instant exp) {

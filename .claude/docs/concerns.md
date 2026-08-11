@@ -569,6 +569,19 @@ real table. **Candidate order matters and is tested** — tenant schema under th
 *first*, so a tenant collection legitimately named `users` still wins in its own schema instead of
 being redirected to `platform_user`.
 
+**FIXED (fix/fail-fast-on-missing-hmac-secrets) — signing keys fell back to hardcoded defaults.**
+`VisitTokenService` defaulted to `kelta-dev-visit-secret` and `CampaignProperties` to
+`kelta-dev-campaign-tracking-secret-change-me`, each with a startup `WARN`. Both were unset in
+production, so real links were signed with values published in this public repo — the visit one
+seriously, since a visit token is exchangeable for a portal login. The warning fired on every pod
+boot for months and was never actioned; **a `log.warn` is not a control**. Both now throw
+`IllegalStateException` naming the env var. Local dev keeps working: `docker-compose.yml` sets
+local-only literals (CI's compose inherits them) and `make gen-keys` writes random values into
+`.env` for a bare `mvn spring-boot:run`. Precedent for the pattern already existed —
+`KELTA_AUTH_BOT_CHALLENGE_HMAC_KEY` fails startup on purpose for the same reason. **Never give a
+signing key a default**; the tuning knobs beside it in `CampaignProperties` still default freely,
+and that contrast is the point.
+
 **Test-harness note:** the runtime-core storage tests now build H2 with `DATABASE_TO_LOWER=TRUE`
 (as `ExternalJdbcStorageAdapterTest` already did). H2 folds unquoted identifiers to *upper* case
 while PostgreSQL folds to *lower*; without the flag, quoted-lowercase DDL wouldn't match the

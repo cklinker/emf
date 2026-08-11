@@ -168,6 +168,12 @@ services:
       SPRING_DATASOURCE_PASSWORD: kelta
       # In compose there is no K8s PreSync Job — let worker run its own Flyway
       SPRING_FLYWAY_ENABLED: "true"
+      # HMAC signing keys. The worker refuses to start without these — they used to fall back to
+      # hardcoded defaults, which is how production ended up signing real visit links with a key
+      # published in this repo. These literals are fine precisely because they are local-only:
+      # anything reachable from outside your machine must generate its own.
+      KELTA_TELEHEALTH_VISIT_SECRET: local-dev-visit-secret-not-for-any-deployed-environment
+      CAMPAIGN_TRACKING_SECRET: local-dev-campaign-secret-not-for-any-deployed-environment
       # Redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"

@@ -473,6 +473,16 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   The endpoint resolves its own tenant from the verified token and records events under
   `TenantContext.withTenant`. Campaign management itself is a normal `/api/admin/campaigns`
   endpoint gated in-controller on `MANAGE_CAMPAIGNS` (the DB-lookup pattern above).
+  Either list is guarded by `PublicSurfaceTest`, which reads the **shipped** `application.yml`
+  and asserts the allowlist equals a reviewed set — widening it must also edit that test.
+- **UI bootstrap endpoints**: `kelta-ui/app/src/utils/bootstrapCache.ts` fetches `ui-pages`,
+  `ui-menus`, `ui-translations`, `oidc-providers`, and `tenants` **with no token**, before a
+  session exists. Every one of those must be in `public-paths` (GET/HEAD only) or the gateway
+  401s it. The bootstrap is deliberately failure-tolerant — a non-ok response resolves to an
+  empty list rather than failing the whole app — so a missing prefix does **not** surface as a
+  visible error, only as a permanently empty section of the bootstrap plus a gateway
+  `Missing Authorization header` WARN. Adding a new pre-login fetch means adding its prefix
+  here in the same change.
 - **Sandbox/promotion/package routes** (2026-07-04): `/api/environments/**` and
   `/api/promotions/**` (static routes `environments`/`promotions`) are gated in-controller on
   **`MANAGE_SANDBOXES`**; `/api/packages/**` (static route `packages`) on

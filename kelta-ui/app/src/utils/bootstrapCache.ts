@@ -230,10 +230,18 @@ export function fetchBootstrapConfig(): Promise<unknown> {
     ),
     // Tenant translation overlay (app-intelligence slice 4) — failure-tolerant:
     // a non-ok response OR a thrown fetch resolves empty so the overlay can never
-    // take the whole bootstrap down.
+    // take the whole bootstrap down. It warns on a non-ok response because silence
+    // is how this went unnoticed: the endpoint was missing from the gateway's
+    // public-paths allowlist, so every pre-login fetch 401'd and the overlay was
+    // permanently empty with nothing in the console to say so.
     fetch(`${base}/api/ui-translations?page[size]=2000`)
       .then(async (r) => {
-        if (!r.ok) return { data: [] }
+        if (!r.ok) {
+          console.warn(
+            `Tenant translations unavailable (HTTP ${r.status}); falling back to built-in strings`
+          )
+          return { data: [] }
+        }
         return r.json()
       })
       .catch(() => ({ data: [] })),

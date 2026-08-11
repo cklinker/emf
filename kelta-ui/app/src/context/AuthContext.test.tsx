@@ -606,11 +606,11 @@ describe('AuthContext', () => {
 
       // Token endpoint fails with a network error (transient)
       const baseFetch = createMockFetch()
-      global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      global.fetch = vi.fn(async (input: RequestInfo | URL) => {
         if (String(input) === mockDiscoveryDoc.token_endpoint) {
           throw new Error('network down')
         }
-        return baseFetch(input, init)
+        return baseFetch(input)
       }) as typeof fetch
 
       renderWithAuth()

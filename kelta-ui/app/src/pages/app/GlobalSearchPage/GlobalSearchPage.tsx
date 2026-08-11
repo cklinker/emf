@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import type { MenuConfig, MenuItemConfig } from '@/types/config'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -43,11 +44,11 @@ interface SearchResult {
  * Extract collection names from menu config.
  */
 function getCollectionNames(
-  config: { menus?: Array<{ items?: Array<{ path?: string; label?: string }> }> } | null
+  config: { menus?: MenuConfig[] } | null
 ): Array<{ name: string; label: string }> {
   if (!config?.menus) return []
   const collections: Array<{ name: string; label: string }> = []
-  const visit = (items: (typeof config.menus)[number]['items']) => {
+  const visit = (items: MenuItemConfig[] | undefined) => {
     for (const item of items ?? []) {
       if (item.path?.startsWith('/resources/')) {
         const name = item.path.replace('/resources/', '').split('/')[0]

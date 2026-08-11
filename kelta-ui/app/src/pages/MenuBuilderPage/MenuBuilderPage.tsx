@@ -49,6 +49,13 @@ export interface UIMenu {
   id: string
   name: string
   items: UIMenuItem[]
+  /** Lucide icon name shown in the end-user app switcher (apps/nav v2, V164). */
+  icon?: string
+  /** The app selected when the user has no stored preference (apps/nav v2, V164). */
+  isDefault?: boolean
+  /** Inactive apps are hidden from the end-user shell (apps/nav v2, V164). */
+  active?: boolean
+  displayOrder?: number
   createdAt: string
   updatedAt: string
 }

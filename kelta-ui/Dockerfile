@@ -49,7 +49,10 @@ COPY kelta-ui/app/public ./public
 ARG VITE_API_BASE_URL=https://api.kelta.io
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# Build the Vite app (skip tsc — CI validates types separately)
+# Build the Vite app. tsc is skipped here on purpose — the image build stays a
+# pure bundle step. Types are gated by the "Type check kelta-ui" step in
+# .github/workflows/ci.yml (`npm run typecheck`); keep that step in place, or
+# type errors reach main unnoticed, as 22 of them did before that step existed.
 RUN npx vite build
 
 # =============================================================================

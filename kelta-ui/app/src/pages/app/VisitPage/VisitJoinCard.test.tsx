@@ -16,7 +16,7 @@ vi.mock('@/context/ApiContext', () => ({
 vi.mock('@/hooks/useMyIdentity', () => ({
   useMyIdentity: vi.fn(() => ({ identity: { userId: 'me', email: null, profileId: null } })),
 }))
-const mockPresence = vi.fn(() => [] as { id: string; email?: string }[])
+const mockPresence = vi.fn<(resource: string | null) => { id: string; email?: string }[]>(() => [])
 vi.mock('@/realtime/usePresence', () => ({
   usePresence: (resource: string | null) => mockPresence(resource),
 }))

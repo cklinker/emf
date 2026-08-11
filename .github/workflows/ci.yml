@@ -196,6 +196,31 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
+      # -----------------------------------------------------------------------
+      # kelta-ui/app types. The prod image builds with bare `vite build`, which
+      # skips tsc entirely — so without this step nothing validates kelta-ui/app
+      # types and errors accumulate silently on main (22 had, when this was added).
+      #
+      # kelta-ui/app resolves @kelta/* through the built dist/*.d.ts of the
+      # kelta-web packages, so those must be built first or the typecheck
+      # reports phantom "has no exported member" errors against a stale dist.
+      # -----------------------------------------------------------------------
+      - name: Build kelta-web packages (kelta-ui type resolution)
+        run: |
+          npm run build --workspace=packages/formula
+          npm run build --workspace=packages/sdk
+          npm run build --workspace=packages/plugin-sdk
+          npm run build --workspace=packages/components
+
+      - name: Install kelta-ui dependencies
+        working-directory: kelta-ui/app
+        run: npm ci --no-audit --no-fund
+        timeout-minutes: 5
+
+      - name: Type check kelta-ui
+        working-directory: kelta-ui/app
+        run: npm run typecheck
+
       - name: Upload coverage report
         continue-on-error: true
         if: always()

@@ -101,6 +101,8 @@ export interface CollectionSchema {
   id: string
   name: string
   displayName: string
+  /** Collection-level record versioning toggle — gates the record History tab */
+  trackHistory?: boolean
   fields: FieldDefinition[]
 }
 
@@ -297,6 +299,7 @@ async function fetchCollectionSchema(
     id: collection.id as string,
     name: collection.name as string,
     displayName: (collection.displayName as string) || (collection.name as string),
+    trackHistory: !!collection.trackHistory,
     fields,
   }
 }

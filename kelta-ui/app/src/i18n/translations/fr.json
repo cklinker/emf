@@ -987,7 +987,7 @@
       "auditEvents": "Audit Events",
       "noAuditEvents": "No audit events for this request.",
       "noHeaders": "No request headers captured.",
-      "viewInJaeger": "View full trace in Jaeger"
+      "viewInTempo": "View full trace in Tempo"
     }
   },
   "logViewer": {

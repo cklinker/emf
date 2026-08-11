@@ -12,6 +12,34 @@ export interface RequestLogDetailPageProps {
 
 type Tab = 'request' | 'response' | 'trace' | 'logs' | 'audit'
 
+/**
+ * Deep link into Grafana Explore, querying the Tempo datasource for one trace.
+ * Grafana encodes Explore state in a `panes` object keyed by an arbitrary pane
+ * id; `schemaVersion=1` is the format Grafana 10.1+ reads.
+ */
+function buildTraceUrl(traceId: string): string {
+  const panes = {
+    trace: {
+      datasource: 'tempo',
+      queries: [
+        {
+          refId: 'A',
+          datasource: { type: 'tempo', uid: 'tempo' },
+          queryType: 'traceql',
+          query: traceId,
+        },
+      ],
+      range: { from: 'now-24h', to: 'now' },
+    },
+  }
+  const params = new URLSearchParams({
+    schemaVersion: '1',
+    orgId: '1',
+    panes: JSON.stringify(panes),
+  })
+  return `https://grafana.rzware.com/explore?${params.toString()}`
+}
+
 export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
   const { t } = useI18n()
   const { keltaClient } = useApi()
@@ -58,7 +86,8 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
   }
   const spans = ((data as { spans?: Span[] }).spans || []) as Span[]
   // Find the root span: the span whose parent is not in the result set.
-  // Jaeger stores parent references in the 'references' array, not in the flat tagMap.
+  // Spans come back in the Jaeger data model, which Tempo also emits: the
+  // parent is in the 'references' array, not in the flat tagMap.
   const rootSpan =
     spans.find((s: Span) => {
       const parentSpanId = s.references?.[0]?.spanID
@@ -170,13 +199,13 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
             {t('requestLog.traceId')}: {traceId}
           </span>
           <a
-            href={`https://jaeger.rzware.com/trace/${traceId}`}
+            href={buildTraceUrl(traceId!)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-primary hover:underline"
-            data-testid="request-detail-jaeger-link"
+            data-testid="request-detail-trace-link"
           >
-            {t('requestLog.detail.viewInJaeger')}
+            {t('requestLog.detail.viewInTempo')}
           </a>
         </div>
       </div>

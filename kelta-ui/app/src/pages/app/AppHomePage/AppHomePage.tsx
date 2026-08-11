@@ -25,6 +25,7 @@ import { useAppContext } from '@/context/AppContext'
 import { useConfig } from '@/context/ConfigContext'
 import { CustomPage } from '../CustomPage/CustomPage'
 import { resolveHomePageSlug } from './homePage'
+import type { MenuConfig, MenuItemConfig } from '@/types/config'
 
 /**
  * Format a timestamp into a human-readable relative time string.
@@ -50,11 +51,11 @@ function formatRelativeTime(timestamp: number): string {
  * Extract collection tabs from menu config for quick actions.
  */
 function getCollectionTabs(
-  config: { menus?: Array<{ items?: Array<{ path?: string; label?: string }> }> } | null
+  config: { menus?: MenuConfig[] } | null
 ): Array<{ collectionName: string; label: string }> {
   if (!config?.menus) return []
   const tabs: Array<{ collectionName: string; label: string }> = []
-  const visit = (items: (typeof config.menus)[number]['items']) => {
+  const visit = (items: MenuItemConfig[] | undefined) => {
     for (const item of items ?? []) {
       if (item.path?.startsWith('/resources/')) {
         const collectionName = item.path.replace('/resources/', '').split('/')[0]

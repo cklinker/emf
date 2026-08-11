@@ -1,5 +1,4 @@
 /** SelectableNode visibility chrome (app-platform slice 1): ghost + badge, never hides. */
-import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'

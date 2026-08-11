@@ -256,7 +256,7 @@ runtime/runtime-messaging-nats -am -B
 | Full pre-PR build + tests (all modules) | `/verify` |
 | Java service tests | `/test-java` · or `mvn verify -f kelta-<svc>/pom.xml -B` |
 | Integration tests (Testcontainers) | `mvn verify -f kelta-test-harness/pom.xml -Pintegration-tests` |
-| Frontend lint/type/test | `/test-frontend` · or in `kelta-web`/`kelta-ui/app`: `npm run lint && npm run typecheck && npm run test:run` |
+| Frontend lint/type/test | `/test-frontend` · or in `kelta-web`/`kelta-ui/app`: `npm run lint && npm run typecheck && npm run test:run`. For `kelta-ui/app`, **build the `kelta-web` packages first** (`cd kelta-web && npm run build`) — its `@kelta/*` types resolve through their built `dist/*.d.ts`, so a stale `dist` yields phantom "has no exported member" errors (`concerns.md` → Fragile Areas) |
 | Single Java test | `mvn test -f kelta-<svc>/pom.xml -Dtest=ClassName` |
 | Run full local stack | `make up` (then `make seed`) — see `README.md` |
 | Local stack, low-memory box | `make up-jvm` — JVM images instead of GraalVM native. `make up` builds 3 native images concurrently and needs ~24 GB allocated to Docker, else `cannot allocate memory` |

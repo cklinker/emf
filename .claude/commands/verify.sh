@@ -31,9 +31,13 @@ step "4/5 kelta-web checks"
   || fail "kelta-web"
 
 # Step 5 only if kelta-ui touched.
+# kelta-ui/app resolves @kelta/* types through the built dist/*.d.ts of the
+# kelta-web packages, so those must be built before `typecheck` — otherwise it
+# reports phantom "has no exported member" errors against a stale dist.
 if git diff --name-only origin/main 2>/dev/null | grep -q '^kelta-ui/'; then
   step "5/5 kelta-ui checks (changes detected)"
-  ( cd kelta-ui/app && npm install && npm run lint && npm run format:check && npm run test:run ) \
+  ( cd kelta-web && npm run build ) || fail "kelta-web packages build (needed for kelta-ui types)"
+  ( cd kelta-ui/app && npm install && npm run lint && npm run typecheck && npm run format:check && npm run test:run ) \
     || fail "kelta-ui"
 else
   step "5/5 kelta-ui (skipped — no changes since origin/main)"

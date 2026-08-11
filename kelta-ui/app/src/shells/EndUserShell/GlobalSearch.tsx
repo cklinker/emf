@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge'
 import { useApi } from '@/context/ApiContext'
 import { useConfig } from '@/context/ConfigContext'
 import { useAppContext } from '@/context/AppContext'
+import type { MenuConfig, MenuItemConfig } from '@/types/config'
 
 interface SearchResult {
   id: string
@@ -41,11 +42,11 @@ interface SearchResult {
  * Extract collection tabs from menu config.
  */
 function getCollectionNames(
-  config: { menus?: Array<{ items?: Array<{ path?: string; label?: string }> }> } | null
+  config: { menus?: MenuConfig[] } | null
 ): Array<{ name: string; label: string }> {
   if (!config?.menus) return []
   const collections: Array<{ name: string; label: string }> = []
-  const visit = (items: (typeof config.menus)[number]['items']) => {
+  const visit = (items: MenuItemConfig[] | undefined) => {
     for (const item of items ?? []) {
       if (item.path?.startsWith('/resources/')) {
         const name = item.path.replace('/resources/', '').split('/')[0]

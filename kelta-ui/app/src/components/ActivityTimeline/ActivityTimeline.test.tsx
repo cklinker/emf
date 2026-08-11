@@ -296,7 +296,7 @@ describe('ActivityTimeline', () => {
     })
 
     it('does not fetch record versions and keeps synthesized entries when historyEnabled is off', async () => {
-      const getList = vi.fn(() => Promise.resolve([]))
+      const getList = vi.fn<(url: string) => Promise<unknown[]>>(() => Promise.resolve([]))
 
       renderTimeline({ getList: getList as unknown as ApiClient['getList'] })
 

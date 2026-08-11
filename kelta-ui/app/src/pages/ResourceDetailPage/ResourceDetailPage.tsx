@@ -34,77 +34,10 @@ import { RecordShell } from '../../components/record/RecordShell'
 import { RecordDetailBody } from '../../components/record/RecordDetailBody'
 import { RecordSectionNav } from '../../components/record/RecordSectionNav'
 import { resolveSectionNavItems } from '../../components/LayoutFieldSections/sectionNavItems'
-import { unwrapResource, extractIncluded } from '../../utils/jsonapi'
+import { useCollectionSchema } from '../../hooks/useCollectionSchema'
+import { unwrapResource } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
-
-/**
- * Field definition interface for collection schema
- */
-export interface FieldDefinition {
-  id: string
-  name: string
-  displayName?: string
-  type:
-    | 'string'
-    | 'number'
-    | 'boolean'
-    | 'date'
-    | 'datetime'
-    | 'json'
-    | 'reference'
-    | 'picklist'
-    | 'multi_picklist'
-    | 'currency'
-    | 'percent'
-    | 'auto_number'
-    | 'phone'
-    | 'email'
-    | 'url'
-    | 'rich_text'
-    | 'encrypted'
-    | 'external_id'
-    | 'geolocation'
-    | 'lookup'
-    | 'master_detail'
-    | 'formula'
-    | 'rollup_summary'
-  required: boolean
-  referenceTarget?: string
-  referenceCollectionId?: string
-}
-
-/**
- * Reverse mapping from backend canonical types (uppercase) to UI types (lowercase).
- */
-const BACKEND_TYPE_TO_UI: Record<string, FieldDefinition['type']> = {
-  DOUBLE: 'number',
-  INTEGER: 'number',
-  LONG: 'number',
-  JSON: 'json',
-  ARRAY: 'json',
-  REFERENCE: 'master_detail',
-  LOOKUP: 'master_detail',
-}
-
-function normalizeFieldType(backendType: string): FieldDefinition['type'] {
-  const upper = backendType.toUpperCase()
-  if (upper in BACKEND_TYPE_TO_UI) {
-    return BACKEND_TYPE_TO_UI[upper]
-  }
-  return backendType.toLowerCase() as FieldDefinition['type']
-}
-
-/**
- * Collection schema interface
- */
-export interface CollectionSchema {
-  id: string
-  name: string
-  displayName: string
-  /** Collection-level record versioning toggle — gates the record History tab */
-  trackHistory?: boolean
-  fields: FieldDefinition[]
-}
+import type { FieldDefinition } from '../../hooks/useCollectionSchema'
 
 /**
  * Resource record interface
@@ -263,47 +196,6 @@ export interface ResourceDetailPageProps {
 }
 
 // API functions using apiClient
-async function fetchCollectionSchema(
-  apiClient: ApiClient,
-  collectionName: string
-): Promise<CollectionSchema> {
-  // Fetch the collection record with included field definitions in a single request.
-  const response = await apiClient.get(
-    `/api/collections/${encodeURIComponent(collectionName)}?include=fields`
-  )
-
-  // Extract the collection record from the response envelope
-  const collection = unwrapResource<Record<string, unknown>>(response)
-
-  // Extract included field records from the JSON:API `included` array
-  const fieldRecords = extractIncluded<Record<string, unknown>>(response, 'fields')
-
-  // Sort by fieldOrder and filter to active fields, then normalize types.
-  // Spread all properties to preserve validation rules, constraints, etc.
-  const fields: FieldDefinition[] = fieldRecords
-    .filter((f) => f.active !== false)
-    .sort((a, b) => {
-      const orderA = typeof a.fieldOrder === 'number' ? a.fieldOrder : 999
-      const orderB = typeof b.fieldOrder === 'number' ? b.fieldOrder : 999
-      return orderA - orderB
-    })
-    .map((f) => ({
-      ...(f as unknown as FieldDefinition),
-      type: normalizeFieldType(f.type as string),
-      required: !!f.required,
-      displayName: (f.displayName as string) || undefined,
-      referenceTarget: (f.referenceTarget as string) || undefined,
-    }))
-
-  return {
-    id: collection.id as string,
-    name: collection.name as string,
-    displayName: (collection.displayName as string) || (collection.name as string),
-    trackHistory: !!collection.trackHistory,
-    fields,
-  }
-}
-
 async function fetchResource(
   apiClient: ApiClient,
   collectionName: string,
@@ -394,16 +286,12 @@ export function ResourceDetailPage({
   // Share modal state
   const [shareModalOpen, setShareModalOpen] = useState(false)
 
-  // Fetch collection schema
+  // Fetch collection schema (shared hook — canonical fetcher + cache key)
   const {
-    data: schema,
+    schema,
     isLoading: schemaLoading,
     error: schemaError,
-  } = useQuery({
-    queryKey: ['collection-schema', collectionName],
-    queryFn: () => fetchCollectionSchema(apiClient, collectionName),
-    enabled: !!collectionName,
-  })
+  } = useCollectionSchema(collectionName)
 
   // Resolve page layout for this collection (returns null if none configured)
   const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)

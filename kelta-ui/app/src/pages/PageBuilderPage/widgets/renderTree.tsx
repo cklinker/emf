@@ -20,7 +20,8 @@ interface NodeRendererProps {
 function NodeRenderer({ node, scope, mode, tenantSlug }: NodeRendererProps): React.ReactElement {
   const descriptor = widgetRegistry.get(node.type)
   // Resolved-node invariant: props handed to Render are always already resolved.
-  const resolvedNode: RenderNode = { ...node, props: resolveBindings(node.props ?? {}, scope) }
+  const resolvedProps = resolveBindings(node.props ?? {}, scope)
+  const resolvedNode: RenderNode = { ...node, props: resolvedProps }
   // Conditional visibility (app-platform slice 1): at runtime a node whose `visible`
   // prop is present AND resolves hidden skips its whole subtree. The editor never
   // hides (SelectableNode ghosts/badges instead); absent prop = today's behavior.
@@ -28,7 +29,7 @@ function NodeRenderer({ node, scope, mode, tenantSlug }: NodeRendererProps): Rea
     mode === 'runtime' &&
     node.props &&
     'visible' in node.props &&
-    isHiddenValue(resolvedNode.props.visible)
+    isHiddenValue(resolvedProps.visible)
   ) {
     return <></>
   }

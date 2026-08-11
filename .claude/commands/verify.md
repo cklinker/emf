@@ -25,8 +25,13 @@ cd kelta-web && npm install && npm run lint && npm run typecheck && npm run form
 ## Step 5: Run kelta-ui checks (only if kelta-ui/ files were changed)
 Check if any files in `kelta-ui/` were modified using `git diff --name-only main`. If yes:
 ```bash
-cd kelta-ui/app && npm install && npm run lint && npm run format:check && npm run test:run
+cd kelta-web && npm install && npm run build && cd ../kelta-ui/app && npm install && npm run lint && npm run typecheck && npm run format:check && npm run test:run
 ```
+
+**The `kelta-web` build is required first.** `kelta-ui/app` consumes `@kelta/{sdk,components,…}`
+via `file:` deps that resolve types through their **built** `dist/*.d.ts`. Typechecking against a
+stale or absent `dist/` reports dozens of phantom "has no exported member" errors that have nothing
+to do with your change. If you see those, rebuild `kelta-web` before believing them.
 
 ## Final Report
 After all steps, print a summary checklist:
@@ -34,6 +39,6 @@ After all steps, print a summary checklist:
 - [ ] Gateway tests passed
 - [ ] Worker tests passed
 - [ ] kelta-web lint/typecheck/format/tests passed
-- [ ] kelta-ui lint/format/tests passed (if applicable)
+- [ ] kelta-ui lint/typecheck/format/tests passed (if applicable)
 
 If any step failed, report the specific failure and stop.

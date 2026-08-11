@@ -14,9 +14,16 @@ npm run test:coverage
 ```
 
 ## kelta-ui (if argument is "ui" or empty)
+
+`kelta-ui/app` resolves `@kelta/*` types through the **built** `dist/*.d.ts` of the kelta-web
+packages, so build those first — typechecking against a stale `dist` reports phantom
+"has no exported member" errors unrelated to your change.
+
 ```bash
-cd kelta-ui/app && npm install
+cd kelta-web && npm install && npm run build
+cd ../kelta-ui/app && npm install
 npm run lint
+npm run typecheck
 npm run format:check
 npm run test:run
 ```

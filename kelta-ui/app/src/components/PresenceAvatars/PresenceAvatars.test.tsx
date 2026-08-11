@@ -1,5 +1,4 @@
 /** PresenceAvatars (app-intelligence slice 3): others-only filter, overflow, empty. */
-import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { PresenceAvatars } from './PresenceAvatars'

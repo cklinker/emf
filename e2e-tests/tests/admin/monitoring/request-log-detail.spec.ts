@@ -23,7 +23,7 @@ test.describe("Request Log Detail", () => {
     }
   });
 
-  test("shows Jaeger trace link", async ({ page, tenantSlug }) => {
+  test("shows Tempo trace link", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/monitoring/requests`);
     await page.waitForLoadState("load");
 
@@ -34,9 +34,10 @@ test.describe("Request Log Detail", () => {
       await page.waitForURL(`**/${tenantSlug}/monitoring/requests/*`);
 
       const detailPage = new RequestLogDetailPage(page, tenantSlug);
-      await expect(detailPage.jaegerLink).toBeVisible();
-      const href = await detailPage.jaegerLink.getAttribute("href");
-      expect(href).toContain("jaeger");
+      await expect(detailPage.traceLink).toBeVisible();
+      const href = await detailPage.traceLink.getAttribute("href");
+      expect(href).toContain("grafana.rzware.com/explore");
+      expect(href).toContain("tempo");
     }
   });
 });

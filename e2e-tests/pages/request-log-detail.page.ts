@@ -8,7 +8,7 @@ export class RequestLogDetailPage extends BasePage {
   readonly traceTab: Locator;
   readonly logsTab: Locator;
   readonly auditTab: Locator;
-  readonly jaegerLink: Locator;
+  readonly traceLink: Locator;
   readonly requestHeaders: Locator;
   readonly requestBodyViewer: Locator;
   readonly responseBodyViewer: Locator;
@@ -22,7 +22,7 @@ export class RequestLogDetailPage extends BasePage {
     this.traceTab = this.testId("request-detail-trace-tab");
     this.logsTab = this.testId("request-detail-logs-tab");
     this.auditTab = this.testId("request-detail-audit-tab");
-    this.jaegerLink = this.testId("request-detail-jaeger-link");
+    this.traceLink = this.testId("request-detail-trace-link");
     this.requestHeaders = this.testId("request-detail-request-headers");
     this.requestBodyViewer = this.testId("request-detail-request-body");
     this.responseBodyViewer = this.testId("request-detail-response-body");

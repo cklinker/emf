@@ -23,7 +23,8 @@ import type { ObjectPermission } from '@/components/SecurityEditor'
 import type { CollectionRef, FieldRef, FieldPermission } from '@/components/SecurityEditor'
 import { useCollectionSummaries } from '@/hooks/useCollectionSummaries'
 import { useExtractIncluded } from '@/hooks/useIncludedResources'
-import { unwrapResource } from '@/utils/jsonapi'
+import { flattenResource, unwrapResource } from '@/utils/jsonapi'
+import type { JsonApiResource } from '@/utils/jsonapi'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -69,6 +70,9 @@ interface FieldDefinition {
   type: string
   collectionId: string
 }
+
+/** Gateway clamps HTTP page size at MAX_HTTP_PAGE_SIZE = 200. */
+const FIELDS_PAGE_SIZE = 200
 
 export interface ProfileDetailPageProps {
   testId?: string
@@ -144,23 +148,43 @@ export function ProfileDetailPage({
   // Fetch collections for name resolution and field permissions
   const { summaryMap: collectionSummaryMap } = useCollectionSummaries()
 
-  // Fetch fields for field permissions editor
+  // Fetch fields for field permissions editor.
+  // The HTTP page size clamps at MAX_HTTP_PAGE_SIZE (200), so walk every page —
+  // a single oversized request silently returns only the first 200 fields.
   const { data: fieldsData } = useQuery({
     queryKey: ['all-fields'],
-    queryFn: () => apiClient.get('/api/fields?page[size]=1000'),
+    queryFn: async () => {
+      const collected: JsonApiResource[] = []
+      let pageNumber = 1
+      let totalPages = 1
+      do {
+        const response = (await apiClient.get(
+          `/api/fields?page[size]=${FIELDS_PAGE_SIZE}&page[number]=${pageNumber}`
+        )) as { data?: JsonApiResource[]; metadata?: { totalPages?: number } }
+        if (Array.isArray(response?.data)) {
+          collected.push(...response.data)
+        }
+        totalPages = response?.metadata?.totalPages ?? 1
+        pageNumber += 1
+      } while (pageNumber <= totalPages)
+      return collected
+    },
     enabled: !!id,
   })
 
   const allFields: FieldDefinition[] = useMemo(() => {
-    if (!fieldsData) return []
-    const data = (fieldsData as { data?: unknown[] })?.data
-    if (!Array.isArray(data)) return []
-    return (data as Record<string, unknown>[]).map((f) => ({
-      id: (f.id as string) ?? '',
-      name: ((f.attributes as Record<string, unknown>)?.name as string) ?? '',
-      type: ((f.attributes as Record<string, unknown>)?.type as string) ?? '',
-      collectionId: ((f.attributes as Record<string, unknown>)?.collectionId as string) ?? '',
-    }))
+    if (!Array.isArray(fieldsData)) return []
+    return fieldsData
+      .map((resource) => flattenResource<Record<string, unknown>>(resource))
+      .map((f) => ({
+        id: (f.id as string) ?? '',
+        name: (f.name as string) ?? '',
+        type: (f.type as string) ?? '',
+        // collectionId is a JSON:API relationship, not an attribute —
+        // flattenResource surfaces it as a flat id.
+        collectionId: (f.collectionId as string) ?? '',
+      }))
+      .filter((f) => f.id !== '' && f.collectionId !== '')
   }, [fieldsData])
 
   // Convert system permissions array → Record<string, boolean> for checklist

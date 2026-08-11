@@ -725,6 +725,25 @@ for removal ("inline the current value"). Findings:
   prints the exact JSON entry to add — copy it into the worker reflect-config in the fix PR.
   Until deployed, scripts can avoid `Date` entirely: pass `${$.record.data.updatedAt}` in
   `inputPayload` and do string/int calendar math (the F3/F6 billing flows show the pattern).
+- **A native image freezes `@Conditional*` evaluation at BUILD time — config supplied only by a
+  runtime env var is too late.** Found 2026-08-10: worker, gateway and auth exported **zero traces**
+  in production, with no error anywhere. Spring Boot creates the OTLP span exporter only when
+  `management.opentelemetry.tracing.export.otlp.endpoint` is set —
+  `OtlpTracingConfigurations.ConnectionDetails` is `@ConditionalOnProperty` on it (no
+  `matchIfMissing`) and `Exporters` is `@ConditionalOnBean` on the bean it creates. The endpoint
+  was only ever set as a Kubernetes env var, so at AOT time the condition was false, the exporter
+  bean was never registered, and the frozen bean factory could not gain it later no matter what the
+  environment said. The JVM re-evaluates at boot, which is why `Dockerfile.jvm` and every CI test
+  looked fine. The failure is silent and *looks like a collector problem*: spans are still created
+  (log MDC carries real `traceId`/`spanId`) — only the export is missing. Fixed by declaring the
+  endpoint in each service's `application.yml` as
+  `${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT:http://localhost:4318/v1/traces}`;
+  guarded by `TracingExportPropertiesTest` in worker/gateway/auth. **Rule: any property that gates a
+  bean via `@ConditionalOnProperty` must be declared in `application.yml` with an
+  `${ENV_VAR:default}` placeholder — the env var may choose the value, never whether the property
+  exists.** To check what AOT actually kept, read
+  `<service>/target/spring-aot/main/sources/**/…__BeanFactoryRegistrations.java` after
+  `mvn spring-boot:process-aot` — a missing `registerBeanDefinition("…")` line is the whole bug.
 - **Every new `kelta.*` NATS subject namespace needs its own JetStream stream in `JetStreamInitializer`.**
   `NatsEventPublisher` always JetStream-publishes and awaits an ack; a subject matched by no stream never
   acks → `CancellationException: response not registered in time` and the event is dropped (publish is

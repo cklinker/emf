@@ -11,7 +11,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { useApi } from '@/context/ApiContext'
 import { useToast } from '@/components'
-import type { CreateFlowRequest } from '@kelta/sdk'
 import { getTenantSlug } from '@/context/TenantContext'
 import { cn } from '@/lib/utils'
 import type { FlowType, NatsTriggerConfig, TriggerConfig } from '@/pages/FlowDesignerPage/types'
@@ -70,11 +69,7 @@ export function CreateFlowWizard({ open, onOpenChange }: CreateFlowWizardProps) 
         definition: MINIMAL_DEFINITION,
         triggerConfig: Object.keys(triggerConfig).length > 0 ? triggerConfig : null,
       }
-      const resp = await keltaClient.admin.flows.create(
-        '',
-        '',
-        payload as unknown as CreateFlowRequest
-      )
+      const resp = await keltaClient.admin.flows.create('', '', payload)
       return resp
     },
     onSuccess: (data) => {

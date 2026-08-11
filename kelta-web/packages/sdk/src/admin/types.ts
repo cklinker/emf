@@ -1680,6 +1680,25 @@ export interface CreateApprovalStepRequest {
 
 // --- Flow Engine (Phase 4 Stream D) ---
 
+/**
+ * A field backed by a Postgres `jsonb` column, so its wire shape is a real JSON
+ * object — not a JSON string.
+ *
+ * Writing a *string* into one of these lands in the database as
+ * `{"type":"jsonb","value":"<escaped json>"}`, which every reader then has to
+ * defensively unwrap (see the `"jsonb"`/`"value"` unwrap in
+ * `kelta-worker/.../listener/NatsTriggerFlowListener.java`). Send the object.
+ *
+ * `string` stays in the read/write unions for rows written before that was
+ * understood; callers narrow on `typeof` before use.
+ *
+ * Deliberately `object` rather than `Record<string, unknown>`: callers pass
+ * their own domain interfaces here (a flow state machine, a trigger config),
+ * and TypeScript gives an implicit index signature to type aliases but not to
+ * interfaces, so `Record<string, unknown>` would reject them.
+ */
+export type JsonObjectField = object;
+
 export interface FlowDefinition {
   id: string;
   name: string;
@@ -1710,11 +1729,14 @@ export interface FlowExecution {
 
 export interface CreateFlowRequest {
   name: string;
-  description?: string;
+  /** `null` clears the stored description; `undefined` leaves it untouched. */
+  description?: string | null;
   flowType: string;
   active?: boolean;
-  triggerConfig?: string;
-  definition: string;
+  /** `jsonb` — send an object. See {@link JsonObjectField}. */
+  triggerConfig?: JsonObjectField | string | null;
+  /** `jsonb` — send an object. See {@link JsonObjectField}. */
+  definition: JsonObjectField | string;
   /**
    * Audit identity stamped on records this flow writes when the execution has
    * no initiating user (cron/NATS/webhook starts). Falls back to the flow

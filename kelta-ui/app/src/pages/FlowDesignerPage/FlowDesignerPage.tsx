@@ -5,7 +5,6 @@ import { ReactFlowProvider } from '@xyflow/react'
 import type { Node, Edge } from '@xyflow/react'
 
 import { useApi } from '../../context/ApiContext'
-import type { CreateFlowRequest } from '@kelta/sdk'
 import type { Flow } from './types'
 import { unwrapResource } from '../../utils/jsonapi'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
@@ -97,7 +96,7 @@ export function FlowDesignerPage() {
             ? JSON.parse(flow.triggerConfig)
             : flow.triggerConfig
           : null,
-      } as unknown as Partial<CreateFlowRequest>)
+      })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flow', flowId] })

@@ -260,6 +260,17 @@ MCP tools (`query_collection`, `list_picklists`, `list_approvals`) take flat `pa
 - Generics for type-safe resource ops: `ResourceClient<T>`
 - Explicit return types on public methods
 - Readonly properties for immutability
+- **`jsonb`-backed fields carry objects on the wire, not JSON strings.** Send the object
+  (`definition`, `triggerConfig`, …). Sending a JSON *string* lands in the column as
+  `{"type":"jsonb","value":"<escaped json>"}`, which every reader then has to unwrap — see
+  the defensive `"jsonb"`/`"value"` unwrap in `NatsTriggerFlowListener` /
+  `FlowEventListener`. In `@kelta/sdk` these are typed `JsonObjectField | string` (the
+  `string` arm covers rows written before that was understood; narrow on `typeof`).
+- **A cast at a call site is a bug report about the type.** `as unknown as X` around an SDK
+  request body means the request type disagrees with what the endpoint accepts — fix the
+  type, don't widen the cast. Three flow call sites carried such casts, all hiding the same
+  stale `triggerConfig?: string`; the casts also masked a `description: null` mismatch that
+  only surfaced once they were removed.
 
 ### Component reuse (kelta-ui/app and kelta-web)
 

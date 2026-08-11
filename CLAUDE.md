@@ -192,6 +192,7 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 - ❌ Read a flow input as `$.<key>` → ✅ `$.input.<key>` (manual/MCP/HTTP double-wraps).
 - ❌ Reintroduce Kafka → messaging is NATS JetStream only.
 - ❌ Add a new `kelta.*` NATS subject without a JetStream stream in `JetStreamInitializer` **and** a native `reflect-config.json` entry for its payload in worker+gateway → ✅ else the publish no-acks (`CancellationException`, event dropped) or the payload serializes `{}` on the native image (`concerns.md` → Dependency Risks).
+- ❌ Gate a bean on `@ConditionalOnProperty` and supply that property only as a deployment env var → ✅ declare it in `application.yml` as `${ENV_VAR:default}`. Native images (worker/gateway/auth) freeze condition evaluation at **build** time, so the bean is never registered and the env var arrives too late — silently. This is what left all three services exporting zero traces (`concerns.md` → Dependency Risks).
 - ❌ Leave docs stale → update them in the same PR (Rule 6).
 
 ---

@@ -161,6 +161,20 @@ management:
   health:
     redis:
       enabled: true
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          # MUST be declared here, not left to an env var alone. Spring Boot only
+          # creates the OTLP span exporter when this property is SET
+          # (OtlpTracingConfigurations.ConnectionDetails is @ConditionalOnProperty on it,
+          # with no matchIfMissing, and Exporters is @ConditionalOnBean on that). GraalVM
+          # native images freeze condition evaluation at BUILD time, so a value supplied
+          # only as a runtime env var arrives too late — the exporter bean is never
+          # registered and the service emits no spans at all, silently. Declaring it with
+          # a default makes the condition true at AOT time; the env var still overrides
+          # the URL at runtime.
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
   tracing:
     export:
       enabled: true

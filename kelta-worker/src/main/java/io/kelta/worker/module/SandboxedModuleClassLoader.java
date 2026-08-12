@@ -26,6 +26,8 @@ import java.util.Set;
  *   <li>{@code io.kelta.runtime.flow.} — ActionHandlerDescriptor</li>
  *   <li>{@code io.kelta.runtime.module.} — ModuleManifest, TenantModuleData</li>
  *   <li>{@code io.kelta.runtime.query.} — QueryEngine for data access</li>
+ *   <li>{@code io.kelta.runtime.model.} — CollectionDefinition, FieldDefinition and friends;
+ *       the parameter and return types of everything in {@code .query} and {@code .registry}</li>
  *   <li>{@code io.kelta.runtime.registry.} — CollectionRegistry</li>
  *   <li>{@code io.kelta.runtime.formula.} — FormulaEvaluator</li>
  *   <li>{@code io.kelta.runtime.storage.} — StorageAdapter</li>
@@ -50,6 +52,15 @@ public class SandboxedModuleClassLoader extends URLClassLoader implements Closea
         "io.kelta.runtime.flow.",
         "io.kelta.runtime.module.",
         "io.kelta.runtime.query.",
+        // Required to make .query and .registry usable at all: every
+        // QueryEngine method takes a CollectionDefinition, and
+        // CollectionRegistry#get returns one. Without this a module is handed
+        // QueryEngine and CollectionRegistry in its ModuleContext and cannot
+        // call a single method on either — the linker fails resolving the
+        // parameter type. Pure data-model types (CollectionDefinition,
+        // FieldDefinition, FieldType, builders, config records); this widens
+        // the API surface, not the trust boundary.
+        "io.kelta.runtime.model.",
         "io.kelta.runtime.registry.",
         "io.kelta.runtime.formula.",
         "io.kelta.runtime.storage.",

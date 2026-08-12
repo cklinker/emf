@@ -51,6 +51,24 @@ class SandboxedModuleClassLoaderTest {
     }
 
     @Test
+    void shouldAllowTheTypesQueryEngineActuallyNeeds() throws Exception {
+        // ModuleContext hands every module a QueryEngine and a
+        // CollectionRegistry. Both are useless unless CollectionDefinition
+        // resolves too: every QueryEngine method takes one as a parameter and
+        // CollectionRegistry#get returns one, so a module that could not load
+        // it could not read or write a single record.
+        URL jarUrl = createEmptyJar("empty.jar");
+        try (SandboxedModuleClassLoader cl = new SandboxedModuleClassLoader("test", jarUrl, getClass().getClassLoader())) {
+            assertNotNull(cl.loadClass("io.kelta.runtime.query.QueryEngine"));
+            assertNotNull(cl.loadClass("io.kelta.runtime.registry.CollectionRegistry"));
+            assertNotNull(cl.loadClass("io.kelta.runtime.model.CollectionDefinition"),
+                "CollectionDefinition is in every QueryEngine signature");
+            assertNotNull(cl.loadClass("io.kelta.runtime.model.FieldDefinition"));
+            assertNotNull(cl.loadClass("io.kelta.runtime.model.FieldType"));
+        }
+    }
+
+    @Test
     void shouldAllowSlf4jClasses() throws Exception {
         URL jarUrl = createEmptyJar("empty.jar");
         try (SandboxedModuleClassLoader cl = new SandboxedModuleClassLoader("test", jarUrl, getClass().getClassLoader())) {

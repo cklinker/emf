@@ -1,11 +1,13 @@
 package io.kelta.worker.config;
 
 import io.kelta.runtime.formula.FormulaEvaluator;
+import io.kelta.runtime.module.ModuleSigningKeyStore;
 import io.kelta.runtime.module.ModuleStore;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
 import io.kelta.runtime.workflow.module.ModuleContext;
+import io.kelta.worker.module.JdbcModuleSigningKeyStore;
 import io.kelta.worker.module.JdbcModuleStore;
 import io.kelta.worker.module.ModuleConfigEventPublisher;
 import io.kelta.worker.module.ModuleJarService;
@@ -46,6 +48,16 @@ public class ModuleConfig {
     @Bean
     public ModuleStore moduleStore(JdbcTemplate jdbcTemplate) {
         return new JdbcModuleStore(jdbcTemplate);
+    }
+
+    /**
+     * Per-tenant module signing keys — the trust anchors {@code ModuleSignatureVerifier} checks
+     * a JAR signature against. Absent this bean the verifier falls back to the platform-wide
+     * key alone.
+     */
+    @Bean
+    public ModuleSigningKeyStore moduleSigningKeyStore(JdbcTemplate jdbcTemplate) {
+        return new JdbcModuleSigningKeyStore(jdbcTemplate);
     }
 
     /**

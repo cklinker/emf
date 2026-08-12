@@ -96,7 +96,12 @@ public class DecisionActionHandler implements ActionHandler {
                     continue;
                 }
 
-                Optional<ActionHandler> handlerOpt = handlerRegistry.getHandler(actionType);
+                // Tenant-scoped first, then global — same reason as
+                // TaskStateExecutor: a nested action supplied by a runtime-loaded
+                // module lives only in the tenant map, so a global-only lookup
+                // silently SKIPPED it.
+                Optional<ActionHandler> handlerOpt =
+                    handlerRegistry.getHandler(context.tenantId(), actionType);
                 if (handlerOpt.isEmpty()) {
                     log.warn("No handler for nested action type '{}' in decision", actionType);
                     actionResults.add(Map.of("actionType", actionType, "status", "SKIPPED",

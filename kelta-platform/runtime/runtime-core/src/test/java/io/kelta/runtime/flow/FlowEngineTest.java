@@ -990,6 +990,119 @@ class FlowEngineTest {
         }
     }
 
+    @Nested
+    @DisplayName("Tenant-scoped handlers")
+    class TenantScopedHandlers {
+
+        /**
+         * A step whose Resource comes from a runtime-loaded module, i.e. one
+         * registered with {@code registerTenantHandler} rather than
+         * {@code register}. Resolving against the global map alone made every
+         * module-contributed step fail ResourceNotFound, which left the whole
+         * runtime-module feature unreachable from a flow — installed, ACTIVE,
+         * and silently unusable.
+         */
+        private static final String MODULE_STEP_FLOW = """
+            {
+                "StartAt": "Ingest",
+                "States": {
+                    "Ingest": {
+                        "Type": "Task",
+                        "Resource": "MODULE_STEP",
+                        "ResultPath": "$.moduleResult",
+                        "Next": "Done"
+                    },
+                    "Done": { "Type": "Succeed" }
+                }
+            }
+            """;
+
+        private ActionHandler handlerReturning(String key, Map<String, Object> output) {
+            return new ActionHandler() {
+                @Override
+                public String getActionTypeKey() { return key; }
+
+                @Override
+                public ActionResult execute(ActionContext context) {
+                    return ActionResult.success(output);
+                }
+            };
+        }
+
+        @Test
+        @DisplayName("a Task resolves a handler registered only for its tenant")
+        void tenantHandlerResolves() {
+            handlerRegistry.registerTenantHandler(
+                "t1", handlerReturning("MODULE_STEP", Map.of("ranInModule", true)));
+
+            Map<String, Object> result =
+                engine.executeSynchronous("t1", "f1", MODULE_STEP_FLOW, Map.of(), "u1");
+
+            assertNotNull(result.get("moduleResult"), "tenant-scoped handler was not resolved");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> moduleResult = (Map<String, Object>) result.get("moduleResult");
+            assertEquals(true, moduleResult.get("ranInModule"));
+        }
+
+        @Test
+        @DisplayName("a tenant handler is invisible to another tenant")
+        void tenantHandlerDoesNotLeakAcrossTenants() {
+            // Modules are installed per tenant, so one tenant's step must not
+            // become executable for everyone else.
+            handlerRegistry.registerTenantHandler(
+                "t1", handlerReturning("MODULE_STEP", Map.of("ranInModule", true)));
+
+            FlowExecutionData failed = runToCompletion("t2", MODULE_STEP_FLOW);
+
+            assertEquals(FlowExecutionData.STATUS_FAILED, failed.status());
+            assertTrue(String.valueOf(failed.errorMessage()).contains("MODULE_STEP"),
+                "expected ResourceNotFound naming the unresolved resource, got: "
+                    + failed.errorMessage());
+        }
+
+        @Test
+        @DisplayName("a tenant handler overrides a global one with the same key")
+        void tenantHandlerTakesPriorityOverGlobal() {
+            // The registry documents tenant handlers as taking priority; assert
+            // it, since the override is the whole point of a per-tenant module.
+            handlerRegistry.register(handlerReturning("OVERRIDABLE", Map.of("from", "global")));
+            handlerRegistry.registerTenantHandler(
+                "t1", handlerReturning("OVERRIDABLE", Map.of("from", "tenant")));
+
+            String json = MODULE_STEP_FLOW.replace("MODULE_STEP", "OVERRIDABLE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> tenant = (Map<String, Object>)
+                engine.executeSynchronous("t1", "f1", json, Map.of(), "u1").get("moduleResult");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> other = (Map<String, Object>)
+                engine.executeSynchronous("t2", "f1", json, Map.of(), "u1").get("moduleResult");
+
+            assertEquals("tenant", tenant.get("from"));
+            assertEquals("global", other.get("from"), "t2 should still see the global handler");
+        }
+
+        private FlowExecutionData runToCompletion(String tenantId, String definitionJson) {
+            String executionId = engine.startExecution(
+                tenantId, "f1", definitionJson, Map.of(), "u1", null, false);
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                Optional<FlowExecutionData> current = flowStore.loadExecution(executionId);
+                if (current.isPresent()
+                        && !FlowExecutionData.STATUS_RUNNING.equals(current.get().status())) {
+                    return current.get();
+                }
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            return flowStore.loadExecution(executionId).orElseThrow();
+        }
+    }
+
     static class InMemoryFlowStore implements FlowStore {
         private final Map<String, FlowExecutionData> executions = new ConcurrentHashMap<>();
         private final Map<String, List<FlowStepLogData>> stepLogs = new ConcurrentHashMap<>();

@@ -49,8 +49,14 @@ public class TaskStateExecutor implements StateExecutor {
         // 1. Apply InputPath
         Map<String, Object> input = dataResolver.applyInputPath(context.stateData(), task.inputPath());
 
-        // 2. Resolve handler
-        Optional<ActionHandler> handler = handlerRegistry.getHandler(task.resource());
+        // 2. Resolve handler.
+        // Tenant-scoped first, then global. Runtime-loaded modules register their
+        // handlers with ActionHandlerRegistry#registerTenantHandler, so resolving
+        // against the global map alone made every module-contributed step fail
+        // ResourceNotFound no matter how cleanly the module installed — the whole
+        // runtime-module feature was unreachable from a flow.
+        Optional<ActionHandler> handler =
+            handlerRegistry.getHandler(context.tenantId(), task.resource());
         if (handler.isEmpty()) {
             return handleError(task, context, "ResourceNotFound",
                 "No handler found for resource: " + task.resource());

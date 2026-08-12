@@ -24,7 +24,8 @@ Trigger: `pull_request` → `main`, plus `workflow_dispatch`.
 | Job | What it does |
 |-----|--------------|
 | `changes` | Path-filter detection (above). |
-| `test-java` | Matrix `[gateway, worker, auth, ai, mcp]`. Builds runtime libs, then `mvn verify -f kelta-<svc>/pom.xml -B`. Uploads `kelta-test-results-<svc>` (surefire XML) + `java-coverage-<svc>` (JaCoCo). |
+| `test-java` | Matrix `[gateway, worker, auth, ai, mcp]`. Builds runtime libs **`-DskipTests`**, then `mvn verify -f kelta-<svc>/pom.xml -B` — i.e. it tests only the *services*, never the runtime libs it just built. That is what `test-runtime` exists for. Uploads `kelta-test-results-<svc>` (surefire XML) + `java-coverage-<svc>` (JaCoCo). |
+| `test-runtime` | `mvn test` over the seven `kelta-platform/runtime/*` modules (~1,900 tests). Runs when the `runtime` path filter (`kelta-platform/**`) or `workflows` changed. **Why it's a separate job:** `test-java` builds these with `-DskipTests`, so before this existed their tests were compiled and never executed — the query engine, storage adapters and their DDL/SQL generation, flow engine, validation and `TenantContext` had zero CI coverage, and a FORMULA regression (#1281) sat on a green `main` for eleven days with its own test failing. Its own job rather than dropping `-DskipTests` above, so the suite runs once instead of once per service. Uploads `java-test-results-runtime`. |
 | `test-frontend` | In `kelta-web`: `npm ci`, `npm run lint`, `npm run typecheck`, `npm run format:check`, `npm run test:coverage` (Vitest, v8 coverage, **80% threshold** in `vitest.config.ts`). Then **`kelta-ui/app` types**: builds the `kelta-web` packages (formula → sdk → plugin-sdk → components), `npm ci`, `npm run typecheck`. |
 | `integration-tests` | Builds service JARs, pre-pulls images (`redis:7`, `nats:2.10`, `cerbos:0.40.0`, `eclipse-temurin:25-jre`), pre-builds service images, then `mvn verify -f kelta-test-harness/pom.xml -Pintegration-tests` (failsafe). `TESTCONTAINERS_RYUK_DISABLED=true`. |
 | `e2e` | Builds JVM service images (`Dockerfile.jvm`), spins up the full stack via `docker-compose.yml -f docker-compose.ci.yml`, runs Playwright (`mcr.microsoft.com/playwright:v1.58.2-noble`) inside the compose network. Timeout 45 min. Uploads HTML report + traces. **Readiness gating:** `up -d --wait` is the only barrier before the tests run, so it has to be trustworthy. The gateway's healthcheck targets `/actuator/health/readiness`, which stays 503 until its route table is loaded — `RouteInitializer` is an `ApplicationRunner` and runs *after* the web server starts, so plain `/actuator/health` reports UP while every `/api/**` still 404s. That window used to surface as the first few minutes of specs failing and everything afterwards passing, which reads like a broken page but is pure startup ordering. See `architecture.md` → Gateway startup & readiness. |
@@ -34,7 +35,9 @@ Trigger: `pull_request` → `main`, plus `workflow_dispatch`.
 
 Trigger: `push` → `main` (path-filtered), plus `workflow_dispatch`.
 
-1. `changes`, `test-java`, `test-frontend` — same as CI.
+1. `changes`, `test-java`, `test-runtime`, `test-frontend` — same as CI.
+   `build-and-push` gates on all three test jobs (`result != 'failure'`), so a runtime-module
+   regression stops images from building rather than shipping.
 2. **`build-and-push`** — matrix `[gateway, worker, worker-migrate, auth, ui, ai, mcp]`.
    Docker buildx → pushes to `harbor.rzware.com/emf/emf-<svc>:latest` and
    `:main-<short-sha>`. Per-service GHA cache scope.

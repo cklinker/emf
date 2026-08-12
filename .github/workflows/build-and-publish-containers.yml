@@ -171,6 +171,64 @@ jobs:
         run: mvn verify -f kelta-${{ matrix.service }}/pom.xml -B
 
   # ===========================================================================
+  # Test the runtime modules themselves.
+  #
+  # test-java builds them with -DskipTests and only verifies kelta-<service>, so
+  # until this job existed the runtime modules' ~1,900 tests never ran on main —
+  # query engine, storage adapters and their DDL/SQL generation, flow engine,
+  # validation, TenantContext. A FORMULA regression (#1281) rode eleven days of
+  # green main with its own test failing. Gating build-and-push on this (below)
+  # is what makes the coverage real rather than advisory.
+  # ===========================================================================
+  test-runtime:
+    name: Test Runtime Modules
+    needs: changes
+    if: needs.changes.outputs.runtime == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: k8s-runner
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Install Maven
+        run: |
+          if ! command -v mvn &> /dev/null; then
+            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
+            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
+          fi
+          mkdir -p ~/.m2
+          cp ci/maven-settings.xml ~/.m2/settings.xml
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Clean stale Kelta artifacts
+        run: rm -rf ~/.m2/repository/io/kelta
+
+      - name: Test runtime modules
+        run: mvn test -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-messaging-nats,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
+
+      - name: Upload test results
+        continue-on-error: true
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-test-results-runtime
+          path: kelta-platform/runtime/*/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ===========================================================================
   # Test Frontend
   # ===========================================================================
   test-frontend:
@@ -212,10 +270,10 @@ jobs:
   # ===========================================================================
   build-and-push:
     name: Build & Push ${{ matrix.service }}
-    needs: [changes, test-java, test-frontend]
-    # `if: always()` lets us run after test-java/test-frontend skip;
+    needs: [changes, test-java, test-runtime, test-frontend]
+    # `if: always()` lets us run after test-java/test-runtime/test-frontend skip;
     # the per-step `matrix.changed` check still gates each image.
-    if: always() && !cancelled() && needs.test-java.result != 'failure' && needs.test-frontend.result != 'failure'
+    if: always() && !cancelled() && needs.test-java.result != 'failure' && needs.test-runtime.result != 'failure' && needs.test-frontend.result != 'failure'
     runs-on: k8s-runner
     strategy:
       fail-fast: false

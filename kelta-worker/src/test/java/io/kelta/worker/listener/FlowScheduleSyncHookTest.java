@@ -219,4 +219,69 @@ class FlowScheduleSyncHookTest {
                 eq("0 0 */4 * * *"), eq("UTC"), eq(true),
                 notNull(), eq("user-1"));
     }
+
+    @Test
+    @DisplayName("afterUpdate keeps the job in sync when the row is there")
+    void afterUpdateSyncsExistingJob() {
+        when(repository.findByFlowId(anyString(), anyString()))
+                .thenReturn(Optional.of(Map.of("id", "job-1")));
+        when(repository.updateForFlow(anyString(), anyString(), anyString(),
+                anyString(), anyBoolean(), any())).thenReturn(true);
+
+        hook.afterUpdate("flow-1", activeScheduledFlow(true), previousScheduledFlow(), "tenant-1");
+
+        verify(repository).updateForFlow(
+                eq("job-1"), eq("Nightly sweep"), eq("0 0 13 * * *"), eq("UTC"), eq(true), notNull());
+        verify(repository, never()).insertForFlow(
+                anyString(), anyString(), anyString(), anyString(), anyString(),
+                anyBoolean(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("a vanished job row is recreated, not silently left missing")
+    void afterUpdateRecreatesAVanishedJob() {
+        // updateForFlow matching no row means the schedule is gone while the flow still reads
+        // active — it would never fire, and nothing about the flow would show it. Recreate.
+        when(repository.findByFlowId(anyString(), anyString()))
+                .thenReturn(Optional.of(Map.of("id", "job-1")));
+        when(repository.updateForFlow(anyString(), anyString(), anyString(),
+                anyString(), anyBoolean(), any())).thenReturn(false);
+
+        hook.afterUpdate("flow-1", activeScheduledFlow(true), previousScheduledFlow(), "tenant-1");
+
+        verify(repository).insertForFlow(
+                eq("flow-1"), eq("tenant-1"), eq("Nightly sweep"), eq("0 0 13 * * *"),
+                eq("UTC"), eq(true), notNull(), eq("user-1"));
+    }
+
+    @Test
+    @DisplayName("deactivating clears next_run_at so the executor stops picking it up")
+    void afterUpdateDeactivationNullsNextRun() {
+        when(repository.findByFlowId(anyString(), anyString()))
+                .thenReturn(Optional.of(Map.of("id", "job-1")));
+        when(repository.updateForFlow(anyString(), anyString(), anyString(),
+                anyString(), anyBoolean(), any())).thenReturn(true);
+
+        hook.afterUpdate("flow-1", activeScheduledFlow(false), previousScheduledFlow(), "tenant-1");
+
+        verify(repository).updateForFlow(
+                eq("job-1"), eq("Nightly sweep"), eq("0 0 13 * * *"), eq("UTC"), eq(false), isNull());
+    }
+
+    private static Map<String, Object> activeScheduledFlow(boolean active) {
+        Map<String, Object> record = new HashMap<>();
+        record.put("id", "flow-1");
+        record.put("name", "Nightly sweep");
+        record.put("flowType", "SCHEDULED");
+        record.put("active", active);
+        record.put("createdBy", "user-1");
+        record.put("triggerConfig", Map.of("cron", "0 0 13 * * *", "timezone", "UTC"));
+        return record;
+    }
+
+    private static Map<String, Object> previousScheduledFlow() {
+        Map<String, Object> record = activeScheduledFlow(true);
+        record.put("active", false);
+        return record;
+    }
 }

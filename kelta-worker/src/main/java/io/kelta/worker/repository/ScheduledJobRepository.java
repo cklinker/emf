@@ -256,9 +256,11 @@ public class ScheduledJobRepository {
 
     /**
      * Inserts a new scheduled_job row for a FLOW.
+     *
+     * @return the new job id
      */
-    public void insertForFlow(String flowId, String tenantId, String name, String cronExpression,
-                               String timezone, boolean active, Instant nextRunAt, String createdBy) {
+    public String insertForFlow(String flowId, String tenantId, String name, String cronExpression,
+                                 String timezone, boolean active, Instant nextRunAt, String createdBy) {
         String id = UUID.randomUUID().toString();
         jdbcTemplate.update(
                 "INSERT INTO scheduled_job (id, tenant_id, name, job_type, job_reference_id, " +
@@ -274,14 +276,23 @@ public class ScheduledJobRepository {
                 createdBy
         );
         log.debug("Inserted scheduled_job {} for flow {}", id, flowId);
+        return id;
     }
 
     /**
      * Updates an existing scheduled_job for a FLOW (cron, timezone, active, next_run_at, name).
+     *
+     * <p>Warns when the statement matches no row. Without that check this method logged
+     * "Updated scheduled_job ..." whether it wrote one row or none, so a schedule that silently
+     * stopped syncing was indistinguishable from one that synced fine — and the consequence is
+     * invisible in the usual places: the flow still reads {@code active}, and a job left at
+     * {@code active=false} or a null {@code next_run_at} simply never fires.
+     *
+     * @return whether a row was actually updated
      */
-    public void updateForFlow(String jobId, String name, String cronExpression,
-                               String timezone, boolean active, Instant nextRunAt) {
-        jdbcTemplate.update(
+    public boolean updateForFlow(String jobId, String name, String cronExpression,
+                                  String timezone, boolean active, Instant nextRunAt) {
+        int updated = jdbcTemplate.update(
                 "UPDATE scheduled_job SET name = ?, cron_expression = ?, timezone = ?, " +
                         "active = ?, next_run_at = ?, updated_at = ? WHERE id = ?",
                 name,
@@ -292,7 +303,14 @@ public class ScheduledJobRepository {
                 Timestamp.from(Instant.now()),
                 jobId
         );
+        if (updated == 0) {
+            log.warn("scheduled_job {} matched no row on update (cron={}, active={}) — "
+                    + "the flow's schedule is now out of sync and it will not fire as configured",
+                    jobId, cronExpression, active);
+            return false;
+        }
         log.debug("Updated scheduled_job {} (cron={}, active={})", jobId, cronExpression, active);
+        return true;
     }
 
     /**

@@ -310,6 +310,58 @@ class RuntimeModuleManagerTest {
         assertEquals("stub", result.outputData().get("mode"));
     }
 
+    @Test
+    void unloadByIdWorksAfterTheRowIsDeleted() {
+        // The production sequence: uninstall deletes the row, THEN publishes UNINSTALLED, so every
+        // pod except the one that served the request handles the event with no row to look up.
+        // Unloading has to work from the id alone or the handlers stay registered forever.
+        TenantModuleData module = createModuleDataWithS3Key("mod-s3", "modules/t/m/v/checksum.jar");
+        manager.loadModule(TENANT_ID, module);
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isPresent());
+
+        manager.unloadModule(TENANT_ID, "test-module");
+
+        assertFalse(manager.isLoaded(TENANT_ID, "test-module"));
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isEmpty(),
+                "handlers must be removed even though the module row is gone");
+    }
+
+    @Test
+    void reinstallAfterUninstallRegistersHandlersAgain() {
+        // The bug this pins. Uninstall-then-reinstall left loadedModules holding the id on every
+        // pod that could not find the deleted row, so loadModule's "already loaded" early return
+        // registered nothing — the module ran on one pod and was missing from the others, while
+        // /api/modules reported ACTIVE and a flow step failed ResourceNotFound non-deterministically.
+        TenantModuleData module = createModuleDataWithS3Key("mod-s3", "modules/t/m/v/checksum.jar");
+        manager.loadModule(TENANT_ID, module);
+
+        manager.unloadModule(TENANT_ID, "test-module");   // row already deleted upstream
+
+        // The assertion that matters. If the unload silently no-ops, the OLD jar's handlers stay
+        // registered and loadedModules keeps the id, so the reinstall below hits the "already
+        // loaded" early return and the pod keeps serving the previous version forever — while
+        // /api/modules reports ACTIVE and isLoaded() agrees.
+        assertFalse(manager.isLoaded(TENANT_ID, "test-module"),
+                "unload must clear the loaded marker or the reinstall is skipped");
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isEmpty(),
+                "stale handlers from the previous version must not survive the unload");
+
+        manager.loadModule(TENANT_ID, module);            // reinstall
+
+        assertTrue(manager.isLoaded(TENANT_ID, "test-module"));
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isPresent(),
+                "a reinstalled module must register its handlers again");
+    }
+
+    @Test
+    void unloadByIdIsIdempotent() {
+        assertDoesNotThrow(() -> manager.unloadModule(TENANT_ID, "never-loaded"));
+        TenantModuleData module = createModuleDataWithS3Key("mod-s3", "modules/t/m/v/checksum.jar");
+        manager.loadModule(TENANT_ID, module);
+        manager.unloadModule(TENANT_ID, "test-module");
+        assertDoesNotThrow(() -> manager.unloadModule(TENANT_ID, "test-module"));
+    }
+
     private TenantModuleData createModuleData(String id) {
         return createModuleData(id, TenantModuleData.STATUS_INSTALLED);
     }

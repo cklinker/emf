@@ -62,6 +62,19 @@ public class RuntimeModuleManager {
     private final Map<String, KeltaModule> activeModuleInstances = new ConcurrentHashMap<>();
 
     /**
+     * What each load actually registered, keyed "tenantId:moduleId".
+     *
+     * <p>Held in memory so unloading never needs the database row. Uninstall deletes the row and
+     * <em>then</em> publishes UNINSTALLED, so every pod except the one that served the request
+     * sees the event after the row is already gone — see {@link #unloadModule(String, String)}.
+     */
+    private final Map<String, LoadedModule> loadedActionKeys = new ConcurrentHashMap<>();
+
+    /** The registry keys and cached JAR a single loaded module owns. */
+    private record LoadedModule(Set<String> actionKeys, String s3Key) {
+    }
+
+    /**
      * Creates a RuntimeModuleManager with JAR loading support.
      */
     public RuntimeModuleManager(ModuleStore moduleStore,
@@ -335,6 +348,21 @@ public class RuntimeModuleManager {
         }
 
         loaded.add(module.moduleId());
+        // Capture what was registered while the row is still in hand; unload works from this
+        // rather than re-reading the database, which may no longer have the row by then.
+        Set<String> registered = new HashSet<>();
+        for (var action : module.actions()) {
+            registered.add(action.actionKey());
+        }
+        KeltaModule instance = activeModuleInstances.get(tenantId + ":" + module.moduleId());
+        if (instance != null) {
+            for (ActionHandler handler : instance.getActionHandlers()) {
+                registered.add(handler.getActionTypeKey());
+            }
+        }
+        loadedActionKeys.put(tenantId + ":" + module.moduleId(),
+            new LoadedModule(registered, module.s3Key()));
+
         log.info("Loaded module '{}' v{} with {} handlers for tenant {}",
             module.name(), module.version(), module.actions().size(), tenantId);
     }
@@ -446,19 +474,38 @@ public class RuntimeModuleManager {
      * @param module the module data
      */
     public void unloadModule(String tenantId, TenantModuleData module) {
+        unloadModule(tenantId, module.moduleId());
+    }
+
+    /**
+     * Unloads a module's handlers using only its identifier.
+     * Idempotent — no-op if not loaded.
+     *
+     * <p>Deliberately does <strong>not</strong> read the module row. Uninstall deletes the row and
+     * only then publishes UNINSTALLED, so every pod other than the one that served the request
+     * processes the event against a row that no longer exists. The previous implementation looked
+     * the row up, found nothing, and returned without unloading — leaving {@code loadedModules}
+     * holding the id. A subsequent reinstall then hit the "already loaded" early return in
+     * {@link #loadModule} and silently registered nothing, so the module ran on the request-serving
+     * pod and was missing from every other one while {@code /api/modules} reported ACTIVE. A flow
+     * step would fail ResourceNotFound on some pods and not others.
+     *
+     * @param tenantId the tenant ID
+     * @param moduleId the module identifier from the manifest
+     */
+    public void unloadModule(String tenantId, String moduleId) {
         Set<String> loaded = loadedModules.get(tenantId);
-        if (loaded == null || !loaded.contains(module.moduleId())) {
-            log.debug("Module '{}' not loaded for tenant {}", module.moduleId(), tenantId);
+        if (loaded == null || !loaded.contains(moduleId)) {
+            log.debug("Module '{}' not loaded for tenant {}", moduleId, tenantId);
             return;
         }
 
-        Set<String> actionKeys = new HashSet<>();
-        for (var action : module.actions()) {
-            actionKeys.add(action.actionKey());
-        }
+        String classLoaderKey = tenantId + ":" + moduleId;
+        LoadedModule record = loadedActionKeys.remove(classLoaderKey);
+        Set<String> actionKeys = new HashSet<>(
+            record != null ? record.actionKeys() : Set.<String>of());
 
         // Also remove any real handlers registered by the KeltaModule
-        String classLoaderKey = tenantId + ":" + module.moduleId();
         KeltaModule keltaModule = activeModuleInstances.remove(classLoaderKey);
         if (keltaModule != null) {
             for (ActionHandler handler : keltaModule.getActionHandlers()) {
@@ -474,20 +521,20 @@ public class RuntimeModuleManager {
             try {
                 classLoader.close();
             } catch (IOException e) {
-                log.warn("Failed to close ClassLoader for module '{}': {}", module.moduleId(), e.getMessage());
+                log.warn("Failed to close ClassLoader for module '{}': {}", moduleId, e.getMessage());
             }
         }
 
         // Evict JAR from local cache
-        if (module.s3Key() != null && jarService != null) {
-            jarService.evictFromCache(module.s3Key());
+        if (record != null && record.s3Key() != null && jarService != null) {
+            jarService.evictFromCache(record.s3Key());
         }
 
-        loaded.remove(module.moduleId());
+        loaded.remove(moduleId);
         if (loaded.isEmpty()) {
             loadedModules.remove(tenantId);
         }
-        log.info("Unloaded module '{}' for tenant {}", module.moduleId(), tenantId);
+        log.info("Unloaded module '{}' for tenant {}", moduleId, tenantId);
     }
 
     /**

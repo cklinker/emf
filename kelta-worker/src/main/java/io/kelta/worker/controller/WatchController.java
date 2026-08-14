@@ -151,18 +151,13 @@ public class WatchController implements SelfScopedController {
         String tenantId = requireTenant();
         String subject = resolveSubject(request, tenantId,
                 body == null ? null : body.memberId());
-        WatchTarget target = resolveTarget(tenantId, body);
-        if (!target.active()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Target is not currently watchable");
-        }
-
-        String criteria = validateCriteria(body.criteria());
-        List<String> channels = intersectChannels(tenantId, subject, body.channels());
-
-        // Pre-check the quota so the member gets an actionable message with an
-        // upgrade hint. The quota hook still enforces it on the way through — this
-        // is a nicer error, not the guard.
+        // Quota BEFORE resolving the target, because resolving may create one.
+        // The other order leaks: a member at their limit gets a 422 and still leaves a
+        // watch_target behind, so retrying in a loop mints unlimited rows — each one
+        // something the poller can be asked to poll — while never creating a watch.
+        //
+        // Still a pre-check for a nicer message, not the guard; the quota hook enforces
+        // it on the way through.
         int limit = entitlementService.intLimit(tenantId, subject, ENTITLEMENT_MAX_WATCHES,
                 Integer.MAX_VALUE);
         if (limit != Integer.MAX_VALUE) {
@@ -174,6 +169,15 @@ public class WatchController implements SelfScopedController {
                                 + "). Upgrade your plan to add more watches.");
             }
         }
+
+        WatchTarget target = resolveTarget(tenantId, body);
+        if (!target.active()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Target is not currently watchable");
+        }
+
+        String criteria = validateCriteria(body.criteria());
+        List<String> channels = intersectChannels(tenantId, subject, body.channels());
 
         Map<String, Object> data = new LinkedHashMap<>();
         // Direct queryEngine.create must set tenantId itself — the JSON:API layer

@@ -334,4 +334,27 @@ class WatchControllerTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("targetId, or source and externalId, is required");
     }
+
+    @Test
+    @DisplayName("a member at their plan limit does not leave a promoted target behind")
+    void quotaRejectionPromotesNothing() {
+        // Found in production: the 422 fired AFTER the target was created, so retrying at
+        // the limit minted unlimited watch_target rows — each one something the poller can
+        // be asked to poll — while never creating a watch.
+        WatchController promoting = controllerWithPromotable("recreation.gov");
+        when(entitlements.intLimit(anyString(), anyString(),
+                eq(WatchController.ENTITLEMENT_MAX_WATCHES), anyInt())).thenReturn(1);
+        when(watchRepository.countByMemberAndStatus(TENANT, OWNER, Watch.STATUS_ACTIVE))
+                .thenReturn(1);
+        when(targetRepository.findBySourceAndExternalId(TENANT, "recreation.gov", "274314"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> promoting.create(
+                promoteRequest("recreation.gov", "274314", "Silver Valley"),
+                requestFrom(OWNER, false)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("plan limit");
+
+        verify(queryEngine, never()).create(any(), any());
+    }
 }

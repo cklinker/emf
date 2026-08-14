@@ -61,7 +61,7 @@ class RuntimeModuleManagerTest {
         ModuleJarService jarService = mock(ModuleJarService.class);
         ModuleSignatureVerifier verifier = mock(ModuleSignatureVerifier.class);
         doThrow(new ModuleSignatureException("bad signature"))
-                .when(verifier).verify(any(), any());
+                .when(verifier).verify(any(), any(), any());
         RuntimeModuleManager jarManager = new RuntimeModuleManager(
                 moduleStore, actionHandlerRegistry, objectMapper, jarService, null, verifier);
 
@@ -78,7 +78,10 @@ class RuntimeModuleManagerTest {
     void installWithJarProceedsWhenSignatureVerifies() {
         ModuleJarService jarService = mock(ModuleJarService.class);
         when(jarService.uploadJar(any(), any(), any(), any())).thenReturn("s3/key.jar");
-        ModuleSignatureVerifier verifier = mock(ModuleSignatureVerifier.class); // verify() no-op
+        ModuleSignatureVerifier verifier = mock(ModuleSignatureVerifier.class);
+        // The fingerprint of the key that verified — recorded against the module so a later key
+        // rotation can tell what still depends on that key.
+        when(verifier.verify(any(), any(), any())).thenReturn("fp-abc");
         when(moduleStore.findByTenantAndModuleId(any(), any())).thenReturn(Optional.empty());
         RuntimeModuleManager jarManager = new RuntimeModuleManager(
                 moduleStore, actionHandlerRegistry, objectMapper, jarService, null, verifier);
@@ -86,11 +89,14 @@ class RuntimeModuleManagerTest {
         byte[] jar = "jar".getBytes();
         jarManager.installModuleWithJar(TENANT_ID, MANIFEST_JSON, jar, "user", "sig");
 
-        verify(verifier).verify(eq(jar), eq("sig"));
+        // Verified against the INSTALLING TENANT's keys — a JAR signed for another tenant
+        // must not be installable here.
+        verify(verifier).verify(eq(TENANT_ID), eq(jar), eq("sig"));
         verify(jarService).uploadJar(any(), any(), any(), any());
         verify(moduleStore).createModule(any());
-        // The verified signature is persisted so every load can re-verify the JAR
-        verify(moduleStore).saveJarSignature(any(), eq("sig"));
+        // The verified signature is persisted so every load can re-verify the JAR, together with
+        // the key that verified it.
+        verify(moduleStore).saveJarSignature(any(), eq("sig"), eq("fp-abc"));
     }
 
     @Test
@@ -121,7 +127,7 @@ class RuntimeModuleManagerTest {
         ModuleJarService jarService = mock(ModuleJarService.class);
         when(jarService.downloadJarToCache("s3/key.jar")).thenReturn(jarFile.toUri().toURL());
         ModuleSignatureVerifier verifier = mock(ModuleSignatureVerifier.class);
-        when(verifier.isEnabled()).thenReturn(true);
+        when(verifier.isEnabledFor(TENANT_ID)).thenReturn(true);
         when(moduleStore.findJarSignature("mod-1")).thenReturn(Optional.of("stored-sig"));
 
         RuntimeModuleManager jarManager = new RuntimeModuleManager(
@@ -136,7 +142,7 @@ class RuntimeModuleManagerTest {
         jarManager.loadModule(TENANT_ID, module);
 
         // The stored install-time signature was re-verified against the downloaded bytes
-        verify(verifier).verify(eq(jarBytes), eq("stored-sig"));
+        verify(verifier).verify(eq(TENANT_ID), eq(jarBytes), eq("stored-sig"));
         java.nio.file.Files.deleteIfExists(jarFile);
     }
 
@@ -302,6 +308,58 @@ class RuntimeModuleManagerTest {
             .execute(null);
         assertTrue(result.successful());
         assertEquals("stub", result.outputData().get("mode"));
+    }
+
+    @Test
+    void unloadByIdWorksAfterTheRowIsDeleted() {
+        // The production sequence: uninstall deletes the row, THEN publishes UNINSTALLED, so every
+        // pod except the one that served the request handles the event with no row to look up.
+        // Unloading has to work from the id alone or the handlers stay registered forever.
+        TenantModuleData module = createModuleDataWithS3Key("mod-s3", "modules/t/m/v/checksum.jar");
+        manager.loadModule(TENANT_ID, module);
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isPresent());
+
+        manager.unloadModule(TENANT_ID, "test-module");
+
+        assertFalse(manager.isLoaded(TENANT_ID, "test-module"));
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isEmpty(),
+                "handlers must be removed even though the module row is gone");
+    }
+
+    @Test
+    void reinstallAfterUninstallRegistersHandlersAgain() {
+        // The bug this pins. Uninstall-then-reinstall left loadedModules holding the id on every
+        // pod that could not find the deleted row, so loadModule's "already loaded" early return
+        // registered nothing — the module ran on one pod and was missing from the others, while
+        // /api/modules reported ACTIVE and a flow step failed ResourceNotFound non-deterministically.
+        TenantModuleData module = createModuleDataWithS3Key("mod-s3", "modules/t/m/v/checksum.jar");
+        manager.loadModule(TENANT_ID, module);
+
+        manager.unloadModule(TENANT_ID, "test-module");   // row already deleted upstream
+
+        // The assertion that matters. If the unload silently no-ops, the OLD jar's handlers stay
+        // registered and loadedModules keeps the id, so the reinstall below hits the "already
+        // loaded" early return and the pod keeps serving the previous version forever — while
+        // /api/modules reports ACTIVE and isLoaded() agrees.
+        assertFalse(manager.isLoaded(TENANT_ID, "test-module"),
+                "unload must clear the loaded marker or the reinstall is skipped");
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isEmpty(),
+                "stale handlers from the previous version must not survive the unload");
+
+        manager.loadModule(TENANT_ID, module);            // reinstall
+
+        assertTrue(manager.isLoaded(TENANT_ID, "test-module"));
+        assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isPresent(),
+                "a reinstalled module must register its handlers again");
+    }
+
+    @Test
+    void unloadByIdIsIdempotent() {
+        assertDoesNotThrow(() -> manager.unloadModule(TENANT_ID, "never-loaded"));
+        TenantModuleData module = createModuleDataWithS3Key("mod-s3", "modules/t/m/v/checksum.jar");
+        manager.loadModule(TENANT_ID, module);
+        manager.unloadModule(TENANT_ID, "test-module");
+        assertDoesNotThrow(() -> manager.unloadModule(TENANT_ID, "test-module"));
     }
 
     private TenantModuleData createModuleData(String id) {

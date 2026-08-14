@@ -38,6 +38,23 @@ public interface ModuleStore {
     }
 
     /**
+     * Persists the verified signature along with the fingerprint of the key that verified it.
+     *
+     * <p>The fingerprint is what makes key rotation safe to perform: retiring a key silently
+     * degrades every module signed only by it to inert stub handlers on the next load, while
+     * {@code /api/modules} keeps reporting {@code ACTIVE}. Recording the key per module is the
+     * only way to answer "what breaks if I retire this key" before doing it.
+     *
+     * @param moduleRowId     the module primary key
+     * @param signatureBase64 the detached base64 signature over the JAR bytes
+     * @param keyFingerprint  fingerprint of the verifying key, or {@code null} when signing was
+     *                        not enforced for the tenant
+     */
+    default void saveJarSignature(String moduleRowId, String signatureBase64, String keyFingerprint) {
+        saveJarSignature(moduleRowId, signatureBase64);
+    }
+
+    /**
      * Loads the publisher signature stored at install time.
      *
      * @param moduleRowId the module primary key

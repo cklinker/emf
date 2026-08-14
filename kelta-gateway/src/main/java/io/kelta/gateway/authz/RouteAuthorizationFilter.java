@@ -151,6 +151,29 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
                     // real collections — they only require the API_ACCESS check
                     // above.  Skip the collection-level Cerbos check for them.
                     if (collectionId.startsWith("static-")) {
+                        // Designating a module signing key is a grant of code-execution
+                        // authority: a module JAR signed by a trusted key runs arbitrary Java in
+                        // the worker JVM (SandboxedModuleClassLoader allows java.* wholesale).
+                        // API_ACCESS — all the rest of /api/modules/** carries — is far too weak
+                        // a gate for that, so writes here need MANAGE_CREDENTIALS. Reads are left
+                        // at API_ACCESS: the keys are public, and the dependentModules count is
+                        // what makes a rotation safe to plan.
+                        if ("static-modules".equals(collectionId)
+                                && path.startsWith("/api/modules/signing-keys")
+                                && isWriteMethod(exchange)) {
+                            return cerbosService.checkSystemPermission(principal, "MANAGE_CREDENTIALS")
+                                    .flatMap(allowed -> {
+                                        if (!allowed) {
+                                            log.warn("User {} denied MANAGE_CREDENTIALS for module "
+                                                    + "signing key write on path: {}",
+                                                    principal.getUsername(), path);
+                                            metrics.recordAuthzDenied(tenantSlug, collectionName, methodStr);
+                                            return forbidden(exchange,
+                                                    "Insufficient permissions: MANAGE_CREDENTIALS required");
+                                        }
+                                        return forwardWithHeaders(exchange, chain, principal);
+                                    });
+                        }
                         // Tenant management write operations require MANAGE_TENANTS
                         if ("static-tenants".equals(collectionId) && isWriteMethod(exchange)) {
                             return cerbosService.checkSystemPermission(principal, "MANAGE_TENANTS")

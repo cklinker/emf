@@ -13,6 +13,7 @@ import io.kelta.worker.repository.WatchTarget;
 import io.kelta.worker.repository.WatchTargetRepository;
 import io.kelta.worker.service.availability.WatchCriteria;
 import io.kelta.worker.service.billing.EntitlementService;
+import io.kelta.runtime.storage.UniqueConstraintViolationException;
 import io.kelta.worker.interceptor.SelfScopedController;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +36,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,6 +78,11 @@ public class WatchController implements SelfScopedController {
     /** Permission letting internal staff act on a named member's behalf (support). */
     static final String SUPPORT_PERMISSION = "MANAGE_DATA";
 
+    /** Collection holding watchable things, for the promotion path. */
+    static final String TARGET_COLLECTION = "watch-targets";
+    /** Longest name accepted when promoting; the column is varchar(255). */
+    private static final int MAX_PROMOTED_NAME = 255;
+
     private final WatchRepository watchRepository;
     private final WatchTargetRepository targetRepository;
     private final QueryEngine queryEngine;
@@ -82,6 +92,16 @@ public class WatchController implements SelfScopedController {
     private final CerbosPermissionResolver permissionResolver;
     private final BootstrapRepository bootstrapRepository;
     private final ObjectMapper objectMapper;
+    /**
+     * Sources a member may promote a target for, from
+     * {@code kelta.watch.promotable-sources}.
+     *
+     * <p>Empty by default, which turns promotion off. It has to be opt-in: creating a
+     * target is creating something the poller will be asked to poll, so an open door
+     * here lets any member with API_ACCESS mint arbitrary rows in another system's
+     * name.
+     */
+    private final Set<String> promotableSources;
 
     public WatchController(WatchRepository watchRepository,
                            WatchTargetRepository targetRepository,
@@ -91,7 +111,8 @@ public class WatchController implements SelfScopedController {
                            UserIdResolver userIdResolver,
                            CerbosPermissionResolver permissionResolver,
                            BootstrapRepository bootstrapRepository,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           @Value("${kelta.watch.promotable-sources:}") String promotableSources) {
         this.watchRepository = watchRepository;
         this.targetRepository = targetRepository;
         this.queryEngine = queryEngine;
@@ -101,6 +122,12 @@ public class WatchController implements SelfScopedController {
         this.permissionResolver = permissionResolver;
         this.bootstrapRepository = bootstrapRepository;
         this.objectMapper = objectMapper;
+        this.promotableSources = promotableSources == null || promotableSources.isBlank()
+                ? Set.of()
+                : Arrays.stream(promotableSources.split(","))
+                        .map(String::trim)
+                        .filter(v -> !v.isEmpty())
+                        .collect(Collectors.toUnmodifiableSet());
     }
 
     /** The caller's own watches. Support staff may name another member explicitly. */
@@ -124,13 +151,7 @@ public class WatchController implements SelfScopedController {
         String tenantId = requireTenant();
         String subject = resolveSubject(request, tenantId,
                 body == null ? null : body.memberId());
-        if (body == null || body.targetId() == null || body.targetId().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "targetId is required");
-        }
-
-        WatchTarget target = targetRepository.findById(tenantId, body.targetId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Unknown target"));
+        WatchTarget target = resolveTarget(tenantId, body);
         if (!target.active()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Target is not currently watchable");
@@ -390,6 +411,114 @@ public class WatchController implements SelfScopedController {
         }
     }
 
+    /**
+     * Finds the target a create request names, promoting it if the tenant allows.
+     *
+     * <p>Two ways in. {@code targetId} addresses an existing row directly. {@code source}
+     * + {@code externalId} resolves by natural key and, when that source is promotable,
+     * creates the row if it is missing — which is what lets a member watch something from
+     * a catalog without an operator minting the target first.
+     *
+     * <p>Promotion is deliberately narrow. Only sources named in
+     * {@code kelta.watch.promotable-sources} may be created, and the default is none:
+     * creating a target is creating something the poller will be asked to poll, so an
+     * open door lets any caller with API_ACCESS mint rows in another system's name.
+     *
+     * <p>Note what this does NOT verify: that the external id is real, or pollable. The
+     * platform has no way to know — that belongs to whoever owns the catalog, and the
+     * client is expected to offer only things it knows are watchable. A bogus id here
+     * costs a watch that never fires, which is why the audit that reconciles targets
+     * against their source matters.
+     */
+    private WatchTarget resolveTarget(String tenantId, CreateWatchRequest body) {
+        if (body == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "targetId, or source and externalId, is required");
+        }
+        if (body.targetId() != null && !body.targetId().isBlank()) {
+            return targetRepository.findById(tenantId, body.targetId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "Unknown target"));
+        }
+
+        String source = trimToNull(body.source());
+        String externalId = trimToNull(body.externalId());
+        if (source == null || externalId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "targetId, or source and externalId, is required");
+        }
+
+        Optional<WatchTarget> existing =
+                targetRepository.findBySourceAndExternalId(tenantId, source, externalId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        if (!promotableSources.contains(source)) {
+            // 404 rather than 403: from the caller's side the target simply does not
+            // exist, and whether this deployment permits promotion is not their business.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown target");
+        }
+        return promote(tenantId, source, externalId, body);
+    }
+
+    /**
+     * Creates a watch target for a promotable source.
+     *
+     * <p>The unique index on {@code (tenant_id, source, external_id)} is the concurrency
+     * control: two members watching the same facility at the same moment both reach here,
+     * one wins, and the loser re-reads rather than failing. Checking first and then
+     * creating would leave exactly that race open.
+     */
+    private WatchTarget promote(String tenantId, String source, String externalId,
+                                CreateWatchRequest body) {
+        // Validate the request before reaching for infrastructure: a missing name is the
+        // caller's problem (400) and an unregistered collection is ours (500). Checking
+        // the registry first would report our fault for their mistake.
+        String name = trimToNull(body.name());
+        if (name == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "name is required when creating a target");
+        }
+        if (name.length() > MAX_PROMOTED_NAME) {
+            name = name.substring(0, MAX_PROMOTED_NAME);
+        }
+
+        CollectionDefinition targets = collectionRegistry.get(TARGET_COLLECTION);
+        if (targets == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "watch-targets collection not registered");
+        }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        // Direct queryEngine.create must set tenantId itself, same as watches below.
+        data.put("tenantId", tenantId);
+        data.put("source", source);
+        data.put("externalId", externalId);
+        data.put("name", name);
+        data.put("category", trimToNull(body.category()) != null ? body.category().trim() : source);
+        data.put("active", true);
+
+        try {
+            queryEngine.create(targets, data);
+        } catch (UniqueConstraintViolationException e) {
+            log.debug("Target {}/{} was promoted concurrently in tenant {}; reusing it",
+                    source, externalId, tenantId);
+        }
+
+        return targetRepository.findBySourceAndExternalId(tenantId, source, externalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Promoted target could not be read back"));
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private CollectionDefinition definition() {
         CollectionDefinition definition = collectionRegistry.get(COLLECTION);
         if (definition == null) {
@@ -419,9 +548,18 @@ public class WatchController implements SelfScopedController {
         return userId;
     }
 
-    /** Request body for {@code POST /api/watches}. */
+    /**
+     * Request body for {@code POST /api/watches}.
+     *
+     * <p>Identify the target either by {@code targetId}, or by {@code source} +
+     * {@code externalId} to have it resolved — and created if the tenant permits
+     * promotion for that source. {@code name} and {@code category} are only read
+     * when a target is actually created.
+     */
     public record CreateWatchRequest(String targetId, Object criteria, List<String> channels,
-                                     String memberId, String expiresAt) {
+                                     String memberId, String expiresAt,
+                                     String source, String externalId,
+                                     String name, String category) {
     }
 
     /** Request body for {@code PATCH /api/watches/{id}}. */

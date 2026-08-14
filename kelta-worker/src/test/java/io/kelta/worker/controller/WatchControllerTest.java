@@ -4,8 +4,10 @@ import tools.jackson.databind.ObjectMapper;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.query.QueryEngine;
+import io.kelta.runtime.storage.UniqueConstraintViolationException;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.router.UserIdResolver;
+import io.kelta.worker.controller.WatchController.CreateWatchRequest;
 import io.kelta.worker.controller.WatchController.UpdateWatchRequest;
 import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.repository.Watch;
@@ -33,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,6 +64,16 @@ class WatchControllerTest {
     private CerbosPermissionResolver permissionResolver;
     private BootstrapRepository bootstrapRepository;
     private WatchController controller;
+    private CollectionRegistry registry;
+    private EntitlementService entitlements;
+    private UserIdResolver userIdResolver;
+
+    /** A controller whose promotable-source allowlist is the given comma list. */
+    private WatchController controllerWithPromotable(String sources) {
+        return new WatchController(watchRepository, targetRepository, queryEngine,
+                registry, entitlements, userIdResolver, permissionResolver,
+                bootstrapRepository, new ObjectMapper(), sources);
+    }
 
     @BeforeEach
     void setUp() {
@@ -72,6 +85,8 @@ class WatchControllerTest {
 
         CollectionRegistry registry = mock(CollectionRegistry.class);
         when(registry.get(WatchController.COLLECTION)).thenReturn(mock(CollectionDefinition.class));
+        when(registry.get(WatchController.TARGET_COLLECTION))
+                .thenReturn(mock(CollectionDefinition.class));
 
         UserIdResolver userIdResolver = mock(UserIdResolver.class);
         when(userIdResolver.resolve(anyString(), any())).thenAnswer(i -> i.getArgument(0));
@@ -80,9 +95,10 @@ class WatchControllerTest {
         when(entitlements.intLimit(anyString(), anyString(), anyString(), anyInt()))
                 .thenAnswer(i -> (int) i.getArgument(3));
 
-        controller = new WatchController(watchRepository, targetRepository, queryEngine,
-                registry, entitlements, userIdResolver, permissionResolver,
-                bootstrapRepository, new ObjectMapper());
+        this.registry = registry;
+        this.entitlements = entitlements;
+        this.userIdResolver = userIdResolver;
+        controller = controllerWithPromotable("");
         TenantContext.set(TENANT);
 
         when(queryEngine.update(any(), anyString(), any()))
@@ -217,5 +233,105 @@ class WatchControllerTest {
                 requestFrom(OWNER, false));
 
         verify(targetRepository, never()).findById(anyString(), anyString());
+    }
+
+    // ---- promotion: watching something by (source, externalId) ----
+
+    private CreateWatchRequest promoteRequest(String source, String externalId, String name) {
+        return new CreateWatchRequest(null, null, null, null, null, source, externalId, name, null);
+    }
+
+    @Test
+    @DisplayName("resolves an existing target by source and external id without creating one")
+    void resolvesExistingBySourceAndExternalId() {
+        WatchController promoting = controllerWithPromotable("recreation.gov");
+        when(targetRepository.findBySourceAndExternalId(TENANT, "recreation.gov", "232462"))
+                .thenReturn(Optional.of(new WatchTarget("target-1", TENANT, "recreation.gov",
+                        "232462", "Glacier Basin", "campsites", null, true)));
+        when(queryEngine.create(any(), any())).thenAnswer(i -> Map.of("id", "watch-new"));
+
+        promoting.create(promoteRequest("recreation.gov", "232462", "Glacier Basin"),
+                requestFrom(OWNER, false));
+
+        // One create — the watch. Nothing was promoted, because it already existed.
+        verify(queryEngine, times(1)).create(any(), any());
+    }
+
+    @Test
+    @DisplayName("creates the target when the source is promotable and it is missing")
+    void promotesAMissingTarget() {
+        WatchController promoting = controllerWithPromotable("recreation.gov");
+        when(targetRepository.findBySourceAndExternalId(TENANT, "recreation.gov", "232462"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(new WatchTarget("target-new", TENANT, "recreation.gov",
+                        "232462", "Glacier Basin", "campsites", null, true)));
+        when(queryEngine.create(any(), any())).thenAnswer(i -> Map.of("id", "x"));
+
+        promoting.create(promoteRequest("recreation.gov", "232462", "Glacier Basin"),
+                requestFrom(OWNER, false));
+
+        // Two creates: the target, then the watch.
+        verify(queryEngine, times(2)).create(any(), any());
+    }
+
+    @Test
+    @DisplayName("refuses to promote a source the tenant has not allowed")
+    void refusesUnlistedSource() {
+        // Default allowlist is empty, so promotion is off. 404 rather than 403: from the
+        // caller's side the target does not exist, and whether this deployment permits
+        // promotion is not their business.
+        when(targetRepository.findBySourceAndExternalId(TENANT, "evil.example", "1"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.create(
+                promoteRequest("evil.example", "1", "Anything"), requestFrom(OWNER, false)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Unknown target");
+        verify(queryEngine, never()).create(any(), any());
+    }
+
+    @Test
+    @DisplayName("a concurrent promotion is reused, not failed")
+    void concurrentPromotionReusesTheWinner() {
+        // The unique index on (tenant_id, source, external_id) is the concurrency control:
+        // two members watching the same facility both reach promote(), one wins, the loser
+        // re-reads. Checking first and then creating would leave that race open.
+        WatchController promoting = controllerWithPromotable("recreation.gov");
+        when(targetRepository.findBySourceAndExternalId(TENANT, "recreation.gov", "232462"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(new WatchTarget("target-winner", TENANT, "recreation.gov",
+                        "232462", "Glacier Basin", "campsites", null, true)));
+        when(queryEngine.create(any(), any()))
+                .thenThrow(new UniqueConstraintViolationException(
+                        "watch-targets", "externalId", "232462"))
+                .thenAnswer(i -> Map.of("id", "watch-new"));
+
+        promoting.create(promoteRequest("recreation.gov", "232462", "Glacier Basin"),
+                requestFrom(OWNER, false));
+        // Reached the watch create despite the target insert losing the race.
+        verify(queryEngine, times(2)).create(any(), any());
+    }
+
+    @Test
+    @DisplayName("promotion needs a name — the row is what a member will see")
+    void promotionRequiresAName() {
+        WatchController promoting = controllerWithPromotable("recreation.gov");
+        when(targetRepository.findBySourceAndExternalId(TENANT, "recreation.gov", "232462"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> promoting.create(
+                promoteRequest("recreation.gov", "232462", "  "), requestFrom(OWNER, false)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("name is required");
+    }
+
+    @Test
+    @DisplayName("neither targetId nor source/externalId is a 400, not an NPE")
+    void requiresSomeIdentifier() {
+        assertThatThrownBy(() -> controller.create(
+                new CreateWatchRequest(null, null, null, null, null, null, null, null, null),
+                requestFrom(OWNER, false)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("targetId, or source and externalId, is required");
     }
 }

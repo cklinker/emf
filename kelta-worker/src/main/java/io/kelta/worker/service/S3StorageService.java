@@ -7,7 +7,10 @@ import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -308,6 +311,32 @@ public class S3StorageService {
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(config.getAccessKey(), config.getSecretKey())))
                 .forcePathStyle(true)
+                // Required for S3-COMPATIBLE stores; this deployment runs Garage, not AWS.
+                //
+                // SDK 2.30 changed the default to WHEN_SUPPORTED, which adds a flexible-checksum
+                // trailer and sends the literal header
+                //   x-amz-content-sha256: STREAMING-UNSIGNED-PAYLOAD-TRAILER
+                // instead of a hex digest. Garage parses that as a hash and rejects the request:
+                //   "Invalid content sha256 hash: Invalid character 'S' at position 0"
+                // — the 'S' being the start of STREAMING.
+                //
+                // WHEN_REQUIRED still sends a checksum wherever the S3 API mandates one, so
+                // integrity is not being traded away; it only stops the SDK adding trailers the
+                // server cannot parse.
+                //
+                // This affects every server-side upload — module JARs, data exports and
+                // telehealth archives. It went unnoticed because ordinary attachments upload
+                // via presigned URLs straight from the browser, which never sends the trailer.
+                .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
+                // Both settings are needed, and this is the one that actually removes the
+                // STREAMING-UNSIGNED-PAYLOAD-TRAILER header: WHEN_REQUIRED alone stops the
+                // flexible-checksum trailer but leaves aws-chunked framing on, so the sentinel
+                // value is still sent and Garage still rejects it. Verified by
+                // S3StorageServiceChecksumTest against a real client on a loopback socket.
+                .serviceConfiguration(S3Configuration.builder()
+                        .chunkedEncodingEnabled(false)
+                        .build())
                 .build();
     }
 

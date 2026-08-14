@@ -1,5 +1,20 @@
-# JVM-mode build of Kelta Worker for CI/e2e — fast iteration, not for production.
-# Production builds use kelta-worker/Dockerfile (GraalVM native-image).
+# JVM build of Kelta Worker. THIS IS WHAT PRODUCTION RUNS.
+#
+# The native-image build (kelta-worker/Dockerfile) is kept for local `make up`
+# and for reference, but it cannot run this service's runtime-module feature:
+# SandboxedModuleClassLoader defines classes from an installed JAR at runtime and
+# a native image has no bytecode interpreter, so URLClassLoader.findClass throws
+# ClassNotFoundException, the loader falls back to inert stub handlers, and
+# /api/modules keeps reporting ACTIVE. Nothing surfaces the breakage.
+#
+# Trade-offs accepted: ~20-40s startup instead of ~50ms, and a larger heap.
+# Startup is covered by the deployment's startupProbe (up to ~310s).
+#
+# NOTE: no OpenTelemetry javaagent is installed here on purpose. Tracing goes
+# through Spring Boot's own OTLP exporter
+# (MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT); adding the agent as
+# well would double-instrument every request. Do not put -javaagent in JAVA_OPTS
+# for this image — the JVM refuses to start when the agent path does not exist.
 
 # =============================================================================
 # Stage 1: Build runtime-platform dependencies

@@ -69,8 +69,6 @@ public class ModuleSigningKeyController {
                 .map(key -> keyToMap(key, keyStore.countModulesSignedBy(tenantId, key.fingerprint())))
                 .toList();
 
-        Map<String, Object> response =
-                new LinkedHashMap<>(JsonApiResponseBuilder.collection("module-signing-keys", records));
         // Surfaced because it changes what these keys mean: while a platform-wide key is
         // configured it is trusted for every tenant, so this tenant's key set is not the whole
         // trust boundary. Its fingerprint is included so a module recorded against it is
@@ -82,8 +80,8 @@ public class ModuleSigningKeyController {
         if (platformFingerprint != null) {
             meta.put("platformKeyFingerprint", platformFingerprint);
         }
-        response.put("meta", meta);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+                JsonApiResponseBuilder.collection("module-signing-keys", records, meta));
     }
 
     /**
@@ -138,8 +136,7 @@ public class ModuleSigningKeyController {
 
         log.info("Added module signing key '{}' ({}, fingerprint {}) for tenant {}",
                 key.label(), key.algorithm(), key.shortFingerprint(), tenantId);
-        return ResponseEntity.ok(JsonApiResponseBuilder.single(
-                "module-signing-keys", key.id(), keyToMap(key, 0)));
+        return singleKey(key, 0, null);
     }
 
     /**
@@ -196,8 +193,7 @@ public class ModuleSigningKeyController {
         }
         keyStore.delete(tenantId, id);
         log.info("Deleted retired module signing key '{}' for tenant {}", key.label(), tenantId);
-        return ResponseEntity.ok(JsonApiResponseBuilder.single(
-                "module-signing-keys", id, keyToMap(key, 0)));
+        return singleKey(key, 0, null);
     }
 
     private ResponseEntity<Map<String, Object>> setActive(
@@ -219,18 +215,38 @@ public class ModuleSigningKeyController {
         }
 
         ModuleSigningKey updated = keyStore.findById(tenantId, id).orElse(existing);
-        Map<String, Object> attributes = keyToMap(updated, dependents);
-        if (!active && dependents > 0) {
-            attributes.put("warning", dependents + " installed module(s) were signed by this key "
-                    + "and will fall back to stub handlers on their next load until re-signed "
-                    + "with an active key");
+        String warning = (!active && dependents > 0)
+                ? dependents + " installed module(s) were signed by this key and will fall back "
+                    + "to stub handlers on their next load until re-signed with an active key"
+                : null;
+        return singleKey(updated, dependents, warning);
+    }
+
+    /**
+     * One key as a JSON:API single-resource response.
+     *
+     * <p>Drops {@code id} from the attribute map — {@code single()} puts the id in the resource
+     * envelope itself and does not strip it from attributes the way the collection path does, and
+     * JSON:API forbids an {@code id} member inside {@code attributes}.
+     */
+    private ResponseEntity<Map<String, Object>> singleKey(
+            ModuleSigningKey key, int dependentModules, String warning) {
+        Map<String, Object> attributes = keyToMap(key, dependentModules);
+        attributes.remove("id");
+        if (warning != null) {
+            attributes.put("warning", warning);
         }
         return ResponseEntity.ok(JsonApiResponseBuilder.single(
-                "module-signing-keys", id, attributes));
+                "module-signing-keys", key.id(), attributes));
     }
 
     private Map<String, Object> keyToMap(ModuleSigningKey key, int dependentModules) {
         Map<String, Object> map = new LinkedHashMap<>();
+        // JsonApiResponseBuilder.toResource() lifts "id" out of the record map into the resource
+        // envelope. Without it every listed key serialises as "id": null, and since retire,
+        // activate and delete are all addressed by id, the listing could not be acted on — which
+        // is the entire rotation workflow.
+        map.put("id", key.id());
         map.put("label", key.label());
         map.put("algorithm", key.algorithm());
         map.put("fingerprint", key.fingerprint());

@@ -164,17 +164,27 @@ public class FlowScheduleSyncHook implements BeforeSaveHook {
         Instant nextRunAt = active ? ScheduledJobRepository.calculateNextRunAt(normalized, timezone) : null;
 
         Optional<Map<String, Object>> existing = scheduledJobRepository.findByFlowId(flowId, tenantId);
-        if (existing.isEmpty()) {
-            String createdBy = resolveCreatedBy(record, flowId);
-            if (createdBy == null) {
-                log.warn("Cannot create scheduled_job for flow {} — could not resolve createdBy", flowId);
+        if (existing.isPresent()) {
+            String jobId = asString(existing.get().get("id"));
+            if (scheduledJobRepository.updateForFlow(
+                    jobId, flowName, normalized, timezone, active, nextRunAt)) {
                 return;
             }
-            scheduledJobRepository.insertForFlow(flowId, tenantId, flowName, normalized, timezone, active, nextRunAt, createdBy);
-        } else {
-            String jobId = asString(existing.get().get("id"));
-            scheduledJobRepository.updateForFlow(jobId, flowName, normalized, timezone, active, nextRunAt);
+            // The row was read a moment ago and is gone now — deleted concurrently, or never
+            // visible to this connection for write. Fall through and recreate it rather than
+            // leave the flow marked active with no job behind it, which never fires and shows
+            // no symptom anywhere the flow itself is displayed.
+            log.warn("scheduled_job {} for flow {} vanished between read and update — recreating",
+                    jobId, flowId);
         }
+
+        String createdBy = resolveCreatedBy(record, flowId);
+        if (createdBy == null) {
+            log.warn("Cannot create scheduled_job for flow {} — could not resolve createdBy", flowId);
+            return;
+        }
+        scheduledJobRepository.insertForFlow(
+            flowId, tenantId, flowName, normalized, timezone, active, nextRunAt, createdBy);
     }
 
     private String resolveCreatedBy(Map<String, Object> record, String flowId) {

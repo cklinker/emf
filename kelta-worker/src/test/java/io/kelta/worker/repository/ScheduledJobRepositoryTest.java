@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -85,5 +86,27 @@ class ScheduledJobRepositoryTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().get("definition")).isNull();
+    }
+
+    @Test
+    void updateForFlowReportsWhenNoRowMatched() {
+        // Without this the method logged "Updated scheduled_job ..." whether it wrote one row or
+        // none, so a schedule that silently stopped syncing looked identical to a healthy one.
+        when(jdbcTemplate.update(contains("UPDATE scheduled_job"),
+                any(), any(), any(), any(), any(), any(), any())).thenReturn(0);
+
+        boolean updated = repository.updateForFlow(
+                "job-1", "nightly", "0 0 13 * * *", "UTC", true, java.time.Instant.now());
+
+        assertFalse(updated, "a zero-row update must not report success");
+    }
+
+    @Test
+    void updateForFlowReportsSuccessWhenARowMatched() {
+        when(jdbcTemplate.update(contains("UPDATE scheduled_job"),
+                any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
+
+        assertTrue(repository.updateForFlow(
+                "job-1", "nightly", "0 0 13 * * *", "UTC", true, java.time.Instant.now()));
     }
 }

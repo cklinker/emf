@@ -1787,15 +1787,44 @@ public class DynamicCollectionRouter {
     }
 
     /**
+     * System collections that are writable through this router but whose rows are also mutated
+     * out-of-band, so {@code readOnly} does not exclude them and caching them serves fiction.
+     *
+     * <p>{@code scheduled-jobs} is the case in hand. Every meaningful write to it happens via
+     * {@code ScheduledJobRepository}'s direct JDBC — the scheduler stamps {@code last_run_at},
+     * {@code last_status} and a recomputed {@code next_run_at} after <em>every</em> execution, and
+     * {@code FlowScheduleSyncHook} rewrites {@code active}/{@code next_run_at} whenever a flow's
+     * schedule changes. None of that goes through this router, so nothing evicts the entry.
+     *
+     * <p>Eviction on write would not fix it either: the cache is per-pod, so a pod that never
+     * served the write keeps its own stale copy regardless. Not caching is the only correct
+     * answer short of broadcasting invalidation over NATS, and this data is low-traffic
+     * operational state where caching buys nothing.
+     *
+     * <p>The cost of getting this wrong is not a slightly stale list. It is that every tool for
+     * answering "is this schedule healthy?" reports fiction — the endpoint kept serving
+     * {@code active=false, next_run_at=null} for a job that was active with a correct next run,
+     * which reads exactly like a broken scheduler and sent one investigation down a bug that did
+     * not exist.
+     */
+    private static final Set<String> NEVER_CACHED_SYSTEM_COLLECTIONS = Set.of("scheduled-jobs");
+
+    /**
      * Whether this collection's responses may be served from / stored in the
      * {@link SystemCollectionCache}. Read-only system collections (record-versions,
      * field-history, email-logs, login-history, audit logs, ...) are excluded:
      * they are written by backend services via direct JDBC, never through this
      * router, so no write path ever evicts their entries — caching them serves
      * stale, per-pod results until the TTL expires.
+     *
+     * <p>{@link #NEVER_CACHED_SYSTEM_COLLECTIONS} extends that exclusion to collections which are
+     * writable here but still mutated out-of-band.
      */
     private boolean cacheable(CollectionDefinition definition) {
-        return definition.systemCollection() && !definition.readOnly() && systemCollectionCache != null;
+        return definition.systemCollection()
+                && !definition.readOnly()
+                && !NEVER_CACHED_SYSTEM_COLLECTIONS.contains(definition.name())
+                && systemCollectionCache != null;
     }
 
     /**

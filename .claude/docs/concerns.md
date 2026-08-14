@@ -836,6 +836,20 @@ Regression guard: `TenantAwareDataSourceTest` asserts tenant connections use tra
 
 ## Test Coverage Gaps
 
+- **FIXED — the runtime modules' tests never ran in CI.** Both `ci.yml` and
+  `build-and-publish-containers.yml` built `kelta-platform/runtime/*` with **`-DskipTests`** and
+  then ran `mvn verify` against `kelta-<service>` only. So ~1,900 tests across the seven runtime
+  modules — 89 test classes in `runtime-core` alone, covering the query engine, the storage
+  adapters and their DDL/SQL generation, the flow engine, validation, `TenantContext` and the
+  field-type model — were compiled on every run and **never executed**. This is not a
+  hypothetical: #1281 flipped `FieldType.hasPhysicalColumn()` for FORMULA on 2026-07-29 and
+  `FieldTypeTest.formulaHasNoPhysicalColumn` failed from that moment, while every `main` run
+  reported green for eleven days. It surfaced only because someone ran `runtime-core` locally.
+  A new `test-runtime` job now runs `mvn test` over all seven modules, gated on the `runtime`
+  path filter, and is wired into **both** gates — `quality-gate` (PR-blocking) and
+  `build-and-push`'s `result != 'failure'` (deploy-blocking) — so it blocks rather than informs.
+  Lesson for any new module: being on the `-am` build list is **not** coverage; check it is in a
+  job that actually runs its tests.
 - **No worker Spring-context test — bean-wiring bugs reach production silently.** Nothing in the worker suite starts an application context, so a bean that cannot be constructed compiles, passes every unit test, and fails only at pod startup. This has now bitten **three** classes, all the same shape: a `@Component` with a **package-private test constructor alongside the production one** is multi-constructor, so Spring looks for a no-arg constructor and refuses to start. `StripeApiClient` (caught by a harness run that failed to boot the container); `FcmPushProvider` **and** `ApnsPushProvider` (caught 2026-08-03 by the new `PushProviderWiringTest` — both meant `kelta.push.provider=fcm|apns` was **unstartable**, undetected since those providers shipped). **Adding a second constructor to a `@Component` requires `@Autowired` on the production one.** Likewise, adding a second bean of an already-injected type breaks single-typed injection points (`WebPushProvider` vs `PushProvider` — fixed by `@Primary` on the mutually exclusive `kelta.push.provider` transports). `PushProviderWiringTest` is the pattern to copy: an `ApplicationContextRunner` over just the beans involved, no infrastructure. A whole-worker context test is still owed.
 - **Rate-limit tests are mocked — no test proves two replicas actually share a counter.** The
   gateway and kelta-auth suites assert the Redis *key shape* and the TTL contract, which is

@@ -72,15 +72,14 @@ public class ModuleEventListener {
                             log.warn("Module '{}' not found in DB for tenant {}", moduleId, tenantId);
                         }
                     }
-                    case DISABLED, UNINSTALLED -> {
-                        Optional<TenantModuleData> module =
-                            moduleStore.findByTenantAndModuleId(tenantId, moduleId);
-                        if (module.isPresent()) {
-                            runtimeModuleManager.unloadModule(tenantId, module.get());
-                        } else {
-                            log.debug("Module '{}' already removed for tenant {}", moduleId, tenantId);
-                        }
-                    }
+                    // Unload by id, never by row. Uninstall deletes the row and only then
+                    // publishes UNINSTALLED, so every pod except the one that served the request
+                    // gets here after the row is gone. Looking it up found nothing, skipped the
+                    // unload, and left the id in loadedModules — after which a reinstall hit the
+                    // "already loaded" early return and registered no handlers at all, on every
+                    // pod but one, while /api/modules still reported ACTIVE.
+                    case DISABLED, UNINSTALLED ->
+                        runtimeModuleManager.unloadModule(tenantId, moduleId);
                 }
             });
         } catch (Exception e) {

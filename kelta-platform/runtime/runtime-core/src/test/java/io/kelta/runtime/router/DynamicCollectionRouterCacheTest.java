@@ -178,6 +178,48 @@ class DynamicCollectionRouterCacheTest {
         }
 
         @Test
+        @DisplayName("Should NOT cache scheduled-jobs — it is mutated out-of-band by the scheduler")
+        void list_doesNotCache_forScheduledJobs() throws Exception {
+            // scheduled-jobs is writable through this router, so readOnly does not exclude it, but
+            // every meaningful write happens in ScheduledJobRepository via direct JDBC: the
+            // scheduler stamps last_run_at/last_status/next_run_at after every execution, and
+            // FlowScheduleSyncHook rewrites active/next_run_at when a flow's schedule changes.
+            // Nothing evicts the entry, and the cache is per-pod so eviction-on-write would not
+            // help either. Caching it made the endpoint report active=false/next_run_at=null for a
+            // job that was active with a correct next run — indistinguishable from a dead scheduler.
+            CollectionDefinition def = buildSystemCollection("scheduled-jobs");
+            when(registry.get("scheduled-jobs")).thenReturn(def);
+
+            QueryResult result = QueryResult.empty(Pagination.defaults());
+            when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(result);
+
+            mockMvc.perform(get("/api/scheduled-jobs")
+                            .header("X-Tenant-ID", "tenant-1"))
+                    .andExpect(status().isOk());
+
+            verify(cache, never()).getListResponse(any(), any(), any());
+            verify(cache, never()).putListResponse(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Should still cache other writable system collections")
+        void list_stillCaches_forOtherWritableSystemCollections() throws Exception {
+            // Guards the exclusion from being widened by accident.
+            CollectionDefinition def = buildSystemCollection("ui-menus");
+            when(registry.get("ui-menus")).thenReturn(def);
+            when(cache.getListResponse(any(), any(), any())).thenReturn(Optional.empty());
+
+            QueryResult result = QueryResult.empty(Pagination.defaults());
+            when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(result);
+
+            mockMvc.perform(get("/api/ui-menus")
+                            .header("X-Tenant-ID", "tenant-1"))
+                    .andExpect(status().isOk());
+
+            verify(cache).putListResponse(any(), any(), any(), any());
+        }
+
+        @Test
         @DisplayName("Should NOT cache response when include parameter is present")
         void list_doesNotCache_whenIncludePresent() throws Exception {
             CollectionDefinition def = buildSystemCollection("collections");

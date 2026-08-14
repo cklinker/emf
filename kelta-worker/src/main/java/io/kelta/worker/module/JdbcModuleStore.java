@@ -55,6 +55,16 @@ public class JdbcModuleStore implements ModuleStore {
     }
 
     @Override
+    public void saveJarSignature(String moduleRowId, String signatureBase64, String keyFingerprint) {
+        jdbcTemplate.update("""
+            UPDATE tenant_module
+               SET jar_signature = ?, jar_signature_key_fingerprint = ?, updated_at = NOW()
+             WHERE id = ?
+            """,
+            signatureBase64, keyFingerprint, moduleRowId);
+    }
+
+    @Override
     public Optional<String> findJarSignature(String moduleRowId) {
         List<String> rows = jdbcTemplate.query(
                 "SELECT jar_signature FROM tenant_module WHERE id = ?",

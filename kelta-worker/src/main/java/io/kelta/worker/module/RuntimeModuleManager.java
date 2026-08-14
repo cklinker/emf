@@ -188,9 +188,13 @@ public class RuntimeModuleManager {
             throw new IllegalStateException("JAR upload requires S3 storage to be enabled");
         }
 
-        // Authenticity gate — reject before any S3 upload or DB write.
+        // Authenticity gate — reject before any S3 upload or DB write. Verified against the
+        // INSTALLING TENANT's own signing keys, so a JAR signed for one tenant cannot be
+        // installed into another. Null when the tenant trusts no key and signing is not
+        // required; a ModuleSignatureException otherwise.
+        String signingKeyFingerprint = null;
         if (signatureVerifier != null) {
-            signatureVerifier.verify(jarBytes, signatureBase64);
+            signingKeyFingerprint = signatureVerifier.verify(tenantId, jarBytes, signatureBase64);
         }
 
         ModuleManifest manifest = manifestParser.parse(manifestJson);
@@ -218,8 +222,9 @@ public class RuntimeModuleManager {
         moduleStore.createModule(data);
         if (signatureBase64 != null && !signatureBase64.isBlank()) {
             // Keep the verified signature so every subsequent load can re-verify
-            // the downloaded JAR (defense-in-depth vs S3 tamper).
-            moduleStore.saveJarSignature(id, signatureBase64);
+            // the downloaded JAR (defense-in-depth vs S3 tamper), and the key that
+            // verified it so a rotation can tell what still depends on that key.
+            moduleStore.saveJarSignature(id, signatureBase64, signingKeyFingerprint);
         }
 
         // Create action records from manifest
@@ -407,12 +412,18 @@ public class RuntimeModuleManager {
             }
         }
 
-        if (signatureVerifier != null && signatureVerifier.isEnabled()) {
+        if (signatureVerifier != null && signatureVerifier.isEnabledFor(module.tenantId())) {
             String signature = moduleStore.findJarSignature(module.id()).orElse(null);
             // verify() throws when the signature is missing or invalid —
             // modules installed before signing was enabled must be re-installed
             // with a signature once a public key is configured.
-            signatureVerifier.verify(jarBytes, signature);
+            //
+            // Re-verified against the tenant's keys AS THEY ARE NOW, not against the key
+            // recorded at install: that is what lets a rotation be additive. The flip side is
+            // that retiring a key whose modules were never re-signed makes them fail here and
+            // fall back to stubs — see jar_signature_key_fingerprint and
+            // GET /api/modules/signing-keys, which reports the dependent module count.
+            signatureVerifier.verify(module.tenantId(), jarBytes, signature);
         }
     }
 

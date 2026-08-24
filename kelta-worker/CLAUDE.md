@@ -126,6 +126,8 @@ stops the rollout. Two rules follow:
 | NATS event listener | `listener/CollectionSchemaListener.java` |
 | NATS subscription wiring | `config/NatsSubscriptionConfig.java` |
 | JDBC repository | `repository/ApprovalRepository.java` |
+| Owner-guard hook, system collection (raw JDBC against the one shared table) | `listener/UserPreferenceGuardHook.java` |
+| Owner-guard hook, tenant collection (no hardcoded table — `beforeDelete` reads the row via `QueryEngine`/`CollectionRegistry` instead, since a tenant collection's physical table is schema-qualified by tenant slug and only resolved inside `PhysicalTableStorageAdapter`) | `listener/FieldReportGuardHook.java` |
 | Service with event publishing | `service/CollectionLifecycleManager.java` |
 | Unit test | `scim/service/ScimUserServiceTest.java` |
 | Controller test | `scim/controller/ScimUserControllerTest.java` |

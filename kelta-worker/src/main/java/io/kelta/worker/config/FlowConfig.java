@@ -577,6 +577,26 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Owner guard for spotopened's field-reports tenant collection: a write may only
+     * touch rows whose memberId equals the caller's canonical UUID. Unlike
+     * user-ui-preferences (a system collection with one shared physical table),
+     * field-reports is a plain tenant collection, so beforeDelete reads the existing
+     * row through QueryEngine/CollectionRegistry rather than a raw JDBC query against
+     * a hardcoded table name -- see FieldReportGuardHook's own javadoc for why.
+     */
+    @Bean
+    public io.kelta.worker.listener.FieldReportGuardHook fieldReportGuardHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.runtime.router.UserIdResolver userIdResolver,
+            io.kelta.runtime.registry.CollectionRegistry collectionRegistry,
+            io.kelta.runtime.query.QueryEngine queryEngine) {
+        io.kelta.worker.listener.FieldReportGuardHook hook =
+                new io.kelta.worker.listener.FieldReportGuardHook(userIdResolver, collectionRegistry, queryEngine);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public LayoutRuleRefreshHook layoutRuleRefreshHook(
             BeforeSaveHookRegistry hookRegistry,

@@ -65,7 +65,7 @@ class FieldReportGuardHookTest {
     @DisplayName("allows creating a row the caller owns")
     void allowsSelfCreate() {
         bindRequest("me@example.com");
-        BeforeSaveResult result = hook.beforeCreate(Map.of("memberId", ME), "t1");
+        BeforeSaveResult result = hook.beforeCreate(Map.of("createdBy", ME), "t1");
         assertThat(result.isSuccess()).isTrue();
     }
 
@@ -73,7 +73,7 @@ class FieldReportGuardHookTest {
     @DisplayName("rejects creating a row for another member")
     void rejectsCrossMemberCreate() {
         bindRequest("me@example.com");
-        BeforeSaveResult result = hook.beforeCreate(Map.of("memberId", OTHER), "t1");
+        BeforeSaveResult result = hook.beforeCreate(Map.of("createdBy", OTHER), "t1");
         assertThat(result.isSuccess()).isFalse();
     }
 
@@ -82,11 +82,11 @@ class FieldReportGuardHookTest {
     void rejectsCrossMemberUpdate() {
         bindRequest("me@example.com");
         assertThat(hook.beforeUpdate("p1", Map.of("notes", "washed out"),
-                Map.of("memberId", OTHER), "t1").isSuccess()).isFalse();
-        assertThat(hook.beforeUpdate("p1", Map.of("memberId", OTHER),
-                Map.of("memberId", ME), "t1").isSuccess()).isFalse();
+                Map.of("createdBy", OTHER), "t1").isSuccess()).isFalse();
+        assertThat(hook.beforeUpdate("p1", Map.of("createdBy", OTHER),
+                Map.of("createdBy", ME), "t1").isSuccess()).isFalse();
         assertThat(hook.beforeUpdate("p1", Map.of("notes", "washed out"),
-                Map.of("memberId", ME), "t1").isSuccess()).isTrue();
+                Map.of("createdBy", ME), "t1").isSuccess()).isTrue();
     }
 
     @Test
@@ -97,11 +97,11 @@ class FieldReportGuardHookTest {
         when(collectionRegistry.get("field-reports")).thenReturn(definition);
 
         when(queryEngine.getById(eq(definition), eq("p1")))
-                .thenReturn(Optional.of(Map.of("memberId", OTHER)));
+                .thenReturn(Optional.of(Map.of("createdBy", OTHER)));
         assertThat(hook.beforeDelete("p1", "t1").isSuccess()).isFalse();
 
         when(queryEngine.getById(eq(definition), eq("p2")))
-                .thenReturn(Optional.of(Map.of("memberId", ME)));
+                .thenReturn(Optional.of(Map.of("createdBy", ME)));
         assertThat(hook.beforeDelete("p2", "t1").isSuccess()).isTrue();
     }
 
@@ -117,7 +117,7 @@ class FieldReportGuardHookTest {
     @DisplayName("rejects a present-but-unresolvable identity (fail-closed)")
     void rejectsUnresolvableIdentity() {
         bindRequest("ghost@example.com");
-        BeforeSaveResult result = hook.beforeCreate(Map.of("memberId", ME), "t1");
+        BeforeSaveResult result = hook.beforeCreate(Map.of("createdBy", ME), "t1");
         assertThat(result.isSuccess()).isFalse();
     }
 
@@ -125,9 +125,9 @@ class FieldReportGuardHookTest {
     @DisplayName("admits internal writes with no HTTP request identity")
     void admitsInternalTier() {
         // no request bound at all
-        assertThat(hook.beforeCreate(Map.of("memberId", OTHER), "t1").isSuccess()).isTrue();
+        assertThat(hook.beforeCreate(Map.of("createdBy", OTHER), "t1").isSuccess()).isTrue();
         // request bound but no identity header (SCIM/internal)
         bindRequest(null);
-        assertThat(hook.beforeCreate(Map.of("memberId", OTHER), "t1").isSuccess()).isTrue();
+        assertThat(hook.beforeCreate(Map.of("createdBy", OTHER), "t1").isSuccess()).isTrue();
     }
 }

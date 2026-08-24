@@ -35,12 +35,18 @@ import java.util.UUID;
  * the generic write path this hook itself guards.
  *
  * <p>Rule: on any HTTP write carrying a gateway-stamped identity, the row's
- * {@code memberId} must equal the caller's canonical {@code platform_user}
+ * {@code createdBy} must equal the caller's canonical {@code platform_user}
  * UUID ({@code X-User-Id} header — an email — resolved through
- * {@link UserIdResolver}). An identity that is present but unresolvable is
- * rejected (fail-closed). Writes with no HTTP request context (flows,
- * schedulers, provisioning) are admitted — the same internal-tier contract
- * every other guard hook in this package uses.
+ * {@link UserIdResolver}). {@code createdBy} rather than a hand-declared
+ * {@code memberId} field on purpose: {@code DynamicCollectionRouter} stamps
+ * {@code createdBy} onto every create from the resolved caller identity
+ * <em>before</em> {@code queryEngine.create} runs any before-save hook, and
+ * it overwrites whatever the client attributes contained — so a client
+ * cannot forge it, and this hook does not need its own field for the same
+ * fact the platform already guarantees. An identity that is present but
+ * unresolvable is rejected (fail-closed). Writes with no HTTP request
+ * context (flows, schedulers, provisioning) are admitted — the same
+ * internal-tier contract every other guard hook in this package uses.
  *
  * <p>Registering a hook under the literal name {@code "field-reports"}
  * applies to that collection name in <em>every</em> tenant that happens to
@@ -53,7 +59,7 @@ public class FieldReportGuardHook implements BeforeSaveHook {
     private static final Logger log = LoggerFactory.getLogger(FieldReportGuardHook.class);
 
     static final String COLLECTION = "field-reports";
-    private static final String OWNER_FIELD = "memberId";
+    private static final String OWNER_FIELD = "createdBy";
     private static final String USER_ID_HEADER = "X-User-Id";
 
     private final UserIdResolver userIdResolver;

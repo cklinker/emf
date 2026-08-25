@@ -597,6 +597,25 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Owner guard for the notes system collection, platform-wide (every tenant
+     * shares the one notes table). No dedicated controller exists for notes --
+     * it is plain generic-route CRUD -- so without this hook any tenant user
+     * could edit or delete any other user's note on any record. Same shape as
+     * fieldReportGuardHook above; see NoteGuardHook's own javadoc.
+     */
+    @Bean
+    public io.kelta.worker.listener.NoteGuardHook noteGuardHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.runtime.router.UserIdResolver userIdResolver,
+            io.kelta.runtime.registry.CollectionRegistry collectionRegistry,
+            io.kelta.runtime.query.QueryEngine queryEngine) {
+        io.kelta.worker.listener.NoteGuardHook hook =
+                new io.kelta.worker.listener.NoteGuardHook(userIdResolver, collectionRegistry, queryEngine);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public LayoutRuleRefreshHook layoutRuleRefreshHook(
             BeforeSaveHookRegistry hookRegistry,

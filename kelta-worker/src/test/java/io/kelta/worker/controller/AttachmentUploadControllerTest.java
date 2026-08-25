@@ -213,6 +213,41 @@ class AttachmentUploadControllerTest {
     }
 
     @Test
+    void deleteAttachment_deniedForNonOwner() {
+        String attachmentId = "att-1";
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", attachmentId);
+        row.put("storage_key", "tenant-1/col-1/rec-1/att-1/report.pdf");
+        row.put("uploaded_by", "owner@example.com");
+
+        when(jdbcTemplate.queryForList(anyString(), eq(attachmentId), eq(TENANT_ID)))
+                .thenReturn(List.of(row));
+
+        ResponseEntity<Void> response = controller.deleteAttachment(attachmentId, TENANT_ID, "someone-else@example.com");
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(storageService, never()).deleteObject(anyString());
+        verify(jdbcTemplate, never()).update(contains("DELETE FROM file_attachment"), anyString(), anyString());
+    }
+
+    @Test
+    void deleteAttachment_allowedForOwner() {
+        String attachmentId = "att-1";
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", attachmentId);
+        row.put("storage_key", "tenant-1/col-1/rec-1/att-1/report.pdf");
+        row.put("uploaded_by", USER_EMAIL);
+
+        when(jdbcTemplate.queryForList(anyString(), eq(attachmentId), eq(TENANT_ID)))
+                .thenReturn(List.of(row));
+
+        ResponseEntity<Void> response = controller.deleteAttachment(attachmentId, TENANT_ID, USER_EMAIL);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(storageService).deleteObject("tenant-1/col-1/rec-1/att-1/report.pdf");
+    }
+
+    @Test
     void deleteAttachment_notFound() {
         when(jdbcTemplate.queryForList(anyString(), eq("bad-id"), eq(TENANT_ID)))
                 .thenReturn(Collections.emptyList());

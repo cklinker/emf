@@ -280,7 +280,8 @@ public class AttachmentUploadController {
      * @param id        the attachment ID
      * @param tenantId  the tenant ID from gateway header
      * @param userEmail the authenticated user's email
-     * @return 204 No Content on success, 404 if the attachment does not exist
+     * @return 204 No Content on success, 404 if the attachment does not exist,
+     *         403 if the caller did not upload it
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAttachment(
@@ -291,6 +292,19 @@ public class AttachmentUploadController {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_ATTACHMENT, id, tenantId);
         if (rows.isEmpty()) {
             return ResponseEntity.notFound().build();
+        }
+
+        // This controller bypasses the generic route entirely (raw JDBC, no
+        // BeforeSaveHook path), so ownership has to be enforced here directly
+        // rather than via a guard hook -- there is no hook invocation to guard.
+        // uploaded_by is stamped server-side from the resolved caller identity
+        // at upload-url time (never client-supplied), so it is a trustworthy
+        // owner field to compare against.
+        String uploadedBy = (String) rows.get(0).get("uploaded_by");
+        if (uploadedBy != null && !uploadedBy.equals(userEmail)) {
+            securityLog.info("security_event=ATTACHMENT_DELETE_DENIED user={} tenant={} attachment={} owner={}",
+                    userEmail, tenantId, id, uploadedBy);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
         String storageKey = (String) rows.get(0).get("storage_key");

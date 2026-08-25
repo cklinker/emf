@@ -186,7 +186,7 @@ class JwtAuthenticationFilterTest {
             ServerWebExchange capturedExchange = invocation.getArgument(0);
             GatewayPrincipal stored = JwtAuthenticationFilter.getPrincipal(capturedExchange);
             assertThat(stored).isNotNull();
-            assertThat(stored.getUsername()).isEqualTo("guest");
+            assertThat(stored.getUsername()).isEqualTo("00000000-0000-0000-0000-000000000000");
             assertThat(stored.getProfileId()).isEqualTo("guest-profile-id");
             assertThat(stored.getProfileName()).isEqualTo("Guest");
             assertThat(stored.getTenantId()).isEqualTo("tenant-1");

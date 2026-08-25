@@ -34,6 +34,10 @@ class PhotoGuardHookTest {
     private static final String ME = "11111111-1111-1111-1111-111111111111";
     private static final String OTHER = "22222222-2222-2222-2222-222222222222";
 
+    /** JwtAuthenticationFilter.GUEST_USER_ID (kelta-gateway) -- UUID-shaped on purpose, see
+     *  that constant's javadoc for why. */
+    private static final String GUEST = "00000000-0000-0000-0000-000000000000";
+
     @Mock private UserIdResolver userIdResolver;
     @Mock private CollectionRegistry collectionRegistry;
     @Mock private QueryEngine queryEngine;
@@ -43,9 +47,15 @@ class PhotoGuardHookTest {
     @BeforeEach
     void setUp() {
         hook = new PhotoGuardHook(userIdResolver, collectionRegistry, queryEngine);
+        // Mirrors the real JdbcUserIdResolver: UUID-shaped input short-circuits back
+        // unchanged (no DB lookup), anything else not otherwise stubbed passes through
+        // as a stand-in for "this doesn't resolve to a real platform_user".
         lenient().when(userIdResolver.resolve(anyString(), any()))
-                .thenAnswer(inv -> "me@example.com".equals(inv.getArgument(0))
-                        ? ME : inv.getArgument(0));
+                .thenAnswer(inv -> {
+                    String id = inv.getArgument(0);
+                    if ("me@example.com".equals(id)) return ME;
+                    return id;
+                });
     }
 
     @AfterEach
@@ -76,13 +86,13 @@ class PhotoGuardHookTest {
     }
 
     @Test
-    @DisplayName("allows a Guest create -- createdBy is stamped \"guest\" too, and they match")
+    @DisplayName("allows a Guest create -- the UUID-shaped sentinel resolves to itself, matching createdBy")
     void allowsGuestCreate() {
-        bindRequest("guest");
-        BeforeSaveResult result = hook.beforeCreate(Map.of("createdBy", "guest"), "t1");
+        bindRequest(GUEST);
+        BeforeSaveResult result = hook.beforeCreate(Map.of("createdBy", GUEST), "t1");
         assertThat(result.isSuccess())
-                .as("a real bug: without the guest special case, this would fail closed as "
-                        + "'unresolvable identity' and block every anonymous upload")
+                .as("the guest sentinel is UUID-shaped specifically so this needs no special "
+                        + "case: it parses as a UUID and matches the identically-stamped createdBy")
                 .isTrue();
     }
 

@@ -19,8 +19,9 @@ import java.util.UUID;
 /**
  * Owner guard for spotopened's {@code facility-comments} tenant collection.
  * Identical shape to {@link PhotoGuardHook} -- see that class's javadoc (and
- * {@link FieldReportGuardHook}'s) for the full reasoning, including why
- * {@link #GUEST_IDENTITY} needs its own special case in {@link #callerUuid}.
+ * {@link FieldReportGuardHook}'s) for the full reasoning, including why a
+ * Guest create needs no special case here (the guest sentinel is UUID-shaped
+ * specifically so it doesn't).
  */
 public class CommentGuardHook implements BeforeSaveHook {
 
@@ -29,7 +30,6 @@ public class CommentGuardHook implements BeforeSaveHook {
     static final String COLLECTION = "facility-comments";
     private static final String OWNER_FIELD = "createdBy";
     private static final String USER_ID_HEADER = "X-User-Id";
-    private static final String GUEST_IDENTITY = "guest";
 
     private final UserIdResolver userIdResolver;
     private final CollectionRegistry collectionRegistry;
@@ -121,9 +121,6 @@ public class CommentGuardHook implements BeforeSaveHook {
         String identifier = request.getHeader(USER_ID_HEADER);
         if (identifier == null || identifier.isBlank()) {
             return null;
-        }
-        if (GUEST_IDENTITY.equals(identifier)) {
-            return GUEST_IDENTITY;
         }
         String resolved = userIdResolver.resolve(identifier, tenantId);
         try {

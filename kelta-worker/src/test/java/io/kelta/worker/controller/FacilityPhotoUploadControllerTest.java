@@ -183,7 +183,7 @@ class FacilityPhotoUploadControllerTest {
                 .thenReturn("https://s3.rzware.com/spotopened-media/signed-download-url");
 
         ResponseEntity<Void> response = controller.redirectToDownloadUrl(
-                requestFor("/api/facility-photo-downloads/tenant-1/facility-photos/abc/photo.jpg"));
+                requestFor("/api/facility-photos/download/tenant-1/facility-photos/abc/photo.jpg"));
 
         assertEquals(HttpStatus.FOUND, response.getStatusCode());
         assertEquals("https://s3.rzware.com/spotopened-media/signed-download-url",
@@ -193,7 +193,7 @@ class FacilityPhotoUploadControllerTest {
     @Test
     void redirectToDownloadUrl_blankKey_returns400() {
         ResponseEntity<Void> response = controller.redirectToDownloadUrl(
-                requestFor("/api/facility-photo-downloads/"));
+                requestFor("/api/facility-photos/download/"));
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
@@ -201,7 +201,7 @@ class FacilityPhotoUploadControllerTest {
     @Test
     void redirectToDownloadUrl_pathTraversalAttempt_returns400() {
         ResponseEntity<Void> response = controller.redirectToDownloadUrl(
-                requestFor("/api/facility-photo-downloads/../../etc/passwd"));
+                requestFor("/api/facility-photos/download/../../etc/passwd"));
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
@@ -211,7 +211,7 @@ class FacilityPhotoUploadControllerTest {
         when(storageService.isEnabled()).thenReturn(false);
 
         ResponseEntity<Void> response = controller.redirectToDownloadUrl(
-                requestFor("/api/facility-photo-downloads/tenant-1/facility-photos/abc/photo.jpg"));
+                requestFor("/api/facility-photos/download/tenant-1/facility-photos/abc/photo.jpg"));
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
     }
@@ -223,7 +223,7 @@ class FacilityPhotoUploadControllerTest {
                 .thenThrow(new RuntimeException("presigner failure"));
 
         ResponseEntity<Void> response = controller.redirectToDownloadUrl(
-                requestFor("/api/facility-photo-downloads/tenant-1/facility-photos/abc/photo.jpg"));
+                requestFor("/api/facility-photos/download/tenant-1/facility-photos/abc/photo.jpg"));
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
     }

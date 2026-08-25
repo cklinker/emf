@@ -56,11 +56,15 @@ public class WorkerCacheManager {
     private static final Duration DASHBOARD_WIDGET_TTL = Duration.ofMinutes(5);
     private static final int DASHBOARD_WIDGET_MAX_SIZE = 5_000;
 
+    private static final Duration GUEST_PROFILE_TTL = Duration.ofMinutes(10);
+    private static final int GUEST_PROFILE_MAX_SIZE = 1_000;
+
     private final Cache<String, String> customDomainCache;
     private final Cache<String, Map<String, Object>> permissionsCache;
     private final Cache<String, Map<String, Object>> tenantLimitsCache;
     private final Cache<String, Map<String, Object>> systemCollectionCache;
     private final Cache<String, Map<String, Object>> dashboardWidgetCache;
+    private final Cache<String, String> guestProfileCache;
 
     public WorkerCacheManager(MeterRegistry meterRegistry) {
         this.customDomainCache = Caffeine.newBuilder()
@@ -93,11 +97,54 @@ public class WorkerCacheManager {
                 .recordStats()
                 .build();
 
+        this.guestProfileCache = Caffeine.newBuilder()
+                .maximumSize(GUEST_PROFILE_MAX_SIZE)
+                .expireAfterWrite(GUEST_PROFILE_TTL)
+                .recordStats()
+                .build();
+
         meterRegistry.gauge("worker.cache.size.custom-domain", customDomainCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.permissions", permissionsCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.tenant-limits", tenantLimitsCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.system-collection", systemCollectionCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.dashboard-widget", dashboardWidgetCache, Cache::estimatedSize);
+        meterRegistry.gauge("worker.cache.size.guest-profile", guestProfileCache, Cache::estimatedSize);
+    }
+
+    // ── Guest Profile Cache ──────────────────────────────────────────────
+
+    /**
+     * Sentinel value indicating a tenant was looked up and has no Guest profile configured.
+     * Cached to avoid repeated DB queries for tenants that never opt into anonymous access.
+     */
+    public static final String GUEST_PROFILE_NOT_FOUND = "__NOT_FOUND__";
+
+    /**
+     * Returns the cached result for a tenant's Guest-profile lookup.
+     *
+     * <p>Returns:
+     * <ul>
+     *   <li>{@code Optional.empty()} — not in the cache (cache miss)</li>
+     *   <li>{@code Optional.of(GUEST_PROFILE_NOT_FOUND)} — looked up, tenant has no Guest profile</li>
+     *   <li>{@code Optional.of(profileId)} — the tenant's Guest profile id</li>
+     * </ul>
+     */
+    public Optional<String> getGuestProfile(String tenantId) {
+        return Optional.ofNullable(guestProfileCache.getIfPresent(tenantId));
+    }
+
+    public void putGuestProfile(String tenantId, String profileId) {
+        guestProfileCache.put(tenantId, profileId);
+    }
+
+    public void putGuestProfileNotFound(String tenantId) {
+        guestProfileCache.put(tenantId, GUEST_PROFILE_NOT_FOUND);
+    }
+
+    /** Evicts a tenant's cached Guest-profile lookup — called when the Guest profile changes. */
+    public void evictGuestProfile(String tenantId) {
+        guestProfileCache.invalidate(tenantId);
+        log.debug("Evicted guest profile cache entry: {}", tenantId);
     }
 
     // ── Custom Domain Cache ──────────────────────────────────────────────

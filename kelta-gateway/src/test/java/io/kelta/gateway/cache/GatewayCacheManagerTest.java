@@ -687,6 +687,66 @@ class GatewayCacheManagerTest {
         }
     }
 
+    // ── Guest Profile Cache Tests ────────────────────────────────────
+
+    @Nested
+    class GuestProfileCacheTests {
+
+        @Test
+        void resolveGuestProfileReactive_cachesPositiveResult() {
+            stubGuestProfileResponse("tenant-1", Mono.just("guest-profile-id"));
+
+            Optional<String> resolved = cacheManager.resolveGuestProfileReactive("tenant-1")
+                    .block(Duration.ofSeconds(5));
+
+            assertThat(resolved).contains("guest-profile-id");
+        }
+
+        @Test
+        void resolveGuestProfileReactive_cachesNegativeResultAndDoesNotRefetch() {
+            stubGuestProfileResponse("tenant-1",
+                    Mono.error(new org.springframework.web.reactive.function.client.WebClientResponseException(
+                            404, "Not Found", null, null, null)));
+
+            Optional<String> first = cacheManager.resolveGuestProfileReactive("tenant-1")
+                    .block(Duration.ofSeconds(5));
+            assertThat(first).isEmpty();
+
+            reset(webClient);
+            Optional<String> second = cacheManager.resolveGuestProfileReactive("tenant-1")
+                    .block(Duration.ofSeconds(5));
+            assertThat(second).isEmpty();
+            verifyNoInteractions(webClient);
+        }
+
+        @Test
+        void resolveGuestProfileReactive_doesNotNegativeCacheOnTransportFailure() {
+            stubGuestProfileResponse("tenant-1", Mono.error(new RuntimeException("connection reset")));
+            assertThat(cacheManager.resolveGuestProfileReactive("tenant-1").block(Duration.ofSeconds(5)))
+                    .isEmpty();
+
+            stubGuestProfileResponse("tenant-1", Mono.just("guest-profile-id"));
+            assertThat(cacheManager.resolveGuestProfileReactive("tenant-1").block(Duration.ofSeconds(5)))
+                    .contains("guest-profile-id");
+        }
+
+        @Test
+        void resolveGuestProfileReactive_blankTenantIdIsEmptyWithoutCallingWorker() {
+            assertThat(cacheManager.resolveGuestProfileReactive("").block(Duration.ofSeconds(5))).isEmpty();
+            assertThat(cacheManager.resolveGuestProfileReactive(null).block(Duration.ofSeconds(5))).isEmpty();
+            verifyNoInteractions(webClient);
+        }
+
+        @SuppressWarnings("unchecked")
+        private void stubGuestProfileResponse(String tenantId, Mono<String> response) {
+            when(webClient.get()).thenReturn(requestHeadersUriSpec);
+            when(requestHeadersUriSpec.uri("/internal/tenants/{tenantId}/guest-profile", tenantId))
+                    .thenReturn(requestHeadersSpec);
+            when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+            when(responseSpec.bodyToMono(String.class)).thenReturn(response);
+        }
+    }
+
     // ── System Collection Response Cache Tests ─────────────────────────
 
     @Nested

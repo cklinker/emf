@@ -23,17 +23,25 @@ import java.util.UUID;
  * for beforeDelete, fail-closed on an unresolvable identity, internal tier
  * admitted).
  *
- * <p>The one thing worth calling out here specifically: this collection is
- * also granted {@code create} (and {@code read}) to spotopened's Guest
- * profile (emf#1368), so a create can legitimately arrive with
- * {@code createdBy = "guest"} -- the literal, shared string every anonymous
- * caller stamps (see {@code DynamicCollectionRouter.resolveUserId}). Without
- * a special case that value would fail the same "unresolvable identity"
- * check a genuinely broken caller hits, rejecting every Guest create
- * outright -- see {@link #GUEST_IDENTITY}. It is Cerbos, not this hook, that
- * keeps a guest from ever reaching {@link #beforeUpdate}/{@link #beforeDelete}
- * at all: Guest has no edit/delete grant on this collection, so those
- * requests never get past {@code RouteAuthorizationFilter}.
+ * <p>This collection is also granted {@code create} (and {@code read}) to
+ * spotopened's Guest profile (emf#1368), so a create can legitimately
+ * arrive with {@code createdBy} set to the platform's nil-UUID guest
+ * sentinel ({@code JwtAuthenticationFilter.GUEST_USER_ID} in kelta-gateway).
+ * That value is UUID-shaped on purpose specifically so it needs no special
+ * case here: {@code JdbcUserIdResolver.resolve} short-circuits UUID-shaped
+ * input and returns it unchanged, so both {@code DynamicCollectionRouter}'s
+ * createdBy stamping and this hook's own {@link #callerUuid} resolve it to
+ * the identical value with no extra branch. (An earlier version of this
+ * sentinel was the plain string {@code "guest"}, which needed exactly such a
+ * branch -- and, worse, silently auto-provisioned a real platform_user for
+ * every tenant with Guest access, because {@code LoginTrackingFilter} tracks
+ * any non-UUID X-User-Id as a login. Fixed at the source in
+ * {@code JwtAuthenticationFilter}, not patched around here.)
+ *
+ * <p>It is Cerbos, not this hook, that keeps a guest from ever reaching
+ * {@link #beforeUpdate}/{@link #beforeDelete} at all: Guest has no
+ * edit/delete grant on this collection, so those requests never get past
+ * {@code RouteAuthorizationFilter}.
  */
 public class PhotoGuardHook implements BeforeSaveHook {
 
@@ -42,15 +50,6 @@ public class PhotoGuardHook implements BeforeSaveHook {
     static final String COLLECTION = "facility-photos";
     private static final String OWNER_FIELD = "createdBy";
     private static final String USER_ID_HEADER = "X-User-Id";
-
-    /** Mirrors {@code JwtAuthenticationFilter.GUEST_USERNAME} (kelta-gateway) -- the literal,
-     *  shared, deliberately-unresolvable caller identity every anonymous request stamps. Without
-     *  this special case, the fail-closed "unresolvable identity" check below would reject every
-     *  Guest create outright, even though createdBy is correctly stamped "guest" too and Cerbos
-     *  has already granted Guest create on this collection. Guest never reaches beforeUpdate/
-     *  beforeDelete in practice -- Cerbos has no edit/delete grant for it -- so this only ever
-     *  changes beforeCreate's outcome. */
-    private static final String GUEST_IDENTITY = "guest";
 
     private final UserIdResolver userIdResolver;
     private final CollectionRegistry collectionRegistry;
@@ -142,9 +141,6 @@ public class PhotoGuardHook implements BeforeSaveHook {
         String identifier = request.getHeader(USER_ID_HEADER);
         if (identifier == null || identifier.isBlank()) {
             return null;
-        }
-        if (GUEST_IDENTITY.equals(identifier)) {
-            return GUEST_IDENTITY;
         }
         String resolved = userIdResolver.resolve(identifier, tenantId);
         try {

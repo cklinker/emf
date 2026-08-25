@@ -45,11 +45,26 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /** Cerbos principal id + X-User-Id fallback (HeaderTransformationFilter.resolveUserId) for
-     *  every anonymous request admitted as Guest. Not an email, deliberately -- it must never
-     *  resolve to a real platform_user, so any BeforeSaveHook ownership check that runs on a
-     *  Guest write correctly fails closed as "unresolvable identity" rather than matching
-     *  someone. */
-    static final String GUEST_USERNAME = "guest";
+     *  every anonymous request admitted as Guest. UUID-SHAPED ON PURPOSE, not the readable
+     *  string "guest" the first version of this used -- LoginTrackingFilter runs on every
+     *  request, treats any non-UUID X-User-Id as a login-worthy email, and auto-provisions a
+     *  real platform_user + login_history + security_audit_log rows (and attempts a welcome
+     *  email) for the first request that presents one. "guest" tripped that: every anonymous
+     *  visitor silently got a persistent fake "Standard User" member account in the tenant, one
+     *  per tenant, found live in production logs
+     *  ("Auto-provisioned platform_user for 'guest' ... with profile 'Standard User'").
+     *  {@code LoginTrackingFilter.isUuid(email)} skips tracking entirely for anything
+     *  UUID-shaped, so this sentinel avoids the whole mechanism instead of fighting it.
+     *  The canonical nil UUID is used because it can never collide with a real
+     *  {@code UUID.randomUUID()} value and reads unambiguously as "no identity" in logs/data.
+     *
+     *  <p>This also means {@code JdbcUserIdResolver.resolve} short-circuits on it (UUID-shaped
+     *  input returns unchanged, no DB lookup), so both {@code DynamicCollectionRouter}'s
+     *  createdBy stamping and a guard hook's own {@code callerUuid()} resolve it to the exact
+     *  same value with no special case needed on either side -- see PhotoGuardHook/
+     *  CommentGuardHook, which no longer need the guest-specific branch an earlier version of
+     *  this had. */
+    static final String GUEST_USER_ID = "00000000-0000-0000-0000-000000000000";
     static final String GUEST_PROFILE_NAME = "Guest";
 
     private final DynamicReactiveJwtDecoder jwtDecoder;
@@ -197,7 +212,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     log.debug("Admitting anonymous request as Guest profile for tenant {} on path: {}",
                             tenantId, path);
                     GatewayPrincipal guest = new GatewayPrincipal(
-                            GUEST_USERNAME, List.of(), Map.of(),
+                            GUEST_USER_ID, List.of(), Map.of(),
                             guestProfileId.get(), GUEST_PROFILE_NAME, tenantId, null, null);
 
                     ServerWebExchange mutatedExchange = exchange.mutate()

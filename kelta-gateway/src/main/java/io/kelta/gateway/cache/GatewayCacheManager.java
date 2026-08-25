@@ -73,6 +73,7 @@ public class GatewayCacheManager {
     private final Cache<String, Integer> governorLimitCache;
     private final Cache<String, TenantIpConfig> tenantIpConfigCache; // tenantId → IP allowlist config
     private final Cache<String, String> customDomainCache; // domain → tenantSlug
+    private final Cache<String, String> guestProfileCache; // tenantId → guest profileId
     private final Cache<String, byte[]> systemCollectionResponseCache; // tenantId:path → response body
     private final WebClient webClient;
 
@@ -99,6 +100,11 @@ public class GatewayCacheManager {
                 .build();
 
         this.customDomainCache = Caffeine.newBuilder()
+                .expireAfterWrite(10, TimeUnit.MINUTES)
+                .maximumSize(10_000)
+                .build();
+
+        this.guestProfileCache = Caffeine.newBuilder()
                 .expireAfterWrite(10, TimeUnit.MINUTES)
                 .maximumSize(10_000)
                 .build();
@@ -550,6 +556,60 @@ public class GatewayCacheManager {
             return null;
         }
         return DOMAIN_NOT_FOUND.equals(cached) ? Optional.empty() : Optional.of(cached);
+    }
+
+    // ── Guest Profile Cache ───────────────────────────────────────────────
+
+    /**
+     * Sentinel value indicating a tenant was looked up and has no Guest profile configured.
+     */
+    private static final String GUEST_PROFILE_NOT_FOUND = "__NOT_FOUND__";
+
+    /**
+     * Resolves a tenant's Guest profile id without blocking — the variant the gateway filter
+     * chain must use, since {@link JwtAuthenticationFilter} runs on a non-blocking thread.
+     *
+     * <p>Three-tier lookup: local cache → worker {@code /internal/tenants/{id}/guest-profile}
+     * → not found. A definitive "no Guest profile" is negative-cached (most tenants never
+     * configure one, so this keeps every anonymous request from hitting the worker); a lookup
+     * that *failed* is not, for the same reason {@link #resolveCustomDomainReactive} doesn't —
+     * a transient worker blip must not pin a tenant that actually has a Guest profile to "none"
+     * for the cache TTL.
+     *
+     * @param tenantId the tenant id (not slug — the JWT filter already resolves this)
+     * @return the Guest profile id if the tenant has one configured, empty otherwise
+     */
+    public Mono<Optional<String>> resolveGuestProfileReactive(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return Mono.just(Optional.empty());
+        }
+        String cached = guestProfileCache.getIfPresent(tenantId);
+        if (cached != null) {
+            return Mono.just(GUEST_PROFILE_NOT_FOUND.equals(cached) ? Optional.empty() : Optional.of(cached));
+        }
+        return Mono.defer(() -> webClient.get()
+                        .uri("/internal/tenants/{tenantId}/guest-profile", tenantId)
+                        .retrieve()
+                        .bodyToMono(String.class))
+                .timeout(SLUG_MAP_TIMEOUT)
+                .defaultIfEmpty("")
+                .map(resolved -> {
+                    if (!resolved.isBlank()) {
+                        guestProfileCache.put(tenantId, resolved);
+                        return Optional.of(resolved);
+                    }
+                    guestProfileCache.put(tenantId, GUEST_PROFILE_NOT_FOUND);
+                    return Optional.<String>empty();
+                })
+                .onErrorResume(e -> {
+                    if (e instanceof WebClientResponseException response
+                            && response.getStatusCode().value() == 404) {
+                        guestProfileCache.put(tenantId, GUEST_PROFILE_NOT_FOUND);
+                        return Mono.just(Optional.<String>empty());
+                    }
+                    log.debug("Guest profile lookup failed for tenant {}: {}", tenantId, e.getMessage());
+                    return Mono.just(Optional.<String>empty());
+                });
     }
 
     /**

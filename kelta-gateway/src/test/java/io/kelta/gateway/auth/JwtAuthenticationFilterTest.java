@@ -1,5 +1,6 @@
 package io.kelta.gateway.auth;
 
+import io.kelta.gateway.cache.GatewayCacheManager;
 import io.kelta.gateway.metrics.GatewayMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,11 +50,14 @@ class JwtAuthenticationFilterTest {
     @Mock
     private GatewayFilterChain filterChain;
 
+    @Mock
+    private GatewayCacheManager cacheManager;
+
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(jwtDecoder, principalExtractor, publicPathMatcher, metrics);
+        filter = new JwtAuthenticationFilter(jwtDecoder, principalExtractor, publicPathMatcher, metrics, cacheManager);
 
         // Mock filter chain to return completed Mono (lenient to avoid unnecessary stubbing errors)
         lenient().when(filterChain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());
@@ -168,6 +172,55 @@ class JwtAuthenticationFilterTest {
         verify(filterChain, never()).filter(any());
     }
     
+    @Test
+    void shouldAdmitAsGuestWhenTenantHasAGuestProfileAndNoAuthHeader() {
+        // Given — no Authorization header, but the tenant has configured a Guest profile
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/facility-photos").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
+
+        when(cacheManager.resolveGuestProfileReactive("tenant-1"))
+            .thenReturn(Mono.just(java.util.Optional.of("guest-profile-id")));
+
+        when(filterChain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
+            ServerWebExchange capturedExchange = invocation.getArgument(0);
+            GatewayPrincipal stored = JwtAuthenticationFilter.getPrincipal(capturedExchange);
+            assertThat(stored).isNotNull();
+            assertThat(stored.getUsername()).isEqualTo("guest");
+            assertThat(stored.getProfileId()).isEqualTo("guest-profile-id");
+            assertThat(stored.getProfileName()).isEqualTo("Guest");
+            assertThat(stored.getTenantId()).isEqualTo("tenant-1");
+            return Mono.empty();
+        });
+
+        // When
+        Mono<Void> result = filter.filter(exchange, filterChain);
+
+        // Then
+        StepVerifier.create(result).verifyComplete();
+        verify(filterChain).filter(any(ServerWebExchange.class));
+        verify(jwtDecoder, never()).decode(anyString(), anyString());
+    }
+
+    @Test
+    void shouldReturn401WhenTenantHasNoGuestProfileAndNoAuthHeader() {
+        // Given — no Authorization header, tenant has NOT configured a Guest profile
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
+
+        when(cacheManager.resolveGuestProfileReactive("tenant-1"))
+            .thenReturn(Mono.just(java.util.Optional.empty()));
+
+        // When
+        Mono<Void> result = filter.filter(exchange, filterChain);
+
+        // Then — byte-for-byte the same rejection as before this existed
+        StepVerifier.create(result).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(filterChain, never()).filter(any());
+    }
+
     @Test
     void shouldReturn401WhenTenantContextIsMissing() {
         // Given — Bearer token present but no tenant context set

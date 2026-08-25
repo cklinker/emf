@@ -1,5 +1,6 @@
 package io.kelta.gateway.auth;
 
+import io.kelta.gateway.cache.GatewayCacheManager;
 import io.kelta.gateway.error.ResponseHelpers;
 import io.kelta.gateway.filter.TenantResolutionFilter;
 import io.kelta.gateway.metrics.GatewayMetrics;
@@ -43,10 +44,19 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    /** Cerbos principal id + X-User-Id fallback (HeaderTransformationFilter.resolveUserId) for
+     *  every anonymous request admitted as Guest. Not an email, deliberately -- it must never
+     *  resolve to a real platform_user, so any BeforeSaveHook ownership check that runs on a
+     *  Guest write correctly fails closed as "unresolvable identity" rather than matching
+     *  someone. */
+    static final String GUEST_USERNAME = "guest";
+    static final String GUEST_PROFILE_NAME = "Guest";
+
     private final DynamicReactiveJwtDecoder jwtDecoder;
     private final PrincipalExtractor principalExtractor;
     private final PublicPathMatcher publicPathMatcher;
     private final GatewayMetrics metrics;
+    private final GatewayCacheManager cacheManager;
 
     /**
      * Creates a new JwtAuthenticationFilter.
@@ -55,13 +65,16 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
      * @param principalExtractor the extractor for creating GatewayPrincipal from JWT
      * @param publicPathMatcher the matcher for public (unauthenticated) paths
      * @param metrics the gateway metrics service
+     * @param cacheManager resolves a tenant's Guest profile, if it has configured one
      */
     public JwtAuthenticationFilter(DynamicReactiveJwtDecoder jwtDecoder, PrincipalExtractor principalExtractor,
-                                   PublicPathMatcher publicPathMatcher, GatewayMetrics metrics) {
+                                   PublicPathMatcher publicPathMatcher, GatewayMetrics metrics,
+                                   GatewayCacheManager cacheManager) {
         this.jwtDecoder = jwtDecoder;
         this.principalExtractor = principalExtractor;
         this.publicPathMatcher = publicPathMatcher;
         this.metrics = metrics;
+        this.cacheManager = cacheManager;
     }
     
     @Override
@@ -82,11 +95,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         // Extract Authorization header
         String authHeader = exchange.getRequest().getHeaders().getFirst(AUTHORIZATION_HEADER);
-        
+
         if (authHeader == null || authHeader.isEmpty()) {
-            log.warn("Missing Authorization header for path: {}", path);
-            metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "missing_token");
-            return unauthorized(exchange, "Missing Authorization header");
+            return admitAsGuestOrReject(exchange, chain, path);
         }
 
         if (!authHeader.startsWith(BEARER_PREFIX)) {
@@ -154,6 +165,49 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             .flatMap(chain::filter);
     }
     
+    /**
+     * A request with no Authorization header at all is rejected as before, UNLESS the
+     * resolved tenant has configured a {@code profiles} row named "Guest" -- in which case
+     * the request proceeds as that profile instead of 401ing.
+     *
+     * <p>This grants nothing by itself: the synthetic principal still has to clear
+     * {@code RouteAuthorizationFilter}'s normal Cerbos checks (API_ACCESS, then the
+     * per-collection action) exactly like any authenticated principal, and Cerbos denies by
+     * default until the tenant explicitly grants the Guest profile a permission. A tenant
+     * that never creates a Guest profile sees byte-for-byte the same 401 this filter always
+     * returned -- {@link GatewayCacheManager#resolveGuestProfileReactive} resolves to empty
+     * for them and this falls through to the exact same {@code unauthorized(...)} call.
+     */
+    private Mono<Void> admitAsGuestOrReject(ServerWebExchange exchange, GatewayFilterChain chain, String path) {
+        String tenantId = TenantResolutionFilter.getTenantId(exchange);
+        if (tenantId == null || tenantId.isBlank()) {
+            log.warn("Missing Authorization header for path: {}", path);
+            metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "missing_token");
+            return unauthorized(exchange, "Missing Authorization header");
+        }
+
+        return cacheManager.resolveGuestProfileReactive(tenantId)
+                .flatMap(guestProfileId -> {
+                    if (guestProfileId.isEmpty()) {
+                        log.warn("Missing Authorization header for path: {}", path);
+                        metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "missing_token");
+                        return unauthorized(exchange, "Missing Authorization header");
+                    }
+
+                    log.debug("Admitting anonymous request as Guest profile for tenant {} on path: {}",
+                            tenantId, path);
+                    GatewayPrincipal guest = new GatewayPrincipal(
+                            GUEST_USERNAME, List.of(), Map.of(),
+                            guestProfileId.get(), GUEST_PROFILE_NAME, tenantId, null, null);
+
+                    ServerWebExchange mutatedExchange = exchange.mutate()
+                            .request(exchange.getRequest())
+                            .build();
+                    mutatedExchange.getAttributes().put(PRINCIPAL_ATTRIBUTE, guest);
+                    return chain.filter(mutatedExchange);
+                });
+    }
+
     /**
      * Returns an unauthorized response with the given error message.
      *

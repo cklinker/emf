@@ -8,8 +8,11 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
@@ -114,6 +117,34 @@ public class SpotopenedMediaStorageService {
                 .build();
 
         PresignedPutObjectRequest presigned = presigner.presignPutObject(presignRequest);
+        return presigned.url().toString();
+    }
+
+    /** Public-read stand-in: this bucket is not in Garage's website/public-access
+     *  mode (that needs an [s3_web] listener + a shared-Garage-instance restart --
+     *  see the ops discussion this was deferred from), so a short-lived presigned
+     *  GET is what a plain {@code <img src>} actually loads. No content-existence
+     *  or ownership check here on purpose: every facility-photos row this key
+     *  could belong to is meant to be publicly readable already (that is the
+     *  entire point of the Guest-read grant on facility-photos), so there is no
+     *  confidentiality boundary a presigned URL could cross that the collection's
+     *  own Cerbos grant doesn't already cross. */
+    public String getPresignedDownloadUrl(String storageKey) {
+        if (!isEnabled()) {
+            throw new IllegalStateException(
+                    "spotopened-media storage is not enabled (kelta.storage.spotopened-media.enabled=false)");
+        }
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(storageKey)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(expiry)
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        PresignedGetObjectRequest presigned = presigner.presignGetObject(presignRequest);
         return presigned.url().toString();
     }
 }

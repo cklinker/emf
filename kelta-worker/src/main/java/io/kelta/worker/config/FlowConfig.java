@@ -616,6 +616,39 @@ public class FlowConfig {
         return hook;
     }
 
+    /**
+     * Owner guard for spotopened's facility-photos tenant collection. Same shape as
+     * fieldReportGuardHook/noteGuardHook above; see PhotoGuardHook's own javadoc for why
+     * a "guest" caller needs a special case beforeCreate doesn't get for anyone else.
+     */
+    @Bean
+    public io.kelta.worker.listener.PhotoGuardHook photoGuardHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.runtime.router.UserIdResolver userIdResolver,
+            io.kelta.runtime.registry.CollectionRegistry collectionRegistry,
+            io.kelta.runtime.query.QueryEngine queryEngine) {
+        io.kelta.worker.listener.PhotoGuardHook hook =
+                new io.kelta.worker.listener.PhotoGuardHook(userIdResolver, collectionRegistry, queryEngine);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    /**
+     * Owner guard for spotopened's facility-comments tenant collection. See
+     * PhotoGuardHook/CommentGuardHook's own javadoc.
+     */
+    @Bean
+    public io.kelta.worker.listener.CommentGuardHook commentGuardHook(
+            BeforeSaveHookRegistry hookRegistry,
+            io.kelta.runtime.router.UserIdResolver userIdResolver,
+            io.kelta.runtime.registry.CollectionRegistry collectionRegistry,
+            io.kelta.runtime.query.QueryEngine queryEngine) {
+        io.kelta.worker.listener.CommentGuardHook hook =
+                new io.kelta.worker.listener.CommentGuardHook(userIdResolver, collectionRegistry, queryEngine);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
     @Bean
     public LayoutRuleRefreshHook layoutRuleRefreshHook(
             BeforeSaveHookRegistry hookRegistry,

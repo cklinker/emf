@@ -4,6 +4,7 @@ import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.worker.service.SpotopenedMediaStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,7 +37,6 @@ import java.util.UUID;
  * @since 1.0.0
  */
 @RestController
-@RequestMapping("/api/facility-photo-uploads")
 public class FacilityPhotoUploadController {
 
     private static final Logger log = LoggerFactory.getLogger(FacilityPhotoUploadController.class);
@@ -56,7 +56,7 @@ public class FacilityPhotoUploadController {
         this.storageService = storageService;
     }
 
-    @PostMapping
+    @PostMapping("/api/facility-photo-uploads")
     public ResponseEntity<Map<String, Object>> requestUploadUrl(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestHeader("X-User-Email") String userEmail,
@@ -116,6 +116,45 @@ public class FacilityPhotoUploadController {
         attributes.put("headers", Map.of("Content-Type", contentType));
 
         return ResponseEntity.ok(JsonApiResponseBuilder.single("facility-photo-uploads", storageKey, attributes));
+    }
+
+    /**
+     * Redirects to a short-lived presigned GET for a spotopened-media object,
+     * so a plain {@code <img src="/api/facility-photo-downloads/<storageKey>">}
+     * loads it directly -- no bearer token needed (browsers don't attach one to
+     * an {@code <img>} tag), no blob-URL fetch dance in the client either.
+     *
+     * <p>Wildcard-mapped and extracted from the raw URI, not a
+     * {@code @PathVariable}, because storageKey itself contains {@code /}
+     * (tenantId/facility-photos/uuid/filename) -- same reason
+     * {@code FileController} does this for the shared emf-attachments bucket.
+     * This is the spotopened-media equivalent of that controller, not a
+     * generalization of it -- see {@code SpotopenedMediaStorageService}'s
+     * javadoc for why they stay separate.
+     */
+    @GetMapping("/api/facility-photo-downloads/**")
+    public ResponseEntity<Void> redirectToDownloadUrl(
+            jakarta.servlet.http.HttpServletRequest request) {
+        String storageKey = request.getRequestURI().substring("/api/facility-photo-downloads/".length());
+        if (storageKey.isBlank() || storageKey.contains("..")) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!storageService.isEnabled()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+
+        String url;
+        try {
+            url = storageService.getPresignedDownloadUrl(storageKey);
+        } catch (Exception e) {
+            log.error("Failed to generate presigned download URL for key {}: {}", storageKey, e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, url)
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=60")
+                .build();
     }
 
     private static String sanitizeFileName(String fileName) {

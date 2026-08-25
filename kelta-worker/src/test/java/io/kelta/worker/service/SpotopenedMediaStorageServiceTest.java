@@ -16,6 +16,8 @@ class SpotopenedMediaStorageServiceTest {
         assertFalse(service.isEnabled());
         assertThrows(IllegalStateException.class,
                 () -> service.getPresignedUploadUrl("key", "image/jpeg"));
+        assertThrows(IllegalStateException.class,
+                () -> service.getPresignedDownloadUrl("key"));
     }
 
     @Test
@@ -37,6 +39,20 @@ class SpotopenedMediaStorageServiceTest {
         assertTrue(url.contains("spotopened-media"), url);
         assertTrue(url.contains("tenant-1%2Ffacility-photos%2Fabc%2Fphoto.jpg")
                 || url.contains("tenant-1/facility-photos/abc/photo.jpg"), url);
+    }
+
+    @Test
+    void enabled_presignsDownloadUrlLocallyWithNoNetworkCall() {
+        SpotopenedMediaStorageService service = new SpotopenedMediaStorageService(
+                true, "http://garage.garage.svc.cluster.local:3900", "https://s3.rzware.com",
+                "garage", "spotopened-media", "test-access-key", "test-secret-key",
+                15_728_640L, 15);
+
+        String url = service.getPresignedDownloadUrl("tenant-1/facility-photos/abc/photo.jpg");
+
+        assertTrue(url.startsWith("https://s3.rzware.com/"), url);
+        assertTrue(url.contains("spotopened-media"), url);
+        assertTrue(url.contains("X-Amz-Signature"), url);
     }
 
     @Test

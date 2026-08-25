@@ -6,8 +6,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -164,6 +166,64 @@ class FacilityPhotoUploadControllerTest {
 
         ResponseEntity<Map<String, Object>> response =
                 controller.requestUploadUrl(TENANT_ID, USER_EMAIL, validBody());
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+    }
+
+    private MockHttpServletRequest requestFor(String uri) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI(uri);
+        return request;
+    }
+
+    @Test
+    void redirectToDownloadUrl_success_redirectsToPresignedUrl() {
+        when(storageService.isEnabled()).thenReturn(true);
+        when(storageService.getPresignedDownloadUrl("tenant-1/facility-photos/abc/photo.jpg"))
+                .thenReturn("https://s3.rzware.com/spotopened-media/signed-download-url");
+
+        ResponseEntity<Void> response = controller.redirectToDownloadUrl(
+                requestFor("/api/facility-photo-downloads/tenant-1/facility-photos/abc/photo.jpg"));
+
+        assertEquals(HttpStatus.FOUND, response.getStatusCode());
+        assertEquals("https://s3.rzware.com/spotopened-media/signed-download-url",
+                response.getHeaders().getFirst(HttpHeaders.LOCATION));
+    }
+
+    @Test
+    void redirectToDownloadUrl_blankKey_returns400() {
+        ResponseEntity<Void> response = controller.redirectToDownloadUrl(
+                requestFor("/api/facility-photo-downloads/"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void redirectToDownloadUrl_pathTraversalAttempt_returns400() {
+        ResponseEntity<Void> response = controller.redirectToDownloadUrl(
+                requestFor("/api/facility-photo-downloads/../../etc/passwd"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void redirectToDownloadUrl_disabledStorage_returns503() {
+        when(storageService.isEnabled()).thenReturn(false);
+
+        ResponseEntity<Void> response = controller.redirectToDownloadUrl(
+                requestFor("/api/facility-photo-downloads/tenant-1/facility-photos/abc/photo.jpg"));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+    }
+
+    @Test
+    void redirectToDownloadUrl_presignerFailure_returns500() {
+        when(storageService.isEnabled()).thenReturn(true);
+        when(storageService.getPresignedDownloadUrl(anyString()))
+                .thenThrow(new RuntimeException("presigner failure"));
+
+        ResponseEntity<Void> response = controller.redirectToDownloadUrl(
+                requestFor("/api/facility-photo-downloads/tenant-1/facility-photos/abc/photo.jpg"));
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
     }

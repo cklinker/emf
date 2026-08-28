@@ -6,6 +6,7 @@ import io.kelta.worker.security.SnsSignatureVerifier;
 import io.kelta.worker.util.TenantContextUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,10 +50,19 @@ public class SesNotificationController {
     private final EmailRepository emailRepository;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public SesNotificationController(EmailSuppressionRepository suppressionRepository,
                                       EmailRepository emailRepository,
                                       ObjectMapper objectMapper) {
-        this.restClient = RestClient.create();
+        this(RestClient.create(), suppressionRepository, emailRepository, objectMapper);
+    }
+
+    /** Test seam: lets a unit test bind a mock-server-backed client. */
+    SesNotificationController(RestClient restClient,
+                               EmailSuppressionRepository suppressionRepository,
+                               EmailRepository emailRepository,
+                               ObjectMapper objectMapper) {
+        this.restClient = restClient;
         this.signatureVerifier = new SnsSignatureVerifier(restClient);
         this.suppressionRepository = suppressionRepository;
         this.emailRepository = emailRepository;
@@ -76,8 +86,16 @@ public class SesNotificationController {
         }
 
         String type = envelope.path("Type").asText(null);
-        if ("SubscriptionConfirmation".equals(type) || "UnsubscribeConfirmation".equals(type)) {
+        if ("SubscriptionConfirmation".equals(type)) {
             confirmSubscription(envelope);
+        } else if ("UnsubscribeConfirmation".equals(type)) {
+            // Deliberately not auto-confirmed: AWS sends this as the one final message after
+            // *any* unsubscribe, including an operator unsubscribing on purpose (e.g. via the SNS
+            // console, to pause this feed during an incident). Auto-hitting its SubscribeURL would
+            // silently undo that — the only way left to actually stop the feed would be deleting
+            // the topic or revoking SES's publish permission.
+            log.info("SNS subscription was unsubscribed for topic {} — not auto-resubscribing",
+                    envelope.path("TopicArn").asText(null));
         } else if ("Notification".equals(type)) {
             handleNotification(envelope.path("Message").asText(null));
         }
@@ -133,8 +151,14 @@ public class SesNotificationController {
                 addRecipient(recipients, r.path("emailAddress").asText(null));
             }
         } else if ("Complaint".equals(notificationType)) {
+            JsonNode complaint = ses.path("complaint");
+            // "not-spam" is a mailbox provider RETRACTING a prior complaint via the ARF feedback
+            // loop, not reporting a new one — suppressing on it would be backwards.
+            if ("not-spam".equals(complaint.path("complaintFeedbackType").asText(null))) {
+                return;
+            }
             reason = "COMPLAINT";
-            for (JsonNode r : ses.path("complaint").path("complainedRecipients")) {
+            for (JsonNode r : complaint.path("complainedRecipients")) {
                 addRecipient(recipients, r.path("emailAddress").asText(null));
             }
         } else {

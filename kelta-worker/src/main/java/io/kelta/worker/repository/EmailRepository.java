@@ -233,6 +233,20 @@ public class EmailRepository {
     }
 
     /**
+     * Resolves the tenant whose {@code email_from_address} exactly matches the given address
+     * (case-insensitive). Backs SES bounce/complaint handling: the SNS notification carries
+     * {@code mail.source} — the exact From address used for that send — which is the only signal
+     * available to route the event back to a tenant.
+     */
+    public Optional<String> findTenantIdByFromAddress(String fromAddress) {
+        var rows = jdbcTemplate.queryForList(
+                "SELECT id FROM tenant WHERE lower(email_from_address) = lower(?)",
+                fromAddress
+        );
+        return rows.isEmpty() ? Optional.empty() : Optional.of((String) rows.get(0).get("id"));
+    }
+
+    /**
      * Tenant-level email configuration row. Decryption of the credential
      * happens elsewhere via {@code CredentialResolver}.
      */

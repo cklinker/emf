@@ -9,6 +9,8 @@ import io.kelta.runtime.workflow.ActionContext;
 import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
 import io.kelta.runtime.workflow.ActionResult;
+import io.kelta.runtime.workflow.BeforeSaveHook;
+import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
 import io.kelta.runtime.workflow.module.KeltaModule;
 import io.kelta.runtime.workflow.module.ModuleContext;
 import tools.jackson.databind.ObjectMapper;
@@ -51,6 +53,8 @@ public class RuntimeModuleManager {
     private final ModuleJarService jarService;
     private final ModuleContext moduleContext;
     private final ModuleSignatureVerifier signatureVerifier;
+    private final BeforeSaveHookRegistry beforeSaveHookRegistry;
+    private final ModuleCollectionProvisioner collectionProvisioner;
 
     /** Tracks which modules are loaded per tenant: tenantId -> Set<moduleId> */
     private final Map<String, Set<String>> loadedModules = new ConcurrentHashMap<>();
@@ -61,6 +65,9 @@ public class RuntimeModuleManager {
     /** Tracks loaded KeltaModule instances for lifecycle management */
     private final Map<String, KeltaModule> activeModuleInstances = new ConcurrentHashMap<>();
 
+    /** The exact hook instances registered per load, keyed "tenantId:moduleId" — see LoadedModule. */
+    private final Map<String, List<BeforeSaveHook>> registeredHooks = new ConcurrentHashMap<>();
+
     /**
      * What each load actually registered, keyed "tenantId:moduleId".
      *
@@ -70,8 +77,14 @@ public class RuntimeModuleManager {
      */
     private final Map<String, LoadedModule> loadedActionKeys = new ConcurrentHashMap<>();
 
-    /** The registry keys and cached JAR a single loaded module owns. */
-    private record LoadedModule(Set<String> actionKeys, String s3Key) {
+    /**
+     * The registry keys, hook instances, and cached JAR a single loaded module owns.
+     *
+     * <p>Hooks are held by instance because {@link BeforeSaveHookRegistry} removes them by
+     * identity — a module's {@code getBeforeSaveHooks()} may build fresh objects on each call, so
+     * unload must use the instances that were actually registered.
+     */
+    private record LoadedModule(Set<String> actionKeys, List<BeforeSaveHook> hooks, String s3Key) {
     }
 
     /**
@@ -82,7 +95,9 @@ public class RuntimeModuleManager {
                                  ObjectMapper objectMapper,
                                  ModuleJarService jarService,
                                  ModuleContext moduleContext,
-                                 ModuleSignatureVerifier signatureVerifier) {
+                                 ModuleSignatureVerifier signatureVerifier,
+                                 BeforeSaveHookRegistry beforeSaveHookRegistry,
+                                 ModuleCollectionProvisioner collectionProvisioner) {
         this.moduleStore = Objects.requireNonNull(moduleStore);
         this.actionHandlerRegistry = Objects.requireNonNull(actionHandlerRegistry);
         this.objectMapper = Objects.requireNonNull(objectMapper);
@@ -90,6 +105,22 @@ public class RuntimeModuleManager {
         this.jarService = jarService;
         this.moduleContext = moduleContext;
         this.signatureVerifier = signatureVerifier;
+        this.beforeSaveHookRegistry = beforeSaveHookRegistry;
+        this.collectionProvisioner = collectionProvisioner;
+    }
+
+    /**
+     * Creates a RuntimeModuleManager without hook registration or collection provisioning
+     * (e.g. in tests that only exercise action handlers).
+     */
+    public RuntimeModuleManager(ModuleStore moduleStore,
+                                 ActionHandlerRegistry actionHandlerRegistry,
+                                 ObjectMapper objectMapper,
+                                 ModuleJarService jarService,
+                                 ModuleContext moduleContext,
+                                 ModuleSignatureVerifier signatureVerifier) {
+        this(moduleStore, actionHandlerRegistry, objectMapper, jarService, moduleContext,
+            signatureVerifier, null, null);
     }
 
     /**
@@ -161,6 +192,8 @@ public class RuntimeModuleManager {
         if (!actions.isEmpty()) {
             moduleStore.createActions(actions);
         }
+
+        provisionCollections(tenantId, manifest);
 
         log.info("Installed module '{}' v{} for tenant {} with {} action handlers",
             manifest.name(), manifest.version(), tenantId, actions.size());
@@ -253,10 +286,34 @@ public class RuntimeModuleManager {
             moduleStore.createActions(actions);
         }
 
+        provisionCollections(tenantId, manifest);
+
         log.info("Installed module '{}' v{} for tenant {} with JAR (s3Key={}, {} bytes)",
             manifest.name(), manifest.version(), tenantId, s3Key, jarBytes.length);
 
         return moduleStore.findById(id).orElse(data);
+    }
+
+    /**
+     * Creates the collections the manifest declares, in the installing tenant.
+     *
+     * <p>Failure is logged, not thrown: the module row and its action records are already
+     * persisted at this point, so propagating would leave a half-installed module the admin
+     * cannot see or uninstall. The operator sees the error and can retry by reinstalling —
+     * provisioning skips collections that already exist, so a retry is safe.
+     */
+    private void provisionCollections(String tenantId, ModuleManifest manifest) {
+        if (collectionProvisioner == null || manifest.collections().isEmpty()) {
+            return;
+        }
+        try {
+            List<String> created = collectionProvisioner.provision(tenantId, manifest.collections());
+            log.info("Module '{}' provisioned {} collection(s) for tenant {}: {}",
+                manifest.id(), created.size(), tenantId, created);
+        } catch (RuntimeException e) {
+            log.error("Module '{}' failed to provision collections for tenant {}: {}",
+                manifest.id(), tenantId, e.getMessage(), e);
+        }
     }
 
     /**
@@ -354,14 +411,16 @@ public class RuntimeModuleManager {
         for (var action : module.actions()) {
             registered.add(action.actionKey());
         }
-        KeltaModule instance = activeModuleInstances.get(tenantId + ":" + module.moduleId());
+        String key = tenantId + ":" + module.moduleId();
+        KeltaModule instance = activeModuleInstances.get(key);
         if (instance != null) {
             for (ActionHandler handler : instance.getActionHandlers()) {
                 registered.add(handler.getActionTypeKey());
             }
         }
-        loadedActionKeys.put(tenantId + ":" + module.moduleId(),
-            new LoadedModule(registered, module.s3Key()));
+        loadedActionKeys.put(key,
+            new LoadedModule(registered, registeredHooks.getOrDefault(key, List.of()),
+                module.s3Key()));
 
         log.info("Loaded module '{}' v{} with {} handlers for tenant {}",
             module.name(), module.version(), module.actions().size(), tenantId);
@@ -396,11 +455,16 @@ public class RuntimeModuleManager {
                 actionHandlerRegistry.registerTenantHandler(tenantId, handler);
             }
 
+            // Register before-save hooks, tenant-scoped so a module installed by one tenant
+            // never fires on another tenant's records.
+            List<BeforeSaveHook> hooks = registerTenantHooks(tenantId, keltaModule);
+
             activeClassLoaders.put(classLoaderKey, classLoader);
             activeModuleInstances.put(classLoaderKey, keltaModule);
+            registeredHooks.put(classLoaderKey, hooks);
 
-            log.info("Loaded module '{}' from JAR with {} real handlers for tenant {}",
-                module.moduleId(), handlers.size(), tenantId);
+            log.info("Loaded module '{}' from JAR with {} real handlers and {} hooks for tenant {}",
+                module.moduleId(), handlers.size(), hooks.size(), tenantId);
 
         } catch (Exception e) {
             log.warn("Failed to load module '{}' from JAR for tenant {}: {}. Falling back to stubs.",
@@ -412,6 +476,12 @@ public class RuntimeModuleManager {
                 try { cl.close(); } catch (IOException ignored) {}
             }
             activeModuleInstances.remove(classLoaderKey);
+            // Hooks may have been registered before the failure; strip them so a half-loaded
+            // module cannot keep vetoing saves after falling back to stubs.
+            List<BeforeSaveHook> partialHooks = registeredHooks.remove(classLoaderKey);
+            if (partialHooks != null && beforeSaveHookRegistry != null) {
+                beforeSaveHookRegistry.removeTenantHooks(tenantId, partialHooks);
+            }
 
             // Fall back to stubs
             loadWithStubs(tenantId, module);
@@ -453,6 +523,22 @@ public class RuntimeModuleManager {
             // GET /api/modules/signing-keys, which reports the dependent module count.
             signatureVerifier.verify(module.tenantId(), jarBytes, signature);
         }
+    }
+
+    /**
+     * Registers a module's before-save hooks against the installing tenant, returning the exact
+     * instances registered so unload can remove them by identity. Returns empty when no hook
+     * registry is wired (stub-only test setups) — hooks are then simply not active.
+     */
+    private List<BeforeSaveHook> registerTenantHooks(String tenantId, KeltaModule keltaModule) {
+        if (beforeSaveHookRegistry == null) {
+            return List.of();
+        }
+        List<BeforeSaveHook> hooks = List.copyOf(keltaModule.getBeforeSaveHooks());
+        for (BeforeSaveHook hook : hooks) {
+            beforeSaveHookRegistry.registerTenantHook(tenantId, hook);
+        }
+        return hooks;
     }
 
     /**
@@ -514,6 +600,17 @@ public class RuntimeModuleManager {
         }
 
         actionHandlerRegistry.removeTenantHandlers(tenantId, actionKeys);
+
+        // Remove the tenant-scoped before-save hooks this load registered. Taken from the
+        // in-memory record rather than by re-calling getBeforeSaveHooks(), which may return
+        // fresh instances the registry would not match by identity.
+        List<BeforeSaveHook> hooks = registeredHooks.remove(classLoaderKey);
+        if (hooks == null && record != null) {
+            hooks = record.hooks();
+        }
+        if (hooks != null && !hooks.isEmpty() && beforeSaveHookRegistry != null) {
+            beforeSaveHookRegistry.removeTenantHooks(tenantId, hooks);
+        }
 
         // Close the ClassLoader
         SandboxedModuleClassLoader classLoader = activeClassLoaders.remove(classLoaderKey);

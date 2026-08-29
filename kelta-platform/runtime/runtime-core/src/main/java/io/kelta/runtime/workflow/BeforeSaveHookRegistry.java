@@ -31,6 +31,9 @@ public class BeforeSaveHookRegistry {
 
     private final Map<String, List<BeforeSaveHook>> hooks = new ConcurrentHashMap<>();
 
+    /** Tenant-scoped hooks: tenantId -> collectionName -> hooks (module-installed, runtime-loaded). */
+    private final Map<String, Map<String, List<BeforeSaveHook>>> tenantHooks = new ConcurrentHashMap<>();
+
     /**
      * Creates an empty registry.
      */
@@ -68,6 +71,55 @@ public class BeforeSaveHookRegistry {
     }
 
     /**
+     * Registers a hook scoped to one tenant — used by {@code RuntimeModuleManager} when a
+     * per-tenant JAR-installed module is loaded, so the hook only fires for that tenant's
+     * records rather than platform-wide.
+     *
+     * @param tenantId the tenant ID
+     * @param hook the hook to register
+     */
+    public void registerTenantHook(String tenantId, BeforeSaveHook hook) {
+        String collectionName = hook.getCollectionName();
+        tenantHooks.computeIfAbsent(tenantId, k -> new ConcurrentHashMap<>())
+                .computeIfAbsent(collectionName, k -> Collections.synchronizedList(new ArrayList<>()))
+                .add(hook);
+        tenantHooks.get(tenantId).get(collectionName)
+                .sort(Comparator.comparingInt(BeforeSaveHook::getOrder));
+        log.info("Registered tenant-scoped BeforeSaveHook: tenant={}, collection='{}': {} (order={})",
+                tenantId, collectionName, hook.getClass().getSimpleName(), hook.getOrder());
+    }
+
+    /**
+     * Removes previously tenant-registered hooks — used on module disable/uninstall. Removal is
+     * by instance identity (the same {@link BeforeSaveHook} objects returned from
+     * {@code registerTenantHook}), since hooks have no natural unique key the way
+     * {@code ActionHandler} has {@code getActionTypeKey()}.
+     *
+     * @param tenantId the tenant ID
+     * @param hooksToRemove the exact hook instances to remove
+     */
+    public void removeTenantHooks(String tenantId, List<BeforeSaveHook> hooksToRemove) {
+        Map<String, List<BeforeSaveHook>> byCollection = tenantHooks.get(tenantId);
+        if (byCollection == null || hooksToRemove == null) {
+            return;
+        }
+        for (BeforeSaveHook hook : hooksToRemove) {
+            List<BeforeSaveHook> list = byCollection.get(hook.getCollectionName());
+            if (list != null) {
+                list.remove(hook);
+                log.info("Removed tenant-scoped BeforeSaveHook: tenant={}, collection='{}': {}",
+                        tenantId, hook.getCollectionName(), hook.getClass().getSimpleName());
+                if (list.isEmpty()) {
+                    byCollection.remove(hook.getCollectionName());
+                }
+            }
+        }
+        if (byCollection.isEmpty()) {
+            tenantHooks.remove(tenantId);
+        }
+    }
+
+    /**
      * Gets the ordered list of hooks for the given collection.
      *
      * <p>Returns collection-specific hooks first, followed by wildcard hooks.
@@ -97,6 +149,40 @@ public class BeforeSaveHookRegistry {
     }
 
     /**
+     * Gets the ordered list of hooks for the given tenant + collection: tenant-scoped
+     * collection-specific hooks first, then global (platform) hooks for that collection and its
+     * wildcard, then tenant-scoped wildcard hooks. When {@code tenantId} is blank, or the tenant
+     * has no module-installed hooks at all, this is identical to {@link #getHooks(String)}.
+     *
+     * @param tenantId the tenant ID (may be null/blank for global-only lookup)
+     * @param collectionName the collection name
+     * @return the hooks in priority order
+     */
+    public List<BeforeSaveHook> getHooks(String tenantId, String collectionName) {
+        List<BeforeSaveHook> global = getHooks(collectionName);
+        if (tenantId == null || tenantId.isBlank()) {
+            return global;
+        }
+        Map<String, List<BeforeSaveHook>> byCollection = tenantHooks.get(tenantId);
+        if (byCollection == null || byCollection.isEmpty()) {
+            return global;
+        }
+        List<BeforeSaveHook> tenantSpecific = byCollection.getOrDefault(collectionName, List.of());
+        List<BeforeSaveHook> tenantWildcard = WILDCARD.equals(collectionName)
+                ? List.of()
+                : byCollection.getOrDefault(WILDCARD, List.of());
+        if (tenantSpecific.isEmpty() && tenantWildcard.isEmpty()) {
+            return global;
+        }
+        List<BeforeSaveHook> merged = new ArrayList<>(
+                tenantSpecific.size() + global.size() + tenantWildcard.size());
+        merged.addAll(tenantSpecific);
+        merged.addAll(global);
+        merged.addAll(tenantWildcard);
+        return Collections.unmodifiableList(merged);
+    }
+
+    /**
      * Checks if any hooks are registered for the given collection,
      * including wildcard hooks.
      *
@@ -112,6 +198,37 @@ public class BeforeSaveHookRegistry {
         if (!WILDCARD.equals(collectionName)) {
             List<BeforeSaveHook> wildcardList = hooks.get(WILDCARD);
             return wildcardList != null && !wildcardList.isEmpty();
+        }
+        return false;
+    }
+
+    /**
+     * Tenant-aware variant of {@link #hasHooks(String)} — also true when the tenant has a
+     * module-installed hook (specific or wildcard) for this collection, even if no global hook
+     * exists. Use this (not the global-only overload) as a fast-path guard before fetching a
+     * record solely to run hooks, or a tenant-scoped hook is silently skipped.
+     *
+     * @param tenantId the tenant ID (may be null/blank for global-only)
+     * @param collectionName the collection name
+     */
+    public boolean hasHooks(String tenantId, String collectionName) {
+        if (hasHooks(collectionName)) {
+            return true;
+        }
+        if (tenantId == null || tenantId.isBlank()) {
+            return false;
+        }
+        Map<String, List<BeforeSaveHook>> byCollection = tenantHooks.get(tenantId);
+        if (byCollection == null) {
+            return false;
+        }
+        List<BeforeSaveHook> specific = byCollection.get(collectionName);
+        if (specific != null && !specific.isEmpty()) {
+            return true;
+        }
+        if (!WILDCARD.equals(collectionName)) {
+            List<BeforeSaveHook> wildcard = byCollection.get(WILDCARD);
+            return wildcard != null && !wildcard.isEmpty();
         }
         return false;
     }
@@ -145,7 +262,7 @@ public class BeforeSaveHookRegistry {
      */
     public BeforeSaveResult evaluateBeforeCreate(String collectionName,
                                                   Map<String, Object> record, String tenantId) {
-        List<BeforeSaveHook> collectionHooks = getHooks(collectionName);
+        List<BeforeSaveHook> collectionHooks = getHooks(tenantId, collectionName);
         if (collectionHooks.isEmpty()) {
             return BeforeSaveResult.ok();
         }
@@ -180,7 +297,7 @@ public class BeforeSaveHookRegistry {
     public BeforeSaveResult evaluateBeforeUpdate(String collectionName, String id,
                                                   Map<String, Object> record,
                                                   Map<String, Object> previous, String tenantId) {
-        List<BeforeSaveHook> collectionHooks = getHooks(collectionName);
+        List<BeforeSaveHook> collectionHooks = getHooks(tenantId, collectionName);
         if (collectionHooks.isEmpty()) {
             return BeforeSaveResult.ok();
         }
@@ -211,7 +328,7 @@ public class BeforeSaveHookRegistry {
      * @return the combined result
      */
     public BeforeSaveResult evaluateBeforeDelete(String collectionName, String id, String tenantId) {
-        for (BeforeSaveHook hook : getHooks(collectionName)) {
+        for (BeforeSaveHook hook : getHooks(tenantId, collectionName)) {
             BeforeSaveResult result = hook.beforeDelete(collectionName, id, tenantId);
             if (!result.isSuccess()) {
                 return result;
@@ -228,7 +345,7 @@ public class BeforeSaveHookRegistry {
      * @param tenantId the tenant ID
      */
     public void invokeAfterCreate(String collectionName, Map<String, Object> record, String tenantId) {
-        for (BeforeSaveHook hook : getHooks(collectionName)) {
+        for (BeforeSaveHook hook : getHooks(tenantId, collectionName)) {
             try {
                 hook.afterCreate(collectionName, record, tenantId);
             } catch (Exception e) {
@@ -250,7 +367,7 @@ public class BeforeSaveHookRegistry {
     public void invokeAfterUpdate(String collectionName, String id,
                                    Map<String, Object> record, Map<String, Object> previous,
                                    String tenantId) {
-        for (BeforeSaveHook hook : getHooks(collectionName)) {
+        for (BeforeSaveHook hook : getHooks(tenantId, collectionName)) {
             try {
                 hook.afterUpdate(collectionName, id, record, previous, tenantId);
             } catch (Exception e) {
@@ -268,7 +385,7 @@ public class BeforeSaveHookRegistry {
      * @param tenantId the tenant ID
      */
     public void invokeAfterDelete(String collectionName, String id, String tenantId) {
-        for (BeforeSaveHook hook : getHooks(collectionName)) {
+        for (BeforeSaveHook hook : getHooks(tenantId, collectionName)) {
             try {
                 hook.afterDelete(collectionName, id, tenantId);
             } catch (Exception e) {

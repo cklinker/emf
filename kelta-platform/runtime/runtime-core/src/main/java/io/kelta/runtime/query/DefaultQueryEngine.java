@@ -458,9 +458,13 @@ public class DefaultQueryEngine implements QueryEngine {
             throw new ReadOnlyCollectionException(definition.name());
         }
 
-        // Pre-fetch record data for the delete event and hook tenant scoping
+        // Pre-fetch record data for the delete event and hook tenant scoping. The tenant-aware
+        // hasHooks overload is required here: at this point no record data is fetched yet, so a
+        // tenant-scoped (module-installed) hook can only be seen via TenantContext, not
+        // extractTenantId(record) — using the global-only overload would silently skip it.
         Map<String, Object> recordData = null;
-        boolean hasHooks = beforeSaveHookRegistry != null && beforeSaveHookRegistry.hasHooks(definition.name());
+        boolean hasHooks = beforeSaveHookRegistry != null
+                && beforeSaveHookRegistry.hasHooks(TenantContext.get(), definition.name());
         if (recordEventPublisher != null || hasHooks) {
             recordData = storageAdapter.getById(definition, id).orElse(null);
         }

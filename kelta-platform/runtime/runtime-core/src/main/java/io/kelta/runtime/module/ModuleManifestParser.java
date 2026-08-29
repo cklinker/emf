@@ -49,10 +49,11 @@ public class ModuleManifestParser {
 
             List<String> permissions = parseStringList(root, "permissions");
             List<ModuleManifest.ActionHandlerManifest> handlers = parseActionHandlers(root);
+            List<ModuleManifest.CollectionManifest> collections = parseCollections(root);
 
             return new ModuleManifest(
                 id, name, version, description, author,
-                moduleClass, minPlatformVersion, permissions, handlers
+                moduleClass, minPlatformVersion, permissions, handlers, collections
             );
         } catch (ModuleManifestException e) {
             throw e;
@@ -86,6 +87,36 @@ public class ModuleManifestParser {
         return List.copyOf(handlers);
     }
 
+    private List<ModuleManifest.CollectionManifest> parseCollections(JsonNode root) {
+        JsonNode collectionsNode = root.get("collections");
+        if (collectionsNode == null || !collectionsNode.isArray()) {
+            return List.of();
+        }
+
+        List<ModuleManifest.CollectionManifest> collections = new ArrayList<>();
+        for (JsonNode node : collectionsNode) {
+            String name = requireString(node, "name");
+            String displayName = optionalString(node, "displayName");
+
+            List<ModuleManifest.CollectionManifest.FieldManifest> fields = new ArrayList<>();
+            JsonNode fieldsNode = node.get("fields");
+            if (fieldsNode != null && fieldsNode.isArray()) {
+                for (JsonNode fieldNode : fieldsNode) {
+                    fields.add(new ModuleManifest.CollectionManifest.FieldManifest(
+                        requireString(fieldNode, "name"),
+                        optionalString(fieldNode, "displayName"),
+                        requireString(fieldNode, "type"),
+                        optionalBoolean(fieldNode, "required")
+                    ));
+                }
+            }
+
+            collections.add(new ModuleManifest.CollectionManifest(
+                name, displayName, List.copyOf(fields)));
+        }
+        return List.copyOf(collections);
+    }
+
     private String requireString(JsonNode node, String field) {
         JsonNode value = node.get(field);
         if (value == null || value.isNull() || !value.isTextual() || value.asText().isBlank()) {
@@ -100,6 +131,11 @@ public class ModuleManifestParser {
             return null;
         }
         return value.asText();
+    }
+
+    private boolean optionalBoolean(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        return value != null && value.isBoolean() && value.asBoolean();
     }
 
     private String optionalJsonString(JsonNode node, String field) {

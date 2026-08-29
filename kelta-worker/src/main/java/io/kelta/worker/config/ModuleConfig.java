@@ -6,9 +6,11 @@ import io.kelta.runtime.module.ModuleStore;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
+import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
 import io.kelta.runtime.workflow.module.ModuleContext;
 import io.kelta.worker.module.JdbcModuleSigningKeyStore;
 import io.kelta.worker.module.JdbcModuleStore;
+import io.kelta.worker.module.ModuleCollectionProvisioner;
 import io.kelta.worker.module.ModuleConfigEventPublisher;
 import io.kelta.worker.module.ModuleJarService;
 import io.kelta.worker.module.ModuleSignatureVerifier;
@@ -83,7 +85,9 @@ public class ModuleConfig {
                                                        QueryEngine queryEngine,
                                                        CollectionRegistry collectionRegistry,
                                                        @Nullable FormulaEvaluator formulaEvaluator,
-                                                       ModuleSignatureVerifier signatureVerifier) {
+                                                       ModuleSignatureVerifier signatureVerifier,
+                                                       BeforeSaveHookRegistry beforeSaveHookRegistry,
+                                                       ModuleCollectionProvisioner collectionProvisioner) {
         ModuleContext moduleContext = new ModuleContext(
             queryEngine, collectionRegistry, formulaEvaluator,
             objectMapper, actionHandlerRegistry, null);
@@ -95,7 +99,8 @@ public class ModuleConfig {
         }
 
         return new RuntimeModuleManager(moduleStore, actionHandlerRegistry, objectMapper,
-            jarService, moduleContext, signatureVerifier);
+            jarService, moduleContext, signatureVerifier, beforeSaveHookRegistry,
+            collectionProvisioner);
     }
 
     @Bean

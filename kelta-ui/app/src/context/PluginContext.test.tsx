@@ -901,16 +901,17 @@ describe('PluginContext', () => {
   })
 
   describe('Runtime-module UI bundles', () => {
-    function spyOnApiGet() {
+    function spyOnApiList() {
       // ApiProvider builds its own ApiClient, so spy on the prototype to see what it fetches.
-      return vi.spyOn(ApiClient.prototype, 'get').mockResolvedValue([] as never)
+      // getList, not get: that is the method the loader uses (get returns the raw envelope).
+      return vi.spyOn(ApiClient.prototype, 'getList').mockResolvedValue([] as never)
     }
 
     it('does not fetch modules by default', async () => {
       // The default matters: PluginProvider sits inside every shared test wrapper, so a
       // provider-issued GET would be handed responses that page tests queued for themselves
       // with mockResolvedValueOnce.
-      const get = spyOnApiGet()
+      const getList = spyOnApiList()
 
       render(
         <AuthProvider>
@@ -926,12 +927,12 @@ describe('PluginContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      expect(get).not.toHaveBeenCalled()
-      get.mockRestore()
+      expect(getList).not.toHaveBeenCalled()
+      getList.mockRestore()
     })
 
     it('fetches the tenant modules when the app opts in', async () => {
-      const get = spyOnApiGet()
+      const getList = spyOnApiList()
 
       render(
         <AuthProvider>
@@ -947,8 +948,38 @@ describe('PluginContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      expect(get).toHaveBeenCalledWith('/api/modules')
+      expect(getList).toHaveBeenCalledWith('/api/modules')
+      getList.mockRestore()
+    })
+
+    it('finishes loading even when the module list comes back in an unexpected shape', async () => {
+      // Regression: `apiClient.get` returns the raw JSON:API envelope, and the first version of
+      // the loader iterated it directly. The resulting `not iterable` throw escaped
+      // initializePlugins, so isLoading never cleared and every consumer gated on it sat on a
+      // spinner forever. E2E caught it; this pins the provider's side of the fix.
+      const get = vi
+        .spyOn(ApiClient.prototype, 'get')
+        .mockResolvedValue({ data: [{ type: 'modules', id: 'm1' }] } as never)
+      const getList = vi
+        .spyOn(ApiClient.prototype, 'getList')
+        .mockResolvedValue({ data: [] } as never)
+
+      render(
+        <AuthProvider>
+          <ApiProvider>
+            <PluginProvider plugins={[]} loadModuleBundles>
+              <TestComponent />
+            </PluginProvider>
+          </ApiProvider>
+        </AuthProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+      })
+
       get.mockRestore()
+      getList.mockRestore()
     })
 
     it('finishes loading when opted in without an ApiProvider', async () => {

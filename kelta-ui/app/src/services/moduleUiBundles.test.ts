@@ -7,12 +7,18 @@ import type { ApiClient } from './apiClient'
  * `URL.createObjectURL` nor dynamic `import()` of one, so both are stubbed: what these tests
  * assert is which modules the loader *selects* and how it *fails*, not the browser's module
  * evaluation itself.
+ *
+ * `getList` is what unwraps the JSON:API envelope — `get` returns it raw. Faking the module list
+ * on `get` (as an earlier version of this file did) hides a real defect: iterating the raw
+ * envelope throws `not iterable`, which wedged PluginProvider until E2E caught it. The two are
+ * kept on separate methods here so that mistake cannot be re-made silently.
  */
 function fakeApiClient(overrides: Partial<Record<string, unknown>> = {}): ApiClient {
   return {
+    getList: vi.fn(async () => overrides.modules ?? []),
     get: vi.fn(async (url: string) => {
       if (url === '/api/modules') {
-        return overrides.modules ?? []
+        throw new Error('the loader must use getList for the module list, not get')
       }
       if (typeof overrides.bundle === 'function') {
         return (overrides.bundle as (u: string) => unknown)(url)
@@ -51,7 +57,7 @@ describe('loadModuleUiBundles', () => {
     })
 
     expect(await loadModuleUiBundles(apiClient)).toEqual([])
-    expect(apiClient.get).toHaveBeenCalledTimes(1) // listed only, never fetched
+    expect(apiClient.get).not.toHaveBeenCalled() // listed only, never fetched
   })
 
   it('skips active modules that declare no bundle', async () => {
@@ -60,15 +66,25 @@ describe('loadModuleUiBundles', () => {
     })
 
     expect(await loadModuleUiBundles(apiClient)).toEqual([])
-    expect(apiClient.get).toHaveBeenCalledTimes(1)
+    expect(apiClient.get).not.toHaveBeenCalled()
   })
 
   it('returns empty rather than throwing when the module list is unavailable', async () => {
     // A tenant without the modules feature, or without permission, is the normal case.
     const apiClient = {
-      get: vi.fn(async () => {
+      getList: vi.fn(async () => {
         throw new Error('403')
       }),
+    } as unknown as ApiClient
+
+    await expect(loadModuleUiBundles(apiClient)).resolves.toEqual([])
+  })
+
+  it('returns empty rather than throwing when the list is not an array', async () => {
+    // The defect E2E caught: `get` hands back the raw JSON:API envelope, and iterating an
+    // object throws `not iterable`. Nothing this loader does may escape to its caller.
+    const apiClient = {
+      getList: vi.fn(async () => ({ data: [] })),
     } as unknown as ApiClient
 
     await expect(loadModuleUiBundles(apiClient)).resolves.toEqual([])

@@ -34,7 +34,13 @@ const loadedModuleIds = new Set<string>()
 export async function loadModuleUiBundles(apiClient: ApiClient): Promise<string[]> {
   let modules: TenantModuleSummary[]
   try {
-    modules = await apiClient.get<TenantModuleSummary[]>('/api/modules')
+    // getList, not get: `get` returns the raw JSON:API envelope (`{ data: [...] }`), which is
+    // not iterable. getList unwraps and flattens it into plain rows.
+    modules = await apiClient.getList<TenantModuleSummary>('/api/modules')
+    if (!Array.isArray(modules)) {
+      // Belt and braces — nothing this function does may throw past its caller (see below).
+      modules = []
+    }
   } catch (err) {
     // A tenant without the modules feature, or without permission to list them, is the normal
     // case — not an error worth surfacing in the UI.

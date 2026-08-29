@@ -347,7 +347,12 @@ export function PluginProvider({
     // Step 2: Load the browser bundles of the tenant's runtime-installed modules. Their
     // top-level code registers into the SDK's static ComponentRegistry, which step 4 syncs.
     if (loadModuleBundles && apiClient) {
-      await loadModuleUiBundles(apiClient)
+      try {
+        await loadModuleUiBundles(apiClient)
+      } catch (err) {
+        // Module UI is an enhancement; the admin UI must come up without it.
+        console.error('[Plugin] Module UI bundle loading failed:', err)
+      }
     }
 
     // Step 3: Load explicitly-passed plugins sequentially to maintain order
@@ -368,7 +373,6 @@ export function PluginProvider({
 
     setLoadedPlugins(results)
     setErrors(loadErrors)
-    setIsLoading(false)
 
     const successCount = results.filter((r) => r.status === 'loaded').length
     const failCount = results.filter((r) => r.status === 'error').length
@@ -387,7 +391,17 @@ export function PluginProvider({
     }
     initializedRef.current = true
 
+    // `finally`, not `.catch` alone: whatever happens during init, the provider must stop
+    // reporting isLoading. A throw that skipped this left every consumer gated on plugin
+    // loading stuck on a spinner forever, with no error surfaced — see the module-bundle
+    // loader, whose first version threw here.
     initializePlugins()
+      .catch((err) => {
+        console.error('[Plugin] Plugin initialization failed:', err)
+      })
+      .finally(() => {
+        setIsLoading(false)
+      })
 
     // Cleanup: unload plugins on unmount and clear SDK registry
     return () => {

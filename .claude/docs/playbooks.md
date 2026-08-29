@@ -158,8 +158,17 @@ Platform-managed metadata (not a user collection) — e.g. `feature_announcement
 A module is one signed JAR + `kelta-module.json`, uploaded through `POST /api/modules/install-jar`
 and installed **per tenant at runtime**. Nothing in this repo is recompiled or redeployed.
 
+**Reference implementation: [`kelta-modules/billing/`](../../kelta-modules/billing/)** — collections,
+two action handlers, a webhook handler, and a UI bundle in one JAR. Copy its `pom.xml` shape: no
+parent pom, outside the reactor, platform deps `provided` (they load from the platform
+classloader; bundling them puts a second copy of the runtime model in the JAR and every cast to a
+platform type fails).
+
 1. **Implement `KeltaModule`** (`runtime-core/.../workflow/module/KeltaModule.java`) with a public
-   no-arg constructor — `RuntimeModuleManager.loadFromJar` instantiates it reflectively.
+   no-arg constructor — `RuntimeModuleManager.loadFromJar` instantiates it reflectively. Build
+   handlers in `onStartup(ModuleContext)`, not the constructor: the context does not exist yet at
+   construction. `context.getExtension(CredentialResolverPort.class)` is how a module reaches the
+   credential vault — the only supported way to hold a secret.
    - `getActionHandlers()` → flow steps, registered tenant-scoped in `ActionHandlerRegistry`.
    - `getBeforeSaveHooks()` → registered tenant-scoped in `BeforeSaveHookRegistry`, so they fire
      only on the installing tenant's records. They run **before** global hooks for the same
@@ -198,6 +207,9 @@ and installed **per tenant at runtime**. Nothing in this repo is recompiled or r
      cookie access — the JAR signature is the entire trust model, there is no browser isolation.
    - Loading is opt-in via `<PluginProvider loadModuleBundles>` and enabled only by `App.tsx`;
      shared test wrappers keep the default so they issue no extra `GET /api/modules`.
+   - The bundle is evaluated from a blob URL, so it has **no module graph** and cannot `import`
+     a bare specifier like `@kelta/plugin-sdk`. The host publishes the registry at
+     `globalThis.__keltaComponentRegistry` — that global is the only channel available.
 5. **Classpath**: the module's own classes must be in the JAR. Only the prefixes in
    `SandboxedModuleClassLoader.ALLOWED_PARENT_PREFIXES` resolve from the platform.
 

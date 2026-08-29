@@ -1,0 +1,82 @@
+{
+  "id": "kelta-billing",
+  "name": "Kelta Billing",
+  "version": "1.0.0",
+  "description": "Stripe-backed portal billing: plans, checkout, subscriptions and one-time passes.",
+  "author": "Kelta",
+  "moduleClass": "io.kelta.modules.billing.BillingModule",
+  "minPlatformVersion": "1.0.0",
+  "permissions": ["MANAGE_BILLING"],
+  "webhookHandlerKey": "billing:stripe-webhook",
+  "uiBundlePath": "static/ui-bundle.js",
+  "actionHandlers": [
+    {
+      "key": "billing:create-checkout-session",
+      "name": "Start Checkout",
+      "category": "Billing",
+      "description": "Starts a Stripe hosted checkout for the calling member and returns the redirect URL.",
+      "icon": "credit-card"
+    },
+    {
+      "key": "billing:stripe-webhook",
+      "name": "Process Stripe Webhook",
+      "category": "Billing",
+      "description": "Verifies and applies inbound Stripe events. Dispatched by the platform webhook route, not called directly.",
+      "icon": "webhook"
+    }
+  ],
+  "collections": [
+    {
+      "name": "billing_plans",
+      "displayName": "Billing Plans",
+      "fields": [
+        { "name": "code", "displayName": "Code", "type": "STRING", "required": true },
+        { "name": "name", "displayName": "Name", "type": "STRING", "required": true },
+        { "name": "description", "displayName": "Description", "type": "TEXT" },
+        { "name": "kind", "displayName": "Kind", "type": "STRING", "required": true },
+        { "name": "stripeProductId", "displayName": "Stripe Product Id", "type": "STRING" },
+        { "name": "stripePriceId", "displayName": "Stripe Price Id", "type": "STRING" },
+        { "name": "entitlements", "displayName": "Entitlements", "type": "JSON" },
+        { "name": "passDurationDays", "displayName": "Pass Duration (days)", "type": "INTEGER" },
+        { "name": "active", "displayName": "Active", "type": "BOOLEAN" },
+        { "name": "sortOrder", "displayName": "Sort Order", "type": "INTEGER" }
+      ]
+    },
+    {
+      "name": "billing_customers",
+      "displayName": "Billing Customers",
+      "fields": [
+        { "name": "userId", "displayName": "Member", "type": "STRING", "required": true },
+        { "name": "stripeCustomerId", "displayName": "Stripe Customer Id", "type": "STRING", "required": true },
+        { "name": "email", "displayName": "Email", "type": "STRING" }
+      ]
+    },
+    {
+      "name": "billing_subscriptions",
+      "displayName": "Billing Subscriptions",
+      "fields": [
+        { "name": "userId", "displayName": "Member", "type": "STRING", "required": true },
+        { "name": "planId", "displayName": "Plan", "type": "STRING" },
+        { "name": "stripeSubscriptionId", "displayName": "Stripe Subscription Id", "type": "STRING", "required": true },
+        { "name": "stripeCustomerId", "displayName": "Stripe Customer Id", "type": "STRING" },
+        { "name": "status", "displayName": "Status", "type": "STRING", "required": true },
+        { "name": "currentPeriodEnd", "displayName": "Renews On", "type": "DATETIME" },
+        { "name": "cancelAtPeriodEnd", "displayName": "Cancels At Period End", "type": "BOOLEAN" },
+        { "name": "canceledAt", "displayName": "Canceled At", "type": "DATETIME" }
+      ]
+    },
+    {
+      "name": "billing_passes",
+      "displayName": "Billing Passes",
+      "fields": [
+        { "name": "userId", "displayName": "Member", "type": "STRING", "required": true },
+        { "name": "planId", "displayName": "Plan", "type": "STRING" },
+        { "name": "stripeCheckoutSessionId", "displayName": "Checkout Session Id", "type": "STRING", "required": true },
+        { "name": "stripePaymentIntentId", "displayName": "Payment Intent Id", "type": "STRING" },
+        { "name": "status", "displayName": "Status", "type": "STRING", "required": true },
+        { "name": "startsAt", "displayName": "Starts At", "type": "DATETIME" },
+        { "name": "expiresAt", "displayName": "Expires At", "type": "DATETIME" }
+      ]
+    }
+  ]
+}

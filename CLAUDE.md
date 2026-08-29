@@ -94,6 +94,10 @@ kelta-mcp       MCP server — kelta-admin + kelta-user toolsets over HTTP, PAT 
 kelta-web       Frontend SDK monorepo: @kelta/{sdk,components,plugin-sdk,cli,formula}
 kelta-ui/app    Admin/builder + end-user UI (React 19 + Vite)
 kelta-marketing Astro marketing site (not part of platform deploy)
+kelta-modules/  Runtime-installable modules — built, signed and versioned SEPARATELY from the
+                platform (no parent pom, NOT in the kelta-platform reactor) and uploaded into a
+                tenant via `POST /api/modules/install-jar`. `billing/` is the reference impl.
+                See `.claude/docs/playbooks.md` → "Ship a runtime-installable module"
 kelta-cli-downloads  nginx image serving self-update CLI binaries + manifest (downloads.kelta.io)
 kelta-test-harness  Cross-service integration tests (Testcontainers full mini-stack)
 e2e-tests       Playwright end-to-end tests

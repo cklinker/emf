@@ -88,7 +88,10 @@ These are real gaps, not oversights — record them before relying on this in pr
   subscription is upserted by its Stripe id. Replaying converges; it does not duplicate. A partial
   failure mid-event can still leave one write applied and another not.
 - **Live verification is owed.** Nothing here has run against real Stripe keys or a live tenant.
-  The compiled-in billing code must stay in place until it has.
+  The compiled-in billing code must stay in place until it has. The runbook for that is
+  [`VERIFICATION.md`](VERIFICATION.md) — note especially that a signature failure installs **inert
+  stub handlers while still reporting ACTIVE**, so "installed and ACTIVE" is not evidence of
+  anything.
 - The behavioural differences in the table above are permanent given the module boundary — decide
   they are acceptable for your tenant before cutting over, particularly the **`appliesTo=PORTAL`
   quota rules being skipped**, which silently enforces nothing where the compiled-in version

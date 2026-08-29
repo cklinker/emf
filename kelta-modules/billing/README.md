@@ -11,10 +11,27 @@ ship functionality Kelta never anticipated. Read it alongside
 
 | Piece | How it reaches the platform |
 |-------|-----------------------------|
-| `billing_plans`, `billing_customers`, `billing_subscriptions`, `billing_passes` | Declared in `kelta-module.json` → created at install through the standard collection API |
+| `billing_plans`, `billing_customers`, `billing_subscriptions`, `billing_passes`, `billing_entitlement_rules` | Declared in `kelta-module.json` → created at install through the standard collection API |
 | `billing:create-checkout-session` | `ActionHandler`, invoked as a flow action |
+| `billing:create-portal-session` | `ActionHandler` — opens Stripe's billing portal for the calling member |
+| `billing:resolve-entitlements` | `ActionHandler` — replaces `GET /api/billing/me`; a module cannot contribute a controller |
+| `billing:expire-passes` | `ActionHandler` — schedule with a scheduled flow; **a module has no scheduler** |
 | `billing:stripe-webhook` | `ActionHandler`, dispatched by `POST /api/modules/webhooks/{tenantId}/kelta-billing` |
+| Per-member quotas | `MemberEntitlementQuotaHook`, a wildcard `BeforeSaveHook` driven by `billing_entitlement_rules` |
 | Billing Plans widget | `static/ui-bundle.js`, served by `GET /api/modules/kelta-billing/ui-bundle.js` |
+
+## Deliberate differences from the compiled-in implementation
+
+These are not oversights. Each is a platform constraint a module cannot escape, and each changes
+behaviour in a way an operator should know about.
+
+| Compiled-in | This module | Why |
+|---|---|---|
+| `EntitlementServiceImpl` caches per member (Caffeine) and invalidates fleet-wide over NATS | `EntitlementResolver` **does not cache** | A module cannot subscribe to NATS, so a cache it held could not be invalidated when a webhook on another pod changed a subscription. A stale entitlement is worse than a slower one. |
+| `BillingPassExpirySweep` is a Spring `@Scheduled` bean | `billing:expire-passes` action, scheduled by a flow | A module is not a Spring bean and has no scheduler. Expiry is read-time anyway, so a sweep that never runs cannot over-entitle anyone. |
+| Sweep claims rows `FOR UPDATE SKIP LOCKED` | No claim | A module writes through `QueryEngine` and cannot express one. Two pods sweeping concurrently flip the same row to the same terminal value — harmless. |
+| Quota hook reads `X-User-Type` to exempt internal staff | **Skips `appliesTo=PORTAL` rules** (logged once) | Neither `jakarta.servlet` nor `org.springframework` is on a module's classpath, so a module cannot read the actor tier. Use `appliesTo=ALL` for rules that must hold for every actor. |
+| Webhook claims each event id in a row sharing the mutation's transaction | Converges instead | See *Known limitations* below. |
 
 ## Build
 
@@ -70,9 +87,9 @@ These are real gaps, not oversights — record them before relying on this in pr
   this relies on convergence instead: a pass is granted once per checkout session, and a
   subscription is upserted by its Stripe id. Replaying converges; it does not duplicate. A partial
   failure mid-event can still leave one write applied and another not.
-- **No entitlement resolution or quota enforcement yet.** `EntitlementService`,
-  `MemberEntitlementQuotaHook`, and the pass-expiry sweep have not been ported. Until they are,
-  installing this module does **not** replace the compiled-in billing in `kelta-worker`.
-- **No portal-session action** (`billing:create-portal-session`) yet.
 - **Live verification is owed.** Nothing here has run against real Stripe keys or a live tenant.
   The compiled-in billing code must stay in place until it has.
+- The behavioural differences in the table above are permanent given the module boundary — decide
+  they are acceptable for your tenant before cutting over, particularly the **`appliesTo=PORTAL`
+  quota rules being skipped**, which silently enforces nothing where the compiled-in version
+  enforced a member cap.

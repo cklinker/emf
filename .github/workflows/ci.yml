@@ -39,6 +39,7 @@ jobs:
       ui: ${{ steps.filter.outputs.ui }}
       any_java: ${{ steps.filter.outputs.any_java }}
       e2e: ${{ steps.filter.outputs.e2e }}
+      runtime_modules: ${{ steps.filter.outputs.runtime_modules }}
       workflows: ${{ steps.filter.outputs.workflows }}
     steps:
       - name: Checkout code
@@ -211,6 +212,84 @@ jobs:
         with:
           name: java-test-results-runtime
           path: kelta-platform/runtime/*/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ===========================================================================
+  # Build + test runtime-installable modules (kelta-modules/**).
+  #
+  # These are deliberately OUTSIDE the kelta-platform reactor — they ship as
+  # signed JARs installed into a tenant at runtime, not with the platform — so
+  # nothing else in CI compiles them. Without this job a change to KeltaModule,
+  # ActionHandler, ModuleContext or any SPI type they use breaks every shipped
+  # module silently, and the break only surfaces when an operator uploads one.
+  #
+  # Each module is built independently (no aggregator pom, by design), so the
+  # loop installs the platform artifacts first and then runs each module's own
+  # build against them.
+  # ===========================================================================
+  test-runtime-modules:
+    name: Test Runtime Modules (installable)
+    needs: changes
+    runs-on: k8s-runner
+    if: needs.changes.outputs.runtime_modules == 'true' || needs.changes.outputs.workflows == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Install Maven
+        run: |
+          if ! command -v mvn &> /dev/null; then
+            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
+            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
+          fi
+          mkdir -p ~/.m2
+          cp ci/maven-settings.xml ~/.m2/settings.xml
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Clean stale Kelta artifacts
+        run: rm -rf ~/.m2/repository/io/kelta
+
+      - name: Install platform artifacts modules compile against
+        run: mvn install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema,runtime/runtime-messaging-nats -am -B
+
+      - name: Build and test each installable module
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          found=0
+          for pom in kelta-modules/*/pom.xml; do
+            found=1
+            echo "::group::$(dirname "$pom")"
+            mvn verify -f "$pom" -B
+            echo "::endgroup::"
+          done
+          if [[ "$found" -eq 0 ]]; then
+            echo "No installable modules found under kelta-modules/ — nothing to build."
+          fi
+
+      - name: Upload test results
+        # Artifact upload occasionally hits transient ENOTFOUND on the self-
+        # hosted runner — don't let that mask a green test run.
+        continue-on-error: true
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-test-results-runtime-modules
+          path: kelta-modules/*/target/surefire-reports/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -543,17 +622,18 @@ jobs:
   # ===========================================================================
   quality-gate:
     name: Quality Gate
-    needs: [changes, test-java, test-runtime, test-frontend, integration-tests, e2e]
+    needs: [changes, test-java, test-runtime, test-runtime-modules, test-frontend, integration-tests, e2e]
     if: always()
     runs-on: k8s-runner
     steps:
       - name: Check job results
         run: |
-          for job in test-java test-runtime test-frontend integration-tests e2e; do
+          for job in test-java test-runtime test-runtime-modules test-frontend integration-tests e2e; do
             result_var="${job//-/_}_result"
             case "${job}" in
               test-java)         result="${{ needs.test-java.result }}" ;;
               test-runtime)      result="${{ needs.test-runtime.result }}" ;;
+              test-runtime-modules) result="${{ needs.test-runtime-modules.result }}" ;;
               test-frontend)     result="${{ needs.test-frontend.result }}" ;;
               integration-tests) result="${{ needs.integration-tests.result }}" ;;
               e2e)               result="${{ needs.e2e.result }}" ;;

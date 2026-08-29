@@ -64,6 +64,14 @@ e2e:
   - 'kelta-ui/**'
   - 'e2e-tests/**'
 
+# Runtime-installable modules (kelta-modules/**). Built and tested separately from the
+# platform reactor, but they COMPILE AGAINST the runtime API — so a change to KeltaModule,
+# ActionHandler, ModuleContext or the SPI types they use breaks them. Anchored on *runtime
+# as well as their own tree so a platform change re-verifies every shipped module.
+runtime_modules:
+  - *runtime
+  - 'kelta-modules/**'
+
 # Workflow plumbing changed — run everything.
 workflows:
   - '.github/workflows/**'

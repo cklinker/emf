@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -522,6 +523,129 @@ public class RuntimeModuleManager {
             // fall back to stubs — see jar_signature_key_fingerprint and
             // GET /api/modules/signing-keys, which reports the dependent module count.
             signatureVerifier.verify(module.tenantId(), jarBytes, signature);
+        }
+    }
+
+    /**
+     * Parses a stored module manifest. Exposed so callers can read declarative fields
+     * (e.g. {@code uiBundlePath}) without keeping their own parser instance.
+     *
+     * @throws ModuleManifestParser.ModuleManifestException if the manifest is unreadable
+     */
+    public ModuleManifest parseManifest(String manifestJson) {
+        return manifestParser.parse(manifestJson);
+    }
+
+    /**
+     * Dispatches a raw inbound webhook to the {@code webhookHandlerKey} the module's manifest
+     * names.
+     *
+     * <p><b>The platform authenticates nothing here.</b> The route is unauthenticated by design —
+     * a payment processor or other external system cannot present a platform JWT — so the
+     * handler owns its own trust anchor, typically an HMAC over the raw body verified against a
+     * credential the module resolves itself. The {@code tenantId} in the path is untrusted input:
+     * it selects which tenant's module (and therefore which secret) to dispatch to, nothing more.
+     *
+     * <p>Returns empty when the tenant has no such ACTIVE module, when that module declares no
+     * webhook handler, or when its handler is not registered. All three collapse to one outcome
+     * so an unauthenticated caller cannot tell them apart and enumerate a tenant's modules.
+     *
+     * @param tenantId  the tenant named in the path (untrusted)
+     * @param moduleId  the module named in the path (untrusted)
+     * @param rawBody   the unparsed request body — handlers that verify a body signature MUST use
+     *                  this exact string, since re-serializing changes the bytes the HMAC covers
+     * @param headers   inbound request headers (signature headers live here)
+     * @return the handler's result, or empty if nothing was dispatched
+     */
+    public Optional<ActionResult> dispatchWebhook(String tenantId, String moduleId,
+                                                  String rawBody, Map<String, String> headers) {
+        Optional<TenantModuleData> found = moduleStore.findByTenantAndModuleId(tenantId, moduleId);
+        if (found.isEmpty() || !TenantModuleData.STATUS_ACTIVE.equals(found.get().status())) {
+            return Optional.empty();
+        }
+
+        String handlerKey;
+        try {
+            handlerKey = manifestParser.parse(found.get().manifest()).webhookHandlerKey();
+        } catch (RuntimeException e) {
+            log.warn("Module '{}' of tenant {} has an unreadable manifest — cannot dispatch webhook",
+                moduleId, tenantId);
+            return Optional.empty();
+        }
+        if (handlerKey == null || handlerKey.isBlank()) {
+            return Optional.empty();
+        }
+
+        Optional<ActionHandler> handler = actionHandlerRegistry.getHandler(tenantId, handlerKey);
+        if (handler.isEmpty()) {
+            log.warn("Module '{}' of tenant {} declares webhook handler '{}' which is not "
+                + "registered — the module may have fallen back to stubs", moduleId, tenantId, handlerKey);
+            return Optional.empty();
+        }
+
+        ActionContext context = ActionContext.builder()
+            .tenantId(tenantId)
+            .resolvedData(Map.of(
+                "rawBody", rawBody == null ? "" : rawBody,
+                "headers", headers == null ? Map.of() : headers,
+                "moduleId", moduleId))
+            .build();
+        return Optional.of(handler.get().execute(context));
+    }
+
+    /**
+     * Reads a module's UI bundle from its verified JAR.
+     *
+     * <p>Streams the {@code uiBundlePath} resource out of the JAR the tenant already has
+     * installed. That JAR passed signature verification at install and checksum + signature
+     * re-verification on load, so this adds no new trust boundary — but it does serve
+     * publisher-authored JavaScript same-origin to the admin UI, which is exactly what the
+     * signature gate exists to make safe.
+     *
+     * <p>Empty when the tenant has no such ACTIVE module, the module declares no bundle, JAR
+     * loading is unavailable, or the resource is absent from the JAR.
+     */
+    public Optional<byte[]> readUiBundle(String tenantId, String moduleId) {
+        Optional<TenantModuleData> found = moduleStore.findByTenantAndModuleId(tenantId, moduleId);
+        if (found.isEmpty() || !TenantModuleData.STATUS_ACTIVE.equals(found.get().status())) {
+            return Optional.empty();
+        }
+        TenantModuleData module = found.get();
+        if (module.s3Key() == null || jarService == null) {
+            return Optional.empty();
+        }
+
+        String bundlePath;
+        try {
+            bundlePath = manifestParser.parse(module.manifest()).uiBundlePath();
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
+        if (bundlePath == null || bundlePath.isBlank()) {
+            return Optional.empty();
+        }
+
+        try {
+            URL jarUrl = jarService.downloadJarToCache(module.s3Key());
+            // Same gate the classloader path runs: never serve bytes out of a JAR whose
+            // checksum or signature no longer verifies.
+            verifyDownloadedJar(module, jarUrl);
+            try (java.util.jar.JarFile jar =
+                     new java.util.jar.JarFile(java.nio.file.Path.of(jarUrl.toURI()).toFile())) {
+                java.util.jar.JarEntry entry = jar.getJarEntry(bundlePath);
+                if (entry == null) {
+                    log.warn("Module '{}' of tenant {} declares uiBundlePath '{}' which is not in "
+                        + "its JAR", moduleId, tenantId, bundlePath);
+                    return Optional.empty();
+                }
+                try (InputStream in = jar.getInputStream(entry)) {
+                    return Optional.of(in.readAllBytes());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not read UI bundle for module '{}' of tenant {}: {}",
+                moduleId, tenantId, e.getMessage());
+            return Optional.empty();
         }
     }
 

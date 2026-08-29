@@ -251,6 +251,32 @@ public class ModuleController {
         return ResponseEntity.ok(JsonApiResponseBuilder.collection("module-actions", actionRecords));
     }
 
+    /**
+     * Serves a module's browser bundle from its installed JAR, so a module can ship UI in the same
+     * single package as its backend code.
+     *
+     * <p>Scoped to the calling tenant's own ACTIVE modules — a tenant can never fetch a bundle
+     * from a module it has not installed. The bytes come from a JAR that passed publisher-signature
+     * verification at install and checksum + signature re-verification on read.
+     *
+     * <p><b>This is publisher-authored JavaScript served same-origin to the admin UI.</b> It runs
+     * with the admin session's full DOM and cookie access; the JAR signature gate is the whole of
+     * the trust model (see {@code ModuleSignatureVerifier}). Do not relax that gate without
+     * replacing it with real isolation.
+     */
+    @GetMapping(value = "/{moduleId}/ui-bundle.js", produces = "application/javascript")
+    public ResponseEntity<byte[]> getUiBundle(
+            @RequestHeader("X-Tenant-ID") String tenantId,
+            @PathVariable String moduleId) {
+        return runtimeModuleManager.readUiBundle(tenantId, moduleId)
+                .map(bytes -> ResponseEntity.ok()
+                        // The bundle is immutable for a given installed version, but a reinstall
+                        // reuses this URL, so revalidate rather than cache hard.
+                        .header("Cache-Control", "no-cache")
+                        .body(bytes))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     // =========================================================================
     // Internal helpers
     // =========================================================================
@@ -266,7 +292,20 @@ public class ModuleController {
         map.put("installedBy", m.installedBy());
         map.put("installedAt", m.installedAt() != null ? m.installedAt().toString() : null);
         map.put("updatedAt", m.updatedAt() != null ? m.updatedAt().toString() : null);
+        // Lets the admin UI decide which modules to fetch a bundle for, rather than probing
+        // every installed module with a request that would 404 for most of them.
+        map.put("uiBundlePath", uiBundlePath(m));
         return map;
+    }
+
+    /** The module's declared UI bundle path, or null when it ships no UI or has a bad manifest. */
+    private String uiBundlePath(TenantModuleData m) {
+        try {
+            return runtimeModuleManager.parseManifest(m.manifest()).uiBundlePath();
+        } catch (RuntimeException e) {
+            log.debug("Module '{}' has an unreadable manifest: {}", m.moduleId(), e.getMessage());
+            return null;
+        }
     }
 
     private Map<String, Object> moduleToAttributes(TenantModuleData m) {

@@ -50,10 +50,13 @@ public class ModuleManifestParser {
             List<String> permissions = parseStringList(root, "permissions");
             List<ModuleManifest.ActionHandlerManifest> handlers = parseActionHandlers(root);
             List<ModuleManifest.CollectionManifest> collections = parseCollections(root);
+            String webhookHandlerKey = optionalString(root, "webhookHandlerKey");
+            String uiBundlePath = optionalString(root, "uiBundlePath");
 
             return new ModuleManifest(
                 id, name, version, description, author,
-                moduleClass, minPlatformVersion, permissions, handlers, collections
+                moduleClass, minPlatformVersion, permissions, handlers, collections,
+                webhookHandlerKey, uiBundlePath
             );
         } catch (ModuleManifestException e) {
             throw e;

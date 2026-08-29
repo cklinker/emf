@@ -650,7 +650,9 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
               <I18nProvider>
                 {/* Pushes tenant-authored translations from bootstrap into i18n (slice 4). */}
                 <TenantTranslationsBridge />
-                <PluginProvider plugins={plugins}>
+                {/* loadModuleBundles: only the real app fetches runtime-module UI bundles;
+                    test wrappers keep the default so they make no extra request. */}
+                <PluginProvider plugins={plugins} loadModuleBundles>
                   <AppContextProvider>
                     <AiChatProvider>
                       <ToastProvider>

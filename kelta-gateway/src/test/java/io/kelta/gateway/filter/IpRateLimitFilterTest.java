@@ -149,7 +149,8 @@ class IpRateLimitFilterTest {
             // would read as protection that can never fire.
             Map<String, Integer> defaults = IpRateLimitFilter.parsePathBudgets(
                     List.of(IpRateLimitFilter.DEFAULT_IP_PATHS.split(",")));
-            assertThat(defaults).containsOnlyKeys("/actuator/health", "/api/billing/webhooks");
+            assertThat(defaults).containsOnlyKeys("/actuator/health", "/api/billing/webhooks",
+                    "/api/modules/webhooks");
         }
     }
 

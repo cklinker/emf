@@ -403,6 +403,20 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   re-runs. Being an unauthenticated path also bypasses `TenantIpAllowlistFilter` — the same
   trade the LiveKit webhook makes. Admin authoring of plans/rules rides the system-collection
   JSON:API and is gated by the new **`MANAGE_BILLING`** permission.
+- **Runtime-module webhooks**: `POST /api/modules/webhooks/{tenantId}/{moduleId}` is an
+  **unauthenticated path** and the platform verifies **nothing** — it is a raw dispatcher into
+  the `ActionHandler` the module's manifest names in `webhookHandlerKey`, and **the module owns
+  the trust anchor** (it resolves its own credential and checks the signature). It exists because
+  Spring MVC resolves routes at context start, so a JAR loaded later cannot contribute a
+  controller; without this route a module could not receive a webhook at all. The raw body is
+  passed through verbatim — re-serializing would change the bytes an HMAC covers — and headers
+  are lower-cased and filtered to signature-bearing prefixes so a module never sees `Authorization`
+  or infrastructure headers. The `{tenantId}` is **untrusted**: it selects which tenant's module
+  (and secret) to dispatch to. Unknown tenant, inactive module, and no-declared-handler all answer
+  a uniform **404** so a caller cannot enumerate a tenant's modules; a handler rejection is 401
+  (not a fault to retry) and a thrown handler is 500 (retry). Like the other webhook paths it
+  bypasses `TenantIpAllowlistFilter`, and it carries the same IP rate-limit budget as
+  `/api/billing/webhooks`. The sibling `/api/modules/**` administration routes stay authenticated.
 - **Member watch API** (consumer-alerting slice 5): `/api/watches/**` is a static route, so
   only `API_ACCESS` is checked at the gateway and **all** member scoping is in
   `WatchController`. Every endpoint acts on the calling member from `X-User-Id`; a foreign

@@ -61,10 +61,12 @@ public class IpRateLimitFilter implements GlobalFilter, Ordered {
     private static final String KEY_PREFIX = "ratelimit:ip:";
 
     /**
-     * Default budgets. The webhook allowance is deliberately generous: a payment
+     * Default budgets. The webhook allowances are deliberately generous: a payment
      * processor retries on its own schedule from a small set of shared egress
      * IPs, so a tight bucket would drop legitimate deliveries rather than abuse.
      * Operators can exempt those ranges outright via {@code exempt-cidrs}.
+     * {@code /api/modules/webhooks} carries the same shape of traffic for
+     * runtime-installed modules and gets the same budget.
      *
      * <p><b>The portal public paths are deliberately NOT here.</b> {@code /portal/**}
      * lives on kelta-auth, which has its own ingress and does not transit the
@@ -72,7 +74,8 @@ public class IpRateLimitFilter implements GlobalFilter, Ordered {
      * match anything and would read as protection that does not exist. Those
      * budgets are enforced by kelta-auth's own {@code PortalPublicRateLimitFilter}.
      */
-    static final String DEFAULT_IP_PATHS = "/actuator/health=100,/api/billing/webhooks=300";
+    static final String DEFAULT_IP_PATHS =
+            "/actuator/health=100,/api/billing/webhooks=300,/api/modules/webhooks=300";
 
     /** path prefix -> requests permitted per window, longest prefix first. */
     private final Map<String, Integer> pathBudgets;

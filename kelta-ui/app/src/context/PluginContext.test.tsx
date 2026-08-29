@@ -10,6 +10,9 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import { PluginProvider, usePlugins } from './PluginContext'
 import { ComponentRegistry } from '@kelta/plugin-sdk'
 import { componentRegistry } from '../services/componentRegistry'
+import { ApiProvider } from './ApiContext'
+import { AuthProvider } from './AuthContext'
+import { ApiClient } from '../services/apiClient'
 import type { ReactNode } from 'react'
 import type { Plugin, FieldRendererProps, PageComponentProps } from '../types/plugin'
 
@@ -894,6 +897,71 @@ describe('PluginContext', () => {
 
       // SDK registry should be cleared
       expect(ComponentRegistry.hasFieldRenderer('cleanup_test')).toBe(false)
+    })
+  })
+
+  describe('Runtime-module UI bundles', () => {
+    function spyOnApiGet() {
+      // ApiProvider builds its own ApiClient, so spy on the prototype to see what it fetches.
+      return vi.spyOn(ApiClient.prototype, 'get').mockResolvedValue([] as never)
+    }
+
+    it('does not fetch modules by default', async () => {
+      // The default matters: PluginProvider sits inside every shared test wrapper, so a
+      // provider-issued GET would be handed responses that page tests queued for themselves
+      // with mockResolvedValueOnce.
+      const get = spyOnApiGet()
+
+      render(
+        <AuthProvider>
+          <ApiProvider>
+            <PluginProvider plugins={[]}>
+              <TestComponent />
+            </PluginProvider>
+          </ApiProvider>
+        </AuthProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+      })
+
+      expect(get).not.toHaveBeenCalled()
+      get.mockRestore()
+    })
+
+    it('fetches the tenant modules when the app opts in', async () => {
+      const get = spyOnApiGet()
+
+      render(
+        <AuthProvider>
+          <ApiProvider>
+            <PluginProvider plugins={[]} loadModuleBundles>
+              <TestComponent />
+            </PluginProvider>
+          </ApiProvider>
+        </AuthProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+      })
+
+      expect(get).toHaveBeenCalledWith('/api/modules')
+      get.mockRestore()
+    })
+
+    it('finishes loading when opted in without an ApiProvider', async () => {
+      // No client to fetch with — the provider must still complete rather than throw.
+      render(
+        <PluginProvider plugins={[]} loadModuleBundles>
+          <TestComponent />
+        </PluginProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+      })
     })
   })
 })

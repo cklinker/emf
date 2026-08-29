@@ -176,22 +176,49 @@ and installed **per tenant at runtime**. Nothing in this repo is recompiled or r
    broadcast and lifecycle init (including the physical table) fire on every pod. Collection names
    must match `^[a-z][a-z0-9_]*$`; field names cannot be the platform's reserved ones
    (`id`, `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `tenantId`).
-3. **Classpath**: the module's own classes must be in the JAR. Only the prefixes in
+3. **Accept webhooks** by naming one of your action handlers in `"webhookHandlerKey"`. External
+   systems then POST to `/api/modules/webhooks/{tenantId}/{moduleId}` — one generic,
+   platform-owned route (`ModuleWebhookController`), since a module cannot contribute a
+   `@RestController` of its own.
+   - **The platform verifies nothing.** The path is unauthenticated (an external sender has no
+     platform JWT), so **your handler owns the trust anchor** — resolve your credential and check
+     the signature before treating the payload as real.
+   - The handler receives `resolvedData` = `{rawBody, headers, moduleId}` and `context.tenantId()`.
+     Use `rawBody` verbatim for any HMAC: re-serializing changes the bytes the signature covers.
+     `headers` is lower-cased and limited to signature-bearing prefixes.
+   - Return `ActionResult.failure(...)` to reject (→ 401). Nothing-to-dispatch-to (unknown tenant,
+     inactive module, no declared handler) uniformly returns 404 so a caller cannot enumerate a
+     tenant's modules.
+4. **Ship UI** by putting a browser bundle in the same JAR and naming it in `"uiBundlePath"`
+   (e.g. `static/ui-bundle.js`). The admin UI fetches it from
+   `GET /api/modules/{moduleId}/ui-bundle.js` and evaluates it; its top-level code calls
+   `ComponentRegistry.registerPageComponent(...)` from `@kelta/plugin-sdk`, which makes the
+   component available to the Page Builder.
+   - ⚠️ **Same-origin, signature-gated.** The bundle runs with the admin session's full DOM and
+     cookie access — the JAR signature is the entire trust model, there is no browser isolation.
+   - Loading is opt-in via `<PluginProvider loadModuleBundles>` and enabled only by `App.tsx`;
+     shared test wrappers keep the default so they issue no extra `GET /api/modules`.
+5. **Classpath**: the module's own classes must be in the JAR. Only the prefixes in
    `SandboxedModuleClassLoader.ALLOWED_PARENT_PREFIXES` resolve from the platform.
 
 **Known limits** — these still need a platform change, so design around them:
 - **No new `@RestController`.** Spring MVC resolves routes at context start. A module's HTTP
-  surface rides existing dynamic routes: flows (`execute_flow`) and collection CRUD.
+  surface rides existing dynamic routes: flows (`execute_flow`), collection CRUD, and the generic
+  webhook route above.
 - **No new `CredentialType`.** `CredentialTypeRegistry` is built once at boot from a Spring
   `List<CredentialType>`.
 - **No DDL or Flyway.** By design — a module gets exactly the schema powers the admin API exposes.
 - **Uninstall does not drop collections or data**, and reinstall/upgrade **skips** a collection
   whose name already exists rather than updating it.
 
-**Tests**: `RuntimeModuleManagerHookTest` loads a real JAR through the real sandboxed classloader —
-copy that shape rather than mocking the module instance, since the registration path only exists
-inside `loadFromJar`. `ModuleCollectionProvisionerTest` covers manifest → collection creation.
-**Docs**: [`status.md`](status.md) (Extensibility / modules row).
+**Tests**: `RuntimeModuleManagerHookTest` and `ModuleWebhookDispatchTest` load a real JAR through
+the real sandboxed classloader — copy that shape rather than mocking the module instance, since
+hook registration and handler resolution only happen inside `loadFromJar`.
+`ModuleCollectionProvisionerTest` covers manifest → collection creation;
+`ModuleWebhookControllerTest` covers the HTTP status contract.
+**Docs**: [`status.md`](status.md) (Extensibility / modules row); adding an unauthenticated path
+also means updating `kelta-gateway` `application.yml` (`unauthenticated-paths`),
+`IpRateLimitFilter.DEFAULT_IP_PATHS`, and `PublicSurfaceTest`'s expected allowlist.
 
 ---
 

@@ -38,6 +38,8 @@ import type {
   PageComponentProps,
 } from '../types/plugin'
 import { componentRegistry } from '../services/componentRegistry'
+import { loadModuleUiBundles } from '../services/moduleUiBundles'
+import { useOptionalApi } from './ApiContext'
 
 /**
  * Plugin context value interface
@@ -75,6 +77,15 @@ export interface PluginProviderProps {
   getLocale?: () => string
   /** Optional function to get current theme mode (for plugin context) */
   getThemeMode?: () => 'light' | 'dark'
+  /**
+   * Fetch and evaluate the UI bundles of the tenant's runtime-installed modules on mount.
+   *
+   * Off by default, and enabled only by the real app shell (App.tsx). Turning it on adds a
+   * `GET /api/modules` on every mount, which every test rendering through a shared wrapper
+   * would otherwise have to account for — a page test that stubs responses positionally
+   * (`mockResolvedValueOnce`) would silently hand the provider's request the page's own data.
+   */
+  loadModuleBundles?: boolean
 }
 
 // Create the context with undefined default
@@ -102,7 +113,14 @@ export function PluginProvider({
   plugins = [],
   getLocale = () => 'en',
   getThemeMode = () => 'light',
+  loadModuleBundles = false,
 }: PluginProviderProps): React.ReactElement {
+  // Authenticated client used to fetch runtime-module UI bundles. Optional on purpose: the
+  // provider's core job — registering statically-passed plugins — needs no API, so a
+  // PluginProvider mounted without an ApiProvider must still work. In the app ApiProvider
+  // wraps it (App.tsx), so module bundles do load.
+  const apiClient = useOptionalApi()?.apiClient
+
   // Component registry state
   const [fieldRenderers, setFieldRenderers] = useState<
     Map<string, ComponentType<FieldRendererProps>>
@@ -326,7 +344,13 @@ export function PluginProvider({
     // the React app mounted.
     syncFromSdkRegistry()
 
-    // Step 2: Load explicitly-passed plugins sequentially to maintain order
+    // Step 2: Load the browser bundles of the tenant's runtime-installed modules. Their
+    // top-level code registers into the SDK's static ComponentRegistry, which step 4 syncs.
+    if (loadModuleBundles && apiClient) {
+      await loadModuleUiBundles(apiClient)
+    }
+
+    // Step 3: Load explicitly-passed plugins sequentially to maintain order
     if (plugins.length > 0) {
       for (const plugin of plugins) {
         const result = await loadPlugin(plugin)
@@ -338,8 +362,8 @@ export function PluginProvider({
       }
     }
 
-    // Step 3: After plugin onLoad hooks have run, sync again in case plugins
-    // registered additional components via the SDK's ComponentRegistry during init.
+    // Step 4: After module bundles and plugin onLoad hooks have run, sync again to pick up
+    // everything they registered via the SDK's ComponentRegistry during init.
     syncFromSdkRegistry()
 
     setLoadedPlugins(results)
@@ -351,7 +375,7 @@ export function PluginProvider({
     console.info(
       `[Plugin] Plugin initialization complete: ${successCount} loaded, ${failCount} failed`
     )
-  }, [plugins, loadPlugin, syncFromSdkRegistry])
+  }, [plugins, loadPlugin, syncFromSdkRegistry, apiClient, loadModuleBundles])
 
   /**
    * Initialize plugins on mount

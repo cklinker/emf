@@ -143,3 +143,17 @@ export function useApi(): ApiContextValue {
   }
   return context
 }
+
+/**
+ * Hook to access the API client where its absence is a legitimate state rather than a bug —
+ * a provider that works standalone but does more when an API client happens to be available.
+ *
+ * Prefer {@link useApi} everywhere else: for a component that genuinely needs the client,
+ * failing fast beats a silent no-op.
+ *
+ * @returns the context, or `undefined` when there is no surrounding ApiProvider
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useOptionalApi(): ApiContextValue | undefined {
+  return useContext(ApiContext)
+}

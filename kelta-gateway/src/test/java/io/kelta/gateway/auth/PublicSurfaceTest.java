@@ -45,7 +45,8 @@ class PublicSurfaceTest {
             "/api/track",                   // campaign open-pixel / click / unsubscribe (HMAC)
             "/api/telehealth/visits",       // signed visit links
             "/api/telehealth/webhooks",     // LiveKit webhook (signed JWT + body digest)
-            "/api/billing/webhooks");       // payment-processor webhook (HMAC)
+            "/api/billing/webhooks",        // payment-processor webhook (HMAC)
+            "/api/modules/webhooks");       // runtime-module webhook (module owns verification)
 
     /**
      * GET/HEAD-only bootstrap data the UI needs before anyone has signed in — exactly the
@@ -140,6 +141,10 @@ class PublicSurfaceTest {
             // /api/billing/webhooks is unauthenticated; /api/billing is not.
             assertThat(isPublic("/api/billing/webhooks/stripe/t1", HttpMethod.POST)).isTrue();
             assertThat(isPublic("/api/billing", HttpMethod.GET)).isFalse();
+            // Same for modules: the webhook dispatch path is open, module administration is not.
+            assertThat(isPublic("/api/modules/webhooks/t1/m1", HttpMethod.POST)).isTrue();
+            assertThat(isPublic("/api/modules", HttpMethod.GET)).isFalse();
+            assertThat(isPublic("/api/modules/install-jar", HttpMethod.POST)).isFalse();
             assertThat(isPublic("/api/telehealth/encounters", HttpMethod.GET)).isFalse();
         }
     }

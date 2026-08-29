@@ -18,6 +18,16 @@ import java.util.List;
  * @param collections       collections the module needs — created at install time via the same
  *                          metadata-driven path an admin uses (no DDL, no Flyway); see
  *                          {@link CollectionManifest}
+ * @param webhookHandlerKey the {@code ActionHandler} key that inbound webhooks posted to
+ *                          {@code /api/modules/webhooks/{tenantId}/{moduleId}} are dispatched to.
+ *                          Null when the module accepts no webhooks. The platform performs NO
+ *                          authentication on that path — the handler owns its own trust anchor
+ *                          (typically an HMAC over the raw body, verified against a credential
+ *                          the module resolves itself)
+ * @param uiBundlePath      classpath resource inside the same JAR holding the module's browser
+ *                          bundle (e.g. {@code static/ui-bundle.js}), served to the admin UI by
+ *                          {@code GET /api/modules/{moduleId}/ui-bundle.js}. Null when the module
+ *                          ships no UI
  * @since 1.0.0
  */
 public record ModuleManifest(
@@ -30,7 +40,9 @@ public record ModuleManifest(
     String minPlatformVersion,
     List<String> permissions,
     List<ActionHandlerManifest> actionHandlers,
-    List<CollectionManifest> collections
+    List<CollectionManifest> collections,
+    String webhookHandlerKey,
+    String uiBundlePath
 ) {
     /**
      * Declares an action handler provided by the module.

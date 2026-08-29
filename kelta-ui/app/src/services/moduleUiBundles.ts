@@ -1,4 +1,14 @@
+import { ComponentRegistry } from '@kelta/plugin-sdk'
 import type { ApiClient } from './apiClient'
+
+/**
+ * Global the host publishes for module bundles to register through.
+ *
+ * A bundle is evaluated from a blob URL, so it has no module graph of its own and cannot resolve
+ * a bare specifier like `@kelta/plugin-sdk` — a global is the only channel available. Kept to a
+ * single namespaced key so what a module can reach stays explicit and reviewable.
+ */
+const REGISTRY_GLOBAL = '__keltaComponentRegistry'
 
 /**
  * Shape of the module rows `GET /api/modules` returns. Only the fields the loader needs.
@@ -47,6 +57,10 @@ export async function loadModuleUiBundles(apiClient: ApiClient): Promise<string[
     console.debug('[Module UI] Could not list modules; skipping module bundles', err)
     return []
   }
+
+  // Published before any bundle is evaluated — a bundle registers at import time, so the
+  // registry has to be reachable by then.
+  ;(globalThis as Record<string, unknown>)[REGISTRY_GLOBAL] = ComponentRegistry
 
   const loaded: string[] = []
   for (const module of modules ?? []) {

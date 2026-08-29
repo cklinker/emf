@@ -3,6 +3,7 @@ package io.kelta.worker.config;
 import io.kelta.runtime.formula.FormulaEvaluator;
 import io.kelta.runtime.module.ModuleSigningKeyStore;
 import io.kelta.runtime.module.ModuleStore;
+import io.kelta.runtime.module.integration.spi.CredentialResolverPort;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
@@ -27,6 +28,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import io.kelta.runtime.event.PlatformEventPublisher;
 import org.springframework.lang.Nullable;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Spring configuration for runtime module loading.
@@ -87,10 +91,21 @@ public class ModuleConfig {
                                                        @Nullable FormulaEvaluator formulaEvaluator,
                                                        ModuleSignatureVerifier signatureVerifier,
                                                        BeforeSaveHookRegistry beforeSaveHookRegistry,
-                                                       ModuleCollectionProvisioner collectionProvisioner) {
+                                                       ModuleCollectionProvisioner collectionProvisioner,
+                                                       @Nullable CredentialResolverPort credentialResolverPort) {
+        // Runtime-loaded modules get the same credential bridge the compile-time modules get
+        // (FlowConfig wires the identical extension). Without it a module cannot reach the vault
+        // at all, so anything talking to an external API — the case runtime modules exist for —
+        // would have to carry its secret in plaintext config.
+        Map<Class<?>, Object> extensions = new HashMap<>();
+        if (credentialResolverPort != null) {
+            extensions.put(CredentialResolverPort.class, credentialResolverPort);
+            log.info("CredentialResolverPort wired into the runtime module context");
+        }
+
         ModuleContext moduleContext = new ModuleContext(
             queryEngine, collectionRegistry, formulaEvaluator,
-            objectMapper, actionHandlerRegistry, null);
+            objectMapper, actionHandlerRegistry, extensions);
 
         if (jarService != null) {
             log.info("Runtime module JAR loading enabled (S3 storage available)");

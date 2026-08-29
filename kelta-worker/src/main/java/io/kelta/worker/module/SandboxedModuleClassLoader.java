@@ -61,6 +61,13 @@ public class SandboxedModuleClassLoader extends URLClassLoader implements Closea
         // FieldDefinition, FieldType, builders, config records); this widens
         // the API surface, not the trust boundary.
         "io.kelta.runtime.model.",
+        // Required to make CredentialResolverPort usable: it returns a ResolvedCredential, so
+        // without this a module handed the port cannot call it — the linker fails resolving the
+        // return type. Data-model types only (ResolvedCredential, CredentialType descriptors);
+        // the vault, its encryption, and the resolver implementation stay out of reach, so this
+        // widens the API surface, not the trust boundary. A module still only ever sees
+        // credentials it asks for by reference, for its own tenant.
+        "io.kelta.runtime.credential.",
         "io.kelta.runtime.registry.",
         "io.kelta.runtime.formula.",
         "io.kelta.runtime.storage.",

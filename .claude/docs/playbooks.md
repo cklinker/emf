@@ -147,6 +147,52 @@ Platform-managed metadata (not a user collection) — e.g. `feature_announcement
 **Tests**: registry/refresh unit test + migration applied against a non-empty DB.
 **Docs**: [`status.md`](status.md); [`concerns.md`](concerns.md) notes `SystemCollectionDefinitions.java` is already 1,400+ lines — keep additions minimal.
 
+> **This recipe is for platform-owned metadata only.** A collection that belongs to one tenant's
+> installed module is declared in that module's `kelta-module.json` instead — see recipe 5b. It
+> needs no code in this repo, no Flyway migration, and no redeploy.
+
+---
+
+## 5b. Ship a runtime-installable module (collections + hooks + handlers)
+
+A module is one signed JAR + `kelta-module.json`, uploaded through `POST /api/modules/install-jar`
+and installed **per tenant at runtime**. Nothing in this repo is recompiled or redeployed.
+
+1. **Implement `KeltaModule`** (`runtime-core/.../workflow/module/KeltaModule.java`) with a public
+   no-arg constructor — `RuntimeModuleManager.loadFromJar` instantiates it reflectively.
+   - `getActionHandlers()` → flow steps, registered tenant-scoped in `ActionHandlerRegistry`.
+   - `getBeforeSaveHooks()` → registered tenant-scoped in `BeforeSaveHookRegistry`, so they fire
+     only on the installing tenant's records. They run **before** global hooks for the same
+     collection; `"*"` still means every collection (for that tenant only).
+2. **Declare collections in the manifest**, not in code:
+   ```json
+   "collections": [
+     { "name": "invoices", "displayName": "Invoices",
+       "fields": [ { "name": "reference", "type": "STRING", "required": true } ] }
+   ]
+   ```
+   `ModuleCollectionProvisioner` creates them at install via `queryEngine.create` on the
+   `collections`/`fields` system collections — the standard admin write path, so the NATS config
+   broadcast and lifecycle init (including the physical table) fire on every pod. Collection names
+   must match `^[a-z][a-z0-9_]*$`; field names cannot be the platform's reserved ones
+   (`id`, `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `tenantId`).
+3. **Classpath**: the module's own classes must be in the JAR. Only the prefixes in
+   `SandboxedModuleClassLoader.ALLOWED_PARENT_PREFIXES` resolve from the platform.
+
+**Known limits** — these still need a platform change, so design around them:
+- **No new `@RestController`.** Spring MVC resolves routes at context start. A module's HTTP
+  surface rides existing dynamic routes: flows (`execute_flow`) and collection CRUD.
+- **No new `CredentialType`.** `CredentialTypeRegistry` is built once at boot from a Spring
+  `List<CredentialType>`.
+- **No DDL or Flyway.** By design — a module gets exactly the schema powers the admin API exposes.
+- **Uninstall does not drop collections or data**, and reinstall/upgrade **skips** a collection
+  whose name already exists rather than updating it.
+
+**Tests**: `RuntimeModuleManagerHookTest` loads a real JAR through the real sandboxed classloader —
+copy that shape rather than mocking the module instance, since the registration path only exists
+inside `loadFromJar`. `ModuleCollectionProvisionerTest` covers manifest → collection creation.
+**Docs**: [`status.md`](status.md) (Extensibility / modules row).
+
 ---
 
 ## 6. Add a field type

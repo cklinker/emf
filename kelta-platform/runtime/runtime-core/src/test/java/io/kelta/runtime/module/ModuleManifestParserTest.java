@@ -37,6 +37,62 @@ class ModuleManifestParserTest {
         assertNull(manifest.minPlatformVersion());
         assertTrue(manifest.permissions().isEmpty());
         assertTrue(manifest.actionHandlers().isEmpty());
+        assertTrue(manifest.collections().isEmpty());
+    }
+
+    @Test
+    void shouldParseDeclaredCollections() {
+        String json = """
+            {
+              "id": "test-module",
+              "name": "Test Module",
+              "version": "1.0.0",
+              "moduleClass": "com.test.TestModule",
+              "collections": [
+                {
+                  "name": "invoices",
+                  "displayName": "Invoices",
+                  "fields": [
+                    { "name": "reference", "displayName": "Reference", "type": "STRING", "required": true },
+                    { "name": "amount", "type": "DECIMAL" }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        ModuleManifest manifest = parser.parse(json);
+
+        assertEquals(1, manifest.collections().size());
+        ModuleManifest.CollectionManifest collection = manifest.collections().get(0);
+        assertEquals("invoices", collection.name());
+        assertEquals("Invoices", collection.displayName());
+        assertEquals(2, collection.fields().size());
+
+        assertEquals("reference", collection.fields().get(0).name());
+        assertEquals("STRING", collection.fields().get(0).type());
+        assertTrue(collection.fields().get(0).required());
+
+        // Omitted displayName/required fall back rather than failing the parse.
+        assertNull(collection.fields().get(1).displayName());
+        assertFalse(collection.fields().get(1).required());
+    }
+
+    @Test
+    void shouldRejectCollectionFieldWithoutType() {
+        String json = """
+            {
+              "id": "test-module",
+              "name": "Test Module",
+              "version": "1.0.0",
+              "moduleClass": "com.test.TestModule",
+              "collections": [
+                { "name": "invoices", "fields": [ { "name": "amount" } ] }
+              ]
+            }
+            """;
+
+        assertThrows(ModuleManifestParser.ModuleManifestException.class, () -> parser.parse(json));
     }
 
     @Test

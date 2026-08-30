@@ -58,9 +58,6 @@ public class DefaultQueryEngine implements QueryEngine {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultQueryEngine.class);
 
-    private static final Set<String> SYSTEM_FIELDS =
-            Set.of("id", "createdAt", "updatedAt", "createdBy", "updatedBy", "createdGeo", "updatedGeo");
-
     private final StorageAdapter storageAdapter;
     private final ValidationEngine validationEngine;
     private final FieldEncryptionService encryptionService;
@@ -544,13 +541,10 @@ public class DefaultQueryEngine implements QueryEngine {
      * tenantId is valid for tenant-scoped collections (injected by DynamicCollectionRouter).
      */
     private boolean isValidField(CollectionDefinition definition, String fieldName) {
-        if (SYSTEM_FIELDS.contains(fieldName)) {
-            return true;
-        }
-        if ("tenantId".equals(fieldName) && definition.tenantScoped()) {
-            return true;
-        }
-        return definition.getField(fieldName) != null;
+        // Delegates so there is ONE notion of "queryable field". This used to be a private copy of
+        // the same rule, and a caller that reached for CollectionDefinition#hasField instead got a
+        // subtly different answer for audit fields — see issue #1384.
+        return definition.hasQueryableField(fieldName);
     }
 
     /**

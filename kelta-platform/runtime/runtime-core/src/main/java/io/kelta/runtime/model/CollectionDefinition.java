@@ -208,7 +208,40 @@ public record CollectionDefinition(
     public boolean hasField(String fieldName) {
         return getField(fieldName) != null;
     }
-    
+
+    /**
+     * Every record carries these regardless of what the collection declares. They are real,
+     * filterable columns — {@code PhysicalTableStorageAdapter#resolveColumnName} maps each to its
+     * snake_case column — but they are NOT in {@link #fields()}, so {@link #hasField} returns
+     * false for all of them.
+     */
+    public static final Set<String> SYSTEM_FIELD_NAMES =
+        Set.of("id", "createdAt", "updatedAt", "createdBy", "updatedBy", "createdGeo", "updatedGeo");
+
+    /**
+     * Checks whether {@code fieldName} can be used in a filter, sort, or aggregate — that is, a
+     * declared field OR a system field every record carries.
+     *
+     * <p>Prefer this over {@link #hasField} whenever the question is "may I query on this?".
+     * {@code hasField} answers only "did the collection declare this?", and the two differ for
+     * every audit field. Guarding a query with {@code hasField} silently rejects a perfectly valid
+     * column: that is how per-member quota enforcement came to fail open on every collection
+     * (issue #1384) — the hook checked {@code hasField("createdBy")}, got false, and allowed the
+     * write.
+     */
+    public boolean hasQueryableField(String fieldName) {
+        if (fieldName == null) {
+            return false;
+        }
+        if (SYSTEM_FIELD_NAMES.contains(fieldName)) {
+            return true;
+        }
+        if ("tenantId".equals(fieldName) && tenantScoped()) {
+            return true;
+        }
+        return hasField(fieldName);
+    }
+
     /**
      * Gets all field names in this collection.
      *

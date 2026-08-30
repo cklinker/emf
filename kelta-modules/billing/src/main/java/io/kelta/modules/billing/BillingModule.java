@@ -2,6 +2,7 @@ package io.kelta.modules.billing;
 
 import io.kelta.runtime.module.integration.spi.CredentialResolverPort;
 import io.kelta.runtime.workflow.ActionHandler;
+import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.module.KeltaModule;
 import io.kelta.runtime.workflow.module.ModuleContext;
 import org.slf4j.Logger;
@@ -26,6 +27,7 @@ public class BillingModule implements KeltaModule {
     private static final Logger log = LoggerFactory.getLogger(BillingModule.class);
 
     private List<ActionHandler> actionHandlers = List.of();
+    private List<BeforeSaveHook> beforeSaveHooks = List.of();
 
     @Override
     public String getId() {
@@ -59,19 +61,35 @@ public class BillingModule implements KeltaModule {
                 new BillingCollections(context.queryEngine(), context.collectionRegistry());
         StripeApiClient stripeApiClient = new StripeApiClient(context.objectMapper());
         StripeSignatureVerifier signatureVerifier = new StripeSignatureVerifier();
+        EntitlementResolver entitlements = new EntitlementResolver(collections);
 
         this.actionHandlers = List.of(
                 new CreateCheckoutSessionActionHandler(
                         collections, credentialResolver, stripeApiClient),
+                new CreatePortalSessionActionHandler(
+                        collections, credentialResolver, stripeApiClient),
                 new ProcessStripeWebhookActionHandler(
                         collections, credentialResolver, signatureVerifier,
-                        context.objectMapper()));
+                        context.objectMapper()),
+                new ExpirePassesActionHandler(collections),
+                new ResolveEntitlementsActionHandler(entitlements));
 
-        log.info("Billing module started with {} action handlers", actionHandlers.size());
+        // Wildcard hook — runs on every record create for the installing tenant, so its fast path
+        // (no rules for the collection) must cost nothing.
+        this.beforeSaveHooks = List.of(new MemberEntitlementQuotaHook(
+                collections, entitlements, context.collectionRegistry(), context.queryEngine()));
+
+        log.info("Billing module started with {} action handlers and {} hooks",
+                actionHandlers.size(), beforeSaveHooks.size());
     }
 
     @Override
     public List<ActionHandler> getActionHandlers() {
         return actionHandlers;
+    }
+
+    @Override
+    public List<BeforeSaveHook> getBeforeSaveHooks() {
+        return beforeSaveHooks;
     }
 }

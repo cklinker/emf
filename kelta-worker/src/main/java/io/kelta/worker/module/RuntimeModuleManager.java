@@ -1,5 +1,6 @@
 package io.kelta.worker.module;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.flow.ActionHandlerDescriptor;
 import io.kelta.runtime.module.ModuleManifest;
 import io.kelta.runtime.module.ModuleManifestParser;
@@ -590,7 +591,19 @@ public class RuntimeModuleManager {
                 "headers", headers == null ? Map.of() : headers,
                 "moduleId", moduleId))
             .build();
-        return Optional.of(handler.get().execute(context));
+
+        // Bind the tenant for the handler's data access (Critical Rule 3). The webhook route is
+        // unauthenticated, so nothing upstream binds one — and a module CANNOT bind it itself:
+        // io.kelta.runtime.context is outside SandboxedModuleClassLoader's parent allowlist. An
+        // unbound connection leaves app.current_tenant_id empty, which matches the admin_bypass
+        // RLS policy, so a module's reads and writes would silently run unscoped across tenants.
+        //
+        // Binding before the handler verifies its signature is correct and necessary: resolving
+        // the tenant's own signing secret is itself a tenant-scoped read. The path tenantId is
+        // untrusted, but it only selects which tenant's secret must match — a forged request
+        // fails the handler's own check and touches nothing.
+        return Optional.of(TenantContext.callWithTenant(tenantId,
+            () -> handler.get().execute(context)));
     }
 
     /**

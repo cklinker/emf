@@ -51,6 +51,9 @@ public class WebhookTestModule implements KeltaModule {
                 if (!headers.containsKey("x-test-signature")) {
                     return ActionResult.failure("missing signature");
                 }
+                // Note: this module deliberately does NOT read TenantContext — it cannot. That
+                // class is outside SandboxedModuleClassLoader's allowlist, which is precisely why
+                // the platform binds the tenant on the module's behalf before dispatch.
                 return ActionResult.success(Map.of(
                         "echoBody", resolved.getOrDefault("rawBody", ""),
                         "echoTenant", context.tenantId() == null ? "" : context.tenantId(),

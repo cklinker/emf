@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Data access over the collections this module declares in its manifest.
@@ -32,6 +33,19 @@ public class BillingCollections {
     static final String CUSTOMERS = "billing_customers";
     static final String SUBSCRIPTIONS = "billing_subscriptions";
     static final String PASSES = "billing_passes";
+    static final String ENTITLEMENT_RULES = "billing_entitlement_rules";
+
+    private static final Set<String> MODULE_COLLECTIONS =
+            Set.of(PLANS, CUSTOMERS, SUBSCRIPTIONS, PASSES, ENTITLEMENT_RULES);
+
+    /**
+     * True when {@code name} is one of this module's own collections. The wildcard quota hook uses
+     * it to skip its own bookkeeping — a quota rule must never cap the rows that record billing
+     * state, or a member at their limit could not be granted the pass that raises it.
+     */
+    public static boolean isModuleCollection(String name) {
+        return name != null && MODULE_COLLECTIONS.contains(name);
+    }
 
     private final QueryEngine queryEngine;
     private final CollectionRegistry collectionRegistry;
@@ -172,6 +186,61 @@ public class BillingCollections {
                     return expiry == null || expiry.isAfter(now);
                 })
                 .toList();
+    }
+
+    // ------------------------------------------------------------- Entitlement rules
+
+    /**
+     * Active quota rules for one collection.
+     *
+     * <p>Read on every record create for the tenant (the quota hook is a wildcard), so this stays
+     * a single indexed query with no post-filtering beyond the collection name. Returns empty —
+     * never throws — when the rules collection is absent, so a tenant that installed the module
+     * without it still writes records normally.
+     */
+    public List<Map<String, Object>> activeRulesForCollection(String collectionName) {
+        if (collectionRegistry.get(ENTITLEMENT_RULES) == null) {
+            return List.of();
+        }
+        try {
+            return query(ENTITLEMENT_RULES, List.of(
+                    FilterCondition.eq("collectionName", collectionName),
+                    FilterCondition.eq("active", true)), 100);
+        } catch (RuntimeException e) {
+            // Fail open, like the rest of the quota path: a rules-lookup fault must not block a
+            // tenant's data entry.
+            return List.of();
+        }
+    }
+
+    /**
+     * Claims due passes for expiry, returning the rows flipped from ACTIVE to EXPIRED.
+     *
+     * <p>A tidier, not a gate — {@link EntitlementResolver} already ignores an expired pass at
+     * read time regardless of stored status, so a member is never over-entitled by a sweep that is
+     * late or has never run. What it buys is an accurate status for admin screens.
+     *
+     * <p>Unlike the compiled-in sweep there is no {@code FOR UPDATE SKIP LOCKED} claim, because a
+     * module writes through {@link QueryEngine} and cannot express one. Two pods sweeping at once
+     * would each flip the same row to the same terminal value, which is harmless; the update is
+     * idempotent by construction.
+     */
+    public List<Map<String, Object>> expireDuePasses(Instant now, int limit) {
+        if (collectionRegistry.get(PASSES) == null) {
+            return List.of();
+        }
+        List<Map<String, Object>> expired = new java.util.ArrayList<>();
+        for (Map<String, Object> pass : query(PASSES,
+                List.of(FilterCondition.eq("status", "ACTIVE")), limit)) {
+            Instant expiresAt = toInstant(pass.get("expiresAt"));
+            if (expiresAt == null || expiresAt.isAfter(now)) {
+                continue;
+            }
+            queryEngine.update(definition(PASSES), String.valueOf(pass.get("id")),
+                    Map.of("status", "EXPIRED"));
+            expired.add(pass);
+        }
+        return expired;
     }
 
     // ------------------------------------------------------------- Internals

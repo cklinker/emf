@@ -1,7 +1,10 @@
 package io.kelta.worker.module;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.module.ModuleStore;
 import io.kelta.runtime.module.TenantModuleData;
+import io.kelta.runtime.workflow.ActionContext;
+import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
 import io.kelta.runtime.workflow.ActionResult;
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
@@ -22,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -98,6 +102,49 @@ class ModuleWebhookDispatchTest {
                 .containsEntry("echoBody", body)
                 .containsEntry("echoTenant", TENANT_ID)
                 .containsEntry("echoModule", MODULE_ID);
+    }
+
+    @Test
+    @DisplayName("Binds the tenant before invoking the handler")
+    void bindsTenantForTheHandler() {
+        // Observed from a PLATFORM-side handler, because a JAR module cannot read TenantContext at
+        // all — io.kelta.runtime.context is outside the classloader allowlist. That is exactly why
+        // the platform has to bind it: the webhook route is unauthenticated, so nothing upstream
+        // binds a tenant, and unbound every read and write the handler makes would run under the
+        // admin_bypass RLS policy, across tenants.
+        ActionHandlerRegistry registry = new ActionHandlerRegistry();
+        AtomicReference<String> boundDuringDispatch = new AtomicReference<>();
+        registry.registerTenantHandler(TENANT_ID, new ActionHandler() {
+            @Override
+            public String getActionTypeKey() {
+                return WebhookTestModule.HANDLER_KEY;
+            }
+
+            @Override
+            public ActionResult execute(ActionContext context) {
+                boundDuringDispatch.set(TenantContext.get());
+                return ActionResult.success();
+            }
+        });
+        RuntimeModuleManager platformSide = new RuntimeModuleManager(
+                moduleStore, registry, new ObjectMapper());
+        installed(TenantModuleData.STATUS_ACTIVE);
+
+        assertThat(platformSide.dispatchWebhook(TENANT_ID, MODULE_ID, "{}", Map.of())).isPresent();
+
+        assertThat(boundDuringDispatch.get()).isEqualTo(TENANT_ID);
+    }
+
+    @Test
+    @DisplayName("Leaves no tenant bound after dispatch returns")
+    void unbindsTenantAfterDispatch() {
+        installed(TenantModuleData.STATUS_ACTIVE);
+        manager.loadModule(TENANT_ID, moduleData(TenantModuleData.STATUS_ACTIVE));
+
+        manager.dispatchWebhook(TENANT_ID, MODULE_ID, "{}", Map.of("x-test-signature", "sig"));
+
+        // A leaked binding would silently scope whatever the calling thread does next.
+        assertThat(TenantContext.get()).isNull();
     }
 
     @Test

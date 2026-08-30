@@ -213,7 +213,22 @@ platform type fails).
 5. **Classpath**: the module's own classes must be in the JAR. Only the prefixes in
    `SandboxedModuleClassLoader.ALLOWED_PARENT_PREFIXES` resolve from the platform.
 
+**What the platform does for a module, so it doesn't have to:**
+- **Binds the tenant** around a webhook dispatch. A module *cannot* — `io.kelta.runtime.context`
+  is outside the classloader allowlist — and unbound, its reads and writes run under the
+  `admin_bypass` RLS policy across tenants. Flow and CRUD paths already bind upstream.
+
 **Known limits** — these still need a platform change, so design around them:
+- **No scheduler.** A module is not a Spring bean, so no `@Scheduled`. Expose the work as an
+  `ActionHandler` and let a tenant drive it from a scheduled flow (see `billing:expire-passes`) —
+  more configurable than a hardcoded cron, and needs no new platform capability.
+- **No request context.** Neither `jakarta.servlet` nor `org.springframework` is on the classpath,
+  so a hook cannot read request headers (e.g. the gateway's `X-User-Type` actor tier). Design
+  around the record and `tenantId` it is given.
+- **No NATS.** A module cannot subscribe, so it cannot hold a cache that needs fleet-wide
+  invalidation. Prefer resolving from collections over caching stale config.
+- **No transactions.** A module writes through `QueryEngine` and cannot open one or use
+  `FOR UPDATE SKIP LOCKED`. Design writes to converge on replay rather than relying on a claim.
 - **No new `@RestController`.** Spring MVC resolves routes at context start. A module's HTTP
   surface rides existing dynamic routes: flows (`execute_flow`), collection CRUD, and the generic
   webhook route above.

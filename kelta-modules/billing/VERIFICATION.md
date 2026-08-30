@@ -35,8 +35,13 @@ writing in the wrong scope.
 kelta api GET /api/modules | grep -q uiBundlePath && echo "worker has #1378+ ✓"
 ```
 
-Confirm the deployed worker tag in `homelab-argo/emf/kustomization.yaml` is at or past the commit
-that merged #1381 before continuing.
+Confirm the deployed worker tag is at or past `main-01cf091` (the merge of #1381):
+
+```bash
+kubectl get pods -n emf -o custom-columns='N:.metadata.name,I:.spec.containers[0].image' --no-headers | grep worker
+```
+
+✅ Satisfied as of 2026-08-30: worker pods run `main-01cf091`, rolled 01:25Z.
 
 ## 1. Build the module
 
@@ -45,8 +50,17 @@ mvn package -f kelta-modules/billing/pom.xml
 shasum -a 256 kelta-modules/billing/target/kelta-module-billing-1.0.0.jar
 ```
 
-Last known-good build: `28ab86a54d7c7c4cd893be5293f76ce056060d3b125d9a94b015a36b2ff3263b`
-(re-derive it; the JAR changes whenever the module does).
+Last known-good build, from `01cf0911` (the merge of #1381):
+`2ea8a8a8f81b513c83833977252fa583d94b30cbbc41c6ac6983d3b42c8a8c8c`
+Re-derive it rather than trusting this line — the JAR changes whenever the module does.
+
+Sanity-check the JAR before signing something incomplete:
+
+```bash
+unzip -l "$JAR" | grep -E 'kelta-module.json|ui-bundle.js|BillingModule.class'
+unzip -p "$JAR" kelta-module.json | python3 -c "import sys,json;m=json.load(sys.stdin);print(len(m['actionHandlers']),'handlers',len(m['collections']),'collections')"
+# expect: all three present, and "5 handlers 5 collections"
+```
 
 ## 2. 🔑 Sign the JAR
 
@@ -55,8 +69,13 @@ signed `spotopened-ridb`. A different key installs as stubs (see the warning abo
 
 ```bash
 JAR=kelta-modules/billing/target/kelta-module-billing-1.0.0.jar
-openssl pkeyutl -sign -rawin -inkey /path/to/your/module-signing-key.pem -in "$JAR" | base64 > /tmp/billing.sig
+openssl pkeyutl -sign -rawin -inkey /path/to/your/module-signing-key.pem -in "$JAR" \
+  | base64 | tr -d '\n' > /tmp/billing.sig
 ```
+
+`tr -d '\n'` is not optional. The verifier uses Java's **basic** Base64 decoder, which rejects
+embedded newlines, and `base64` wraps at 76 columns on Linux (macOS does not). Without it the
+install fails on some machines and not others.
 
 Keep the private key out of the repo and out of any agent session.
 

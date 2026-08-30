@@ -5,6 +5,59 @@ Verifies the billing module end-to-end against **real Stripe test-mode keys** on
 
 **Steps marked 🔑 require you to handle secrets and must not be delegated to an agent.**
 
+## Use the sandbox, not production
+
+`spotopened` has a **live subscriber** on the compiled-in billing (6 plans, 1 subscription, 1
+customer). Pointing a real Stripe webhook at the module there would write events into the module's
+parallel, empty collections while the app keeps reading the compiled-in ones — diverging a paying
+member's state. Do the Stripe half in a sandbox.
+
+A sandbox is already provisioned:
+
+| | |
+|---|---|
+| Environment | `billing-stripe-verify` (id `6ec47aed-ecda-40aa-867f-39c023b93421`), status ACTIVE |
+| Sandbox tenant | `c734b580-1204-4e00-97a4-3500a4f5c25e` |
+| Slug | `spotopened--billing-stripe-verify` |
+| CLI profile | `billing-sandbox` (already written to `~/.kelta/config.json`) |
+| Admin user | `spotopened--billing-stripe-verify-admin@kelta.local` |
+| Webhook URL | `https://api.kelta.io/api/modules/webhooks/c734b580-1204-4e00-97a4-3500a4f5c25e/kelta-billing` |
+
+Verified reachable: that webhook URL answers **404** pre-install (dispatcher responding, nothing
+installed) and the sandbox slug resolves 200.
+
+### 🔑 One human step before the rest can be automated
+
+The auth server supports only `authorization_code`, `client_credentials`, `refresh_token` and
+token-exchange — **no password grant** — so a sandbox token cannot be minted non-interactively,
+and a parent-tenant PAT is correctly refused across tenants (403 `User identity not resolved`).
+
+Log in once with the sandbox admin credentials printed by `kelta sandbox create`:
+
+```bash
+kelta auth login --profile billing-sandbox
+```
+
+After that every step below works with `--profile billing-sandbox`.
+
+### Signing keys are per tenant
+
+The sandbox needs its **own** registered key or the install falls back to inert stubs. Register the
+same public half already trusted on spotopened:
+
+```bash
+kelta api POST /api/modules/signing-keys --profile billing-sandbox --yes --data "$(python3 - <<'EOF'
+import json
+pem=open('/Users/craigklinker/.spotopened/module-signing/module-signing-public.pem').read()
+print(json.dumps({"label":"2026-h2","algorithm":"Ed25519","publicKeyPem":pem,"active":True}))
+EOF
+)"
+```
+
+Then run steps 1–8 with `--profile billing-sandbox`, using the sandbox tenant id in the webhook URL.
+
+---
+
 Environment established by inspection, not assumption:
 
 | | |

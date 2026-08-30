@@ -460,4 +460,52 @@ class CollectionDefinitionTest {
             assertNotEquals(collection1, collection2);
         }
     }
+
+    @Nested
+    @DisplayName("Queryable fields (declared + system)")
+    class QueryableFields {
+
+        /** Realistic: no collection declares the audit fields. */
+        private CollectionDefinition collection(boolean tenantScoped) {
+            return CollectionDefinition.builder()
+                    .name("watches")
+                    .displayName("Watches")
+                    .tenantScoped(tenantScoped)
+                    .addField(FieldDefinition.string("label", 100))
+                    .build();
+        }
+
+        @Test
+        @DisplayName("System audit fields are queryable though never declared")
+        void systemFieldsAreQueryable() {
+            CollectionDefinition c = collection(false);
+
+            // The distinction that issue #1384 turned on: these are real, filterable columns,
+            // but they are not in fields(), so hasField says no.
+            for (String f : CollectionDefinition.SYSTEM_FIELD_NAMES) {
+                assertFalse(c.hasField(f), f + " should not be a declared field");
+                assertTrue(c.hasQueryableField(f), f + " must be queryable");
+            }
+        }
+
+        @Test
+        @DisplayName("Declared fields remain queryable")
+        void declaredFieldsAreQueryable() {
+            assertTrue(collection(false).hasQueryableField("label"));
+        }
+
+        @Test
+        @DisplayName("Unknown fields are not queryable")
+        void unknownFieldsAreNotQueryable() {
+            assertFalse(collection(false).hasQueryableField("nope"));
+            assertFalse(collection(false).hasQueryableField(null));
+        }
+
+        @Test
+        @DisplayName("tenantId is queryable only on a tenant-scoped collection")
+        void tenantIdDependsOnScoping() {
+            assertTrue(collection(true).hasQueryableField("tenantId"));
+            assertFalse(collection(false).hasQueryableField("tenantId"));
+        }
+    }
 }

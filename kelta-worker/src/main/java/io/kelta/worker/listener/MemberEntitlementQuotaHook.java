@@ -149,7 +149,12 @@ public class MemberEntitlementQuotaHook implements BeforeSaveHook {
                     rule.limitKey(), collectionName);
             return BeforeSaveResult.ok();
         }
-        if (!definition.hasField(OWNER_FIELD)) {
+        // hasQueryableField, NOT hasField: createdBy is a system audit field that every record
+        // carries and the storage layer can filter on, but it is not in the collection's declared
+        // fields. hasField therefore returns false for EVERY collection, which made this guard
+        // fail open on every positive limit (issue #1384) — only limit <= 0 ever rejected,
+        // because that branch short-circuits above.
+        if (!definition.hasQueryableField(OWNER_FIELD)) {
             log.warn("Collection {} has no {} field — cannot scope quota {} to a member, allowing",
                     collectionName, OWNER_FIELD, rule.limitKey());
             return BeforeSaveResult.ok();
@@ -208,7 +213,9 @@ public class MemberEntitlementQuotaHook implements BeforeSaveHook {
 
         for (Map.Entry<String, JsonNode> entry : node.properties()) {
             String field = entry.getKey();
-            if (!definition.hasField(field)) {
+            // Same reason as the owner guard above: a countFilter may legitimately name an audit
+            // field, and hasField would reject it as unknown.
+            if (!definition.hasQueryableField(field)) {
                 log.warn("Quota rule {} countFilter names unknown field '{}' on {} — allowing",
                         rule.limitKey(), field, definition.name());
                 return false;

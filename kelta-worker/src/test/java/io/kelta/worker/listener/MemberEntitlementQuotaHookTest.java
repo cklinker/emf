@@ -69,7 +69,14 @@ class MemberEntitlementQuotaHookTest {
         RequestContextHolder.resetRequestAttributes();
     }
 
-    /** A collection carrying the audit owner field the quota scopes on. */
+    /**
+     * A realistic collection: it does NOT declare {@code createdBy}.
+     *
+     * <p>No real collection does — {@code createdBy} is a system audit column every record carries.
+     * An earlier version of this fixture declared it as a lookup field, which made
+     * {@code hasField("createdBy")} true and hid issue #1384: in production the guard was always
+     * false, so quotas failed open on every positive limit. Do not add it back.
+     */
     private static CollectionDefinition collectionWithOwner() {
         return CollectionDefinition.builder()
                 .name(COLLECTION)
@@ -77,8 +84,6 @@ class MemberEntitlementQuotaHookTest {
                 .storageConfig(StorageConfig.physicalTable("watches"))
                 .addField(FieldDefinition.string("label", 100))
                 .addField(FieldDefinition.string("status", 20))
-                .addField(FieldDefinition.lookup("createdBy", "users", "Created By")
-                        .withColumnName("created_by"))
                 .build();
     }
 
@@ -397,7 +402,11 @@ class MemberEntitlementQuotaHookTest {
 
         @Test
         @DisplayName("a collection without the owner field allows the write")
-        void missingOwnerFieldAllows() {
+        void undeclaredOwnerFieldStillEnforces() {
+            // Regression for #1384. createdBy is a system audit field, so no collection declares
+            // it; the guard must use hasQueryableField, not hasField. When it used hasField this
+            // returned success and never touched the query engine — quotas silently did not
+            // enforce on ANY collection, for every positive limit.
             asPortalActor();
             withRule(rule("k", null, "PORTAL", null));
             when(entitlementService.intLimit(anyString(), anyString(), anyString(), anyInt()))
@@ -408,9 +417,9 @@ class MemberEntitlementQuotaHookTest {
                     .storageConfig(StorageConfig.physicalTable("watches"))
                     .addField(FieldDefinition.string("label", 100))
                     .build());
+            withCount(1);
 
-            assertThat(hook.beforeCreate(COLLECTION, record(USER), TENANT).isSuccess()).isTrue();
-            verifyNoInteractions(queryEngine);
+            assertThat(hook.beforeCreate(COLLECTION, record(USER), TENANT).isSuccess()).isFalse();
         }
 
         @Test

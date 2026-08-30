@@ -23,6 +23,25 @@ does nothing.
 
 **Never treat ACTIVE as working.** Step 4 is the real gate.
 
+There are **three** independent causes of that silent stub fallback, and they look identical:
+
+1. The signature does not verify (wrong key, or base64 with newlines — see step 2).
+2. The JAR checksum does not match what was stored.
+3. **The worker is running the GraalVM native image.** A native image has no bytecode
+   interpreter, so it cannot execute an uploaded JAR at all — every module installs as stubs.
+
+Cause 3 is the one that is invisible from the API. Check it directly:
+
+```bash
+kubectl exec -n emf deploy/emf-worker -- sh -c 'ls /app'
+# app.jar  => JVM image, modules can run
+# no app.jar (a single native binary) => modules CANNOT run, stop here
+```
+
+✅ Confirmed 2026-08-30: the deployed worker is the JVM image (`/app/app.jar`, Temurin 25.0.4),
+which is also why `spotopened-ridb` works today. If the worker is ever switched to the native
+image, every installed module silently becomes inert.
+
 ---
 
 ## 0. Prerequisite — land the tenant-binding fix first
@@ -67,11 +86,24 @@ unzip -p "$JAR" kelta-module.json | python3 -c "import sys,json;m=json.load(sys.
 Use the **same Ed25519 private key** whose public half is registered as `2026-h2` — the one that
 signed `spotopened-ridb`. A different key installs as stubs (see the warning above).
 
+On this machine that key is `~/.spotopened/module-signing/module-signing-key.pem`; its public half
+matches the registered `2026-h2` anchor exactly. Confirm before signing rather than after:
+
+```bash
+diff <(grep -v 'BEGIN\|END' ~/.spotopened/module-signing/module-signing-public.pem | tr -d '\n') \
+     <(kelta api GET /api/modules/signing-keys | python3 -c "import sys,json;print(json.load(sys.stdin)['data'][0]['attributes']['publicKeyPem'])" | grep -v 'BEGIN\|END' | tr -d '\n') \
+  && echo "key matches the registered anchor"
+```
+
 ```bash
 JAR=kelta-modules/billing/target/kelta-module-billing-1.0.0.jar
-openssl pkeyutl -sign -rawin -inkey /path/to/your/module-signing-key.pem -in "$JAR" \
+openssl pkeyutl -sign -rawin -inkey ~/.spotopened/module-signing/module-signing-key.pem -in "$JAR" \
   | base64 | tr -d '\n' > /tmp/billing.sig
 ```
+
+`-rawin` is required: Ed25519 signs the message itself, and signing a digest instead produces a
+signature the verifier rejects. `scripts/sign-ridb-module.sh` in `spotopened-web` is the proven
+equivalent for the other module — worth reading if this ever misbehaves.
 
 `tr -d '\n'` is not optional. The verifier uses Java's **basic** Base64 decoder, which rejects
 embedded newlines, and `base64` wraps at 76 columns on Linux (macOS does not). Without it the

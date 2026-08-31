@@ -104,15 +104,26 @@ spawn_worker() {
 
 main_loop() {
   log_event dispatch_start max_parallel="$MAX_PARALLEL" tick="$TICK_SECONDS"
-  local gate=""
+  local gate="" ticks=0 hb_every
+  # Heartbeat every ~30 min regardless of gate state. A gated dispatcher is
+  # silent by design, so absence of logs cannot mean "down" without this —
+  # which is precisely how ten weeks of failure went unnoticed.
+  hb_every=$(( 1800 / TICK_SECONDS )); (( hb_every < 1 )) && hb_every=1
   while :; do
+    if (( ticks % hb_every == 0 )); then
+      log_event dispatch_heartbeat gate="${gate:-none}" \
+        active="$(active_sessions | wc -l | tr -d ' ')" \
+        approved="$(ls "$EMF_QUEUE_REPO"/approved/*.md 2>/dev/null | wc -l | tr -d ' ')"
+    fi
+    ticks=$(( ticks + 1 ))
+
     # --- budget gates (BUDGET.md) -----------------------------------------
     # Both defined in lib/queue.sh. Checked every tick, before any pull or
     # claim, so a paused or out-of-window dispatcher does no work at all.
     # Logged on transition only: a gated dispatcher must be distinguishable
     # from a broken one, without one line every TICK_SECONDS for eight hours.
     if throttled; then
-      [[ "$gate" == "paused" ]] || { log_info "paused until $(cat "$PAUSE_FILE" 2>/dev/null)"; gate="paused"; }
+      [[ "$gate" == "paused" ]] || { log_info "paused until $(date -d "@$(cat "$PAUSE_FILE" 2>/dev/null)" '+%Y-%m-%d %H:%M %Z' 2>/dev/null || cat "$PAUSE_FILE" 2>/dev/null)"; gate="paused"; }
       sleep "$TICK_SECONDS"; continue
     fi
     if ! in_run_window; then

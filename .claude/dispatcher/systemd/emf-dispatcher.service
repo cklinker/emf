@@ -8,6 +8,9 @@ Wants=network-online.target
 Type=simple
 User=craig
 Group=craig
+# Shared group over /srv/rzware-ceo, so the dispatcher can read PAUSED_UNTIL
+# whether it runs as craig (today) or as ceo (after the migration).
+SupplementaryGroups=rzware
 WorkingDirectory=/home/craig/GitHub/emf
 ExecStart=/bin/bash /home/craig/GitHub/emf/.claude/dispatcher/dispatch.sh
 

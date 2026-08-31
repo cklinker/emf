@@ -243,3 +243,33 @@ in_run_window() {   # nightly 22:00–06:00 America/Denver unless FORCE_RUN=1
   [ "$h" -ge 22 ] || [ "$h" -lt 6 ]
 }
 # ---------------------------------------------------------------------------
+
+# --- budget: detect a usage-limit signal and self-throttle (BUDGET.md §13) --
+# worker.sh calls this right after the claude run. On a subscription-limit
+# signal it writes PAUSE_FILE with the epoch to resume at; throttled() in
+# dispatch.sh then stops the fleet claiming, with no human in the path.
+#
+# Patterns are deliberately narrow. A false positive halts the whole fleet,
+# and worker logs routinely contain source files named RateLimiter.java, so
+# matching a bare "rate limit" would pause on reading the wrong file.
+detect_usage_limit() {
+  local log="${1:-}" reset="" until=""
+  [ -n "$log" ] && [ -f "$log" ] || return 1
+  grep -qE '"type"[[:space:]]*:[[:space:]]*"rate_limit_error"|Claude usage limit reached|usage_limit_reached' "$log" || return 1
+
+  # Prefer a reset time the stream reports; accept epoch or ISO-8601.
+  reset="$(grep -oE '"(resets_at|resetsAt|reset_at)"[[:space:]]*:[[:space:]]*"?[0-9TZ:+-]+' "$log" \
+           | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:Z+-]+|[0-9]{10,}' | tail -1)"
+  if [ -n "$reset" ]; then
+    case "$reset" in
+      [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*) until="$reset" ;;
+      *) until="$(date -d "$reset" +%s 2>/dev/null || true)" ;;
+    esac
+  fi
+  # No parseable reset: wait an hour and let the next tick re-evaluate.
+  [ -n "$until" ] || until=$(( $(date +%s) + 3600 ))
+
+  mkdir -p "$(dirname "$PAUSE_FILE")" 2>/dev/null || true
+  printf '%s\n' "$until" > "$PAUSE_FILE" 2>/dev/null || return 1
+  return 0
+}

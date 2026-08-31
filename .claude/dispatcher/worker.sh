@@ -142,6 +142,12 @@ EMF_TASK_FILE="$TASK_FILE" \
 CLAUDE_RC=$?
 log_event claude_end task="$ID" rc="$CLAUDE_RC"
 
+# --- budget: self-throttle on a usage-limit signal (BUDGET.md §13) ----------
+# Writes PAUSE_FILE; dispatch.sh's throttled() stops claiming until it lapses.
+if detect_usage_limit "$JSONL_LOG"; then
+  log_warn "usage limit detected; pausing the fleet" until="$(cat "$PAUSE_FILE" 2>/dev/null)"
+fi
+
 # ---- 3. Self-blocked check --------------------------------------------------
 
 if [[ -f "$WT/BLOCKED.md" ]]; then

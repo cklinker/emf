@@ -14,14 +14,31 @@ groups:
           summary: 'Autopilot failed-task count > 3 in 24h ({{ $value }} so far)'
           runbook: 'Check emf-queue/failed/ and tail per-task jsonl logs on worker-01.'
 
-      - alert: EMFAutopilotWorkerHostDown
+      # Was: up{instance=~".*worker-01.*"} == 0
+      # Nothing scrapes 192.168.0.166 and no Prometheus target carries a
+      # worker-01 label, so that expression matched no series and sat green
+      # forever. dispatch.sh emits dispatch_heartbeat every ~30m regardless of
+      # gate state, so its absence is a real liveness signal.
+      - alert: EMFAutopilotDispatcherHeartbeatMissing
         expr: |
-          up{instance=~".*worker-01.*"} == 0
+          sum(count_over_time({source="emf-dispatcher"} |~ "dispatch_heartbeat" [45m])) == 0
         for: 5m
         labels: {severity: critical, component: autopilot}
         annotations:
-          summary: 'worker-01 (craig@192.168.0.166) is unreachable'
-          runbook: 'ssh worker-01; if up, check `systemctl status emf-dispatcher`.'
+          summary: 'No dispatcher heartbeat from worker-01 in 45m — the loop is down'
+          runbook: 'ssh craig@192.168.0.166; systemctl status emf-dispatcher; journalctl -u emf-dispatcher -n50.'
+
+      # AUTOPILOT.md §4.16 — a starved queue is as bad as a failing one, and is
+      # what actually stopped the loop. The heartbeat carries approved= depth.
+      - alert: EMFAutopilotQueueStarved
+        expr: |
+          sum(count_over_time({source="emf-dispatcher"} |~ "dispatch_heartbeat" |~ "\"approved\":\"0\"" [24h]))
+            == sum(count_over_time({source="emf-dispatcher"} |~ "dispatch_heartbeat" [24h]))
+        for: 30m
+        labels: {severity: warning, component: autopilot}
+        annotations:
+          summary: 'approved/ has been empty for 24h — the loop has nothing to do'
+          runbook: 'Promote work: git mv ready/<task>.md approved/ in emf-queue.'
 
       - alert: EMFAutopilotDispatcherFlapping
         expr: |
@@ -48,16 +65,29 @@ groups:
 
       # ---- Cost ---------------------------------------------------------------
 
-      - alert: EMFAutopilotDailySpendHigh
-        # Threshold should be set after 1 week of baseline data per the plan.
-        # Default: $50/day. Edit before deploying.
+      # Threshold set from real data, per AUTOPILOT.md §3c, not an estimate.
+      # Baseline from 42 archived cost-*.json (2026-05-11..06-28, 7 active days):
+      #   median day 144M tokens, max day 473M (15 tasks), median task 32M.
+      # That was MAX_PARALLEL=3 on Opus. The new regime is MAX_PARALLEL=1 with
+      # sonnet by default, so expect roughly a third of the throughput at a
+      # fraction of the per-token cost. 300M/day sits above normal operation
+      # and below the old busiest day — it catches a runaway, not a busy night.
+      # Dollars are not the unit that binds on a subscription; tokens are.
+      - alert: EMFAutopilotDailyTokensHigh
         expr: |
-          sum(sum_over_time({source="emf-dispatcher", stream_type="cost"} | json | unwrap estimated_cost_usd [1d])) > 50
+          sum(sum_over_time({source="emf-dispatcher", stream_type="cost"} | json
+              | unwrap input_tokens [1d]))
+          + sum(sum_over_time({source="emf-dispatcher", stream_type="cost"} | json
+              | unwrap cache_creation_tokens [1d]))
+          + sum(sum_over_time({source="emf-dispatcher", stream_type="cost"} | json
+              | unwrap cache_read_tokens [1d]))
+          + sum(sum_over_time({source="emf-dispatcher", stream_type="cost"} | json
+              | unwrap output_tokens [1d])) > 300000000
         for: 10m
         labels: {severity: warning, component: autopilot}
         annotations:
-          summary: 'Autopilot daily $ spend > $50 (currently ${{ $value | humanize }})'
-          runbook: 'Check Top 10 most expensive tasks panel; drill into longest-running attempts.'
+          summary: 'Autopilot burned >300M tokens in 24h ({{ $value | humanize }}) — check for a runaway'
+          runbook: 'Top-10 expensive tasks panel. Consider MAX_PARALLEL=0 to drain, or touch state/PAUSED_UNTIL.'
 
       - alert: EMFAutopilotSingleTaskSpendHigh
         # Catches runaway loops where one task burns the budget.

@@ -190,6 +190,11 @@ Each maps to a real mistake an agent has made here. Violating one usually compil
 - ❌ Assume `/api/admin/**` is Cerbos-protected per-resource → it gets only `API_ACCESS`; enforce specific permissions in-controller (`architecture.md` → Authorizing a new endpoint).
 - ❌ Register a flow `ActionHandler` as `@Component` → ✅ wire it in the module's `onStartup()` (`playbooks.md`). The `@Component` Javadoc is wrong.
 - ❌ Hand-write MCP `server.addTool(...)` → ✅ implement the `AdminTool`/`UserTool` marker; `McpServerConfig` auto-registers.
+- ❌ Map a worker endpoint as `/**` under `/api` → `DynamicCollectionRouter`'s all-variable
+  4-segment `@GetMapping` wins (Spring ranks catch-alls **last**) and answers 404 as a record
+  read; POST stops at 3 segments so it still works, which reads as a method-specific bug in
+  your controller → ✅ spell out depth-1..N patterns, and register the router stand-in in the
+  mapping test — testing the controller alone cannot see it (`concerns.md` → Fragile Areas).
 - ❌ Add `/api/<new-segment>/**` without a gateway static route → 404. Register in `RouteConfigService.registerStaticRoutes()`.
 - ❌ Reuse or skip a Flyway version → check the migration dir for the head number first.
 - ❌ Fork a new shared table/filter/form component → ✅ reuse/extend `@kelta/components`.

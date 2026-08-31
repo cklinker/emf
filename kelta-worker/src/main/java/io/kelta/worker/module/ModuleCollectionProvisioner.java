@@ -65,9 +65,33 @@ public class ModuleCollectionProvisioner {
      * @throws IllegalArgumentException if a declaration is malformed — the install is rejected
      *         before anything is created, so a bad manifest cannot half-provision a tenant
      */
+    /**
+     * What a provisioning run did, split by ownership.
+     *
+     * <p>The distinction is the whole point: uninstall may remove a collection the module
+     * <b>created</b>, and must never remove one it merely <b>adopted</b> because the name already
+     * existed. Returning only the created names, as this used to, throws that away.
+     */
+    public record ProvisionResult(List<String> created, List<String> adopted) {
+        public int total() {
+            return created.size() + adopted.size();
+        }
+    }
+
+    /**
+     * @deprecated use {@link #provisionWithOwnership} — this loses the created/adopted distinction
+     *             that uninstall depends on.
+     */
+    @Deprecated
     public List<String> provision(String tenantId, List<ModuleManifest.CollectionManifest> collections) {
+        return provisionWithOwnership(tenantId, collections).created();
+    }
+
+    /** Creates the declared collections, reporting which were created and which already existed. */
+    public ProvisionResult provisionWithOwnership(
+            String tenantId, List<ModuleManifest.CollectionManifest> collections) {
         if (collections == null || collections.isEmpty()) {
-            return List.of();
+            return new ProvisionResult(List.of(), List.of());
         }
         for (ModuleManifest.CollectionManifest collection : collections) {
             validate(collection);
@@ -81,16 +105,18 @@ public class ModuleCollectionProvisioner {
             }
 
             List<String> created = new java.util.ArrayList<>();
+            List<String> adopted = new java.util.ArrayList<>();
             for (ModuleManifest.CollectionManifest collection : collections) {
                 if (collectionRegistry.get(collection.name()) != null) {
-                    log.info("Module collection '{}' already exists for tenant {} — skipping",
+                    log.info("Module collection '{}' already exists for tenant {} — adopting",
                             collection.name(), tenantId);
+                    adopted.add(collection.name());
                     continue;
                 }
                 createCollection(tenantId, collectionsDef, fieldsDef, collection);
                 created.add(collection.name());
             }
-            return List.copyOf(created);
+            return new ProvisionResult(List.copyOf(created), List.copyOf(adopted));
         });
     }
 

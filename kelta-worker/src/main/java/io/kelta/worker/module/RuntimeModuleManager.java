@@ -62,6 +62,9 @@ public class RuntimeModuleManager {
     private final ModuleCollectionProvisioner collectionProvisioner;
     /** Resolves tenantId -> slug for webhook dispatch; may be null in tests. */
     private final TenantSlugResolver tenantSlugResolver;
+
+    /** Records what each module provisioned. Null in tests that do not exercise provisioning. */
+    private ModuleProvenanceStore provenanceStore;
     private final ModuleServiceRegistry moduleServiceRegistry;
 
     /**
@@ -245,7 +248,7 @@ public class RuntimeModuleManager {
             moduleStore.createActions(actions);
         }
 
-        provisionCollections(tenantId, manifest);
+        provisionCollections(tenantId, manifest, id);
 
         log.info("Installed module '{}' v{} for tenant {} with {} action handlers",
             manifest.name(), manifest.version(), tenantId, actions.size());
@@ -340,7 +343,7 @@ public class RuntimeModuleManager {
             moduleStore.createActions(actions);
         }
 
-        provisionCollections(tenantId, manifest);
+        provisionCollections(tenantId, manifest, id);
 
         log.info("Installed module '{}' v{} for tenant {} with JAR (s3Key={}, {} bytes)",
             manifest.name(), manifest.version(), tenantId, s3Key, jarBytes.length);
@@ -349,24 +352,64 @@ public class RuntimeModuleManager {
     }
 
     /**
-     * Creates the collections the manifest declares, in the installing tenant.
+     * Creates the collections the manifest declares, in the installing tenant, and records what it
+     * created versus adopted.
      *
-     * <p>Failure is logged, not thrown: the module row and its action records are already
-     * persisted at this point, so propagating would leave a half-installed module the admin
-     * cannot see or uninstall. The operator sees the error and can retry by reinstalling —
-     * provisioning skips collections that already exist, so a retry is safe.
+     * <p>Failure is still not thrown: the module row and its action records are already persisted
+     * at this point, so propagating would leave a half-installed module the admin cannot see or
+     * uninstall. But it is no longer only a log line either — the module is marked {@code FAILED},
+     * which is the state an admin can actually see and act on. Retrying by reinstalling is safe;
+     * a collection that already exists is adopted rather than recreated.
+     *
+     * @param moduleRowId the {@code tenant_module} row, so a failure can be recorded against it
      */
-    private void provisionCollections(String tenantId, ModuleManifest manifest) {
+    private void provisionCollections(String tenantId, ModuleManifest manifest, String moduleRowId) {
         if (collectionProvisioner == null || manifest.collections().isEmpty()) {
             return;
         }
         try {
-            List<String> created = collectionProvisioner.provision(tenantId, manifest.collections());
-            log.info("Module '{}' provisioned {} collection(s) for tenant {}: {}",
-                manifest.id(), created.size(), tenantId, created);
+            var result = collectionProvisioner.provisionWithOwnership(
+                tenantId, manifest.collections());
+            recordProvenance(tenantId, manifest, result);
+            log.info("Module '{}' provisioned {} collection(s) for tenant {} "
+                    + "({} created, {} adopted)",
+                manifest.id(), result.total(), tenantId,
+                result.created().size(), result.adopted().size());
         } catch (RuntimeException e) {
-            log.error("Module '{}' failed to provision collections for tenant {}: {}",
+            log.error("Module '{}' failed to provision collections for tenant {} "
+                    + "and is marked FAILED: {}",
                 manifest.id(), tenantId, e.getMessage(), e);
+            try {
+                moduleStore.updateStatus(moduleRowId, TenantModuleData.STATUS_FAILED);
+            } catch (RuntimeException ignored) {
+                // Bookkeeping must not mask the provisioning error above.
+            }
+        }
+    }
+
+    /**
+     * Records which collections this module created and which it adopted.
+     *
+     * <p>Best-effort: losing the bookkeeping must not fail an install that otherwise succeeded. The
+     * cost of a missing record is a conservative uninstall, which is the behaviour today anyway.
+     */
+    private void recordProvenance(String tenantId, ModuleManifest manifest,
+                                  ModuleCollectionProvisioner.ProvisionResult result) {
+        if (provenanceStore == null) {
+            return;
+        }
+        try {
+            for (String name : result.created()) {
+                provenanceStore.record(tenantId, manifest.id(), manifest.version(),
+                    "COLLECTION", name, null, ModuleProvenanceStore.OWNERSHIP_CREATED, null);
+            }
+            for (String name : result.adopted()) {
+                provenanceStore.record(tenantId, manifest.id(), manifest.version(),
+                    "COLLECTION", name, null, ModuleProvenanceStore.OWNERSHIP_ADOPTED, null);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Could not record provenance for module '{}' in tenant {}: {}",
+                manifest.id(), tenantId, e.getMessage());
         }
     }
 
@@ -986,6 +1029,11 @@ public class RuntimeModuleManager {
             log.warn("Module stub mode is ENABLED: modules without a JAR will load inert handlers "
                 + "that do nothing. This must never be enabled in production.");
         }
+    }
+
+    /** Injected via setter so the several existing constructor overloads stay as they are. */
+    public void setProvenanceStore(ModuleProvenanceStore provenanceStore) {
+        this.provenanceStore = provenanceStore;
     }
 
     /**

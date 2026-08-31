@@ -9,6 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { createTestWrapper, setupAuthMocks, mockAxios, resetMockAxios } from '../../test/testUtils'
 import { componentRegistry } from '../../services/componentRegistry'
 import { ModulesPage } from './ModulesPage'
@@ -130,6 +131,46 @@ describe('ModulesPage', () => {
         .getAllByText(/_field$/)
         .map((el) => el.textContent)
       expect(chips).toEqual(['alpha_field', 'zeta_field'])
+    })
+  })
+
+  describe('Install', () => {
+    it('posts the JAR as multipart to /install-jar, which is the only path that runs code', async () => {
+      // Before this, the form only ever called /api/modules/install with the manifest JSON, so
+      // every module installed through the UI had no implementation at all.
+      const user = userEvent.setup()
+      mockAxios.post.mockResolvedValue({ data: mockModules[0] })
+      render(<ModulesPage />, { wrapper: createTestWrapper() })
+      await waitFor(() => expect(screen.getByText('Analytics Module')).toBeInTheDocument())
+
+      await user.click(screen.getByRole('button', { name: /install module/i }))
+      await user.type(
+        screen.getByLabelText(/module manifest/i),
+        '{{"id":"m","name":"M","version":"1.0.0","moduleClass":"C"}'
+      )
+      await user.upload(
+        screen.getByLabelText(/module jar/i),
+        new File([new Uint8Array([1, 2, 3])], 'm.jar', { type: 'application/java-archive' })
+      )
+      await user.type(screen.getByLabelText(/publisher signature/i), 'sig-base64')
+      await user.click(screen.getByRole('button', { name: /^install$/i }))
+
+      await waitFor(() => expect(mockAxios.post).toHaveBeenCalled())
+      const [url, body] = mockAxios.post.mock.calls[0]
+      expect(url).toBe('/api/modules/install-jar')
+      expect(body).toBeInstanceOf(FormData)
+      expect((body as FormData).get('jar')).toBeInstanceOf(File)
+      expect((body as FormData).get('signature')).toBe('sig-base64')
+    })
+
+    it('warns that a manifest-only install produces a module that cannot run', async () => {
+      const user = userEvent.setup()
+      render(<ModulesPage />, { wrapper: createTestWrapper() })
+      await waitFor(() => expect(screen.getByText('Analytics Module')).toBeInTheDocument())
+
+      await user.click(screen.getByRole('button', { name: /install module/i }))
+
+      expect(screen.getByText(/every action it\s+declares is quarantined/i)).toBeInTheDocument()
     })
   })
 })

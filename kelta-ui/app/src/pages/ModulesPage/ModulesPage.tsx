@@ -108,6 +108,8 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
   const [manifestInput, setManifestInput] = useState('')
   const [sourceUrlInput, setSourceUrlInput] = useState('')
   const [checksumInput, setChecksumInput] = useState('')
+  const [jarFile, setJarFile] = useState<File | null>(null)
+  const [signatureInput, setSignatureInput] = useState('')
   const [expandedModule, setExpandedModule] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [moduleToDelete, setModuleToDelete] = useState<TenantModule | null>(null)
@@ -123,8 +125,31 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
   })
 
   const installMutation = useMutation({
-    mutationFn: (data: { manifest: string; sourceUrl: string; checksum: string }) =>
-      apiClient.post<TenantModule>('/api/modules/install', data),
+    // With a JAR this posts multipart to /install-jar, which is the only path that produces a
+    // module that actually runs. Without one the module installs from its manifest alone and every
+    // declared action is inert -- the platform quarantines it rather than pretending it works.
+    mutationFn: (data: {
+      manifest: string
+      sourceUrl: string
+      checksum: string
+      jar: File | null
+      signature: string
+    }) => {
+      if (!data.jar) {
+        return apiClient.post<TenantModule>('/api/modules/install', {
+          manifest: data.manifest,
+          sourceUrl: data.sourceUrl,
+          checksum: data.checksum,
+        })
+      }
+      const form = new FormData()
+      form.append('manifest', new Blob([data.manifest], { type: 'application/json' }))
+      form.append('jar', data.jar)
+      if (data.signature.trim()) {
+        form.append('signature', data.signature.trim())
+      }
+      return apiClient.postFormData<TenantModule>('/api/modules/install-jar', form)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['modules'] })
       showToast('Module installed successfully', 'success')
@@ -132,6 +157,8 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
       setManifestInput('')
       setSourceUrlInput('')
       setChecksumInput('')
+      setJarFile(null)
+      setSignatureInput('')
     },
     onError: (err: Error) => {
       showToast(err.message || 'Failed to install module', 'error')
@@ -188,6 +215,8 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
       manifest: manifestInput,
       sourceUrl: sourceUrlInput || 'local://upload',
       checksum: checksumInput || 'none',
+      jar: jarFile,
+      signature: signatureInput,
     })
   }
 
@@ -262,6 +291,47 @@ export function ModulesPage({ testId = 'modules-page' }: ModulesPageProps): Reac
                 className="h-40 w-full rounded-md border border-gray-300 p-3 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder='{"id": "my-module", "name": "My Module", "version": "1.0.0", ...}'
               />
+            </div>
+
+            <div>
+              <label htmlFor="module-jar" className="mb-1 block text-sm font-medium text-gray-700">
+                Module JAR
+              </label>
+              <input
+                id="module-jar"
+                type="file"
+                accept=".jar"
+                onChange={(e) => setJarFile(e.target.files?.[0] ?? null)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              {!jarFile && (
+                <p className="mt-1 text-xs text-amber-700">
+                  Without a JAR the module has no implementation. It installs, but every action it
+                  declares is quarantined and will refuse to run.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="module-signature"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Publisher Signature (base64)
+              </label>
+              <input
+                id="module-signature"
+                type="text"
+                value={signatureInput}
+                onChange={(e) => setSignatureInput(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="detached Ed25519 signature over the JAR bytes"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                The signature is the trust boundary: a module runs with the worker&apos;s full
+                access, and its UI bundle runs in your session. Required when this tenant has a
+                signing key registered.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -43,7 +43,11 @@ public class SetupAuditService {
 
             log.debug("Setup audit logged: {} {} {} {} in tenant {}", action, entityType, entityId, entityName, tenantId);
         } catch (Exception e) {
-            log.warn("Failed to write setup audit entry: {} {} {}: {}",
+            // Deliberately non-fatal, but not routine: a dropped row is a hole in the audit
+            // trail, so it is logged at ERROR. A constraint violation here means the action
+            // verb is not in setup_audit_trail's chk_audit_action -- that silently emptied
+            // the credential-access trail once already.
+            log.error("Failed to write setup audit entry: {} {} {}: {}",
                     action, entityType, entityId, e.getMessage());
         }
     }

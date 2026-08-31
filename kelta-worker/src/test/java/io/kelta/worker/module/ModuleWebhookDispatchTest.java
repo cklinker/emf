@@ -2,6 +2,7 @@ package io.kelta.worker.module;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.module.ModuleStore;
+import io.kelta.worker.service.TenantSlugResolver;
 import io.kelta.runtime.module.TenantModuleData;
 import io.kelta.runtime.workflow.ActionContext;
 import io.kelta.runtime.workflow.ActionHandler;
@@ -46,6 +47,7 @@ import static org.mockito.Mockito.when;
 class ModuleWebhookDispatchTest {
 
     private static final String TENANT_ID = "tenant-1";
+    private static final String TENANT_SLUG = "tenant-one";
     private static final String MODULE_ID = "webhook-module";
     private static final String MODULE_CLASS =
             "io.kelta.worker.module.testmodule.WebhookTestModule";
@@ -113,7 +115,8 @@ class ModuleWebhookDispatchTest {
         // binds a tenant, and unbound every read and write the handler makes would run under the
         // admin_bypass RLS policy, across tenants.
         ActionHandlerRegistry registry = new ActionHandlerRegistry();
-        AtomicReference<String> boundDuringDispatch = new AtomicReference<>();
+        AtomicReference<String> boundId = new AtomicReference<>();
+        AtomicReference<String> boundSlug = new AtomicReference<>();
         registry.registerTenantHandler(TENANT_ID, new ActionHandler() {
             @Override
             public String getActionTypeKey() {
@@ -122,17 +125,26 @@ class ModuleWebhookDispatchTest {
 
             @Override
             public ActionResult execute(ActionContext context) {
-                boundDuringDispatch.set(TenantContext.get());
+                boundId.set(TenantContext.get());
+                boundSlug.set(TenantContext.getSlug());
                 return ActionResult.success();
             }
         });
+        TenantSlugResolver slugResolver = mock(TenantSlugResolver.class);
+        when(slugResolver.resolveSlug(TENANT_ID)).thenReturn(Optional.of(TENANT_SLUG));
         RuntimeModuleManager platformSide = new RuntimeModuleManager(
-                moduleStore, registry, new ObjectMapper());
+                moduleStore, registry, new ObjectMapper(), null, null, null, null, null,
+                slugResolver);
         installed(TenantModuleData.STATUS_ACTIVE);
 
         assertThat(platformSide.dispatchWebhook(TENANT_ID, MODULE_ID, "{}", Map.of())).isPresent();
 
-        assertThat(boundDuringDispatch.get()).isEqualTo(TENANT_ID);
+        assertThat(boundId.get()).isEqualTo(TENANT_ID);
+        // The SLUG is what PhysicalTableStorageAdapter#getTableRef reads to pick the tenant
+        // schema. Binding only the id left it null, the adapter fell back to the PUBLIC schema,
+        // and every module query hit an unqualified table that does not exist there —
+        // "relation \"billing_customers\" does not exist" against a live Stripe webhook.
+        assertThat(boundSlug.get()).isEqualTo(TENANT_SLUG);
     }
 
     @Test

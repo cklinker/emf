@@ -58,12 +58,12 @@ public class CreateCheckoutSessionActionHandler implements ActionHandler {
     public ActionResult execute(ActionContext context) {
         String tenantId = context.tenantId();
         String userId = context.userId();
-        Map<String, Object> input = context.resolvedData() == null
-                ? Map.of() : context.resolvedData();
+        // ActionInputs, not resolvedData directly: the flow engine passes the state envelope.
+        Map<String, Object> input = ActionInputs.of(context);
 
-        String planCode = string(input, "planCode");
-        String successUrl = string(input, "successUrl");
-        String cancelUrl = string(input, "cancelUrl");
+        String planCode = ActionInputs.string(input, "planCode");
+        String successUrl = ActionInputs.string(input, "successUrl");
+        String cancelUrl = ActionInputs.string(input, "cancelUrl");
         if (userId == null || userId.isBlank()) {
             return ActionResult.failure("No calling member");
         }
@@ -82,7 +82,7 @@ public class CreateCheckoutSessionActionHandler implements ActionHandler {
             // The free baseline is what a member falls back to; it is not for sale.
             return ActionResult.failure("Plan is not purchasable");
         }
-        String priceId = string(plan, "stripePriceId");
+        String priceId = ActionInputs.string(plan, "stripePriceId");
         if (priceId == null) {
             log.warn("Plan {} of tenant {} has no Stripe price id — cannot check out",
                     planCode, tenantId);
@@ -198,12 +198,4 @@ public class CreateCheckoutSessionActionHandler implements ActionHandler {
         return false;
     }
 
-    private static String string(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value == null) {
-            return null;
-        }
-        String s = value.toString();
-        return s.isBlank() ? null : s;
-    }
 }

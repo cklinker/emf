@@ -278,5 +278,35 @@
   ],
   "services": [
     "io.kelta.runtime.module.service.EntitlementProvider"
+  ],
+  "routes": [
+    {
+      "path": "/plans",
+      "methods": [
+        "GET"
+      ],
+      "handlerKey": "billing:list-plans"
+    },
+    {
+      "path": "/me",
+      "methods": [
+        "GET"
+      ],
+      "handlerKey": "billing:me"
+    },
+    {
+      "path": "/checkout-sessions",
+      "methods": [
+        "POST"
+      ],
+      "handlerKey": "billing:create-checkout-session"
+    },
+    {
+      "path": "/portal-sessions",
+      "methods": [
+        "POST"
+      ],
+      "handlerKey": "billing:create-portal-session"
+    }
   ]
 }

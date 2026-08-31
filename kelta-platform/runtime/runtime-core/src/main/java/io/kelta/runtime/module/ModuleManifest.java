@@ -28,6 +28,7 @@ import java.util.List;
  *                          bundle (e.g. {@code static/ui-bundle.js}), served to the admin UI by
  *                          {@code GET /api/modules/{moduleId}/ui-bundle.js}. Null when the module
  *                          ships no UI
+ * @param routes            HTTP routes the module serves under {@code /api/modules/{id}/x/}
  * @param services          fully-qualified names of the platform ports this module may publish
  *                          through {@code KeltaModule.getServices()}. Publishing a port that is not
  *                          declared here is refused: a module that an admin installed for one
@@ -49,8 +50,28 @@ public record ModuleManifest(
     List<CollectionManifest> collections,
     String webhookHandlerKey,
     String uiBundlePath,
-    List<String> services
+    List<String> services,
+    List<RouteManifest> routes
 ) {
+    /**
+     * An HTTP route the module serves, under the platform-owned
+     * {@code /api/modules/{moduleId}/x/} prefix.
+     *
+     * <p>The prefix is fixed and the module cannot change it. That is deliberate: it keeps every
+     * module route on a path the gateway already treats as authenticated, so a manifest can never
+     * make an authenticated prefix unauthenticated. Unauthenticated inbound traffic has exactly one
+     * home, {@code /api/modules/webhooks/}, and it is not declared here.
+     *
+     * @param path       path under the module prefix, e.g. {@code /plans}. Must start with '/'.
+     * @param methods    HTTP methods this route answers. Empty means GET only.
+     * @param handlerKey the module {@code ActionHandler} the request is dispatched to
+     */
+    public record RouteManifest(
+        String path,
+        List<String> methods,
+        String handlerKey
+    ) {}
+
     /**
      * Declares an action handler provided by the module.
      *

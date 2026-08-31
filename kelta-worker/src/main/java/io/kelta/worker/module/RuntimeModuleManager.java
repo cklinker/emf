@@ -65,6 +65,9 @@ public class RuntimeModuleManager {
 
     /** Records what each module provisioned. Null in tests that do not exercise provisioning. */
     private ModuleProvenanceStore provenanceStore;
+
+    /** Routes each loaded module serves. Null in tests that do not exercise HTTP dispatch. */
+    private ModuleRouteRegistry moduleRouteRegistry;
     private final ModuleServiceRegistry moduleServiceRegistry;
 
     /**
@@ -571,8 +574,16 @@ public class RuntimeModuleManager {
             // Services this module publishes for platform code to call. Self-unwinding: a rejected
             // port removes the ports already accepted from the same module before rethrowing, so a
             // module never ends up half-published.
+            ModuleManifest storedManifest = parseStoredManifest(module);
             Map<Class<?>, Object> services = registerTenantServices(
-                tenantId, keltaModule, parseStoredManifest(module));
+                tenantId, keltaModule, storedManifest);
+
+            // Routes last: only a module whose code actually loaded should answer HTTP. A
+            // quarantined module serves 404 rather than a refusing handler, because an HTTP caller
+            // has no flow to attribute the failure to.
+            if (moduleRouteRegistry != null && storedManifest != null) {
+                moduleRouteRegistry.register(tenantId, module.moduleId(), storedManifest.routes());
+            }
             registeredServices.put(classLoaderKey, services);
 
             activeClassLoaders.put(classLoaderKey, classLoader);
@@ -729,6 +740,73 @@ public class RuntimeModuleManager {
      * @param headers   inbound request headers (signature headers live here)
      * @return the handler's result, or empty if nothing was dispatched
      */
+    /**
+     * Dispatches an authenticated HTTP request to the module handler its manifest routes it to.
+     *
+     * <p>The counterpart of {@link #dispatchWebhook} for the authenticated prefix. Two differences
+     * matter: the caller is a known platform user, so {@code userId} is bound and a handler can
+     * scope to the actor; and the route table comes from {@link ModuleRouteRegistry}, which is
+     * populated on load, so a disabled module stops answering at once.
+     *
+     * <p>Tenant context is bound with id <b>and slug</b>, as everywhere else the platform calls into
+     * a module: a module cannot resolve a slug, and a null one silently reads the public schema
+     * rather than failing.
+     *
+     * @return the handler's result, or empty when the module is not ACTIVE or serves no such route
+     */
+    public Optional<ActionResult> dispatchRoute(String tenantId, String moduleId, String userId,
+                                                String method, String path,
+                                                Map<String, Object> query, String rawBody) {
+        if (moduleRouteRegistry == null) {
+            return Optional.empty();
+        }
+        Optional<TenantModuleData> found = moduleStore.findByTenantAndModuleId(tenantId, moduleId);
+        if (found.isEmpty() || !TenantModuleData.STATUS_ACTIVE.equals(found.get().status())) {
+            return Optional.empty();
+        }
+
+        Optional<String> handlerKey = moduleRouteRegistry.resolve(tenantId, moduleId, method, path);
+        if (handlerKey.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<ActionHandler> handler = actionHandlerRegistry.getHandler(tenantId, handlerKey.get());
+        if (handler.isEmpty()) {
+            log.warn("Module '{}' of tenant {} routes {} {} to handler '{}', which is not registered",
+                moduleId, tenantId, method, path, handlerKey.get());
+            return Optional.empty();
+        }
+
+        Map<String, Object> input = new java.util.LinkedHashMap<>();
+        if (query != null) {
+            input.putAll(query);
+        }
+        // The flow engine passes a state envelope, and handlers read through ActionInputs, which
+        // unwraps "input" when present. Matching that here means one handler serves both paths.
+        Map<String, Object> resolved = Map.of(
+            "input", input,
+            "method", method,
+            "path", path,
+            "rawBody", rawBody == null ? "" : rawBody,
+            "moduleId", moduleId);
+
+        ActionContext context = ActionContext.builder()
+            .tenantId(tenantId)
+            .userId(userId)
+            .resolvedData(resolved)
+            .build();
+
+        String tenantSlug = tenantSlugResolver == null ? null
+            : tenantSlugResolver.resolveSlug(tenantId).orElse(null);
+        return Optional.of(TenantContext.callWithTenant(tenantId, tenantSlug,
+            () -> handler.get().execute(context)));
+    }
+
+    /** Injected via setter so the existing constructor overloads stay as they are. */
+    public void setModuleRouteRegistry(ModuleRouteRegistry moduleRouteRegistry) {
+        this.moduleRouteRegistry = moduleRouteRegistry;
+    }
+
     public Optional<ActionResult> dispatchWebhook(String tenantId, String moduleId,
                                                   String rawBody, Map<String, String> headers) {
         Optional<TenantModuleData> found = moduleStore.findByTenantAndModuleId(tenantId, moduleId);
@@ -977,6 +1055,10 @@ public class RuntimeModuleManager {
         }
         if (hooks != null && !hooks.isEmpty() && beforeSaveHookRegistry != null) {
             beforeSaveHookRegistry.removeTenantHooks(tenantId, hooks);
+        }
+
+        if (moduleRouteRegistry != null) {
+            moduleRouteRegistry.remove(tenantId, moduleId);
         }
 
         // Remove published services before closing the ClassLoader below -- a platform bean that

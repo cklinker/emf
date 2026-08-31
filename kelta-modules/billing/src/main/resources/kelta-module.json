@@ -46,6 +46,18 @@
       "category": "Billing",
       "description": "Flips due one-time passes to EXPIRED. Schedule via a scheduled flow; a tidier, not a gate.",
       "icon": "clock"
+    },
+    {
+      "key": "billing:list-plans",
+      "name": "List Plans",
+      "category": "Billing",
+      "description": "The tenant's purchasable plans, for a pricing page. No processor ids."
+    },
+    {
+      "key": "billing:me",
+      "name": "My Billing",
+      "category": "Billing",
+      "description": "The calling member's plan, subscription, live passes and entitlements."
     }
   ],
   "collections": [

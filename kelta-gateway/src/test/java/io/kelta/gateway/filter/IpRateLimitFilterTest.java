@@ -50,7 +50,7 @@ class IpRateLimitFilterTest {
 
     /** Small budgets keep the expectations readable. */
     private static final List<String> PATHS =
-            List.of("/actuator/health=3", "/api/billing/webhooks=5");
+            List.of("/actuator/health=3", "/api/modules/webhooks=5");
 
     @Mock
     private RedisRateLimiter rateLimiter;
@@ -92,8 +92,8 @@ class IpRateLimitFilterTest {
         void shouldMatchPrefixAgainstSubPath() {
             // The regression this guards: exact Set membership would miss the real
             // webhook URL, silently leaving it unlimited.
-            assertThat(filter.matchPath("/api/billing/webhooks/stripe/tenant-123"))
-                    .isEqualTo("/api/billing/webhooks");
+            assertThat(filter.matchPath("/api/modules/webhooks/stripe/tenant-123"))
+                    .isEqualTo("/api/modules/webhooks");
         }
 
         @Test
@@ -118,17 +118,18 @@ class IpRateLimitFilterTest {
         @DisplayName("should prefer the longest matching prefix")
         void shouldPreferLongestPrefix() {
             Map<String, Integer> budgets = IpRateLimitFilter.parsePathBudgets(
-                    List.of("/api/billing=10", "/api/billing/webhooks=300"));
+                    List.of("/api/modules=10", "/api/modules/webhooks=300"));
             ClientIpResolver resolver = new ClientIpResolver(true);
             IpRateLimitFilter f = new IpRateLimitFilter(
                     resolver,
                     new RateLimitExemptionService(resolver, List.of()),
                     rateLimiter,
-                    List.of("/api/billing=10", "/api/billing/webhooks=300"));
-            assertThat(budgets).containsEntry("/api/billing/webhooks", 300);
-            assertThat(f.matchPath("/api/billing/webhooks/stripe/t1"))
-                    .isEqualTo("/api/billing/webhooks");
-            assertThat(f.matchPath("/api/billing/plans")).isEqualTo("/api/billing");
+                    List.of("/api/modules=10", "/api/modules/webhooks=300"));
+            assertThat(budgets).containsEntry("/api/modules/webhooks", 300);
+            assertThat(f.matchPath("/api/modules/webhooks/stripe/t1"))
+                    .isEqualTo("/api/modules/webhooks");
+            // A sibling under the shorter prefix still matches the shorter budget.
+            assertThat(f.matchPath("/api/modules/install-jar")).isEqualTo("/api/modules");
         }
 
         @Test
@@ -149,7 +150,7 @@ class IpRateLimitFilterTest {
             // would read as protection that can never fire.
             Map<String, Integer> defaults = IpRateLimitFilter.parsePathBudgets(
                     List.of(IpRateLimitFilter.DEFAULT_IP_PATHS.split(",")));
-            assertThat(defaults).containsOnlyKeys("/actuator/health", "/api/billing/webhooks",
+            assertThat(defaults).containsOnlyKeys("/actuator/health", "/api/modules/webhooks",
                     "/api/modules/webhooks");
         }
     }
@@ -210,7 +211,7 @@ class IpRateLimitFilterTest {
             // the same counter, so the shape is asserted exactly.
             givenWindow(RateLimitResult.allowed(4));
             MockServerWebExchange exchange =
-                    createExchange("/api/billing/webhooks/stripe/tenant-1", "203.0.113.9");
+                    createExchange("/api/modules/webhooks/stripe/tenant-1", "203.0.113.9");
 
             StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
 
@@ -221,7 +222,7 @@ class IpRateLimitFilterTest {
                     windowCaptor.capture());
 
             assertThat(keyCaptor.getValue())
-                    .isEqualTo("ratelimit:ip:/api/billing/webhooks:203.0.113.9");
+                    .isEqualTo("ratelimit:ip:/api/modules/webhooks:203.0.113.9");
             assertThat(limitCaptor.getValue()).isEqualTo(5L);
             assertThat(windowCaptor.getValue()).isEqualTo(IpRateLimitFilter.WINDOW);
         }
@@ -236,7 +237,7 @@ class IpRateLimitFilterTest {
             StepVerifier.create(filter.filter(createExchange("/actuator/health", clientIp), chain))
                     .verifyComplete();
             StepVerifier.create(filter.filter(
-                            createExchange("/api/billing/webhooks/stripe/t1", clientIp), chain))
+                            createExchange("/api/modules/webhooks/stripe/t1", clientIp), chain))
                     .verifyComplete();
 
             ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
@@ -244,7 +245,7 @@ class IpRateLimitFilterTest {
                     .checkWindow(keyCaptor.capture(), anyLong(), any(Duration.class));
             assertThat(keyCaptor.getAllValues()).containsExactly(
                     "ratelimit:ip:/actuator/health:10.0.0.7",
-                    "ratelimit:ip:/api/billing/webhooks:10.0.0.7");
+                    "ratelimit:ip:/api/modules/webhooks:10.0.0.7");
         }
 
         @Test

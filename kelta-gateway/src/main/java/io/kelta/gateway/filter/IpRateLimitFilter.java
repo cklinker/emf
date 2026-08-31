@@ -36,8 +36,8 @@ import java.util.Map;
  * <p>Limited paths and their budgets come from
  * {@code kelta.gateway.rate-limit.ip-paths}, a comma-separated list of
  * {@code <path-prefix>=<requests-per-window>} entries. Matching is by
- * <b>longest prefix</b>, so {@code /api/billing/webhooks} covers
- * {@code /api/billing/webhooks/stripe/{tenantId}} while a more specific entry can
+ * <b>longest prefix</b>, so {@code /api/modules/webhooks} covers
+ * {@code /api/modules/webhooks/{tenantId}/{moduleId}} while a more specific entry can
  * still override a broader one.
  *
  * <p>Each matched prefix gets its <b>own</b> counter per IP, so a burst against
@@ -75,7 +75,7 @@ public class IpRateLimitFilter implements GlobalFilter, Ordered {
      * budgets are enforced by kelta-auth's own {@code PortalPublicRateLimitFilter}.
      */
     static final String DEFAULT_IP_PATHS =
-            "/actuator/health=100,/api/billing/webhooks=300,/api/modules/webhooks=300";
+            "/actuator/health=100,/api/modules/webhooks=300";
 
     /** path prefix -> requests permitted per window, longest prefix first. */
     private final Map<String, Integer> pathBudgets;

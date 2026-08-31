@@ -204,7 +204,7 @@ class RedisRateLimiterTest {
     @DisplayName("checkWindow — the shared window primitive")
     class CheckWindow {
 
-        private static final String KEY = "ratelimit:ip:/api/billing/webhooks:203.0.113.9";
+        private static final String KEY = "ratelimit:ip:/api/modules/webhooks:203.0.113.9";
 
         @Test
         @DisplayName("should allow and report the remaining budget when under the limit")

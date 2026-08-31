@@ -616,19 +616,47 @@ jobs:
             --profile ai --profile tools --profile seed down -v || true
 
   # ===========================================================================
+  # The worker image must stay JVM.
+  #
+  # Runtime module loading needs a bytecode interpreter: SandboxedModuleClassLoader defines classes
+  # from an uploaded JAR at runtime, which a native image cannot do. Switching the worker to a
+  # native build is a one-line change that produces no error anywhere -- every installed module
+  # silently loads as inert handlers. This job exists so that change fails here instead.
+  # ===========================================================================
+  worker-image-is-jvm:
+    name: Worker image is JVM
+    runs-on: k8s-runner
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert the worker builds from Dockerfile.jvm
+        run: |
+          set -euo pipefail
+          wf=.github/workflows/build-and-publish-containers.yml
+          # The dockerfile line immediately following `- service: worker`.
+          actual=$(grep -A1 '^          - service: worker$' "$wf" \
+                   | grep 'dockerfile:' | awk '{print $2}')
+          echo "worker dockerfile: ${actual}"
+          if [ "${actual}" != "kelta-worker/Dockerfile.jvm" ]; then
+            echo "::error::The worker image must build from kelta-worker/Dockerfile.jvm, got '${actual}'."
+            echo "A native worker cannot classload an uploaded module JAR, so every installed"
+            echo "module becomes inert with no error reported anywhere."
+            exit 1
+          fi
+
+  # ===========================================================================
   # Quality gate — succeeds when every triggered job succeeded.
   # Jobs that skipped (because their paths didn't change) report `skipped`
   # which is not a failure. Only `failure` and `cancelled` block the gate.
   # ===========================================================================
   quality-gate:
     name: Quality Gate
-    needs: [changes, test-java, test-runtime, test-runtime-modules, test-frontend, integration-tests, e2e]
+    needs: [changes, test-java, test-runtime, test-runtime-modules, test-frontend, integration-tests, e2e, worker-image-is-jvm]
     if: always()
     runs-on: k8s-runner
     steps:
       - name: Check job results
         run: |
-          for job in test-java test-runtime test-runtime-modules test-frontend integration-tests e2e; do
+          for job in test-java test-runtime test-runtime-modules test-frontend integration-tests e2e worker-image-is-jvm; do
             result_var="${job//-/_}_result"
             case "${job}" in
               test-java)         result="${{ needs.test-java.result }}" ;;
@@ -637,6 +665,7 @@ jobs:
               test-frontend)     result="${{ needs.test-frontend.result }}" ;;
               integration-tests) result="${{ needs.integration-tests.result }}" ;;
               e2e)               result="${{ needs.e2e.result }}" ;;
+              worker-image-is-jvm) result="${{ needs.worker-image-is-jvm.result }}" ;;
             esac
             echo "${job}: ${result}"
             if [[ "${result}" == "failure" || "${result}" == "cancelled" ]]; then

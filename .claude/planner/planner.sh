@@ -26,7 +26,10 @@ EMF_QUEUE_REPO="${EMF_QUEUE_REPO:-$HOME/GitHub/emf-queue}"
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
 PLANNER_LOG_DIR="${PLANNER_LOG_DIR:-/srv/rzware-ceo/logs}"
 PLANNER_MODEL="${PLANNER_MODEL:-sonnet}"
-MAX_RUNTIME_SEC="${MAX_RUNTIME_SEC:-300}"
+# 300s killed a run mid-flight on 31 Aug: five briefs, one task emitted, the
+# other four moved but the reasons and the commit never written. The watchdog
+# should catch a hung session, not a busy one.
+MAX_RUNTIME_SEC="${MAX_RUNTIME_SEC:-900}"
 
 mkdir -p "$PLANNER_LOG_DIR"
 LOG="$PLANNER_LOG_DIR/$(date -u +%Y-%m-%dT%H-%M-%SZ).jsonl"
@@ -62,8 +65,24 @@ fi
 trap 'rm -f "$LOCK"' EXIT
 
 # --- Pull latest queue ------------------------------------------------------
-if ! git -C "$EMF_QUEUE_REPO" pull --rebase --autostash >/dev/null 2>&1; then
-  log "queue pull failed; aborting"
+# Retried, because a single failure used to skip the whole 15-minute cycle. The
+# dispatcher pulls this same repo every 30s and holds .git/index.lock while it
+# does, so a collision is routine rather than exceptional — on 31 Aug two of
+# four consecutive runs aborted here and the queue sat unplanned for an hour.
+pull_queue() {
+  local attempt
+  for attempt in 1 2 3; do
+    if git -C "$EMF_QUEUE_REPO" pull --rebase --autostash >/dev/null 2>&1; then
+      (( attempt > 1 )) && log "queue pull succeeded on attempt $attempt"
+      return 0
+    fi
+    # A lock from a dispatcher tick clears in seconds; back off and retry.
+    (( attempt < 3 )) && sleep $(( attempt * 5 ))
+  done
+  return 1
+}
+if ! pull_queue; then
+  log "queue pull failed after 3 attempts; aborting"
   exit 1
 fi
 

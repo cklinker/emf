@@ -104,17 +104,22 @@ spawn_worker() {
 
 main_loop() {
   log_event dispatch_start max_parallel="$MAX_PARALLEL" tick="$TICK_SECONDS"
+  local gate=""
   while :; do
     # --- budget gates (BUDGET.md) -----------------------------------------
     # Both defined in lib/queue.sh. Checked every tick, before any pull or
     # claim, so a paused or out-of-window dispatcher does no work at all.
+    # Logged on transition only: a gated dispatcher must be distinguishable
+    # from a broken one, without one line every TICK_SECONDS for eight hours.
     if throttled; then
-      log_info "paused until $(cat "$PAUSE_FILE" 2>/dev/null)"
+      [[ "$gate" == "paused" ]] || { log_info "paused until $(cat "$PAUSE_FILE" 2>/dev/null)"; gate="paused"; }
       sleep "$TICK_SECONDS"; continue
     fi
     if ! in_run_window; then
+      [[ "$gate" == "window" ]] || { log_info "outside run window (22:00-06:00 America/Denver); idling"; gate="window"; }
       sleep "$TICK_SECONDS"; continue
     fi
+    [[ -z "$gate" ]] || { log_info "gate cleared ($gate); resuming"; gate=""; }
     # ----------------------------------------------------------------------
 
     if ! git -C "$EMF_QUEUE_REPO" pull --rebase --autostash >/dev/null 2>&1; then

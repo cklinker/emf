@@ -670,6 +670,33 @@ for removal ("inline the current value"). Findings:
 
 ## Fragile Areas
 
+### `DynamicCollectionRouter` shadows any `/**` mapping under `/api` (GET only)
+
+`runtime-core/.../router/DynamicCollectionRouter` is `@RequestMapping("/api")` and declares
+all-variable mappings up to four segments deep, including
+`@GetMapping("/{parentName}/{parentId}/{childName}/{childId}")`.
+
+Spring's `PathPattern` specificity comparator ranks **any pattern containing `**` last**, however
+many literal segments it also has. A controller that maps a catch-all under `/api` therefore loses
+every GET the router can match, and the router handles the request as a record read — 404, with the
+only trace anywhere being an INFO line `Collection '<segment>' not in registry, attempting on-demand
+load`. No WARN, no ERROR, nothing from the controller.
+
+The router's POST mappings stop at **three** segments, so POST on the identical URL dispatches
+correctly. That GET/POST asymmetry reads as a method-specific bug in the new controller and is what
+makes this expensive: it sent a night of debugging at the module route registry, the manifest, the
+signed JAR, the gateway and `@RequestBody`, all of which were fine.
+
+Observed 2026-08-31 on module HTTP routes (`/api/modules/<id>/x/plans`). Fixed by spelling out the
+depth-1..3 patterns on `ModuleHttpController` so its literal `modules` and `x` segments count toward
+specificity, keeping `/**` only as a backstop for deeper paths where nothing competes.
+
+**Rules that follow.** Never map `/**` for a worker endpoint under `/api`. A MockMvc test that
+registers the controller **alone** cannot see this class of bug — the isolation test passed the
+entire time — so any test asserting a mapping under `/api` must register a stand-in for the router's
+nested GET mapping (`ModuleHttpControllerMvcTest` does).
+
+
 - **`kelta-ui/app` types are only checked by the `Type check kelta-ui` CI step — and typechecking needs the `kelta-web` packages built first.** The prod image builds with bare `npx vite build` (`kelta-ui/Dockerfile`), which skips `tsc` entirely. Until that step was added nothing else validated those types either: CI's `test-frontend` job ran `npm run typecheck` with `working-directory: kelta-web`, so it checked the SDK workspace and never `kelta-ui/app`. 22 type errors accumulated silently on main. If that CI step is ever dropped, the same drift resumes invisibly — `vite build` will keep going green. Two gotchas when checking locally:
   - `kelta-ui/app` resolves `@kelta/{sdk,components,…}` through `file:` deps whose **types come from the built `dist/*.d.ts`**, not `src/`. Against a stale or missing `dist/`, `tsc` reports dozens of phantom `has no exported member` / `does not exist on type 'AdminClient'` errors that are pure build staleness. **Run `npm run build` in `kelta-web` before believing any of them** (`/verify` and CI both do this).
   - `@kelta/components` declares `@livekit/components-react` as an **optional** peer dep. Rebuilding it against a `node_modules` that lacks livekit emits a `__vite-optional-peer-dep:…:false` stub into `dist/video.js`, and the *app* build then fails with `"useTracks" is not exported by …`. That is a stale install, not a code bug — `npm install` in `kelta-web` and rebuild.

@@ -74,6 +74,21 @@ public class ModuleRouteRegistry {
                 .map(byKey -> byKey.get(key(method, path)));
     }
 
+    /**
+     * The route keys registered for a module, for the dispatch-failure log.
+     *
+     * <p>Knowing a route did not resolve is not the same as knowing what <i>was</i> registered, and
+     * the difference is what turns a 404 into a diagnosis. Bounded by the manifest, so it is safe
+     * to log.
+     */
+    public java.util.Set<String> registeredKeys(String tenantId, String moduleId) {
+        Map<String, Map<String, String>> byModule = routes.get(tenantId);
+        if (byModule == null || byModule.get(moduleId) == null) {
+            return java.util.Set.of();
+        }
+        return java.util.Set.copyOf(byModule.get(moduleId).keySet());
+    }
+
     /** Number of routes registered for a module, for health reporting. */
     public int routeCount(String tenantId, String moduleId) {
         Map<String, Map<String, String>> byModule = routes.get(tenantId);

@@ -225,6 +225,27 @@ platform type fails).
 5. **Classpath**: the module's own classes must be in the JAR. Only the prefixes in
    `SandboxedModuleClassLoader.ALLOWED_PARENT_PREFIXES` resolve from the platform.
 
+**Installing onto a tenant that already has data — order matters.** `POST /api/modules/install-jar`
+**loads the module immediately**: handlers, hooks and `getServices()` all register at *install*
+time, on every pod. The `status` field stays `INSTALLED` until you call `/enable` — that flag is
+bookkeeping, **not** a gate on whether the code is live. So a module that publishes a service starts
+answering platform calls the moment the JAR lands.
+
+That inverts the obvious sequence. If the module resolves something the platform already answers
+(entitlements being the built case), install it and its collections are empty, so the platform
+starts getting empty answers *before* you can migrate anything into them. On the billing pilot that
+would have meant a tenant's members resolving to no plan — and, because `AlertDispatchService`
+treats an empty channel entitlement as "this tenant isn't gating channels", **alert channel limits
+would have silently stopped applying**, including paid SMS for free-tier members.
+
+Populate first, install second:
+
+1. Create the collections through the normal admin API (same names and fields as the manifest).
+   `ModuleCollectionProvisioner` **skips collections that already exist**, so the later install
+   will not clobber them.
+2. Migrate the data the module will answer from, and verify it.
+3. Install + enable, then confirm the module — not the fallback — is answering.
+
 **What the platform does for a module, so it doesn't have to:**
 - **Binds the tenant** around a webhook dispatch. A module *cannot* — `io.kelta.runtime.context`
   is outside the classloader allowlist — and unbound, its reads and writes run under the

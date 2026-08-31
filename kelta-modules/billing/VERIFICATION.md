@@ -396,3 +396,55 @@ reinstall), so this is safe on a tenant with real data.
 Unchanged from the README: `appliesTo=PORTAL` rules are skipped by the module (it cannot read
 `X-User-Type`), entitlements are uncached, pass expiry is flow-scheduled rather than `@Scheduled`,
 and webhook idempotency converges on redelivery rather than claiming each event id transactionally.
+
+---
+
+# Prod rollout — 2026-08-31
+
+Installed and ACTIVE on the `spotopened` tenant (`350a7dfe-3cb4-45ea-8816-555bd04c505e`), worker
+`main-1480dff` (JVM image).
+
+| Check | Result |
+|---|---|
+| Service published | `EntitlementProvider -> ModuleEntitlementProvider` on all 3 pods |
+| Manager log | `5 real handlers, 1 hooks and 1 services` |
+| Platform → module | `GET /api/billing/me` → `200`, plan `member`, `push, email`, 10 watches |
+| Fallback / slug errors | 0 |
+
+The `/api/billing/me` result is the proof, not the log lines: at the time, the member's plan and
+subscription existed **only** in the module's collections, so a compiled-in fallback could not have
+produced that answer. A compiled-in Spring controller resolved a member's entitlements out of a
+signed, runtime-uploaded JAR.
+
+## Install activates the module — `enable` does not
+
+`install-jar` registers handlers, hooks and services immediately, on every pod. `status` stays
+`INSTALLED` until `/enable`; that flag is bookkeeping, not a gate. On a tenant with existing data
+this inverts the obvious order — see `playbooks.md` → "Installing onto a tenant that already has
+data". Here the plans, customer and subscription were copied into the module's collections **first**
+(additive; the compiled-in tables were never written to), and only then was the JAR installed;
+`ModuleCollectionProvisioner` skips collections that already exist.
+
+Had it gone the other way, every member would have resolved to no plan, and because
+`AlertDispatchService` reads an empty channel entitlement as "this tenant isn't gating channels",
+channel limits would have stopped applying — including paid SMS for free-tier members.
+
+## What the rollout uncovered, none of it caused by the module
+
+- **Two Stripe accounts.** The tenant's plans and API key point at the live account
+  (`acct_1U2Y4w2Z52nGRWDU`); its then-existing customer and subscription lived in the **test**
+  account (`acct_1U2Y59F2gMDfMQtB`). Prices and the credential were both re-pointed on 2026-08-10
+  (plans 00:24, credential 00:28) and the customer/subscription — created 08-09 — were left behind.
+  Hence `No such customer` on every "Manage billing" click. Those orphaned rows have since been
+  deleted from both stores.
+- **No webhook reached prod between 2026-08-10 and 08-30.** The subscription row was last touched
+  08-09 16:40. Two stale endpoints in the test account still pointed at the prod tenant and failed
+  100% on signature; they have been deleted. The live account's endpoint had **zero** deliveries
+  ever, so its signing secret had never been exercised — it was rolled and the credential updated
+  on 08-31.
+- **A signing secret cannot be verified without a real event.** Stripe offers "Send test events"
+  only in test mode, so a live endpoint's `whsec_` is unprovable until the first real transaction.
+  Roll it and update the credential in one sitting; that is the only guarantee available.
+- **Portal magic-link login double-verifies.** Every `PORTAL_LOGIN result=success` in the auth log
+  is followed seconds later by a failed re-verify of the same single-use token, so a working link
+  presents as broken. The defect is in the external `app.spotopened.com` callback, not this repo.

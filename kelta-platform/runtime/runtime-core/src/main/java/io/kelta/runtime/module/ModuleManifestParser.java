@@ -52,11 +52,12 @@ public class ModuleManifestParser {
             List<ModuleManifest.CollectionManifest> collections = parseCollections(root);
             String webhookHandlerKey = optionalString(root, "webhookHandlerKey");
             String uiBundlePath = optionalString(root, "uiBundlePath");
+            List<String> services = parseStringList(root, "services");
 
             return new ModuleManifest(
                 id, name, version, description, author,
                 moduleClass, minPlatformVersion, permissions, handlers, collections,
-                webhookHandlerKey, uiBundlePath
+                webhookHandlerKey, uiBundlePath, services
             );
         } catch (ModuleManifestException e) {
             throw e;

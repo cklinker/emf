@@ -28,6 +28,12 @@ import java.util.List;
  *                          bundle (e.g. {@code static/ui-bundle.js}), served to the admin UI by
  *                          {@code GET /api/modules/{moduleId}/ui-bundle.js}. Null when the module
  *                          ships no UI
+ * @param services          fully-qualified names of the platform ports this module may publish
+ *                          through {@code KeltaModule.getServices()}. Publishing a port that is not
+ *                          declared here is refused: a module that an admin installed for one
+ *                          purpose must not be able to quietly become the tenant's authority for an
+ *                          unrelated one, and the declaration is what an admin can be shown and
+ *                          approve. Empty means the module publishes nothing.
  * @since 1.0.0
  */
 public record ModuleManifest(
@@ -42,7 +48,8 @@ public record ModuleManifest(
     List<ActionHandlerManifest> actionHandlers,
     List<CollectionManifest> collections,
     String webhookHandlerKey,
-    String uiBundlePath
+    String uiBundlePath,
+    List<String> services
 ) {
     /**
      * Declares an action handler provided by the module.

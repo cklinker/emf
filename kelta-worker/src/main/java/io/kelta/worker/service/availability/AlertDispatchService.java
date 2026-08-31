@@ -53,6 +53,21 @@ public class AlertDispatchService {
     static final String CHANNEL_EMAIL = "email";
     static final String CHANNEL_SMS = "sms";
 
+    /**
+     * Channels that cost real money to deliver, and are therefore only ever sent on an
+     * <b>affirmative</b> entitlement.
+     *
+     * <p>Everywhere else an absent entitlement means "this tenant is not gating channels", which is
+     * the right default for push and email: a tenant with no billing configured, or one whose
+     * entitlement authority is briefly unavailable, should still get its alerts. Applying that same
+     * permissiveness to SMS means an absent or broken authority silently starts sending paid
+     * messages for members who are not entitled to them — the platform spending money because it
+     * could not determine that it shouldn't.
+     *
+     * <p>"Ungated" must never mean "free-for-all for the things that cost money."
+     */
+    public static final Set<String> BILLABLE_CHANNELS = Set.of(CHANNEL_SMS);
+
     /** Entitlement key listing the channels a member's plan permits. */
     static final String ENTITLEMENT_CHANNELS = "channels";
     /** Tenant-overridable email template for an availability alert. */
@@ -167,9 +182,10 @@ public class AlertDispatchService {
             return new ArrayList<>(entitled);
         }
         if (entitled.isEmpty()) {
-            // No channels entitlement configured at all: treat the tenant as not
-            // using channel gating rather than silently muting every alert.
-            return requested;
+            // No channels entitlement resolved: treat the tenant as not gating rather than
+            // silently muting every alert -- EXCEPT for channels that cost money, which are only
+            // ever sent on an affirmative entitlement. See BILLABLE_CHANNELS.
+            return requested.stream().filter(c -> !BILLABLE_CHANNELS.contains(c)).toList();
         }
         List<String> intersection = new ArrayList<>();
         for (String channel : requested) {

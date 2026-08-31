@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Planner. Runs every 10 min on the Mac via launchd
-# (~/Library/LaunchAgents/com.cklinker.emf-planner.plist). Reads briefs from
-# emf-queue/inbox/, emits structured tasks into emf-queue/ready/.
+# Planner. Runs on worker-01 via systemd (rzware-planner.timer). Reads briefs
+# from emf-queue/inbox/, emits structured tasks into emf-queue/ready/.
+# Moved off the Mac 2026-08-31 per D-008 — RZWare's pipeline should not depend
+# on hardware Craig does not own, or on a laptop being open.
 #
 # This is just a thin wrapper around `claude -p` + the system prompt in
 # planner-prompt.md. The Claude session does the heavy lifting (reading briefs,
@@ -14,7 +15,8 @@
 #   EMF_REPO        path to the EMF main repo (default ~/GitHub/emf)
 #   EMF_QUEUE_REPO  path to emf-queue (default ~/GitHub/emf-queue)
 #   CLAUDE_BIN      path to claude CLI (default 'claude' from PATH)
-#   PLANNER_LOG_DIR default ~/Library/Logs/emf-planner
+#   PLANNER_LOG_DIR default /srv/rzware-ceo/logs (promtail scrapes it)
+#   PLANNER_MODEL   default sonnet (BUDGET.md — planning does not need Opus)
 #   MAX_RUNTIME_SEC default 300 (5 min — kill the session if it overruns)
 
 set -uo pipefail
@@ -22,7 +24,8 @@ set -uo pipefail
 EMF_REPO="${EMF_REPO:-$HOME/GitHub/emf}"
 EMF_QUEUE_REPO="${EMF_QUEUE_REPO:-$HOME/GitHub/emf-queue}"
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
-PLANNER_LOG_DIR="${PLANNER_LOG_DIR:-$HOME/Library/Logs/emf-planner}"
+PLANNER_LOG_DIR="${PLANNER_LOG_DIR:-/srv/rzware-ceo/logs}"
+PLANNER_MODEL="${PLANNER_MODEL:-sonnet}"
 MAX_RUNTIME_SEC="${MAX_RUNTIME_SEC:-300}"
 
 mkdir -p "$PLANNER_LOG_DIR"
@@ -30,6 +33,20 @@ LOG="$PLANNER_LOG_DIR/$(date -u +%Y-%m-%dT%H-%M-%SZ).jsonl"
 LOCK="/tmp/emf-planner.lock"
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
+
+# --- budget: honour the fleet-wide pause (BUDGET.md) ------------------------
+# The dispatcher stops claiming when a worker hits a usage limit. The planner
+# calls the same model on the same subscription, so it must stop too — otherwise
+# the pause leaks and the planner keeps spending during it.
+DISPATCH_LIB="${DISPATCH_LIB:-$EMF_REPO/.claude/dispatcher/lib/queue.sh}"
+if [[ -r "$DISPATCH_LIB" ]]; then
+  # shellcheck source=/dev/null
+  . "$DISPATCH_LIB" 2>/dev/null || true
+  if declare -F throttled >/dev/null && throttled; then
+    log "fleet paused until $(cat "${PAUSE_FILE:-/srv/rzware-ceo/state/PAUSED_UNTIL}" 2>/dev/null); skipping"
+    exit 0
+  fi
+fi
 
 # --- Singleton lock ---------------------------------------------------------
 if ! ( set -o noclobber; echo $$ > "$LOCK" ) 2>/dev/null; then
@@ -62,6 +79,8 @@ log "found ${#INBOX_FILES[@]} inbox file(s); invoking planner session"
 
 # --- Build the user prompt --------------------------------------------------
 USER_PROMPT="$(cat <<EOF
+Today's date is $(date -u +%Y-%m-%d). Use it for task ids.
+
 Process the inbox files in $EMF_QUEUE_REPO/inbox/.
 
 Files to consider:
@@ -93,6 +112,7 @@ unset CLAUDECODE
 if [[ -n "$TIMEOUT_BIN" ]]; then
   "$TIMEOUT_BIN" --preserve-status "$MAX_RUNTIME_SEC" \
     "$CLAUDE_BIN" \
+      --model "$PLANNER_MODEL" \
       -p "$USER_PROMPT" \
       --append-system-prompt "$(cat "$PROMPT_FILE")" \
       --output-format stream-json \
@@ -104,6 +124,7 @@ if [[ -n "$TIMEOUT_BIN" ]]; then
 else
   # Watchdog fallback: launch claude in background, kill after MAX_RUNTIME_SEC.
   "$CLAUDE_BIN" \
+    --model "$PLANNER_MODEL" \
     -p "$USER_PROMPT" \
     --append-system-prompt "$(cat "$PROMPT_FILE")" \
     --output-format stream-json \

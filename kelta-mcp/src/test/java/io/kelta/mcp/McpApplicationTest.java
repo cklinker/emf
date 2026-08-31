@@ -139,7 +139,12 @@ class McpApplicationTest {
                 "update_field",
                 "remove_field",
                 "create_validation_rule",
+                "list_validation_rules",
+                "update_validation_rule",
+                "delete_validation_rule",
                 "create_unique_constraint",
+                "list_unique_constraints",
+                "delete_unique_constraint",
                 "create_picklist",
                 "list_picklists",
                 "get_picklist",
@@ -206,10 +211,11 @@ class McpApplicationTest {
                     .as("user tool %s should be idempotent (read-only is always idempotent)", t.name())
                     .isTrue();
         }
-        // Admin-side reads: the shared browse tools plus the picklist read tools.
+        // Admin-side reads: the shared browse tools plus the picklist/validation/constraint read tools.
         Set<String> adminReads = Set.of(
                 "list_collections", "get_collection_schema",
-                "list_picklists", "get_picklist");
+                "list_picklists", "get_picklist",
+                "list_validation_rules", "list_unique_constraints");
         for (AdminTool at : adminTools) {
             Tool t = at.toSpecification().tool();
             if (!adminReads.contains(t.name())) continue;
@@ -233,7 +239,9 @@ class McpApplicationTest {
                 "update_field", "remove_field",
                 "update_layout", "delete_layout", "update_flow",
                 "delete_picklist",
-                "update_picklist_value", "deactivate_picklist_value");
+                "update_picklist_value", "deactivate_picklist_value",
+                "update_validation_rule", "delete_validation_rule",
+                "delete_unique_constraint");
         for (UserTool ut : userTools) {
             Tool t = ut.toSpecification().tool();
             if (!destructive.contains(t.name())) continue;

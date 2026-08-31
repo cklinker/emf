@@ -4,11 +4,13 @@ import io.kelta.runtime.module.integration.spi.CredentialResolverPort;
 import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.module.KeltaModule;
+import io.kelta.runtime.module.service.EntitlementProvider;
 import io.kelta.runtime.workflow.module.ModuleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Stripe-backed portal billing, as a runtime-installable module.
@@ -28,6 +30,7 @@ public class BillingModule implements KeltaModule {
 
     private List<ActionHandler> actionHandlers = List.of();
     private List<BeforeSaveHook> beforeSaveHooks = List.of();
+    private Map<Class<?>, Object> services = Map.of();
 
     @Override
     public String getId() {
@@ -79,8 +82,14 @@ public class BillingModule implements KeltaModule {
         this.beforeSaveHooks = List.of(new MemberEntitlementQuotaHook(
                 collections, entitlements, context.collectionRegistry(), context.queryEngine()));
 
-        log.info("Billing module started with {} action handlers and {} hooks",
-                actionHandlers.size(), beforeSaveHooks.size());
+        // Published for platform code to call inline. Without this, entitlement resolution could
+        // not leave the worker at all: alert fanout and watch limits need an answer in-process,
+        // and handlers and hooks are dispatch-only.
+        this.services = Map.of(
+                EntitlementProvider.class, new ModuleEntitlementProvider(entitlements));
+
+        log.info("Billing module started with {} action handlers, {} hooks and {} services",
+                actionHandlers.size(), beforeSaveHooks.size(), services.size());
     }
 
     @Override
@@ -91,5 +100,10 @@ public class BillingModule implements KeltaModule {
     @Override
     public List<BeforeSaveHook> getBeforeSaveHooks() {
         return beforeSaveHooks;
+    }
+
+    @Override
+    public Map<Class<?>, Object> getServices() {
+        return services;
     }
 }

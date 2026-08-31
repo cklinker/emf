@@ -1,5 +1,6 @@
 package io.kelta.worker.service.billing;
 
+import io.kelta.runtime.module.service.MemberEntitlements;
 import io.kelta.worker.repository.BillingPass;
 import io.kelta.worker.repository.BillingPassRepository;
 import io.kelta.worker.repository.BillingPlan;

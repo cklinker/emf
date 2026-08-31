@@ -1,5 +1,6 @@
 package io.kelta.worker.service.billing;
 
+import io.kelta.runtime.module.service.MemberEntitlements;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.kelta.runtime.context.TenantContext;

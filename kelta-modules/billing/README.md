@@ -96,3 +96,20 @@ These are real gaps, not oversights — record them before relying on this in pr
   they are acceptable for your tenant before cutting over, particularly the **`appliesTo=PORTAL`
   quota rules being skipped**, which silently enforces nothing where the compiled-in version
   enforced a member cap.
+
+## Entitlements are published to the platform
+
+The module implements the platform port `io.kelta.runtime.module.service.EntitlementProvider` and
+publishes it from `getServices()`. That is what lets compiled-in platform code — availability alert
+fanout, watch limits, the quota hook — resolve entitlements from this module instead of the
+worker's own billing service, on tenants where it is installed.
+
+The platform binds `TenantContext` (id **and** slug) around the call, because `EntitlementResolver`
+reads through the query engine and the tenant's schema comes from the slug; a module has no way to
+look one up. If the slug cannot be resolved, the platform refuses the module path and answers from
+its compiled-in service rather than reading the public schema.
+
+Answers are **not cached** platform-side: a module cannot consume the NATS invalidation that keeps
+the compiled-in cache honest, and a stale entitlement is worse than a slower lookup. A provider that
+throws or returns null falls back to the compiled-in service — entitlements gate alert delivery, so
+a broken module must neither take that path down nor silently widen access.

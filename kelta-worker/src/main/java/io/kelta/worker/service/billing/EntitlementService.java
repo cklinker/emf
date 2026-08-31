@@ -1,5 +1,6 @@
 package io.kelta.worker.service.billing;
 
+import io.kelta.runtime.module.service.MemberEntitlements;
 import java.util.List;
 
 /**

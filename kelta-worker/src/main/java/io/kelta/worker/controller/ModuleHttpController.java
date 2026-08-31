@@ -66,7 +66,16 @@ public class ModuleHttpController {
         this.runtimeModuleManager = runtimeModuleManager;
     }
 
-    @RequestMapping(value = "/**", method = {RequestMethod.GET, RequestMethod.POST,
+    // Depth-1..3 patterns are listed explicitly and the catch-all only backstops deeper paths.
+    // This is not stylistic. DynamicCollectionRouter maps "/api/{parentName}/{parentId}/{childName}/
+    // {childId}" for GET, which matches "/api/modules/<id>/x/plans" exactly, and Spring's
+    // PathPattern specificity comparator ranks ANY pattern containing "**" last -- so a bare "/**"
+    // here loses to it and the request is dispatched as a record read of a collection named
+    // "modules". There is no equally deep @PostMapping on that router, which is why POST worked and
+    // GET returned 404 with no log line anywhere. Spelling the segments out keeps the literal
+    // "modules" and "x" in the pattern, which outranks the router's all-variable one.
+    @RequestMapping(value = {"/{p1}", "/{p1}/{p2}", "/{p1}/{p2}/{p3}", "/**"},
+            method = {RequestMethod.GET, RequestMethod.POST,
             RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
     public ResponseEntity<?> dispatch(@RequestHeader("X-Tenant-ID") String tenantId,
                                       @RequestHeader(value = "X-User-Id", required = false) String userId,

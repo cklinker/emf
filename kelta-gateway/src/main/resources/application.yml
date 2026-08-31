@@ -82,7 +82,7 @@ kelta:
       # Per-IP limits for UNAUTHENTICATED paths, which the tenant limiter cannot
       # cover (it needs a principal). Comma-separated <path-prefix>=<per-minute>.
       # Matched by longest prefix; each prefix gets its own per-IP bucket.
-      ip-paths: ${RATE_LIMIT_IP_PATHS:/actuator/health=100,/api/billing/webhooks=300}
+      ip-paths: ${RATE_LIMIT_IP_PATHS:/actuator/health=100,/api/modules/webhooks=300}
       # IPs / CIDR ranges exempt from ALL rate limiting (per-IP and per-tenant).
       # For trusted infrastructure whose traffic is legitimately bursty: uptime
       # probes, in-cluster callers, a payment processor's webhook egress ranges.
@@ -144,7 +144,7 @@ kelta:
       # NOTE: an unauthenticated path also bypasses TenantIpAllowlistFilter, so a
       # restricted tenant gets no network restriction there — the endpoint's own
       # signature check is the only trust anchor. Keep these prefixes narrow.
-      unauthenticated-paths: /otel,/api/webhooks,/scim,/api/track,/api/telehealth/visits,/api/telehealth/webhooks,/api/billing/webhooks,/api/modules/webhooks
+      unauthenticated-paths: /otel,/api/webhooks,/scim,/api/track,/api/telehealth/visits,/api/telehealth/webhooks,/api/modules/webhooks
 
 # Actuator configuration for health and metrics
 management:

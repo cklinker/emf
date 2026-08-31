@@ -5,10 +5,12 @@ import io.kelta.runtime.event.ModuleChangeType;
 import io.kelta.runtime.module.TenantModuleData;
 import io.kelta.worker.module.ModuleConfigEventPublisher;
 import io.kelta.worker.module.ModuleSignatureException;
+import io.kelta.worker.module.ModuleRouteRegistry;
 import io.kelta.worker.module.RuntimeModuleManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,12 +35,17 @@ public class ModuleController {
     private static final Logger log = LoggerFactory.getLogger(ModuleController.class);
 
     private final RuntimeModuleManager runtimeModuleManager;
+
+    /** Null when module support is switched off; the health payload then reports no route count. */
+    private final ModuleRouteRegistry moduleRouteRegistry;
     private final ModuleConfigEventPublisher eventPublisher;
 
     public ModuleController(RuntimeModuleManager runtimeModuleManager,
-                             ModuleConfigEventPublisher eventPublisher) {
+                             ModuleConfigEventPublisher eventPublisher,
+                            ObjectProvider<ModuleRouteRegistry> moduleRouteRegistry) {
         this.runtimeModuleManager = runtimeModuleManager;
         this.eventPublisher = eventPublisher;
+        this.moduleRouteRegistry = moduleRouteRegistry.getIfAvailable();
     }
 
     /**
@@ -282,6 +289,10 @@ public class ModuleController {
         health.put("loadedOnThisPod", runtimeModuleManager.isLoaded(tenantId, moduleId));
         health.put("podName", System.getenv().getOrDefault("HOSTNAME", "unknown"));
         health.put("actionsDeclared", module.get().actions().size());
+        // Routes registered on THIS pod, which is the question an operator actually has when a
+        // module route 404s: the stored manifest can declare routes that this pod never registered.
+        health.put("routesRegisteredOnThisPod",
+            moduleRouteRegistry == null ? null : moduleRouteRegistry.routeCount(tenantId, moduleId));
         health.putAll(runtimeModuleManager.loadDiagnostics(module.get().id()));
         return ResponseEntity.ok(health);
     }

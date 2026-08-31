@@ -75,6 +75,8 @@ public class ModuleHttpController {
                                       HttpServletRequest request) {
         String path = modulePath(request, moduleId);
         if (path == null) {
+            log.warn("Refusing {} {}: it does not sit under this module's own route prefix",
+                    request.getMethod(), request.getRequestURI());
             return ResponseEntity.notFound().build();
         }
 
@@ -97,6 +99,13 @@ public class ModuleHttpController {
         }
 
         if (result.isEmpty()) {
+            // Logged, not silent. A 404 here has three quite different causes -- the module is not
+            // ACTIVE, it declares no such route, or the route names a handler that is not
+            // registered -- and telling them apart from outside is otherwise impossible. Chasing
+            // one of these without this line cost hours.
+            log.warn("No module route for {} {} on module '{}' in tenant {} "
+                    + "(module inactive, route not declared, or handler not registered)",
+                    request.getMethod(), path, moduleId, tenantId);
             return ResponseEntity.notFound().build();
         }
         if (!result.get().successful()) {

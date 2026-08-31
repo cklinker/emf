@@ -322,3 +322,61 @@ kelta api DELETE /api/modules/kelta-billing         # uninstall; collections and
 
 Disable is enough to stop the module affecting anything: it removes the wildcard quota hook and
 every action handler. Uninstall deliberately leaves the collections and their rows behind.
+
+---
+
+# Outcome — 2026-08-31: PASSED
+
+Run against real Stripe **test-mode** keys on the sandbox tenant
+`c734b580-1204-4e00-97a4-3500a4f5c25e` (`spotopened--billing-stripe-verify`), worker at
+`main-0064fa2` (JVM image, `/app/app.jar`).
+
+| Check | Result |
+|---|---|
+| Not running as stubs (step 4 gate) | real handler output, never `"mode": "stub"` |
+| Five collections provisioned | `billing_{customers,entitlement_rules,passes,plans,subscriptions}` |
+| Checkout | `https://checkout.stripe.com/c/pay/cs_test_…` |
+| Payment (`4242…`) | redirected to `successUrl` |
+| Webhook signature (negative) | unsigned `POST` → `401` |
+| `checkout.session.completed` | customer mirrored → `cus_VAetLbvzT67xlA` |
+| `customer.subscription.*` | subscription mirrored, `status: active`, plan `PRO` |
+| `currentPeriodEnd` | **`2026-09-30T00:59:51Z` — non-null**, parsed correctly |
+| Entitlements | `{"planCode":"PRO","entitlements":{"watches":25},"subscriptionStatus":"active"}` |
+| Portal | `https://billing.stripe.com/p/session?…` |
+| Expiry | `{"expired":0,"batchFull":false}` |
+| Quota hook | limit lowered to 1 → 1st create OK, 2nd rejected `400 beforeSaveHook: "Upgrade to add more watches."` |
+
+The quota check deliberately used a throwaway collection (`quota_probe`), not a billing one: the
+claim being tested is that a **runtime-loaded module's wildcard hook enforces on an arbitrary
+tenant collection**. Sandbox state (PRO `watches`, probe rule, probe collection) was restored after.
+
+## Three real bugs this found, none visible from unit tests
+
+1. **Tenant slug not bound on webhook dispatch** (#1390). `RuntimeModuleManager` bound only the
+   tenant *id*; `PhysicalTableStorageAdapter#getTableRef` resolves the schema from
+   `TenantContext.getSlug()`, so a null slug fell back to the public schema and every module write
+   failed with `relation "billing_customers" does not exist`. The original test asserted
+   `TenantContext.get()` — the mechanism, not the outcome — so it passed against the bug.
+2. **Handlers read the wrong input level** (#1390). `TaskStateExecutor` passes the whole state
+   envelope as `resolvedData`, so `resolvedData.get("planCode")` found nothing and checkout failed
+   with `"planCode is required"` against a request that supplied it. Fixed by `ActionInputs`.
+3. **Metadata stamped on the session, not the subscription** (#1391). Stripe does not copy session
+   metadata onto the subscription, so `customer.subscription.*` arrived with no `userId` and fell
+   back to the order-dependent customer mapping — `"no resolvable member"`, live. Stripe does not
+   guarantee delivery order, so this drops subscriptions intermittently, not deterministically.
+
+## Known gap: installing needs a browser session, not an API-minted PAT
+
+`POST /api/modules/install-jar` is multipart, which `kelta api` cannot send, so install is raw
+`curl` + a token. A PAT minted through `kelta token create` is rejected `403 "User identity not
+resolved"` on **every** authenticated route: `PatAuthenticationFilter` sets only
+`withTenantId(...)`, and `UserIdentityResolutionFilter` (which fills `profileId`) returns early
+when no tenant is resolved for the request — `RouteAuthorizationFilter` then requires a non-null
+`profileId`. The PAT stored by `kelta auth login` works. Until that is reconciled, reinstall from
+the admin UI (**Setup → Modules → Install JAR**) or with the CLI's own stored credential.
+
+## Cutover blockers (decisions, not bugs)
+
+Unchanged from the README: `appliesTo=PORTAL` rules are skipped by the module (it cannot read
+`X-User-Type`), entitlements are uncached, pass expiry is flow-scheduled rather than `@Scheduled`,
+and webhook idempotency converges on redelivery rather than claiming each event id transactionally.

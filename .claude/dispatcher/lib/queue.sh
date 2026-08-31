@@ -19,6 +19,69 @@
 
 EMF_QUEUE_REPO="${EMF_QUEUE_REPO:-$HOME/GitHub/emf-queue}"
 
+# ---- Repo registry ----------------------------------------------------------
+# Tasks may carry an optional `repo:` frontmatter field. Absent/empty/'emf'
+# resolves to the emf mono-repo ($EMF_REPO). Any other name is looked up in a
+# small registry: an env var RZWARE_REPO_<NAME_UPPER> takes precedence, then
+# $HOME/GitHub/<name> is used as a convention fallback if that directory
+# exists. An unknown repo returns nonzero — the caller must fail the task
+# rather than silently defaulting to emf: a task landing in the wrong repo is
+# worse than a task that fails.
+
+queue_repo_env_var() {
+  local name="$1"
+  local upper
+  upper="$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9' '_')"
+  # Strip a trailing underscore from tr -c padding.
+  upper="${upper%_}"
+  printf 'RZWARE_REPO_%s\n' "$upper"
+}
+
+queue_resolve_repo() {
+  local name="${1:-}"
+  if [[ -z "$name" || "$name" == "emf" ]]; then
+    printf '%s\n' "${EMF_REPO:-$HOME/GitHub/emf}"
+    return 0
+  fi
+  local env_var from_env conv
+  env_var="$(queue_repo_env_var "$name")"
+  from_env="${!env_var:-}"
+  if [[ -n "$from_env" ]]; then
+    if [[ -d "$from_env" ]]; then
+      printf '%s\n' "$from_env"
+      return 0
+    fi
+    printf 'repo %s resolved via %s to %s but that path does not exist\n' \
+      "$name" "$env_var" "$from_env" >&2
+    return 1
+  fi
+  conv="$HOME/GitHub/$name"
+  if [[ -d "$conv/.git" ]]; then
+    printf '%s\n' "$conv"
+    return 0
+  fi
+  printf 'repo %s has no configured path (set %s or create %s)\n' \
+    "$name" "$env_var" "$conv" >&2
+  return 1
+}
+
+# Resolve the default branch of a repo (main, master, ...) from origin/HEAD.
+# Falls back to 'main' if origin/HEAD is unset and cannot be discovered.
+queue_repo_default_branch() {
+  local repo_path="$1"
+  local head_ref
+  head_ref="$(git -C "$repo_path" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null)"
+  if [[ -z "$head_ref" ]]; then
+    git -C "$repo_path" remote set-head origin --auto >/dev/null 2>&1 || true
+    head_ref="$(git -C "$repo_path" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null)"
+  fi
+  if [[ -n "$head_ref" ]]; then
+    printf '%s\n' "${head_ref##refs/remotes/origin/}"
+    return 0
+  fi
+  printf 'main\n'
+}
+
 # ---- Internal helpers --------------------------------------------------------
 
 _q() { git -C "$EMF_QUEUE_REPO" "$@"; }

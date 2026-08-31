@@ -1,6 +1,6 @@
 [Unit]
 Description=EMF autopilot dispatcher (worker-01)
-Documentation=https://github.com/cklinker/emf/blob/main/.claude/dispatcher/README.md
+Documentation=https://github.com/kelta-io/kelta/blob/main/.claude/dispatcher/README.md
 After=network-online.target docker.service
 Wants=network-online.target
 

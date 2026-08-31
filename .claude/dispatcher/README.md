@@ -90,7 +90,7 @@ tail -f /var/log/emf-dispatcher/TASK-2026-05-10-0001.jsonl | jq -c .
 |---|---|---|
 | Task stuck in `in-progress/` | tmux session died | Dispatcher prunes within one tick; manual: `queue_release_orphan` or `git mv in-progress/X.md approved/X.md` |
 | Two workers grabbed same task | Push race | Won't happen with `queue_push_with_retry` (commit + push, rebase on reject) |
-| PR opens but CI never runs | No runners online | `gh api /repos/cklinker/emf/actions/runners` — should show 12 idle on fc17 |
+| PR opens but CI never runs | No runners online | `gh api /repos/kelta-io/kelta/actions/runners` — should show 12 idle on fc17 |
 | Migration collision | Two `needs_migration: true` tasks raced | Dispatcher's eligibility filter blocks if `_active-migration` exists; manual: `rm` the marker after manual fix |
 | Worker burns retries | Buggy task brief | Move to `failed/`, rewrite the brief in `inbox/`, re-promote via planner |
 

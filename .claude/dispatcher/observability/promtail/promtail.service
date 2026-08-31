@@ -1,6 +1,6 @@
 [Unit]
 Description=Promtail (ships emf-dispatcher logs to homelab Loki)
-Documentation=https://github.com/cklinker/emf/blob/main/.claude/dispatcher/observability/README.md
+Documentation=https://github.com/kelta-io/kelta/blob/main/.claude/dispatcher/observability/README.md
 After=network-online.target emf-dispatcher.service
 Wants=network-online.target
 

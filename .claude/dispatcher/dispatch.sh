@@ -61,7 +61,7 @@ prune_orphans() {
     # races against the existing PR.
     pr="$(queue_get_field "$f" pr)"
     if [[ -n "$pr" && "$pr" != "null" ]]; then
-      pr_state="$(gh pr view "$pr" -R cklinker/emf --json state --jq '.state' 2>/dev/null || echo UNKNOWN)"
+      pr_state="$(gh pr view "$pr" -R kelta-io/kelta --json state --jq '.state' 2>/dev/null || echo UNKNOWN)"
       id="$(basename "$f" .md)"
       case "$pr_state" in
         OPEN)

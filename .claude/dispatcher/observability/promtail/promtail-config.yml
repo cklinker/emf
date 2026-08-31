@@ -33,6 +33,23 @@ clients:
 
 scrape_configs:
   # ---- 1. Per-task worker logs (claude -p stream-json) -----------------------
+  # CEO layer agent logs (BOOTSTRAP.md 60 step 5). worker-01 ships via its own
+  # promtail, not the in-cluster alloy DaemonSet the bootstrap script names.
+  - job_name: rzware-ceo-agents
+    static_configs:
+      - targets: [localhost]
+        labels:
+          host: worker-01
+          source: rzware-ceo
+          stream_type: agent
+          __path__: /srv/rzware-ceo/logs/*.jsonl
+    pipeline_stages:
+      - regex:
+          source: filename
+          expression: '/(?P<basename>[^/]+)\.jsonl$'
+      - labels:
+          basename:
+
   - job_name: emf-worker-task
     static_configs:
       - targets: [localhost]

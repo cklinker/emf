@@ -327,6 +327,12 @@ every action handler. Uninstall deliberately leaves the collections and their ro
 
 # Outcome — 2026-08-31: PASSED
 
+> **Reinstalled 2026-08-31 after #1391** (subscription metadata) and #1393 merged: JAR rebuilt from
+> `83e0845d`, re-signed, uninstalled + reinstalled + enabled, collections and rows preserved.
+> Re-gated (`resolve-entitlements` → `PRO`/`watches: 25`, not stubs) and a fresh checkout session
+> created — Stripe **accepted** `subscription_data[metadata]`, which it rejects when malformed, so
+> the fix is confirmed against the live API and not only the stub server in the unit test.
+
 Run against real Stripe **test-mode** keys on the sandbox tenant
 `c734b580-1204-4e00-97a4-3500a4f5c25e` (`spotopened--billing-stripe-verify`), worker at
 `main-0064fa2` (JVM image, `/app/app.jar`).
@@ -365,15 +371,25 @@ tenant collection**. Sandbox state (PRO `watches`, probe rule, probe collection)
    back to the order-dependent customer mapping — `"no resolvable member"`, live. Stripe does not
    guarantee delivery order, so this drops subscriptions intermittently, not deterministically.
 
-## Known gap: installing needs a browser session, not an API-minted PAT
+## Installing: address the tenant by URL path, not by header
 
 `POST /api/modules/install-jar` is multipart, which `kelta api` cannot send, so install is raw
-`curl` + a token. A PAT minted through `kelta token create` is rejected `403 "User identity not
-resolved"` on **every** authenticated route: `PatAuthenticationFilter` sets only
-`withTenantId(...)`, and `UserIdentityResolutionFilter` (which fills `profileId`) returns early
-when no tenant is resolved for the request — `RouteAuthorizationFilter` then requires a non-null
-`profileId`. The PAT stored by `kelta auth login` works. Until that is reconciled, reinstall from
-the admin UI (**Setup → Modules → Install JAR**) or with the CLI's own stored credential.
+`curl` + a PAT from `kelta token create`. **The slug goes in the URL path, not an
+`X-Tenant-Slug` header**:
+
+```
+https://api.kelta.io/<tenant-slug>/api/modules/install-jar
+```
+
+This is what the SDK does (`KeltaClient.ts`: `baseUrl = ${rawBase}/${tenantSlug}`), and it is what
+the tenant-slug extraction filter reads. With the header form instead, the tenant never resolves,
+so `UserIdentityResolutionFilter` returns early without populating `profileId` and
+`RouteAuthorizationFilter` rejects the request `403 "User identity not resolved"` — on *every*
+route, which makes it look like a broken token rather than a wrong URL.
+
+Reinstalling over an existing install returns `409`; uninstall first. Uninstall keeps the
+collections and their rows (verified: plan/customer/subscription counts unchanged across a
+reinstall), so this is safe on a tenant with real data.
 
 ## Cutover blockers (decisions, not bugs)
 

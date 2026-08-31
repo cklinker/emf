@@ -278,4 +278,29 @@ class AlertDispatchServiceTest {
             verify(deliveryRepository, never()).markFailed(anyString(), anyString());
         }
     }
+
+    @Test
+    @DisplayName("an unresolved entitlement still sends free channels but never a paid one")
+    void ungatedTenantNeverGetsPaidChannels() {
+        // Empty entitlement means "this tenant is not gating channels". For push and email that is
+        // the right default -- a tenant with no billing, or a briefly unavailable authority, should
+        // still get alerts. Applying it to SMS would spend money on members not entitled to it.
+        when(entitlementService.listLimit(any(), any(), eq("channels"))).thenReturn(List.of());
+
+        List<String> resolved = service.resolveChannels(TENANT,
+                alert("[\"push\",\"email\",\"sms\"]"));
+
+        assertThat(resolved).containsExactly("push", "email");
+        assertThat(resolved).doesNotContain("sms");
+    }
+
+    @Test
+    @DisplayName("an affirmative entitlement is what unlocks a paid channel")
+    void affirmativeEntitlementAllowsSms() {
+        when(entitlementService.listLimit(any(), any(), eq("channels")))
+                .thenReturn(List.of("push", "email", "sms"));
+
+        assertThat(service.resolveChannels(TENANT, alert("[\"sms\"]")))
+                .containsExactly("sms");
+    }
 }

@@ -12,6 +12,7 @@ import io.kelta.worker.repository.WatchRepository;
 import io.kelta.worker.repository.WatchTarget;
 import io.kelta.worker.repository.WatchTargetRepository;
 import io.kelta.worker.service.availability.WatchCriteria;
+import io.kelta.worker.service.availability.AlertDispatchService;
 import io.kelta.worker.service.billing.EntitlementService;
 import io.kelta.runtime.storage.UniqueConstraintViolationException;
 import io.kelta.worker.interceptor.SelfScopedController;
@@ -355,7 +356,18 @@ public class WatchController implements SelfScopedController {
             return entitled;
         }
         if (entitled.isEmpty()) {
-            return requested; // tenant is not gating channels
+            // Tenant is not gating channels -- except for the ones that cost money, which are
+            // only ever granted on an affirmative entitlement (AlertDispatchService.BILLABLE_CHANNELS).
+            // Accepting a billable channel here would also mislead the member: the watch would
+            // claim SMS while dispatch declines to send it.
+            List<String> free = requested.stream()
+                    .filter(c -> !AlertDispatchService.BILLABLE_CHANNELS.contains(c))
+                    .toList();
+            if (free.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "None of the requested alert channels are available on your plan");
+            }
+            return free;
         }
         List<String> intersection = new ArrayList<>();
         for (String channel : requested) {

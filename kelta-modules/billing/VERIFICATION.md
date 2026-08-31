@@ -448,6 +448,10 @@ channel limits would have stopped applying — including paid SMS for free-tier 
 - **A signing secret cannot be verified without a real event.** Stripe offers "Send test events"
   only in test mode, so a live endpoint's `whsec_` is unprovable until the first real transaction.
   Roll it and update the credential in one sitting; that is the only guarantee available.
-- **Portal magic-link login double-verifies.** Every `PORTAL_LOGIN result=success` in the auth log
-  is followed seconds later by a failed re-verify of the same single-use token, so a working link
-  presents as broken. The defect is in the external `<portal-host>` callback, not this repo.
+- **Portal magic-link login is fine — read its audit log carefully.** Login tokens are single-use
+  and expire in 15 minutes, and issuance is capped at **3 per 15 minutes per user**. When mail is
+  slow, a person naturally clicks several links, including ones an earlier click already consumed;
+  each stale click logs `PORTAL_LOGIN actor=unknown result=failure detail=invalid_or_expired_token`
+  interleaved with the genuine successes. That interleaving looks like a re-verify defect and is
+  not one: an uninterrupted request→verify pair logs a single success with nothing after it.
+  Diagnose from a clean attempt, not from a burst.

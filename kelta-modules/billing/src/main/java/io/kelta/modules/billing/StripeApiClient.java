@@ -75,6 +75,17 @@ public class StripeApiClient {
         form.put("metadata[userId]", userId);
         form.put("metadata[tenantId]", tenantId);
         form.put("metadata[planCode]", planCode);
+        if ("subscription".equals(mode)) {
+            // Session metadata does NOT propagate to the subscription Stripe creates — only
+            // subscription_data[metadata] does. Without this, customer.subscription.* events carry
+            // no userId and the webhook can only resolve the member through the stored customer
+            // mapping, which is ORDER-DEPENDENT: a subscription event delivered before
+            // checkout.session.completed finds no mapping yet and is dropped with "no resolvable
+            // member". Stamping it here makes those events self-describing.
+            form.put("subscription_data[metadata][userId]", userId);
+            form.put("subscription_data[metadata][tenantId]", tenantId);
+            form.put("subscription_data[metadata][planCode]", planCode);
+        }
         if (customerId != null && !customerId.isBlank()) {
             form.put("customer", customerId);
         }

@@ -77,6 +77,27 @@ journalctl -fu emf-dispatcher -o cat
 tail -f /var/log/emf-dispatcher/TASK-2026-05-10-0001.jsonl | jq -c .
 ```
 
+## Multi-repo
+
+Every task defaults to the `emf` mono-repo, but a task can carry an optional `repo:` frontmatter field to target any other repository. The dispatcher pulls all repos with eligible tasks each tick, the worker worktrees the resolved repo (fetching from `origin/<default-branch>` — `main` or `master` is discovered from `origin/HEAD`, not assumed), and the PR is opened there.
+
+**Registering a repo.** A repo name is resolved to a filesystem path via, in order:
+
+1. Env var `RZWARE_REPO_<NAME_UPPER>` (dashes → underscores, e.g. `spotopened-web` → `RZWARE_REPO_SPOTOPENED_WEB`). Set these on the systemd unit — the dispatcher's `spawn_worker` forwards every `RZWARE_REPO_*` var into the worker's tmux session.
+2. Convention fallback `$HOME/GitHub/<name>` if that directory exists.
+3. Otherwise: **fail the task**. A task landing in the wrong repo is worse than a task that fails, so an unresolved `repo:` is not silently retargeted at `emf`.
+
+**Example.** Systemd unit `Environment=` lines:
+
+```
+Environment=RZWARE_REPO_SPOTOPENED_WEB=/home/craig/GitHub/spotopened-web
+Environment=RZWARE_REPO_COUCHPICKS=/home/craig/GitHub/couchpicks
+Environment=RZWARE_REPO_RZWARE_WEBSITE=/home/craig/GitHub/rzware_website
+Environment=RZWARE_REPO_HOMELAB_ARGO=/home/craig/GitHub/homelab-argo
+```
+
+Then a task frontmatter of `repo: spotopened-web` worktrees `/home/craig/GitHub/spotopened-web` and opens its PR against that repo's default branch.
+
 ## Safety knobs
 
 - `MAX_PARALLEL=3` (env on systemd unit) — set to `0` to drain without claiming new work

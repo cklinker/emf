@@ -61,7 +61,14 @@ prune_orphans() {
     # races against the existing PR.
     pr="$(queue_get_field "$f" pr)"
     if [[ -n "$pr" && "$pr" != "null" ]]; then
-      pr_state="$(gh pr view "$pr" -R kelta-io/kelta --json state --jq '.state' 2>/dev/null || echo UNKNOWN)"
+      # Resolve which repo the PR lives in and run `gh pr view` from inside
+      # it, so gh identifies the right owner/name without a hardcoded slug.
+      task_repo="$(queue_get_field "$f" repo)"; task_repo="${task_repo:-emf}"
+      if repo_path="$(queue_resolve_repo "$task_repo" 2>/dev/null)"; then
+        pr_state="$(cd "$repo_path" && gh pr view "$pr" --json state --jq '.state' 2>/dev/null || echo UNKNOWN)"
+      else
+        pr_state="UNKNOWN"
+      fi
       id="$(basename "$f" .md)"
       case "$pr_state" in
         OPEN)
@@ -93,13 +100,22 @@ prune_orphans() {
 
 spawn_worker() {
   local task_file="$1"
-  local id sess
+  local id sess repo_env
   id="$(basename "$task_file" .md)"
   sess="$TMUX_PREFIX-$id"
 
+  # tmux inherits its environment from the tmux server, not from this shell,
+  # so an env var set only in the systemd unit for the dispatcher will not
+  # reach the worker unless we forward it explicitly. Carry EMF_REPO,
+  # EMF_QUEUE_REPO and every RZWARE_REPO_* registry entry across.
+  repo_env=""
+  while IFS='=' read -r k v; do
+    repo_env+=" $k='$v'"
+  done < <(env | grep -E '^RZWARE_REPO_[A-Z0-9_]+=' || true)
+
   log_event spawn task="$id" session="$sess"
   tmux new-session -d -s "$sess" \
-    "EMF_REPO='$EMF_REPO' EMF_QUEUE_REPO='$EMF_QUEUE_REPO' bash '$SELF_DIR/worker.sh' '$task_file'; sleep 5"
+    "EMF_REPO='$EMF_REPO' EMF_QUEUE_REPO='$EMF_QUEUE_REPO'$repo_env bash '$SELF_DIR/worker.sh' '$task_file'; sleep 5"
 }
 
 main_loop() {
@@ -136,10 +152,22 @@ main_loop() {
     if ! git -C "$EMF_QUEUE_REPO" pull --rebase --autostash >/dev/null 2>&1; then
       log_warn "queue pull failed; will retry next tick"
     fi
-    if ! git -C "$EMF_REPO" pull --rebase --autostash main >/dev/null 2>&1; then
-      # Not fatal — workers fetch independently.
-      :
-    fi
+    # Refresh every repo that has an eligible task waiting, not just emf.
+    # Not fatal — workers fetch independently — so failures are swallowed.
+    {
+      printf 'emf\n'
+      for f in "$EMF_QUEUE_REPO"/approved/*.md "$EMF_QUEUE_REPO"/in-progress/*.md; do
+        [[ -e "$f" ]] || continue
+        r="$(queue_get_field "$f" repo)"
+        [[ -n "$r" ]] && printf '%s\n' "$r"
+      done
+    } | sort -u | while IFS= read -r repo_name; do
+      [[ -z "$repo_name" ]] && continue
+      if repo_path="$(queue_resolve_repo "$repo_name" 2>/dev/null)"; then
+        default_branch="$(queue_repo_default_branch "$repo_path")"
+        git -C "$repo_path" pull --rebase --autostash origin "$default_branch" >/dev/null 2>&1 || :
+      fi
+    done
 
     prune_orphans
 

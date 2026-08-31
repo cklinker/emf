@@ -20,6 +20,8 @@
 #   EMF_WT_ROOT     worktree root (default /var/lib/emf-wt)
 #   CLAUDE_BIN      claude CLI path (default 'claude' from PATH)
 #   PR_TIMEOUT_MIN  how long to wait for CI (default 30)
+#   RZWARE_REPO_<X> path to non-emf repo X, used when a task carries repo:<x>
+#                   (e.g. RZWARE_REPO_SPOTOPENED_WEB=~/GitHub/spotopened-web)
 
 set -uo pipefail
 
@@ -58,10 +60,23 @@ WT="$EMF_WT_ROOT/$ID"
 ATTEMPTS="$(queue_get_field "$TASK_FILE" attempts)"; ATTEMPTS="${ATTEMPTS:-1}"
 MAX_ATTEMPTS="$(queue_get_field "$TASK_FILE" max_attempts)"; MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
 
+REPO_NAME="$(queue_get_field "$TASK_FILE" repo)"
+REPO_NAME="${REPO_NAME:-emf}"
+_repo_err="$(mktemp)"
+if ! REPO_PATH="$(queue_resolve_repo "$REPO_NAME" 2>"$_repo_err")"; then
+  err_msg="$(cat "$_repo_err")"; rm -f "$_repo_err"
+  log_error "repo resolution failed" repo="$REPO_NAME" error="$err_msg"
+  queue_fail "$TASK_FILE" "unknown repo '$REPO_NAME': ${err_msg:-no configured path}"
+  exit 1
+fi
+rm -f "$_repo_err"
+DEFAULT_BRANCH="$(queue_repo_default_branch "$REPO_PATH")"
+log_info "repo resolved" repo="$REPO_NAME" path="$REPO_PATH" default_branch="$DEFAULT_BRANCH"
+
 cleanup_worktree() {
   if [[ -d "$WT" ]]; then
     log_info "removing worktree" path="$WT"
-    git -C "$EMF_REPO" worktree remove --force "$WT" 2>/dev/null || rm -rf "$WT"
+    git -C "$REPO_PATH" worktree remove --force "$WT" 2>/dev/null || rm -rf "$WT"
   fi
 }
 trap cleanup_worktree EXIT
@@ -71,9 +86,9 @@ trap cleanup_worktree EXIT
 WORKER_START_TS="$(date +%s)"
 log_event worker_start task="$ID" attempts="$ATTEMPTS" max="$MAX_ATTEMPTS" branch="$BRANCH"
 
-if ! git -C "$EMF_REPO" fetch --quiet origin main; then
+if ! git -C "$REPO_PATH" fetch --quiet origin "$DEFAULT_BRANCH"; then
   log_error "git fetch failed"
-  queue_fail "$TASK_FILE" "git fetch origin main failed"
+  queue_fail "$TASK_FILE" "git fetch origin $DEFAULT_BRANCH failed"
   exit 1
 fi
 
@@ -83,22 +98,22 @@ mkdir -p "$EMF_WT_ROOT"
 # remote branch from a prior failed attempt.
 if [[ -d "$WT" ]]; then
   log_warn "stale worktree dir exists, removing" path="$WT"
-  git -C "$EMF_REPO" worktree remove --force "$WT" 2>/dev/null
+  git -C "$REPO_PATH" worktree remove --force "$WT" 2>/dev/null
   rm -rf "$WT"
 fi
-git -C "$EMF_REPO" worktree prune >/dev/null 2>&1
-if git -C "$EMF_REPO" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+git -C "$REPO_PATH" worktree prune >/dev/null 2>&1
+if git -C "$REPO_PATH" show-ref --verify --quiet "refs/heads/$BRANCH"; then
   log_warn "stale local branch exists, deleting" branch="$BRANCH"
-  git -C "$EMF_REPO" branch -D "$BRANCH" >/dev/null 2>&1
+  git -C "$REPO_PATH" branch -D "$BRANCH" >/dev/null 2>&1
 fi
-if git -C "$EMF_REPO" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+if git -C "$REPO_PATH" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
   log_warn "stale remote branch exists, deleting" branch="$BRANCH"
-  git -C "$EMF_REPO" push origin --delete "$BRANCH" >/dev/null 2>&1
+  git -C "$REPO_PATH" push origin --delete "$BRANCH" >/dev/null 2>&1
 fi
 
 # -B (force-create) so a half-cleaned-up branch from a previous attempt
 # doesn't block the new worktree.
-if ! git -C "$EMF_REPO" worktree add --force "$WT" -B "$BRANCH" origin/main 2>&1; then
+if ! git -C "$REPO_PATH" worktree add --force "$WT" -B "$BRANCH" "origin/$DEFAULT_BRANCH" 2>&1; then
   log_error "worktree add failed"
   queue_fail "$TASK_FILE" "worktree add failed"
   exit 1
@@ -130,6 +145,9 @@ mkdir -p "$(dirname "$JSONL_LOG")" 2>/dev/null || true
 
 log_event claude_start task="$ID" log="$JSONL_LOG"
 EMF_TASK_FILE="$TASK_FILE" \
+EMF_TASK_REPO="$REPO_NAME" \
+EMF_TASK_REPO_PATH="$REPO_PATH" \
+EMF_TASK_DEFAULT_BRANCH="$DEFAULT_BRANCH" \
   "$CLAUDE_BIN" \
     --model "$KELTA_MODEL" \
     -p "$USER_PROMPT" \
@@ -165,7 +183,7 @@ fi
 # ---- 5. Push + PR -----------------------------------------------------------
 
 # If nothing changed, the worker did nothing useful. Treat as failure.
-if git -C "$WT" diff --quiet origin/main && [[ -z "$(git -C "$WT" status --porcelain)" ]]; then
+if git -C "$WT" diff --quiet "origin/$DEFAULT_BRANCH" && [[ -z "$(git -C "$WT" status --porcelain)" ]]; then
   log_error "no changes after worker session"
   if (( ATTEMPTS < MAX_ATTEMPTS )); then
     queue_release_orphan "$TASK_FILE"
@@ -197,12 +215,12 @@ if ! git -C "$WT" diff --cached --quiet; then
   git -C "$WT" commit -m "$FALLBACK_MSG" >/dev/null
 fi
 
-# Rebase onto latest origin/main BEFORE pushing. Other autopilot workers
-# may have merged since this worktree was created (e.g. all four touch
-# .claude/CHANGELOG.md — first one wins, the rest hit conflicts that
+# Rebase onto latest origin default branch BEFORE pushing. Other autopilot
+# workers may have merged since this worktree was created (e.g. all four
+# touch .claude/CHANGELOG.md — first one wins, the rest hit conflicts that
 # auto-merge then refuses to merge).
-git -C "$WT" fetch --quiet origin main
-if ! git -C "$WT" rebase origin/main 2>&1; then
+git -C "$WT" fetch --quiet origin "$DEFAULT_BRANCH"
+if ! git -C "$WT" rebase "origin/$DEFAULT_BRANCH" 2>&1; then
   # Auto-resolve append-only conflicts in .claude/CHANGELOG.md: keep both
   # sides. Every worker appends one line to CHANGELOG.md; conflicts there
   # are spurious. Other conflicts are real and a retry won't help.
@@ -210,8 +228,8 @@ if ! git -C "$WT" rebase origin/main 2>&1; then
   if [[ "$conflicting" == ".claude/CHANGELOG.md" ]]; then
     log_warn "auto-resolving CHANGELOG.md append conflict"
     git -C "$WT" checkout --theirs -- .claude/CHANGELOG.md
-    # 'theirs' during rebase = the rebased-onto branch (origin/main). Now
-    # re-append our line: pull it from the original commit's CHANGELOG.md.
+    # 'theirs' during rebase = the rebased-onto branch. Now re-append our
+    # line: pull it from the original commit's CHANGELOG.md.
     if our_line="$(git -C "$WT" show "ORIG_HEAD:.claude/CHANGELOG.md" 2>/dev/null | tail -1)"; then
       [[ -n "$our_line" ]] && printf '%s\n' "$our_line" >> "$WT/.claude/CHANGELOG.md"
     fi
@@ -309,7 +327,7 @@ case "$final_state" in
       log_info "releasing for retry" final_state="$final_state" attempts="$ATTEMPTS" max="$MAX_ATTEMPTS"
       # Close the PR so the next attempt opens a fresh one.
       gh pr close "$PR_NUM" --comment "autopilot retry: closing to relaunch on attempt $((ATTEMPTS + 1))" >/dev/null 2>&1 || true
-      git -C "$EMF_REPO" push origin --delete "$BRANCH" >/dev/null 2>&1 || true
+      git -C "$REPO_PATH" push origin --delete "$BRANCH" >/dev/null 2>&1 || true
       queue_release_orphan "$TASK_FILE"
     else
       log_error "exhausted retries" final_state="$final_state" attempts="$ATTEMPTS"

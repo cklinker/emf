@@ -17,6 +17,7 @@ import io.kelta.runtime.workflow.ModuleUnavailableException;
 import io.kelta.runtime.workflow.module.KeltaModule;
 import io.kelta.runtime.workflow.module.ModuleContext;
 import io.kelta.worker.service.TenantSlugResolver;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -786,6 +787,12 @@ public class RuntimeModuleManager {
         if (query != null) {
             input.putAll(query);
         }
+        // The JSON body has to become inputs too, not just ride along as rawBody. Without this a
+        // POST handler reading its own documented fields finds nothing and answers "... is
+        // required" against a request that supplied everything -- indistinguishable from real
+        // validation, which is exactly how it reached production. Body wins over a same-named query
+        // parameter: for a POST it is the primary source.
+        input.putAll(parseBodyAsInputs(rawBody));
         // The flow engine passes a state envelope, and handlers read through ActionInputs, which
         // unwraps "input" when present. Matching that here means one handler serves both paths.
         Map<String, Object> resolved = Map.of(
@@ -805,6 +812,51 @@ public class RuntimeModuleManager {
             : tenantSlugResolver.resolveSlug(tenantId).orElse(null);
         return Optional.of(TenantContext.callWithTenant(tenantId, tenantSlug,
             () -> handler.get().execute(context)));
+    }
+
+    /**
+     * The request body as handler inputs, or empty when there is nothing usable to read.
+     *
+     * <p>Only a JSON object contributes inputs. A body that is an array, a scalar, or malformed
+     * yields nothing rather than throwing: the handler then reports its own missing-field error,
+     * which is a better message than a parse failure from the dispatcher. {@code rawBody} is still
+     * passed through untouched, because a webhook handler must verify a signature over the exact
+     * bytes and cannot use a re-serialised map.
+     */
+    private Map<String, Object> parseBodyAsInputs(String rawBody) {
+        if (rawBody == null || rawBody.isBlank()) {
+            return Map.of();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(rawBody);
+            if (node == null || !node.isObject()) {
+                return Map.of();
+            }
+            Map<String, Object> values = new java.util.LinkedHashMap<>();
+            node.propertyStream().forEach(e -> values.put(e.getKey(), toPlainValue(e.getValue())));
+            return values;
+        } catch (RuntimeException e) {
+            log.debug("Module route body was not readable as JSON, passing rawBody only: {}",
+                e.getMessage());
+            return Map.of();
+        }
+    }
+
+    /** Unwraps a JSON scalar to the Java value a handler expects; anything else stays a node. */
+    private static Object toPlainValue(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (value.isTextual()) {
+            return value.stringValue();
+        }
+        if (value.isBoolean()) {
+            return value.booleanValue();
+        }
+        if (value.isNumber()) {
+            return value.numberValue();
+        }
+        return value;
     }
 
     /** Injected via setter so the existing constructor overloads stay as they are. */

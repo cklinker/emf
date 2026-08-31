@@ -11,6 +11,7 @@ import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
 import io.kelta.runtime.workflow.ActionResult;
 import io.kelta.runtime.workflow.BeforeSaveHook;
+import io.kelta.runtime.module.service.ModuleServiceRegistry;
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
 import io.kelta.runtime.workflow.module.KeltaModule;
 import io.kelta.runtime.workflow.module.ModuleContext;
@@ -60,6 +61,7 @@ public class RuntimeModuleManager {
     private final ModuleCollectionProvisioner collectionProvisioner;
     /** Resolves tenantId -> slug for webhook dispatch; may be null in tests. */
     private final TenantSlugResolver tenantSlugResolver;
+    private final ModuleServiceRegistry moduleServiceRegistry;
 
     /** Tracks which modules are loaded per tenant: tenantId -> Set<moduleId> */
     private final Map<String, Set<String>> loadedModules = new ConcurrentHashMap<>();
@@ -72,6 +74,12 @@ public class RuntimeModuleManager {
 
     /** The exact hook instances registered per load, keyed "tenantId:moduleId" — see LoadedModule. */
     private final Map<String, List<BeforeSaveHook>> registeredHooks = new ConcurrentHashMap<>();
+
+    /**
+     * Services each load published, so unload can remove the exact instances -- a module's
+     * {@code getServices()} may build fresh objects per call, same reason hooks are tracked.
+     */
+    private final Map<String, Map<Class<?>, Object>> registeredServices = new ConcurrentHashMap<>();
 
     /**
      * What each load actually registered, keyed "tenantId:moduleId".
@@ -103,7 +111,8 @@ public class RuntimeModuleManager {
                                  ModuleSignatureVerifier signatureVerifier,
                                  BeforeSaveHookRegistry beforeSaveHookRegistry,
                                  ModuleCollectionProvisioner collectionProvisioner,
-                                 TenantSlugResolver tenantSlugResolver) {
+                                 TenantSlugResolver tenantSlugResolver,
+                                 ModuleServiceRegistry moduleServiceRegistry) {
         this.moduleStore = Objects.requireNonNull(moduleStore);
         this.actionHandlerRegistry = Objects.requireNonNull(actionHandlerRegistry);
         this.objectMapper = Objects.requireNonNull(objectMapper);
@@ -114,6 +123,7 @@ public class RuntimeModuleManager {
         this.beforeSaveHookRegistry = beforeSaveHookRegistry;
         this.collectionProvisioner = collectionProvisioner;
         this.tenantSlugResolver = tenantSlugResolver;
+        this.moduleServiceRegistry = moduleServiceRegistry;
     }
 
     /** Overload without a slug resolver — webhook dispatch then cannot resolve the tenant schema. */
@@ -126,7 +136,21 @@ public class RuntimeModuleManager {
                                  BeforeSaveHookRegistry beforeSaveHookRegistry,
                                  ModuleCollectionProvisioner collectionProvisioner) {
         this(moduleStore, actionHandlerRegistry, objectMapper, jarService, moduleContext,
-            signatureVerifier, beforeSaveHookRegistry, collectionProvisioner, null);
+            signatureVerifier, beforeSaveHookRegistry, collectionProvisioner, null, null);
+    }
+
+    /** Overload without a service registry -- a module then publishes no platform-callable services. */
+    public RuntimeModuleManager(ModuleStore moduleStore,
+                                 ActionHandlerRegistry actionHandlerRegistry,
+                                 ObjectMapper objectMapper,
+                                 ModuleJarService jarService,
+                                 ModuleContext moduleContext,
+                                 ModuleSignatureVerifier signatureVerifier,
+                                 BeforeSaveHookRegistry beforeSaveHookRegistry,
+                                 ModuleCollectionProvisioner collectionProvisioner,
+                                 TenantSlugResolver tenantSlugResolver) {
+        this(moduleStore, actionHandlerRegistry, objectMapper, jarService, moduleContext,
+            signatureVerifier, beforeSaveHookRegistry, collectionProvisioner, tenantSlugResolver, null);
     }
 
     /**
@@ -478,13 +502,22 @@ public class RuntimeModuleManager {
             // Register before-save hooks, tenant-scoped so a module installed by one tenant
             // never fires on another tenant's records.
             List<BeforeSaveHook> hooks = registerTenantHooks(tenantId, keltaModule);
+            // Recorded immediately: anything that throws after this point must be able to find
+            // these to unwind them, and registerTenantServices below can reject a bad port.
+            registeredHooks.put(classLoaderKey, hooks);
+
+            // Services this module publishes for platform code to call. Self-unwinding: a rejected
+            // port removes the ports already accepted from the same module before rethrowing, so a
+            // module never ends up half-published.
+            Map<Class<?>, Object> services = registerTenantServices(tenantId, keltaModule);
+            registeredServices.put(classLoaderKey, services);
 
             activeClassLoaders.put(classLoaderKey, classLoader);
             activeModuleInstances.put(classLoaderKey, keltaModule);
-            registeredHooks.put(classLoaderKey, hooks);
 
-            log.info("Loaded module '{}' from JAR with {} real handlers and {} hooks for tenant {}",
-                module.moduleId(), handlers.size(), hooks.size(), tenantId);
+            log.info("Loaded module '{}' from JAR with {} real handlers, {} hooks and {} services "
+                    + "for tenant {}",
+                module.moduleId(), handlers.size(), hooks.size(), services.size(), tenantId);
 
         } catch (Exception e) {
             log.warn("Failed to load module '{}' from JAR for tenant {}: {}. Falling back to stubs.",
@@ -501,6 +534,12 @@ public class RuntimeModuleManager {
             List<BeforeSaveHook> partialHooks = registeredHooks.remove(classLoaderKey);
             if (partialHooks != null && beforeSaveHookRegistry != null) {
                 beforeSaveHookRegistry.removeTenantHooks(tenantId, partialHooks);
+            }
+            // Same for services: a half-loaded module must not keep answering platform calls from
+            // a ClassLoader that is about to be discarded.
+            Map<Class<?>, Object> partialServices = registeredServices.remove(classLoaderKey);
+            if (partialServices != null && moduleServiceRegistry != null) {
+                moduleServiceRegistry.remove(tenantId, partialServices);
             }
 
             // Fall back to stubs
@@ -699,6 +738,37 @@ public class RuntimeModuleManager {
      * instances registered so unload can remove them by identity. Returns empty when no hook
      * registry is wired (stub-only test setups) — hooks are then simply not active.
      */
+    /**
+     * Publishes the module's platform-callable services for this tenant.
+     *
+     * <p>Unwinds itself: if one port is rejected -- a duplicate for the tenant, or an interface the
+     * module bundled rather than the platform's -- the ports already accepted from this same module
+     * are removed before the exception propagates, so the caller's fallback-to-stubs path never
+     * leaves a partially published module answering platform calls.
+     *
+     * @return the exact instances registered, for unload to remove by identity
+     */
+    private Map<Class<?>, Object> registerTenantServices(String tenantId, KeltaModule keltaModule) {
+        if (moduleServiceRegistry == null) {
+            return Map.of();
+        }
+        Map<Class<?>, Object> declared = keltaModule.getServices();
+        if (declared == null || declared.isEmpty()) {
+            return Map.of();
+        }
+        Map<Class<?>, Object> registered = new java.util.LinkedHashMap<>();
+        try {
+            declared.forEach((port, service) -> {
+                moduleServiceRegistry.register(tenantId, port, service);
+                registered.put(port, service);
+            });
+        } catch (RuntimeException e) {
+            moduleServiceRegistry.remove(tenantId, registered);
+            throw e;
+        }
+        return Map.copyOf(registered);
+    }
+
     private List<BeforeSaveHook> registerTenantHooks(String tenantId, KeltaModule keltaModule) {
         if (beforeSaveHookRegistry == null) {
             return List.of();
@@ -779,6 +849,13 @@ public class RuntimeModuleManager {
         }
         if (hooks != null && !hooks.isEmpty() && beforeSaveHookRegistry != null) {
             beforeSaveHookRegistry.removeTenantHooks(tenantId, hooks);
+        }
+
+        // Remove published services before closing the ClassLoader below -- a platform bean that
+        // resolved one after the close would call into a dead ClassLoader.
+        Map<Class<?>, Object> services = registeredServices.remove(classLoaderKey);
+        if (services != null && !services.isEmpty() && moduleServiceRegistry != null) {
+            moduleServiceRegistry.remove(tenantId, services);
         }
 
         // Close the ClassLoader

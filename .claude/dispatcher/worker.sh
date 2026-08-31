@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Per-task worker. Runs ONE task end-to-end:
 #   1. Create worktree at $EMF_WT_ROOT/<task-id> on a fresh branch off origin/main
-#   2. Invoke `claude -p` with the worker-prompt, passing the task brief
+#   2. Invoke `claude -p --model "$KELTA_MODEL"` with the worker-prompt, passing the task brief
 #   3. Run /verify (defensive — the worker also runs it inside the session)
 #   4. Push branch, open PR with autopilot label
 #   5. Poll `gh pr checks` until conclusion
@@ -35,6 +35,17 @@ PR_TIMEOUT_MIN="${PR_TIMEOUT_MIN:-30}"
 
 TASK_FILE="${1:-}"
 [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]] || { echo "Usage: $0 <task-file>" >&2; exit 2; }
+
+# --- budget: model routing (BUDGET.md) -------------------------------------
+# Sonnet by default; Opus only when the task asks for it; Haiku for triage.
+KELTA_MODEL="$(awk -F': *' '/^model:/{print $2; exit}' "$TASK_FILE" 2>/dev/null)"
+if [ -z "${KELTA_MODEL:-}" ]; then
+  case "$(awk -F': *' '/^complexity:/{print $2; exit}' "$TASK_FILE" 2>/dev/null)" in
+    high) KELTA_MODEL=opus ;; *) KELTA_MODEL=sonnet ;;
+  esac
+fi
+export KELTA_MODEL
+# ---------------------------------------------------------------------------
 
 EMF_LOG_COMPONENT="worker"
 log_init "worker"
@@ -120,6 +131,7 @@ mkdir -p "$(dirname "$JSONL_LOG")" 2>/dev/null || true
 log_event claude_start task="$ID" log="$JSONL_LOG"
 EMF_TASK_FILE="$TASK_FILE" \
   "$CLAUDE_BIN" \
+    --model "$KELTA_MODEL" \
     -p "$USER_PROMPT" \
     --append-system-prompt "$(cat "$WORKER_PROMPT")" \
     --output-format stream-json \

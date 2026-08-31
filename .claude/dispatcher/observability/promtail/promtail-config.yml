@@ -1,4 +1,4 @@
-# Promtail configuration for worker-01 (craig@192.168.0.232).
+# Promtail configuration for worker-01 (craig@192.168.0.166).
 # Ships dispatcher logs + per-task cost summaries to the homelab Loki.
 #
 # Install:

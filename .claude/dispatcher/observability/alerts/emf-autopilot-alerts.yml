@@ -20,7 +20,7 @@ groups:
         for: 5m
         labels: {severity: critical, component: autopilot}
         annotations:
-          summary: 'worker-01 (craig@192.168.0.232) is unreachable'
+          summary: 'worker-01 (craig@192.168.0.166) is unreachable'
           runbook: 'ssh worker-01; if up, check `systemctl status emf-dispatcher`.'
 
       - alert: EMFAutopilotDispatcherFlapping

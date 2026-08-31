@@ -12,7 +12,7 @@ WorkingDirectory=/home/craig/GitHub/emf
 ExecStart=/bin/bash /home/craig/GitHub/emf/.claude/dispatcher/dispatch.sh
 
 # --- Environment ---
-Environment=MAX_PARALLEL=3
+Environment=MAX_PARALLEL=1
 Environment=TICK_SECONDS=30
 Environment=EMF_REPO=/home/craig/GitHub/emf
 Environment=EMF_QUEUE_REPO=/home/craig/GitHub/emf-queue

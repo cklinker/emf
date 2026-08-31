@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install Promtail on worker-01 (craig@192.168.0.232).
+# Install Promtail on worker-01 (craig@192.168.0.166).
 #
 # Idempotent — safe to re-run after config changes. Pulls latest Promtail
 # binary, installs the config from this dir, drops the systemd unit,

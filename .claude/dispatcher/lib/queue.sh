@@ -226,3 +226,20 @@ queue_release_orphan() {
   queue_set_field "$EMF_QUEUE_REPO/approved/$base" owner "null"
   queue_push_with_retry "release orphan $id (worker died)"
 }
+
+# --- budget: subscription self-throttle (BUDGET.md) -------------------------
+# worker.sh writes state/PAUSED_UNTIL when the stream reports a usage limit.
+# dispatch.sh calls this at the top of every tick and claims nothing while set.
+PAUSE_FILE="${PAUSE_FILE:-/srv/rzware-ceo/state/PAUSED_UNTIL}"
+throttled() {
+  [ -f "$PAUSE_FILE" ] || return 1
+  local until; until=$(cat "$PAUSE_FILE" 2>/dev/null)
+  if [ -n "$until" ] && [ "$(date +%s)" -lt "$until" ]; then return 0; fi
+  rm -f "$PAUSE_FILE"; return 1
+}
+in_run_window() {   # nightly 22:00–06:00 America/Denver unless FORCE_RUN=1
+  [ "${FORCE_RUN:-0}" = "1" ] && return 0
+  local h; h=$(TZ=America/Denver date +%-H)
+  [ "$h" -ge 22 ] || [ "$h" -lt 6 ]
+}
+# ---------------------------------------------------------------------------

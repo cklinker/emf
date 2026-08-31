@@ -1,6 +1,6 @@
 # EMF autopilot dispatcher
 
-Phase 1 of the autonomous feature lifecycle planned in [`~/.claude/plans/i-want-to-maximize-sleepy-karp.md`](../../). Runs on `worker-01` (Linux, `craig@192.168.0.232`) as a systemd service. Mac side runs `status.sh` via launchd for visibility.
+Phase 1 of the autonomous feature lifecycle planned in [`~/.claude/plans/i-want-to-maximize-sleepy-karp.md`](../../). Runs on `worker-01` (Linux, `craig@192.168.0.166`) as a systemd service. Mac side runs `status.sh` via launchd for visibility.
 
 ## Pieces
 
@@ -54,7 +54,7 @@ tail -f /tmp/emf-planner.launchd.log
 # Add an SSH config entry for worker-01 if not already
 cat >> ~/.ssh/config <<'EOF'
 Host worker-01
-  HostName 192.168.0.232
+  HostName 192.168.0.166
   User craig
 EOF
 ```

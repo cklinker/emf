@@ -24,7 +24,7 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SELF_DIR/lib/log.sh"
 . "$SELF_DIR/lib/queue.sh"
 
-MAX_PARALLEL="${MAX_PARALLEL:-3}"
+MAX_PARALLEL="${MAX_PARALLEL:-1}"
 TICK_SECONDS="${TICK_SECONDS:-30}"
 EMF_REPO="${EMF_REPO:-$HOME/GitHub/emf}"
 EMF_QUEUE_REPO="${EMF_QUEUE_REPO:-$HOME/GitHub/emf-queue}"
@@ -105,6 +105,18 @@ spawn_worker() {
 main_loop() {
   log_event dispatch_start max_parallel="$MAX_PARALLEL" tick="$TICK_SECONDS"
   while :; do
+    # --- budget gates (BUDGET.md) -----------------------------------------
+    # Both defined in lib/queue.sh. Checked every tick, before any pull or
+    # claim, so a paused or out-of-window dispatcher does no work at all.
+    if throttled; then
+      log_info "paused until $(cat "$PAUSE_FILE" 2>/dev/null)"
+      sleep "$TICK_SECONDS"; continue
+    fi
+    if ! in_run_window; then
+      sleep "$TICK_SECONDS"; continue
+    fi
+    # ----------------------------------------------------------------------
+
     if ! git -C "$EMF_QUEUE_REPO" pull --rebase --autostash >/dev/null 2>&1; then
       log_warn "queue pull failed; will retry next tick"
     fi

@@ -157,9 +157,14 @@ class McpApplicationTest {
                 "update_layout",
                 "delete_layout",
                 "create_listview",
+                "list_listviews",
+                "update_listview",
+                "delete_listview",
                 // automation admin + integrations (Phase 8)
                 "create_flow",
                 "update_flow",
+                "delete_flow",
+                "list_flows",
                 "import_api_spec",
                 "materialize_api_collection");
     }
@@ -211,11 +216,12 @@ class McpApplicationTest {
                     .as("user tool %s should be idempotent (read-only is always idempotent)", t.name())
                     .isTrue();
         }
-        // Admin-side reads: the shared browse tools plus the picklist/validation/constraint read tools.
+        // Admin-side reads: the shared browse tools plus the picklist/validation/constraint/flow/listview read tools.
         Set<String> adminReads = Set.of(
                 "list_collections", "get_collection_schema",
                 "list_picklists", "get_picklist",
-                "list_validation_rules", "list_unique_constraints");
+                "list_validation_rules", "list_unique_constraints",
+                "list_flows", "list_listviews");
         for (AdminTool at : adminTools) {
             Tool t = at.toSpecification().tool();
             if (!adminReads.contains(t.name())) continue;
@@ -237,11 +243,12 @@ class McpApplicationTest {
                 "update_record", "delete_record", "bulk_apply",
                 "update_collection", "delete_collection",
                 "update_field", "remove_field",
-                "update_layout", "delete_layout", "update_flow",
+                "update_layout", "delete_layout", "update_flow", "delete_flow",
                 "delete_picklist",
                 "update_picklist_value", "deactivate_picklist_value",
                 "update_validation_rule", "delete_validation_rule",
-                "delete_unique_constraint");
+                "delete_unique_constraint",
+                "update_listview", "delete_listview");
         for (UserTool ut : userTools) {
             Tool t = ut.toSpecification().tool();
             if (!destructive.contains(t.name())) continue;
@@ -300,5 +307,21 @@ class McpApplicationTest {
         assertThat(adminNames).doesNotContain(
                 "create_record", "update_record", "delete_record", "bulk_apply",
                 "execute_flow", "submit_for_approval", "list_approvals");
+    }
+
+    @Test
+    void everyCreateToolHasDeleteCounterpart() {
+        // Asserts the ADMIN_INSTRUCTIONS claim: "delete_ counterparts exist for every
+        // create_ tool". Adding a create_ tool without a delete_ counterpart fails here.
+        Set<String> adminNames = adminTools.stream()
+                .map(t -> t.toSpecification().tool().name())
+                .collect(java.util.stream.Collectors.toSet());
+        for (String name : adminNames) {
+            if (!name.startsWith("create_")) continue;
+            String deleteCounterpart = "delete_" + name.substring("create_".length());
+            assertThat(adminNames)
+                    .as("create_ tool '%s' must have a '%s' counterpart", name, deleteCounterpart)
+                    .contains(deleteCounterpart);
+        }
     }
 }

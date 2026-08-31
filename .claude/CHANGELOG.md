@@ -63,3 +63,4 @@ This file tracks merged autopilot work. Entries are appended by autopilot worker
 ## 2026-08-31
 
 - 2026-08-31 feat(mcp): add list_validation_rules, update_validation_rule, delete_validation_rule, list_unique_constraints, delete_unique_constraint admin tools and reword ADMIN_INSTRUCTIONS to not over-claim full counterpart coverage (TASK-2026-08-31-0001)
+- 2026-08-31 feat(mcp): add delete_flow, list_flows, list_listviews, update_listview, delete_listview admin tools; ADMIN_INSTRUCTIONS now states delete_ counterparts exist for every create_ tool (TASK-2026-08-31-0002)

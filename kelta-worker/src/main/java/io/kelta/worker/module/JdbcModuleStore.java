@@ -138,6 +138,33 @@ public class JdbcModuleStore implements ModuleStore {
     }
 
     @Override
+    public void recordLoadOutcome(String id, String status, String error) {
+        jdbcTemplate.update(
+            "UPDATE tenant_module SET status = ?, last_error = ?, "
+                + "last_error_at = CASE WHEN ?::text IS NULL THEN last_error_at ELSE NOW() END, "
+                + "last_loaded_at = CASE WHEN ?::text IS NULL THEN NOW() ELSE last_loaded_at END, "
+                + "load_attempts = load_attempts + 1, updated_at = NOW() WHERE id = ?",
+            status, error, error, error, id);
+    }
+
+    @Override
+    public java.util.Map<String, Object> findLoadDiagnostics(String id) {
+        var rows = jdbcTemplate.queryForList(
+            "SELECT last_error, last_error_at, last_loaded_at, load_attempts "
+                + "FROM tenant_module WHERE id = ?", id);
+        if (rows.isEmpty()) {
+            return java.util.Map.of();
+        }
+        var row = rows.get(0);
+        var out = new java.util.LinkedHashMap<String, Object>();
+        out.put("lastError", row.get("last_error"));
+        out.put("lastErrorAt", row.get("last_error_at"));
+        out.put("lastLoadedAt", row.get("last_loaded_at"));
+        out.put("loadAttempts", row.get("load_attempts"));
+        return out;
+    }
+
+    @Override
     public void deleteModule(String id) {
         // Actions are cascade-deleted via FK
         jdbcTemplate.update("DELETE FROM tenant_module WHERE id = ?", id);

@@ -56,6 +56,12 @@ spring:
     timeout-per-shutdown-phase: 30s
 
 kelta:
+  modules:
+    # Dev/test only. When true, a module with no JAR loads inert stub handlers that do nothing
+    # instead of quarantining. Declared here rather than left to a bare @Value default so it is
+    # visible and greppable -- a silently-stubbing module is the failure this release exists to
+    # remove.
+    stub-mode: ${KELTA_MODULES_STUB_MODE:false}
   # AES-256 master key for envelope encryption (Base64-encoded 32 bytes)
   # Generate with: openssl rand -base64 32
   encryption:

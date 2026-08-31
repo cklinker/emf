@@ -22,6 +22,7 @@ import io.kelta.worker.service.TenantSlugResolver;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
@@ -106,7 +107,9 @@ public class ModuleConfig {
                                                        ModuleCollectionProvisioner collectionProvisioner,
                                                        @Nullable CredentialResolverPort credentialResolverPort,
                                                        TenantSlugResolver tenantSlugResolver,
-                                                       ModuleServiceRegistry moduleServiceRegistry) {
+                                                       ModuleServiceRegistry moduleServiceRegistry,
+                                                       @Value("${kelta.modules.stub-mode:false}")
+                                                       boolean stubModeEnabled) {
         // Runtime-loaded modules get the same credential bridge the compile-time modules get
         // (FlowConfig wires the identical extension). Without it a module cannot reach the vault
         // at all, so anything talking to an external API — the case runtime modules exist for —
@@ -127,9 +130,11 @@ public class ModuleConfig {
             log.info("Runtime module JAR loading disabled (S3 storage not available, using stub handlers)");
         }
 
-        return new RuntimeModuleManager(moduleStore, actionHandlerRegistry, objectMapper,
-            jarService, moduleContext, signatureVerifier, beforeSaveHookRegistry,
+        RuntimeModuleManager manager = new RuntimeModuleManager(moduleStore, actionHandlerRegistry,
+            objectMapper, jarService, moduleContext, signatureVerifier, beforeSaveHookRegistry,
             collectionProvisioner, tenantSlugResolver, moduleServiceRegistry);
+        manager.setStubModeEnabled(stubModeEnabled);
+        return manager;
     }
 
     @Bean

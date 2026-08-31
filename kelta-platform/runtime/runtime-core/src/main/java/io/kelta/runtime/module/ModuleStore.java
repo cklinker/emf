@@ -107,6 +107,27 @@ public interface ModuleStore {
     void updateStatus(String id, String status);
 
     /**
+     * Records the outcome of a load attempt.
+     *
+     * <p>Persisted rather than logged because a load happens at pod startup or on a NATS event,
+     * long after whatever the admin did — a log line on one pod is not something they can see. On
+     * success pass a null error, which clears any previous one.
+     *
+     * @param status the resulting status
+     * @param error  the failure reason, or null on success
+     */
+    void recordLoadOutcome(String id, String status, String error);
+
+    /**
+     * Load diagnostics for one module: {@code lastError}, {@code lastErrorAt}, {@code lastLoadedAt},
+     * {@code loadAttempts}. Read separately rather than widening {@link TenantModuleData}, which is
+     * constructed in many places that have no interest in them.
+     *
+     * @return the values, or an empty map when the module is unknown
+     */
+    java.util.Map<String, Object> findLoadDiagnostics(String id);
+
+    /**
      * Deletes a module and its associated actions.
      *
      * @param id the module primary key

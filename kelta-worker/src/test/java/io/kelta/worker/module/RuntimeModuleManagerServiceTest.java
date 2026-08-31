@@ -58,7 +58,9 @@ class RuntimeModuleManagerServiceTest {
           "id": "two-service-module",
           "name": "Two Service Test Module",
           "version": "1.0.0",
-          "moduleClass": "io.kelta.worker.module.testmodule.TwoServiceTestModule"
+          "moduleClass": "io.kelta.worker.module.testmodule.TwoServiceTestModule",
+          "services": ["io.kelta.runtime.module.service.GreetingPort",
+                       "io.kelta.runtime.module.service.CountingPort"]
         }
         """;
 
@@ -67,7 +69,8 @@ class RuntimeModuleManagerServiceTest {
           "id": "test-module",
           "name": "Service Providing Test Module",
           "version": "1.0.0",
-          "moduleClass": "io.kelta.worker.module.testmodule.ServiceProvidingTestModule"
+          "moduleClass": "io.kelta.worker.module.testmodule.ServiceProvidingTestModule",
+          "services": ["io.kelta.runtime.module.service.GreetingPort"]
         }
         """;
 
@@ -265,5 +268,30 @@ class RuntimeModuleManagerServiceTest {
             in.transferTo(jar);
             jar.closeEntry();
         }
+    }
+
+    @Test
+    @DisplayName("a port the manifest does not declare is refused, not silently published")
+    void undeclaredPortIsRefused() {
+        // The manifest is the authorisation. Without this check, a module an admin installed for
+        // one purpose can publish any platform port and quietly become the tenant's authority for
+        // something unrelated -- the code decides and nobody is ever shown the claim.
+        String manifestWithoutServices = """
+            {
+              "id": "test-module",
+              "name": "Service Providing Test Module",
+              "version": "1.0.0",
+              "moduleClass": "io.kelta.worker.module.testmodule.ServiceProvidingTestModule"
+            }
+            """;
+
+        manager.loadModule(TENANT_ID, new TenantModuleData(
+                "mod-1", TENANT_ID, "test-module", "Service Providing Test Module", "1.0.0",
+                "Test", "https://example.com/module.jar", ModuleJarService.sha256(jarBytes),
+                (long) jarBytes.length, MODULE_CLASS, manifestWithoutServices,
+                TenantModuleData.STATUS_ACTIVE, "user-1",
+                Instant.now(), Instant.now(), "s3/key.jar", List.of()));
+
+        assertThat(serviceRegistry.find(TENANT_ID, GreetingPort.class)).isEmpty();
     }
 }

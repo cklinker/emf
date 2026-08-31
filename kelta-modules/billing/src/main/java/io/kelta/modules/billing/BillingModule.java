@@ -75,7 +75,9 @@ public class BillingModule implements KeltaModule {
                         collections, credentialResolver, signatureVerifier,
                         context.objectMapper()),
                 new ExpirePassesActionHandler(collections),
-                new ResolveEntitlementsActionHandler(entitlements));
+                new ResolveEntitlementsActionHandler(entitlements),
+                new ListPlansActionHandler(collections),
+                new MyBillingActionHandler(collections, entitlements));
 
         // Wildcard hook — runs on every record create for the installing tenant, so its fast path
         // (no rules for the collection) must cost nothing.

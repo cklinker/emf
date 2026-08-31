@@ -13,6 +13,7 @@ import io.kelta.runtime.workflow.ActionResult;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.module.service.ModuleServiceRegistry;
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
+import io.kelta.runtime.workflow.ModuleUnavailableException;
 import io.kelta.runtime.workflow.module.KeltaModule;
 import io.kelta.runtime.workflow.module.ModuleContext;
 import io.kelta.worker.service.TenantSlugResolver;
@@ -62,6 +63,13 @@ public class RuntimeModuleManager {
     /** Resolves tenantId -> slug for webhook dispatch; may be null in tests. */
     private final TenantSlugResolver tenantSlugResolver;
     private final ModuleServiceRegistry moduleServiceRegistry;
+
+    /**
+     * When true, a module with no JAR loads inert stub handlers instead of quarantining. A dev and
+     * test convenience: it makes every declared action succeed without doing anything, which is
+     * exactly the state that must never be reachable by accident in production.
+     */
+    private boolean stubModeEnabled;
 
     /** Tracks which modules are loaded per tenant: tenantId -> Set<moduleId> */
     private final Map<String, Set<String>> loadedModules = new ConcurrentHashMap<>();
@@ -289,16 +297,18 @@ public class RuntimeModuleManager {
 
         ModuleManifest manifest = manifestParser.parse(manifestJson);
 
-        String checksum = ModuleJarService.sha256(jarBytes);
-        String s3Key = jarService.uploadJar(tenantId, manifest.id(), manifest.version(), jarBytes);
-
-        // Check for existing installation
+        // Duplicate check BEFORE the upload. The other order leaves an orphan JAR in S3 on every
+        // rejected install: uninstall only ever deletes the s3Key recorded on the module row, and
+        // a rejected install never wrote one.
         Optional<TenantModuleData> existing = moduleStore.findByTenantAndModuleId(
             tenantId, manifest.id());
         if (existing.isPresent()) {
             throw new IllegalStateException(
                 "Module '" + manifest.id() + "' is already installed for tenant " + tenantId);
         }
+
+        String checksum = ModuleJarService.sha256(jarBytes);
+        String s3Key = jarService.uploadJar(tenantId, manifest.id(), manifest.version(), jarBytes);
 
         String id = UUID.randomUUID().toString();
         TenantModuleData data = new TenantModuleData(
@@ -444,8 +454,17 @@ public class RuntimeModuleManager {
 
         if (module.s3Key() != null && jarService != null) {
             loadFromJar(tenantId, module);
-        } else {
+        } else if (stubModeEnabled) {
+            // Explicit dev opt-in only. Never reached by falling back from an error.
             loadWithStubs(tenantId, module);
+            recordOutcome(module, TenantModuleData.STATUS_STUB, null);
+        } else {
+            // A module with no JAR has no implementation. Its declared actions used to return
+            // success, which is indistinguishable from the work actually happening.
+            quarantine(tenantId, module,
+                module.s3Key() == null
+                    ? "no implementation uploaded (manifest-only install)"
+                    : "JAR storage is unavailable on this pod");
         }
 
         loaded.add(module.moduleId());
@@ -519,8 +538,14 @@ public class RuntimeModuleManager {
                     + "for tenant {}",
                 module.moduleId(), handlers.size(), hooks.size(), services.size(), tenantId);
 
+            // Clears any previous failure, so a module that recovers stops reporting a stale error.
+            recordOutcome(module, TenantModuleData.STATUS_ACTIVE, null);
+
         } catch (Exception e) {
-            log.warn("Failed to load module '{}' from JAR for tenant {}: {}. Falling back to stubs.",
+            // ERROR, not WARN: this module is not running. It used to fall back to stub handlers
+            // that returned success, so a rejected JAR looked healthy at every level an admin
+            // could see.
+            log.error("Module '{}' failed to load for tenant {} and is QUARANTINED: {}",
                 module.moduleId(), tenantId, e.getMessage(), e);
 
             // Clean up partial ClassLoader on failure
@@ -542,8 +567,37 @@ public class RuntimeModuleManager {
                 moduleServiceRegistry.remove(tenantId, partialServices);
             }
 
-            // Fall back to stubs
-            loadWithStubs(tenantId, module);
+            // Fail closed. Handlers are registered but refuse to run, so a flow step fails with
+            // a specific, attributable error instead of ResourceNotFound (which reads to an admin
+            // as a mistyped action key) or, worse, a success against code that never ran.
+            String reason = e.getClass().getSimpleName()
+                    + (e.getMessage() == null ? "" : ": " + e.getMessage());
+            quarantine(tenantId, module, reason);
+        }
+    }
+
+    /**
+     * Registers refusing handlers for every action the manifest declares, and records why.
+     *
+     * <p>Registering rather than leaving the keys absent is deliberate: an absent key surfaces to a
+     * flow as {@code ResourceNotFound}, which an admin reads as a typo in the step. A refusing
+     * handler names the module and the reason.
+     */
+    private void quarantine(String tenantId, TenantModuleData module, String reason) {
+        for (var action : module.actions()) {
+            actionHandlerRegistry.registerTenantHandler(tenantId,
+                createQuarantinedHandler(action, module, reason));
+        }
+        recordOutcome(module, TenantModuleData.STATUS_QUARANTINED, reason);
+    }
+
+    /** Persists a load outcome, never letting a bookkeeping failure mask the load result. */
+    private void recordOutcome(TenantModuleData module, String status, String error) {
+        try {
+            moduleStore.recordLoadOutcome(module.id(), status, error);
+        } catch (Exception e) {
+            log.warn("Could not record load outcome for module '{}': {}",
+                module.moduleId(), e.getMessage());
         }
     }
 
@@ -912,11 +966,73 @@ public class RuntimeModuleManager {
         return loaded != null && loaded.contains(moduleId);
     }
 
+    /** Load diagnostics for one module row, for the health endpoint. */
+    public Map<String, Object> loadDiagnostics(String moduleRowId) {
+        try {
+            return moduleStore.findLoadDiagnostics(moduleRowId);
+        } catch (Exception e) {
+            log.warn("Could not read load diagnostics for {}: {}", moduleRowId, e.getMessage());
+            return Map.of();
+        }
+    }
+
+    /**
+     * Enables stub mode ({@code kelta.modules.stub-mode}). Set from configuration rather than a
+     * constructor parameter so the several existing constructor overloads stay as they are.
+     */
+    public void setStubModeEnabled(boolean stubModeEnabled) {
+        this.stubModeEnabled = stubModeEnabled;
+        if (stubModeEnabled) {
+            log.warn("Module stub mode is ENABLED: modules without a JAR will load inert handlers "
+                + "that do nothing. This must never be enabled in production.");
+        }
+    }
+
     /**
      * Checks if JAR-based loading is available.
      */
     public boolean isJarLoadingEnabled() {
         return jarService != null;
+    }
+
+    /**
+     * A handler that refuses to run, naming the module and why.
+     *
+     * <p>The descriptor is still manifest-derived so the flow designer renders the step normally
+     * rather than showing a blank, and the failure carries a stable {@code ModuleUnavailable} code
+     * a flow's Catch clause can be written against.
+     */
+    private ActionHandler createQuarantinedHandler(TenantModuleData.TenantModuleActionData action,
+                                                    TenantModuleData module, String reason) {
+        return new ActionHandler() {
+            @Override
+            public String getActionTypeKey() {
+                return action.actionKey();
+            }
+
+            @Override
+            public ActionResult execute(ActionContext context) {
+                // Null-safe on purpose: the refusal itself must be what surfaces, not an NPE
+                // from the log line.
+                log.error("Refused action '{}': module '{}' v{} is quarantined for tenant {} ({})",
+                    action.actionKey(), module.moduleId(), module.version(),
+                    context == null ? module.tenantId() : context.tenantId(), reason);
+                throw new ModuleUnavailableException(
+                    module.moduleId(), module.version(), reason);
+            }
+
+            @Override
+            public ActionHandlerDescriptor getDescriptor() {
+                return new ActionHandlerDescriptor() {
+                    @Override public String getDisplayName() { return action.name(); }
+                    @Override public String getCategory() { return action.category(); }
+                    @Override public String getDescription() { return action.description(); }
+                    @Override public String getConfigSchema() { return action.configSchema(); }
+                    @Override public String getInputSchema() { return action.inputSchema(); }
+                    @Override public String getOutputSchema() { return action.outputSchema(); }
+                };
+            }
+        };
     }
 
     /**

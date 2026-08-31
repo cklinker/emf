@@ -252,6 +252,41 @@ public class ModuleController {
     }
 
     /**
+     * Reports whether this module is actually running <b>on this pod</b>, alongside the stored
+     * status and the last load failure.
+     *
+     * <p>The two can disagree, and that is the point. {@code status} is a database column updated
+     * by whichever pod last loaded the module; loading happens per pod, driven by a fire-and-forget
+     * NATS event with no acknowledgement. A pod that missed the event serves traffic with the
+     * module absent while {@code /api/modules} reports {@code ACTIVE}. Until now
+     * {@code isLoaded()} existed and no endpoint returned it, so that divergence was invisible.
+     *
+     * <p>{@code podName} is included because the answer is only true of the pod that replied.
+     */
+    @GetMapping("/{moduleId}/health")
+    public ResponseEntity<Map<String, Object>> getModuleHealth(
+            @RequestHeader("X-Tenant-ID") String tenantId,
+            @PathVariable String moduleId) {
+        var module = runtimeModuleManager.listModules(tenantId).stream()
+            .filter(m -> m.moduleId().equals(moduleId))
+            .findFirst();
+
+        if (module.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Map<String, Object> health = new LinkedHashMap<>();
+        health.put("moduleId", moduleId);
+        health.put("version", module.get().version());
+        health.put("status", module.get().status());
+        health.put("loadedOnThisPod", runtimeModuleManager.isLoaded(tenantId, moduleId));
+        health.put("podName", System.getenv().getOrDefault("HOSTNAME", "unknown"));
+        health.put("actionsDeclared", module.get().actions().size());
+        health.putAll(runtimeModuleManager.loadDiagnostics(module.get().id()));
+        return ResponseEntity.ok(health);
+    }
+
+    /**
      * Serves a module's browser bundle from its installed JAR, so a module can ship UI in the same
      * single package as its backend code.
      *

@@ -2,6 +2,7 @@ package io.kelta.worker.module;
 
 import io.kelta.runtime.module.ModuleStore;
 import io.kelta.runtime.module.TenantModuleData;
+import io.kelta.runtime.workflow.ModuleUnavailableException;
 import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
 import io.kelta.runtime.workflow.ActionResult;
@@ -295,19 +296,20 @@ class RuntimeModuleManagerTest {
     }
 
     @Test
-    void shouldUseStubHandlersWhenModuleHasS3KeyButNoJarService() {
-        // Module has s3Key but no JarService configured — should fall back to stubs
+    void shouldQuarantineWhenModuleHasS3KeyButNoJarService() {
+        // The module has a JAR but this pod cannot fetch it. That is a broken module, not a
+        // working one: it used to register stubs that returned success, so the action reported
+        // EXECUTED for work that never ran.
         TenantModuleData module = createModuleDataWithS3Key("mod-s3", "modules/t/m/v/checksum.jar");
 
         manager.loadModule(TENANT_ID, module);
 
         assertTrue(manager.isLoaded(TENANT_ID, "test-module"));
-        // Stub handlers should still be registered
+        // The action key stays registered, so the flow step names the module rather than failing
+        // as ResourceNotFound, which reads as a mistyped key.
         assertTrue(actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").isPresent());
-        ActionResult result = actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").get()
-            .execute(null);
-        assertTrue(result.successful());
-        assertEquals("stub", result.outputData().get("mode"));
+        assertThrows(ModuleUnavailableException.class, () ->
+            actionHandlerRegistry.getHandler(TENANT_ID, "test:action1").get().execute(null));
     }
 
     @Test

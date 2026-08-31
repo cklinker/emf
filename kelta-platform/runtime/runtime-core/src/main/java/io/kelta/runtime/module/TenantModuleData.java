@@ -52,6 +52,26 @@ public record TenantModuleData(
     public static final String STATUS_UNINSTALLING = "UNINSTALLING";
 
     /**
+     * Loading failed — signature, checksum, classloading, or the module's own {@code onStartup}
+     * threw. Its action handlers are registered but refuse to run, so a flow step fails with a
+     * specific {@code ModuleUnavailable} error rather than succeeding against code that never ran.
+     */
+    public static final String STATUS_QUARANTINED = "QUARANTINED";
+
+    /**
+     * Loaded, but something the module declared is unavailable (a required setting is unset, a
+     * declared service port was refused). Real handlers for what loaded; quarantined for the rest.
+     */
+    public static final String STATUS_DEGRADED = "DEGRADED";
+
+    /**
+     * Handlers are manifest-derived stubs that do nothing and say so. Only ever reached by the
+     * explicit {@code kelta.modules.stub-mode=true} dev opt-in — never by falling back from an
+     * error, which is what made a rejected module look healthy.
+     */
+    public static final String STATUS_STUB = "STUB";
+
+    /**
      * Data record for an action handler provided by a module.
      */
     public record TenantModuleActionData(

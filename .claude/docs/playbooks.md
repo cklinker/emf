@@ -246,6 +246,22 @@ Populate first, install second:
 2. Migrate the data the module will answer from, and verify it.
 3. Install + enable, then confirm the module — not the fallback — is answering.
 
+**When a module fails to load, it fails closed.** A JAR that does not verify (signature, checksum,
+classloading, or a throwing `onStartup`) does **not** fall back to working-looking stubs any more. Its
+declared action keys are registered as *quarantined* handlers that throw `ModuleUnavailableException`,
+and the module reports `QUARANTINED` with the reason in `tenant_module.last_error`. So:
+
+- A flow step calling it fails with a specific, attributable error — catchable as
+  `ModuleUnavailableException` — rather than `ResourceNotFound` (which reads as a mistyped key) or,
+  as before, *succeeding*.
+- A **manifest-only** module (no JAR, so no implementation) quarantines for the same reason. Declaring
+  a module before its code exists is fine; expecting its actions to do anything is not.
+- Stub mode still exists for dev as `kelta.modules.stub-mode=true`, reports `STUB` rather than
+  `ACTIVE`, and is never reached by falling back from an error.
+- `GET /api/modules/{id}/health` reports whether the module is loaded **on the pod that answered**,
+  which is not the same as the stored status: loading is per-pod and driven by a fire-and-forget NATS
+  event.
+
 **What the platform does for a module, so it doesn't have to:**
 - **Binds the tenant** around a webhook dispatch. A module *cannot* — `io.kelta.runtime.context`
   is outside the classloader allowlist — and unbound, its reads and writes run under the

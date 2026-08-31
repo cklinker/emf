@@ -136,7 +136,9 @@ class RuntimeModuleManagerHookTest {
         provisioningManager.installModuleWithJar(
                 TENANT_ID, manifestWithCollections, jarBytes, "user-1");
 
-        verify(provisioner).provision(eq(TENANT_ID), argThat(collections ->
+        // provisionWithOwnership, not provision: the install path needs to know which collections
+        // it created versus adopted so uninstall can act on that difference.
+        verify(provisioner).provisionWithOwnership(eq(TENANT_ID), argThat(collections ->
                 collections.size() == 1 && "invoices".equals(collections.get(0).name())));
     }
 

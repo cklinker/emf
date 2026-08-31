@@ -15,6 +15,7 @@ import io.kelta.worker.module.JdbcModuleStore;
 import io.kelta.worker.module.ModuleCollectionProvisioner;
 import io.kelta.worker.module.ModuleConfigEventPublisher;
 import io.kelta.worker.module.ModuleJarService;
+import io.kelta.worker.module.ModuleProvenanceStore;
 import io.kelta.worker.module.ModuleSignatureVerifier;
 import io.kelta.worker.module.RuntimeModuleManager;
 import io.kelta.worker.service.S3StorageService;
@@ -108,6 +109,7 @@ public class ModuleConfig {
                                                        @Nullable CredentialResolverPort credentialResolverPort,
                                                        TenantSlugResolver tenantSlugResolver,
                                                        ModuleServiceRegistry moduleServiceRegistry,
+                                                       ModuleProvenanceStore provenanceStore,
                                                        @Value("${kelta.modules.stub-mode:false}")
                                                        boolean stubModeEnabled) {
         // Runtime-loaded modules get the same credential bridge the compile-time modules get
@@ -134,6 +136,7 @@ public class ModuleConfig {
             objectMapper, jarService, moduleContext, signatureVerifier, beforeSaveHookRegistry,
             collectionProvisioner, tenantSlugResolver, moduleServiceRegistry);
         manager.setStubModeEnabled(stubModeEnabled);
+        manager.setProvenanceStore(provenanceStore);
         return manager;
     }
 

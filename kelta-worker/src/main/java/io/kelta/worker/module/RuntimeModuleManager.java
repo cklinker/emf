@@ -767,6 +767,11 @@ public class RuntimeModuleManager {
 
         Optional<String> handlerKey = moduleRouteRegistry.resolve(tenantId, moduleId, method, path);
         if (handlerKey.isEmpty()) {
+            // Log what IS registered. Knowing the route did not resolve is not the same as knowing
+            // what was registered, and the difference is what turns a 404 into a diagnosis.
+            log.warn("Module '{}' in tenant {} serves no route for '{} {}'. Registered: {}",
+                moduleId, tenantId, method, path,
+                moduleRouteRegistry.registeredKeys(tenantId, moduleId));
             return Optional.empty();
         }
 

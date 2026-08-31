@@ -140,7 +140,8 @@ an in-memory bucket is per-pod, so N replicas silently grant N× the configured 
 | Redis key | `ratelimit:ip:<prefix>:<ip>` | `ratelimit:<tenantId>:user:<principal>` | `ratelimit:<tenantId>:tenant` | `authratelimit:ip:<prefix>:<ip>` |
 
 `ip-paths` is a comma-separated list of `<path-prefix>=<per-minute>` entries matched by
-**longest prefix** (so `/api/billing/webhooks` covers `/api/billing/webhooks/stripe/{tenantId}`),
+**longest prefix** (so `/api/modules/webhooks` covers
+`/api/modules/webhooks/{tenantId}/{moduleId}`),
 and each prefix gets its own per-IP bucket — a burst on one public endpoint cannot exhaust
 another's budget for that client. 429 carries a `Retry-After` computed from the real remaining
 window. `RateLimitFilter` returns early when there is no principal, which is exactly why the
@@ -355,20 +356,22 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   `BootstrapRepository.findProfileSystemPermissions` check as bulk-ops), so a delegated admin
   without it cannot shorten retention or release a hold. The retention *purge* is a background
   sweep (not an endpoint), DRY-RUN by default — see concerns.md.
-- **Portal billing member endpoints** (consumer-alerting slice 1B): `GET /api/billing/plans`
-  (any authenticated caller; safe fields only — no processor ids, no raw entitlement map),
-  `GET /api/billing/me`, `POST /api/billing/checkout-sessions`,
-  `POST /api/billing/portal-sessions`. All are on the `static-billing` route, so the gateway
-  applies only `API_ACCESS` and **scoping is in-controller**: every endpoint acts on the
-  **calling** member resolved from `X-User-Id` via `UserIdResolver`, and none accepts a member
-  id — there is no id to tamper with and no cross-member read to guard. Checkout and portal
-  **return URLs are validated against the credential's `allowedReturnOrigins`**
-  (`ReturnUrlValidator`: origin equality, HTTPS-only, userinfo rejected, empty allowlist denies
-  all) because those URLs are handed to the processor, which will redirect a paying member to
-  them — an unvalidated one is an open redirect starting inside a real payment flow. Processor
-  errors are mapped to caller-safe statuses (401 → 409 "not configured", anything else → 502)
-  and the processor's own message is logged, never returned, since it can name account
-  internals.
+- **Portal billing member endpoints** now belong to the **`kelta-billing` module**, not the
+  platform. `BillingController` and its `service/billing` HTTP stack (`BillingCheckoutService`,
+  `StripeApiClient`, `ReturnUrlValidator`, `StripeFormBody`, `StripeApiException`,
+  `BillingCustomerRepository`) were deleted once the module served the same four routes:
+  `GET /api/modules/kelta-billing/x/{plans,me}` and
+  `POST /api/modules/kelta-billing/x/{checkout-sessions,portal-sessions}`, with byte-identical
+  response shapes. They ride the platform-owned `/api/modules/**` static route, so the gateway
+  applies only `API_ACCESS` and **scoping is in the handler**: every route acts on the **calling**
+  member resolved from `X-User-Id`, and none accepts a member id — there is no id to tamper with.
+  Checkout and portal **return URLs are validated against the credential's
+  `allowedReturnOrigins`** by the module, on the semantics the deleted `ReturnUrlValidator` set:
+  origin equality (a prefix check accepts `https://app.example.com.evil.test`), HTTPS off
+  loopback only, userinfo rejected, default ports normalised, empty allowlist denies all. Those
+  URLs are handed to the processor, which redirects a paying member to them — an unvalidated one
+  is an open redirect starting inside a real payment flow. Processor errors are logged, never
+  returned, since they can name account internals.
 - **Analytics capture ingest** (consumer-alerting slice 8): `POST /api/analytics/events` is on
   the new `static-analytics` route (`/api/analytics/**`), so the gateway applies only
   `API_ACCESS` and **scoping is server-side**: every event is owner-stamped from the caller's
@@ -390,19 +393,19 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   collection, unparseable filter, failed count → allow), matching the governor-limit hooks and
   deliberately unlike the fail-closed guard hooks: those protect other users' data, this one
   protects revenue.
-- **Portal billing** (consumer-alerting slice 1, V178): `/api/billing/**` is a static route, so
-  only `API_ACCESS` is checked at the gateway — member scoping belongs in the controller.
-  `POST /api/billing/webhooks/stripe/{tenantId}` is an **unauthenticated path**: the HMAC
-  `Stripe-Signature` over the **raw** body is its only trust anchor, verified before the body is
-  parsed. The `{tenantId}` in the path is **untrusted** — it merely selects which tenant's
-  `webhookSecret` to verify against, so a passing signature is what proves the event belongs to
-  that tenant. An unknown tenant and a bad signature both answer 401 with no detail, so an
-  unauthenticated caller cannot enumerate which tenants have billing configured. Processing is
-  idempotent by event id (`billing_webhook_event`), and the claim insert shares one transaction
-  with the mutation so a failure rolls the claim back and the processor's retry genuinely
-  re-runs. Being an unauthenticated path also bypasses `TenantIpAllowlistFilter` — the same
-  trade the LiveKit webhook makes. Admin authoring of plans/rules rides the system-collection
-  JSON:API and is gated by the new **`MANAGE_BILLING`** permission.
+- **Portal billing** (consumer-alerting slice 1, V178) is **no longer a platform surface**. Both
+  halves moved to the `kelta-billing` module: the Stripe webhook now arrives on
+  `POST /api/modules/webhooks/{tenantId}/kelta-billing` and the member endpoints on
+  `/api/modules/kelta-billing/x/**`, so `/api/billing/**` and its unauthenticated webhook path no
+  longer exist in the gateway. The trust model is unchanged in substance and now owned by the
+  module: the HMAC `Stripe-Signature` over the **raw** body is the only anchor, the path
+  `{tenantId}` is untrusted and merely selects which secret to verify against, and an unknown
+  tenant and a bad signature answer alike so a caller cannot enumerate which tenants have billing.
+  One property genuinely weakened: the compiled-in path claimed each event id in the same
+  transaction as the mutation, so a failure rolled the claim back and the retry re-ran. A module
+  writes through `QueryEngine` with no transaction of its own, so it **converges on redelivery**
+  instead. Admin authoring of plans and rules still rides the system-collection JSON:API gated by
+  **`MANAGE_BILLING`**.
 - **Runtime-module webhooks**: `POST /api/modules/webhooks/{tenantId}/{moduleId}` is an
   **unauthenticated path** and the platform verifies **nothing** — it is a raw dispatcher into
   the `ActionHandler` the module's manifest names in `webhookHandlerKey`, and **the module owns
@@ -415,8 +418,8 @@ Cerbos enforcement is **collection/record-scoped, not blanket**. Concretely:
   (and secret) to dispatch to. Unknown tenant, inactive module, and no-declared-handler all answer
   a uniform **404** so a caller cannot enumerate a tenant's modules; a handler rejection is 401
   (not a fault to retry) and a thrown handler is 500 (retry). Like the other webhook paths it
-  bypasses `TenantIpAllowlistFilter`, and it carries the same IP rate-limit budget as
-  `/api/billing/webhooks`. The sibling `/api/modules/**` administration routes stay authenticated.
+  bypasses `TenantIpAllowlistFilter`, and it carries its own per-IP rate-limit budget (300 per
+  window). The sibling `/api/modules/**` administration and module-route paths stay authenticated.
 - **Member watch API** (consumer-alerting slice 5): `/api/watches/**` is a static route, so
   only `API_ACCESS` is checked at the gateway and **all** member scoping is in
   `WatchController`. Every endpoint acts on the calling member from `X-User-Id`; a foreign

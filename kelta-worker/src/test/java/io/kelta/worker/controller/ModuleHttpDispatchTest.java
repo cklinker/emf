@@ -40,10 +40,15 @@ class ModuleHttpDispatchTest {
     private ModuleRouteRegistry routes;
     private RuntimeModuleManager manager;
 
-    private static ActionHandler handler(String key) {
+    /** The context the last dispatched handler saw, so inputs can be asserted directly. */
+    private final java.util.concurrent.atomic.AtomicReference<io.kelta.runtime.workflow.ActionContext>
+            lastContext = new java.util.concurrent.atomic.AtomicReference<>();
+
+    private ActionHandler handler(String key) {
         return new ActionHandler() {
             @Override public String getActionTypeKey() { return key; }
             @Override public ActionResult execute(io.kelta.runtime.workflow.ActionContext c) {
+                lastContext.set(c);
                 return ActionResult.success(Map.of("handled", key));
             }
         };
@@ -91,5 +96,54 @@ class ModuleHttpDispatchTest {
     void wrongMethodDoesNotDispatch() {
         assertThat(manager.dispatchRoute(TENANT, "kelta-billing", "u1", "POST", "/plans",
                 Map.of(), "{}")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a JSON body becomes handler inputs, not just rawBody")
+    void jsonBodyBecomesInputs() {
+        // dispatchRoute built "input" from query parameters alone and passed the body only as
+        // rawBody, so a POST handler reading its own fields found nothing and answered
+        // "planCode ... is required" against a request that supplied them. That is indistinguishable
+        // from real validation from outside, which is how it reached production and broke checkout
+        // and the billing portal for members.
+        manager.dispatchRoute(TENANT, "kelta-billing", "u1", "POST", "/checkout-sessions",
+                Map.of(), "{\"planCode\":\"PRO\",\"successUrl\":\"https://a.test/ok\"}");
+
+        // Handlers read through the module-side ActionInputs, which unwraps "input" -- so that is
+        // the map the fields must land in.
+        Map<?, ?> inputs = (Map<?, ?>) lastContext.get().resolvedData().get("input");
+        assertThat(inputs.get("planCode")).isEqualTo("PRO");
+        assertThat(inputs.get("successUrl")).isEqualTo("https://a.test/ok");
+    }
+
+    @Test
+    @DisplayName("the exact body bytes still reach the handler for signature verification")
+    void rawBodyIsPreserved() {
+        String body = "{\"id\":\"evt_1\"}";
+        manager.dispatchRoute(TENANT, "kelta-billing", "u1", "POST", "/checkout-sessions",
+                Map.of(), body);
+
+        // A webhook verifies a signature over the bytes it was sent; a re-serialised map will not do.
+        assertThat(lastContext.get().resolvedData().get("rawBody")).isEqualTo(body);
+    }
+
+    @Test
+    @DisplayName("the body wins over a query parameter of the same name")
+    void bodyOverridesQuery() {
+        manager.dispatchRoute(TENANT, "kelta-billing", "u1", "POST", "/checkout-sessions",
+                Map.of("planCode", "FROM_QUERY"), "{\"planCode\":\"FROM_BODY\"}");
+
+        assertThat(((Map<?, ?>) lastContext.get().resolvedData().get("input")).get("planCode"))
+                .isEqualTo("FROM_BODY");
+    }
+
+    @Test
+    @DisplayName("a non-object or malformed body dispatches with no inputs rather than failing")
+    void malformedBodyIsTolerated() {
+        for (String body : new String[]{"[1,2]", "\"scalar\"", "not json at all", ""}) {
+            var result = manager.dispatchRoute(TENANT, "kelta-billing", "u1", "POST",
+                    "/checkout-sessions", Map.of(), body);
+            assertThat(result).as("body=%s", body).isPresent();
+        }
     }
 }

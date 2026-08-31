@@ -1,5 +1,6 @@
 package io.kelta.worker.controller;
 
+import io.kelta.runtime.module.service.MemberEntitlements;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.router.UserIdResolver;
 import io.kelta.worker.repository.BillingPass;
@@ -10,7 +11,6 @@ import io.kelta.worker.repository.BillingSubscription;
 import io.kelta.worker.repository.BillingSubscriptionRepository;
 import io.kelta.worker.service.billing.BillingCheckoutService;
 import io.kelta.worker.service.billing.EntitlementService;
-import io.kelta.worker.service.billing.MemberEntitlements;
 import io.kelta.worker.interceptor.SelfScopedController;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;

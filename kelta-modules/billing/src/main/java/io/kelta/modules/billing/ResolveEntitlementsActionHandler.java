@@ -1,5 +1,6 @@
 package io.kelta.modules.billing;
 
+import io.kelta.runtime.module.service.MemberEntitlements;
 import io.kelta.runtime.workflow.ActionContext;
 import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.ActionResult;

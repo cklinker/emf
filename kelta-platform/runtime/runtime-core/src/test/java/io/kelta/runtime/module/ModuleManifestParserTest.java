@@ -290,4 +290,52 @@ class ModuleManifestParserTest {
         ModuleManifest manifest = parser.parse(json);
         assertEquals(3, manifest.actionHandlers().size());
     }
+
+    @Test
+    void parsesRoutesAndDefaultsMethodToGet() {
+        var manifest = parser.parse("""
+            {
+              "id": "m", "name": "M", "version": "1.0.0", "moduleClass": "C",
+              "routes": [
+                { "path": "/plans", "handlerKey": "m:plans" },
+                { "path": "/sessions", "methods": ["post"], "handlerKey": "m:create" }
+              ]
+            }
+            """);
+
+        assertEquals(2, manifest.routes().size());
+        assertEquals(java.util.List.of("GET"), manifest.routes().get(0).methods());
+        // Normalised to upper case, because that is what arrives on the wire.
+        assertEquals(java.util.List.of("POST"), manifest.routes().get(1).methods());
+    }
+
+    @Test
+    void rejectsMalformedRoutesRatherThanSkippingThem() {
+        // Skipping one silently would leave the module installed and apparently healthy while an
+        // endpoint its UI depends on simply 404s -- far harder to diagnose than a refused install.
+        assertThrows(ModuleManifestParser.ModuleManifestException.class, () -> parser.parse("""
+            {"id":"m","name":"M","version":"1.0.0","moduleClass":"C",
+             "routes":[{"path":"plans","handlerKey":"m:plans"}]}
+            """));
+
+        assertThrows(ModuleManifestParser.ModuleManifestException.class, () -> parser.parse("""
+            {"id":"m","name":"M","version":"1.0.0","moduleClass":"C",
+             "routes":[{"path":"/../secret","handlerKey":"m:x"}]}
+            """));
+
+        assertThrows(ModuleManifestParser.ModuleManifestException.class, () -> parser.parse("""
+            {"id":"m","name":"M","version":"1.0.0","moduleClass":"C",
+             "routes":[{"path":"/plans"}]}
+            """));
+    }
+
+    @Test
+    void manifestWithoutRoutesHasNone() {
+        var manifest = parser.parse("""
+            {"id":"m","name":"M","version":"1.0.0","moduleClass":"C"}
+            """);
+
+        assertTrue(manifest.routes().isEmpty());
+        assertTrue(manifest.services().isEmpty());
+    }
 }

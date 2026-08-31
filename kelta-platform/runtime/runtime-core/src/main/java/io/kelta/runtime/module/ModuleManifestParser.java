@@ -53,11 +53,12 @@ public class ModuleManifestParser {
             String webhookHandlerKey = optionalString(root, "webhookHandlerKey");
             String uiBundlePath = optionalString(root, "uiBundlePath");
             List<String> services = parseStringList(root, "services");
+            List<ModuleManifest.RouteManifest> routes = parseRoutes(root);
 
             return new ModuleManifest(
                 id, name, version, description, author,
                 moduleClass, minPlatformVersion, permissions, handlers, collections,
-                webhookHandlerKey, uiBundlePath, services
+                webhookHandlerKey, uiBundlePath, services, routes
             );
         } catch (ModuleManifestException e) {
             throw e;
@@ -148,6 +149,48 @@ public class ModuleManifestParser {
             return null;
         }
         return value.toString();
+    }
+
+    /**
+     * Reads the {@code routes} array.
+     *
+     * <p>A malformed route is rejected rather than skipped. Silently dropping one would leave the
+     * module installed and apparently healthy while an endpoint its UI depends on simply 404s,
+     * which is a far harder failure to diagnose than a refused install.
+     */
+    private List<ModuleManifest.RouteManifest> parseRoutes(JsonNode root) {
+        JsonNode value = root.get("routes");
+        if (value == null || !value.isArray()) {
+            return List.of();
+        }
+        List<ModuleManifest.RouteManifest> routes = new ArrayList<>();
+        for (JsonNode item : value) {
+            String path = item.path("path").asText(null);
+            String handlerKey = item.path("handlerKey").asText(null);
+            if (path == null || path.isBlank() || !path.startsWith("/")) {
+                throw new ModuleManifestException(
+                    "Module route 'path' is required and must start with '/': " + path);
+            }
+            if (path.contains("..")) {
+                throw new ModuleManifestException(
+                    "Module route path must not contain '..': " + path);
+            }
+            if (handlerKey == null || handlerKey.isBlank()) {
+                throw new ModuleManifestException(
+                    "Module route '" + path + "' declares no handlerKey");
+            }
+            List<String> methods = new ArrayList<>();
+            for (JsonNode m : item.path("methods")) {
+                if (m.isTextual()) {
+                    methods.add(m.asText().toUpperCase(java.util.Locale.ROOT));
+                }
+            }
+            if (methods.isEmpty()) {
+                methods.add("GET");
+            }
+            routes.add(new ModuleManifest.RouteManifest(path, List.copyOf(methods), handlerKey));
+        }
+        return List.copyOf(routes);
     }
 
     private List<String> parseStringList(JsonNode node, String field) {

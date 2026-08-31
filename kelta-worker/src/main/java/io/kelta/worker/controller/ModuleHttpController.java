@@ -5,7 +5,7 @@ import io.kelta.worker.module.RuntimeModuleManager;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,7 +43,6 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/modules/{moduleId}/x")
-@ConditionalOnBean(RuntimeModuleManager.class)
 public class ModuleHttpController {
 
     private static final Logger log = LoggerFactory.getLogger(ModuleHttpController.class);
@@ -51,9 +50,19 @@ public class ModuleHttpController {
     /** Caps a runaway module response rather than streaming it to the caller. */
     private static final int MAX_RESPONSE_ENTRIES = 1000;
 
-    private final RuntimeModuleManager runtimeModuleManager;
+    /**
+     * Resolved lazily rather than gated with {@code @ConditionalOnBean}.
+     *
+     * <p>{@code @ConditionalOnBean} on a component-scanned controller is evaluated during scanning,
+     * before {@code @Configuration} bean methods are all registered, so whether it matches depends
+     * on scan order. This controller lost that race and was silently not registered — every module
+     * route answered 404 while the module itself reported ACTIVE with its routes registered, which
+     * is a miserable thing to debug. An ObjectProvider is deterministic: the controller always
+     * exists, and answers 404 when module support is switched off.
+     */
+    private final ObjectProvider<RuntimeModuleManager> runtimeModuleManager;
 
-    public ModuleHttpController(RuntimeModuleManager runtimeModuleManager) {
+    public ModuleHttpController(ObjectProvider<RuntimeModuleManager> runtimeModuleManager) {
         this.runtimeModuleManager = runtimeModuleManager;
     }
 
@@ -69,9 +78,14 @@ public class ModuleHttpController {
             return ResponseEntity.notFound().build();
         }
 
+        RuntimeModuleManager manager = runtimeModuleManager.getIfAvailable();
+        if (manager == null) {
+            return ResponseEntity.notFound().build();
+        }
+
         Optional<ActionResult> result;
         try {
-            result = runtimeModuleManager.dispatchRoute(tenantId, moduleId, userId,
+            result = manager.dispatchRoute(tenantId, moduleId, userId,
                     request.getMethod(), path, queryParams(request), rawBody);
         } catch (RuntimeException e) {
             // Module code threw rather than returning a failure. The message is logged, never

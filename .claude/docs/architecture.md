@@ -757,9 +757,10 @@ also carry a `links` block (`self` / `prev` / `next`) built by
 `runtime-jsonapi/.../PaginationLinks#build`; URLs are relative paths so
 cached system-collection responses remain reusable across hosts and behind
 load balancers. MCP tools (`query_collection`, `list_picklists`,
-`list_approvals`) accept flat `pageNumber` / `pageSize` arguments and
-translate them to the bracket form at the MCP→gateway boundary. Bounds and
-response shape are documented in `.claude/docs/conventions.md`.
+`list_flows`, `list_listviews`, `list_approvals`) accept flat `pageNumber` /
+`pageSize` arguments and translate them to the bracket form at the
+MCP→gateway boundary. Bounds and response shape are documented in
+`.claude/docs/conventions.md`.
 
 **Error response ownership** — every 4xx/5xx is wrapped in the JSON:API
 `{"errors":[{status, code, title, detail, source?, meta?}]}` envelope. Three

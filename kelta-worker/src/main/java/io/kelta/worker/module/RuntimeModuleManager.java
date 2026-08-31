@@ -528,7 +528,8 @@ public class RuntimeModuleManager {
             // Services this module publishes for platform code to call. Self-unwinding: a rejected
             // port removes the ports already accepted from the same module before rethrowing, so a
             // module never ends up half-published.
-            Map<Class<?>, Object> services = registerTenantServices(tenantId, keltaModule);
+            Map<Class<?>, Object> services = registerTenantServices(
+                tenantId, keltaModule, parseStoredManifest(module));
             registeredServices.put(classLoaderKey, services);
 
             activeClassLoaders.put(classLoaderKey, classLoader);
@@ -598,6 +599,22 @@ public class RuntimeModuleManager {
         } catch (Exception e) {
             log.warn("Could not record load outcome for module '{}': {}",
                 module.moduleId(), e.getMessage());
+        }
+    }
+
+    /**
+     * The manifest as stored on the module row, used to check what the module is allowed to
+     * publish. A module whose stored manifest cannot be parsed publishes nothing rather than
+     * everything — the declaration is the authorisation, so an unreadable one is not a licence.
+     */
+    private ModuleManifest parseStoredManifest(TenantModuleData module) {
+        try {
+            return manifestParser.parse(module.manifest());
+        } catch (RuntimeException e) {
+            log.warn("Could not parse the stored manifest for module '{}': {}. "
+                    + "It will not be permitted to publish any service.",
+                module.moduleId(), e.getMessage());
+            return null;
         }
     }
 
@@ -802,7 +819,8 @@ public class RuntimeModuleManager {
      *
      * @return the exact instances registered, for unload to remove by identity
      */
-    private Map<Class<?>, Object> registerTenantServices(String tenantId, KeltaModule keltaModule) {
+    private Map<Class<?>, Object> registerTenantServices(String tenantId, KeltaModule keltaModule,
+                                                         ModuleManifest manifest) {
         if (moduleServiceRegistry == null) {
             return Map.of();
         }
@@ -810,9 +828,22 @@ public class RuntimeModuleManager {
         if (declared == null || declared.isEmpty()) {
             return Map.of();
         }
+        Set<String> allowed = manifest == null || manifest.services() == null
+                ? Set.of() : Set.copyOf(manifest.services());
         Map<Class<?>, Object> registered = new java.util.LinkedHashMap<>();
         try {
             declared.forEach((port, service) -> {
+                // A module may only publish ports its manifest declares. Without this, a module an
+                // admin installed for one purpose can publish any platform port and silently become
+                // the tenant's authority for something unrelated -- the code decides, and nobody is
+                // ever shown the claim. The manifest entry is what an admin can be told about and
+                // approve.
+                if (!allowed.contains(port.getName())) {
+                    throw new IllegalStateException("Module '"
+                        + (manifest == null ? "?" : manifest.id())
+                        + "' tried to publish " + port.getName()
+                        + ", which its manifest does not declare in \"services\"");
+                }
                 moduleServiceRegistry.register(tenantId, port, service);
                 registered.put(port, service);
             });

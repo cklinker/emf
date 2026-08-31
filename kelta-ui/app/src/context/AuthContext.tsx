@@ -878,5 +878,19 @@ export function useAuth(): AuthContextValue {
   return context
 }
 
+/**
+ * Hook for a provider that must work with or without an surrounding AuthProvider — it does its
+ * core job regardless, and only does *more* when a session exists.
+ *
+ * Prefer {@link useAuth} everywhere else: for a component that genuinely needs the session,
+ * failing fast beats silently behaving as if signed out.
+ *
+ * @returns the context, or `undefined` when there is no surrounding AuthProvider
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useOptionalAuth(): AuthContextValue | undefined {
+  return useContext(AuthContext)
+}
+
 // Export the context for testing purposes
 export { AuthContext }

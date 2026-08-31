@@ -40,6 +40,7 @@ import type {
 import { componentRegistry } from '../services/componentRegistry'
 import { loadModuleUiBundles } from '../services/moduleUiBundles'
 import { useOptionalApi } from './ApiContext'
+import { useOptionalAuth } from './AuthContext'
 
 /**
  * Plugin context value interface
@@ -120,6 +121,11 @@ export function PluginProvider({
   // PluginProvider mounted without an ApiProvider must still work. In the app ApiProvider
   // wraps it (App.tsx), so module bundles do load.
   const apiClient = useOptionalApi()?.apiClient
+  // Module bundles are fetched from an AUTHENTICATED endpoint, so they must wait for a session.
+  // Requesting /api/modules while signed out returns 401, and the client's 401 handling sends the
+  // app back to /login — where this provider mounts again and repeats it. That was a login loop
+  // on every tenant.
+  const isAuthenticated = useOptionalAuth()?.isAuthenticated ?? false
 
   // Component registry state
   const [fieldRenderers, setFieldRenderers] = useState<
@@ -344,18 +350,10 @@ export function PluginProvider({
     // the React app mounted.
     syncFromSdkRegistry()
 
-    // Step 2: Load the browser bundles of the tenant's runtime-installed modules. Their
-    // top-level code registers into the SDK's static ComponentRegistry, which step 4 syncs.
-    if (loadModuleBundles && apiClient) {
-      try {
-        await loadModuleUiBundles(apiClient)
-      } catch (err) {
-        // Module UI is an enhancement; the admin UI must come up without it.
-        console.error('[Plugin] Module UI bundle loading failed:', err)
-      }
-    }
+    // Module bundles are NOT loaded here: this runs on mount, including on the login page where
+    // there is no session. They load from their own auth-gated effect below.
 
-    // Step 3: Load explicitly-passed plugins sequentially to maintain order
+    // Step 2: Load explicitly-passed plugins sequentially to maintain order
     if (plugins.length > 0) {
       for (const plugin of plugins) {
         const result = await loadPlugin(plugin)
@@ -367,8 +365,8 @@ export function PluginProvider({
       }
     }
 
-    // Step 4: After module bundles and plugin onLoad hooks have run, sync again to pick up
-    // everything they registered via the SDK's ComponentRegistry during init.
+    // Step 3: After plugin onLoad hooks have run, sync again to pick up everything they
+    // registered via the SDK's ComponentRegistry during init.
     syncFromSdkRegistry()
 
     setLoadedPlugins(results)
@@ -417,6 +415,35 @@ export function PluginProvider({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * Load runtime-module UI bundles once a session exists.
+   *
+   * Separate from plugin init on purpose. Init runs on mount — including on the login page, where
+   * there is no session — and `/api/modules` is authenticated. Calling it signed out returns 401,
+   * the client's 401 handling redirects to /login, this provider mounts again, and the app loops.
+   *
+   * Keying on isAuthenticated also means bundles load right after sign-in, not only for users who
+   * arrive already authenticated.
+   */
+  const bundlesLoadedRef = useRef(false)
+  useEffect(() => {
+    if (!loadModuleBundles || !isAuthenticated || !apiClient || bundlesLoadedRef.current) {
+      return
+    }
+    bundlesLoadedRef.current = true
+    loadModuleUiBundles(apiClient)
+      .then((loaded) => {
+        if (loaded.length > 0) {
+          // Their top-level code registers into the SDK registry; pull it into host state.
+          syncFromSdkRegistry()
+        }
+      })
+      .catch((err) => {
+        // Module UI is an enhancement — never let it take the admin UI down.
+        console.error('[Plugin] Module UI bundle loading failed:', err)
+      })
+  }, [loadModuleBundles, isAuthenticated, apiClient, syncFromSdkRegistry])
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo<PluginContextValue>(

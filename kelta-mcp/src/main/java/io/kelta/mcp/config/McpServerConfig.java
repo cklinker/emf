@@ -103,8 +103,8 @@ public class McpServerConfig {
             create_validation_rule / create_unique_constraint as needed -> for picklist \
             fields, create_picklist + add_picklist_value first, then reference it from \
             add_field via picklistSourceId -> create_layout / create_listview for the admin \
-            UI -> create_flow for automation. update_/delete_ counterparts exist for every \
-            create_ tool.
+            UI -> create_flow for automation. list_/update_/delete_ counterparts exist for \
+            most create_ tools; call tools/list to discover the full set.
 
             Field types: add_field's `type` argument accepts friendly aliases (text, number, \
             picklist, reference, ...) that map onto the native uppercase FieldType enum — see \

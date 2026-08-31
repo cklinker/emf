@@ -35,6 +35,20 @@ For each file in `inbox/`:
 
 - `id`: `(TASK|BUG|CHORE|DOC|SEC)-YYYY-MM-DD-NNNN`. **Today's date is given in the user prompt — use that, never a date from this file.** Increment NNNN within the day. Pick the prefix that matches `type`: TASK for `feature`, BUG for `bug`, CHORE for `chore`, DOC for `doc`, SEC for `security`.
 - `type`: one of `feature | bug | chore | doc | security`.
+- `repo`: which RZWare repository the task targets. Omit for `emf`, which is the default and
+  what every task before 2026-08-31 means. Set it for work in `spotopened-web`, `couchpicks`,
+  `rzware_website`, `homelab-argo` or `rzware-ceo`. Resolution and failure behaviour are in
+  `queue_resolve_repo()` in `.claude/dispatcher/lib/queue.sh`: an unknown repo fails the task
+  rather than defaulting to `emf`, because a task landing in the wrong repo is worse than one
+  that fails. **A brief whose work is not in `emf` is now plannable — do not send it to
+  `_needs_clarification/` for that reason.** Everything else in this file is written about the
+  Kelta monorepo; when you emit a task for another repo, say so plainly in the brief body,
+  and do not assume `kelta-worker` paths, Flyway migrations or the Kelta test layout apply.
+- `complexity`: `low | medium | high`. Read by `worker.sh` for model routing — `high` selects
+  Opus, anything else Sonnet. Reserve `high` for genuinely hard work; it is the single biggest
+  cost lever the fleet has (`BUDGET.md`).
+- `model`: only when a task needs a specific model regardless of complexity. Prefer
+  `complexity`; `model` overrides it.
 - `priority`: 1 (urgent) to 5 (low). User briefs default to 3. Bugs default to 2. Security defaults to 1.
 - `parallel_safe`: `true` unless the task touches Flyway migrations, shared registries (auth roles, system collections), or large refactors. When unsure, default `false` — the cost is one fewer parallel worker, the cost of being wrong is two PRs racing on the same code.
 - `needs_migration`: `true` only if a new `kelta-worker/.../db/migration/V<N>__*.sql` file is required. Always implies `parallel_safe: false`.

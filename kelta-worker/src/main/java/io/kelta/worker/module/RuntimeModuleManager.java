@@ -14,6 +14,7 @@ import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
 import io.kelta.runtime.workflow.module.KeltaModule;
 import io.kelta.runtime.workflow.module.ModuleContext;
+import io.kelta.worker.service.TenantSlugResolver;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,8 @@ public class RuntimeModuleManager {
     private final ModuleSignatureVerifier signatureVerifier;
     private final BeforeSaveHookRegistry beforeSaveHookRegistry;
     private final ModuleCollectionProvisioner collectionProvisioner;
+    /** Resolves tenantId -> slug for webhook dispatch; may be null in tests. */
+    private final TenantSlugResolver tenantSlugResolver;
 
     /** Tracks which modules are loaded per tenant: tenantId -> Set<moduleId> */
     private final Map<String, Set<String>> loadedModules = new ConcurrentHashMap<>();
@@ -99,7 +102,8 @@ public class RuntimeModuleManager {
                                  ModuleContext moduleContext,
                                  ModuleSignatureVerifier signatureVerifier,
                                  BeforeSaveHookRegistry beforeSaveHookRegistry,
-                                 ModuleCollectionProvisioner collectionProvisioner) {
+                                 ModuleCollectionProvisioner collectionProvisioner,
+                                 TenantSlugResolver tenantSlugResolver) {
         this.moduleStore = Objects.requireNonNull(moduleStore);
         this.actionHandlerRegistry = Objects.requireNonNull(actionHandlerRegistry);
         this.objectMapper = Objects.requireNonNull(objectMapper);
@@ -109,6 +113,20 @@ public class RuntimeModuleManager {
         this.signatureVerifier = signatureVerifier;
         this.beforeSaveHookRegistry = beforeSaveHookRegistry;
         this.collectionProvisioner = collectionProvisioner;
+        this.tenantSlugResolver = tenantSlugResolver;
+    }
+
+    /** Overload without a slug resolver — webhook dispatch then cannot resolve the tenant schema. */
+    public RuntimeModuleManager(ModuleStore moduleStore,
+                                 ActionHandlerRegistry actionHandlerRegistry,
+                                 ObjectMapper objectMapper,
+                                 ModuleJarService jarService,
+                                 ModuleContext moduleContext,
+                                 ModuleSignatureVerifier signatureVerifier,
+                                 BeforeSaveHookRegistry beforeSaveHookRegistry,
+                                 ModuleCollectionProvisioner collectionProvisioner) {
+        this(moduleStore, actionHandlerRegistry, objectMapper, jarService, moduleContext,
+            signatureVerifier, beforeSaveHookRegistry, collectionProvisioner, null);
     }
 
     /**
@@ -598,11 +616,25 @@ public class RuntimeModuleManager {
         // unbound connection leaves app.current_tenant_id empty, which matches the admin_bypass
         // RLS policy, so a module's reads and writes would silently run unscoped across tenants.
         //
+        // The SLUG matters as much as the id, and binding only the id is not enough:
+        // PhysicalTableStorageAdapter#getTableRef resolves a tenant collection's schema from
+        // TenantContext.getSlug(), and with no slug it falls back to the PUBLIC schema. Every
+        // query then hits an unqualified table that does not exist there — the module's own
+        // collections live in the tenant schema. Same reasoning as FlowWebhookController, which
+        // resolves the slug for the identical reason.
+        //
         // Binding before the handler verifies its signature is correct and necessary: resolving
         // the tenant's own signing secret is itself a tenant-scoped read. The path tenantId is
         // untrusted, but it only selects which tenant's secret must match — a forged request
         // fails the handler's own check and touches nothing.
-        return Optional.of(TenantContext.callWithTenant(tenantId,
+        String tenantSlug = tenantSlugResolver == null
+            ? null
+            : tenantSlugResolver.resolveSlug(tenantId).orElse(null);
+        if (tenantSlug == null) {
+            log.warn("Could not resolve slug for tenant {} dispatching a webhook to module '{}' — "
+                + "the module's tenant-schema queries will fail", tenantId, moduleId);
+        }
+        return Optional.of(TenantContext.callWithTenant(tenantId, tenantSlug,
             () -> handler.get().execute(context)));
     }
 

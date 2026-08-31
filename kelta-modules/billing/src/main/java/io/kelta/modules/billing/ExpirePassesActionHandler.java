@@ -48,8 +48,7 @@ public class ExpirePassesActionHandler implements ActionHandler {
 
     @Override
     public ActionResult execute(ActionContext context) {
-        Map<String, Object> input = context.resolvedData() == null
-                ? Map.of() : context.resolvedData();
+        Map<String, Object> input = ActionInputs.of(context);
         int limit = positiveInt(input.get("limit"), DEFAULT_BATCH_LIMIT);
 
         int expired;

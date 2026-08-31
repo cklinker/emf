@@ -17,6 +17,7 @@ import io.kelta.worker.module.ModuleJarService;
 import io.kelta.worker.module.ModuleSignatureVerifier;
 import io.kelta.worker.module.RuntimeModuleManager;
 import io.kelta.worker.service.S3StorageService;
+import io.kelta.worker.service.TenantSlugResolver;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,7 +93,8 @@ public class ModuleConfig {
                                                        ModuleSignatureVerifier signatureVerifier,
                                                        BeforeSaveHookRegistry beforeSaveHookRegistry,
                                                        ModuleCollectionProvisioner collectionProvisioner,
-                                                       @Nullable CredentialResolverPort credentialResolverPort) {
+                                                       @Nullable CredentialResolverPort credentialResolverPort,
+                                                       TenantSlugResolver tenantSlugResolver) {
         // Runtime-loaded modules get the same credential bridge the compile-time modules get
         // (FlowConfig wires the identical extension). Without it a module cannot reach the vault
         // at all, so anything talking to an external API — the case runtime modules exist for —
@@ -115,7 +117,7 @@ public class ModuleConfig {
 
         return new RuntimeModuleManager(moduleStore, actionHandlerRegistry, objectMapper,
             jarService, moduleContext, signatureVerifier, beforeSaveHookRegistry,
-            collectionProvisioner);
+            collectionProvisioner, tenantSlugResolver);
     }
 
     @Bean

@@ -52,15 +52,13 @@ public class CreatePortalSessionActionHandler implements ActionHandler {
     public ActionResult execute(ActionContext context) {
         String tenantId = context.tenantId();
         String userId = context.userId();
-        Map<String, Object> input = context.resolvedData() == null
-                ? Map.of() : context.resolvedData();
+        Map<String, Object> input = ActionInputs.of(context);
 
         if (userId == null || userId.isBlank()) {
             return ActionResult.failure("No calling member");
         }
-        Object rawReturnUrl = input.get("returnUrl");
-        String returnUrl = rawReturnUrl == null ? null : rawReturnUrl.toString();
-        if (returnUrl == null || returnUrl.isBlank()) {
+        String returnUrl = ActionInputs.string(input, "returnUrl");
+        if (returnUrl == null) {
             return ActionResult.failure("returnUrl is required");
         }
 

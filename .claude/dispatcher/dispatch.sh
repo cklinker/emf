@@ -127,7 +127,7 @@ main_loop() {
       sleep "$TICK_SECONDS"; continue
     fi
     if ! in_run_window; then
-      [[ "$gate" == "window" ]] || { log_info "outside run window (22:00-06:00 America/Denver); idling"; gate="window"; }
+      [[ "$gate" == "window" ]] || { log_info "outside run window (RUN_WINDOW=${RUN_WINDOW:-nightly}); idling"; gate="window"; }
       sleep "$TICK_SECONDS"; continue
     fi
     [[ -z "$gate" ]] || { log_info "gate cleared ($gate); resuming"; gate=""; }

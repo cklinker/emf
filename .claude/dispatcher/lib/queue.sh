@@ -237,11 +237,25 @@ throttled() {
   if [ -n "$until" ] && [ "$(date +%s)" -lt "$until" ]; then return 0; fi
   rm -f "$PAUSE_FILE"; return 1
 }
-in_run_window() {   # nightly 22:00–06:00 America/Denver unless FORCE_RUN=1
+# --- when the fleet may claim work ------------------------------------------
+# RUN_WINDOW=nightly  22:00-06:00 America/Denver (the original BUDGET.md §4 rule)
+# RUN_WINDOW=always   any hour (the setting in use)
+#
+# The window was only ever a proxy for "do not spend the five-hour session
+# quota Craig is using". Two better guards exist now — MAX_PARALLEL=1 and
+# detect_usage_limit() below, which throttles on a real limit signal rather
+# than on the clock — so the clock can stop standing in for them.
+#
+# One serial worker is the whole budget control. Nothing watches for Craig's
+# own sessions: at MAX_PARALLEL=1 the fleet's draw is bounded, and if it does
+# collide with him the throttle backs the fleet off on a real signal.
+in_run_window() {
   [ "${FORCE_RUN:-0}" = "1" ] && return 0
+  [ "${RUN_WINDOW:-nightly}" = "always" ] && return 0
   local h; h=$(TZ=America/Denver date +%-H)
   [ "$h" -ge 22 ] || [ "$h" -lt 6 ]
 }
+
 # ---------------------------------------------------------------------------
 
 # --- budget: detect a usage-limit signal and self-throttle (BUDGET.md §13) --

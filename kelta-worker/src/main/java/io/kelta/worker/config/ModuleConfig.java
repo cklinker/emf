@@ -3,6 +3,7 @@ package io.kelta.worker.config;
 import io.kelta.runtime.formula.FormulaEvaluator;
 import io.kelta.runtime.module.ModuleSigningKeyStore;
 import io.kelta.runtime.module.ModuleStore;
+import io.kelta.runtime.module.service.ModuleServiceRegistry;
 import io.kelta.runtime.module.integration.spi.CredentialResolverPort;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
@@ -82,6 +83,16 @@ public class ModuleConfig {
         return new ModuleJarService(s3StorageService);
     }
 
+    /**
+     * Holds services published by runtime modules for platform code to call -- the direction
+     * {@code ModuleContext} does not cover. Always defined: with no module publishing anything it
+     * simply resolves empty and every caller keeps its compiled-in behaviour.
+     */
+    @Bean
+    public ModuleServiceRegistry moduleServiceRegistry() {
+        return new ModuleServiceRegistry();
+    }
+
     @Bean
     public RuntimeModuleManager runtimeModuleManager(ModuleStore moduleStore,
                                                        ActionHandlerRegistry actionHandlerRegistry,
@@ -94,7 +105,8 @@ public class ModuleConfig {
                                                        BeforeSaveHookRegistry beforeSaveHookRegistry,
                                                        ModuleCollectionProvisioner collectionProvisioner,
                                                        @Nullable CredentialResolverPort credentialResolverPort,
-                                                       TenantSlugResolver tenantSlugResolver) {
+                                                       TenantSlugResolver tenantSlugResolver,
+                                                       ModuleServiceRegistry moduleServiceRegistry) {
         // Runtime-loaded modules get the same credential bridge the compile-time modules get
         // (FlowConfig wires the identical extension). Without it a module cannot reach the vault
         // at all, so anything talking to an external API — the case runtime modules exist for —
@@ -117,7 +129,7 @@ public class ModuleConfig {
 
         return new RuntimeModuleManager(moduleStore, actionHandlerRegistry, objectMapper,
             jarService, moduleContext, signatureVerifier, beforeSaveHookRegistry,
-            collectionProvisioner, tenantSlugResolver);
+            collectionProvisioner, tenantSlugResolver, moduleServiceRegistry);
     }
 
     @Bean

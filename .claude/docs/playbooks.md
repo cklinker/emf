@@ -173,6 +173,18 @@ platform type fails).
    - `getBeforeSaveHooks()` → registered tenant-scoped in `BeforeSaveHookRegistry`, so they fire
      only on the installing tenant's records. They run **before** global hooks for the same
      collection; `"*"` still means every collection (for that tenant only).
+   - `getServices()` → `Map<Class<?>, Object>` of **platform-defined port → your implementation**,
+     registered tenant-scoped in `ModuleServiceRegistry`. This is the only way platform code can
+     ask a module a question *inline*; handlers and hooks are dispatch-only, and no Spring bean can
+     reach through `SandboxedModuleClassLoader` on its own. Platform callers resolve
+     `moduleServiceRegistry.find(tenantId, SomePort.class)` **per call** and fall back to their
+     compiled-in behaviour when it is empty — so publishing nothing changes nothing.
+     - The key must be an interface **the platform defines**, under a package in the classloader's
+       parent allowlist (`io.kelta.runtime.module.` and friends). Bundling your own copy of it is
+       rejected at registration rather than failing later as a `ClassCastException`.
+     - Two modules cannot publish the same port for one tenant; the second load is refused and
+       falls back to stubs. A refusal withdraws that module's already-accepted ports.
+     - **Never cache the instance platform-side** — unload closes the module's ClassLoader.
 2. **Declare collections in the manifest**, not in code:
    ```json
    "collections": [

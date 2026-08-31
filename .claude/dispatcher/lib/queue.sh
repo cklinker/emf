@@ -326,25 +326,92 @@ in_run_window() {
 # signal it writes PAUSE_FILE with the epoch to resume at; throttled() in
 # dispatch.sh then stops the fleet claiming, with no human in the path.
 #
-# Patterns are deliberately narrow. A false positive halts the whole fleet,
-# and worker logs routinely contain source files named RateLimiter.java, so
-# matching a bare "rate limit" would pause on reading the wrong file.
+# This reads the run's *outcome* fields, never the whole log as text.
+#
+# It used to grep the log for literal strings, narrowed to avoid the
+# RateLimiter.java false positive. That was not narrow enough. Two of those
+# strings live in this very function, and TASK-2026-08-31-0003 was a task to
+# parameterize the dispatcher — so the worker read lib/queue.sh, the
+# stream-json log captured the file verbatim, and the detector matched its own
+# source. It paused the whole fleet on 31 Aug for an hour against a
+# subscription that was nowhere near its limit, and blocked every shell
+# command behind guard-bash.sh rule 7 while it did.
+#
+# Any text search over the log has that failure mode permanently, because the
+# detector lives in the repo the fleet edits. So: parse the JSONL and look only
+# at fields the CLI itself writes as the result of the run — the terminal
+# result line, an error object, and synthetic assistant messages. File content
+# arrives inside tool_use/tool_result blocks, which are never consulted.
 detect_usage_limit() {
-  local log="${1:-}" reset="" until=""
+  local log="${1:-}" until=""
   [ -n "$log" ] && [ -f "$log" ] || return 1
-  grep -qE '"type"[[:space:]]*:[[:space:]]*"rate_limit_error"|Claude usage limit reached|usage_limit_reached' "$log" || return 1
+  command -v python3 >/dev/null 2>&1 || return 1
 
-  # Prefer a reset time the stream reports; accept epoch or ISO-8601.
-  reset="$(grep -oE '"(resets_at|resetsAt|reset_at)"[[:space:]]*:[[:space:]]*"?[0-9TZ:+-]+' "$log" \
-           | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:Z+-]+|[0-9]{10,}' | tail -1)"
-  if [ -n "$reset" ]; then
-    case "$reset" in
-      [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*) until="$reset" ;;
-      *) until="$(date -d "$reset" +%s 2>/dev/null || true)" ;;
-    esac
-  fi
-  # No parseable reset: wait an hour and let the next tick re-evaluate.
-  [ -n "$until" ] || until=$(( $(date +%s) + 3600 ))
+  until="$(python3 - "$log" <<'PY'
+import json, re, sys, time
+
+INDICATORS = ("usage limit reached", "usage_limit_reached",
+              "rate_limit_error", "rate limit exceeded")
+
+def outcome_fields(o):
+    """Only what the CLI reports about the run itself. Never nested content."""
+    t = o.get("type")
+    if t == "result" and o.get("is_error"):
+        yield str(o.get("result") or "")
+        yield str(o.get("subtype") or "")
+    elif t == "error":
+        yield str(o.get("message") or "")
+    elif t == "assistant":
+        m = o.get("message") or {}
+        if m.get("model") == "<synthetic>":      # CLI-generated, not model output
+            for c in m.get("content") or []:
+                if isinstance(c, dict) and c.get("type") == "text":
+                    yield str(c.get("text") or "")
+    e = o.get("error")
+    if isinstance(e, dict):
+        yield str(e.get("type") or "")
+        yield str(e.get("message") or "")
+
+def reset_epoch(o, text):
+    m = re.search(r"(\d{10,})", text)            # "…reached|1788212345"
+    if m:
+        return int(m.group(1))
+    src = o.get("error") if isinstance(o.get("error"), dict) else o
+    for k in ("resets_at", "resetsAt", "reset_at"):
+        v = src.get(k)
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            m = re.search(r"\d{10,}", v)
+            if m:
+                return int(m.group())
+    return None
+
+hit, reset = False, None
+with open(sys.argv[1], errors="replace") as fh:
+    for line in fh:
+        line = line.lstrip()
+        if not line.startswith("{"):
+            continue
+        try:
+            o = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(o, dict):
+            continue
+        for text in outcome_fields(o):
+            if any(i in text.lower() for i in INDICATORS):
+                hit = True
+                reset = reset or reset_epoch(o, text)
+
+if not hit:
+    sys.exit(1)
+now = int(time.time())
+# No parseable reset: wait an hour and let the next tick re-evaluate.
+print(reset if reset and reset > now else now + 3600)
+PY
+)" || return 1
+  [ -n "$until" ] || return 1
 
   mkdir -p "$(dirname "$PAUSE_FILE")" 2>/dev/null || true
   printf '%s\n' "$until" > "$PAUSE_FILE" 2>/dev/null || return 1

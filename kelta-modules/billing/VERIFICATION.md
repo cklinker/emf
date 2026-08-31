@@ -1,14 +1,17 @@
 # Live verification runbook — billing module
 
 Verifies the billing module end-to-end against **real Stripe test-mode keys** on the live
-`spotopened` tenant. Until this passes, the compiled-in `kelta-worker` billing stays in place.
+`<tenant-slug>` tenant. Until this passes, the compiled-in `kelta-worker` billing stays in place.
 
 **Steps marked 🔑 require you to handle secrets and must not be delegated to an agent.**
 
 ## Use the sandbox, not production
 
-`spotopened` has a **live subscriber** on the compiled-in billing (6 plans, 1 subscription, 1
-customer). Pointing a real Stripe webhook at the module there would write events into the module's
+`<tenant-slug>` had an existing subscriber row on the compiled-in billing (6 plans, 1 subscription,
+1 customer). *(It emerged later that this was a **test-mode** subscription orphaned by a processor
+account switch, and it has since been deleted — see the prod-rollout section. The reasoning below
+still holds: at the time it was indistinguishable from a real one, and treating it as real cost
+nothing.)* Pointing a real Stripe webhook at the module there would write events into the module's
 parallel, empty collections while the app keeps reading the compiled-in ones — diverging a paying
 member's state. Do the Stripe half in a sandbox.
 
@@ -16,12 +19,12 @@ A sandbox is already provisioned:
 
 | | |
 |---|---|
-| Environment | `billing-stripe-verify` (id `6ec47aed-ecda-40aa-867f-39c023b93421`), status ACTIVE |
-| Sandbox tenant | `c734b580-1204-4e00-97a4-3500a4f5c25e` |
-| Slug | `spotopened--billing-stripe-verify` |
+| Environment | `billing-stripe-verify` (id `<environment-id>`), status ACTIVE |
+| Sandbox tenant | `<sandbox-tenant-id>` |
+| Slug | `<sandbox-slug>` |
 | CLI profile | `billing-sandbox` (already written to `~/.kelta/config.json`) |
-| Admin user | `spotopened--billing-stripe-verify-admin@kelta.local` |
-| Webhook URL | `https://api.kelta.io/api/modules/webhooks/c734b580-1204-4e00-97a4-3500a4f5c25e/kelta-billing` |
+| Admin user | `<sandbox-admin>` |
+| Webhook URL | `https://<api-host>/api/modules/webhooks/<sandbox-tenant-id>/kelta-billing` |
 
 Verified reachable: that webhook URL answers **404** pre-install (dispatcher responding, nothing
 installed) and the sandbox slug resolves 200.
@@ -43,12 +46,12 @@ After that every step below works with `--profile billing-sandbox`.
 ### Signing keys are per tenant
 
 The sandbox needs its **own** registered key or the install falls back to inert stubs. Register the
-same public half already trusted on spotopened:
+same public half already trusted on <tenant-slug>:
 
 ```bash
 kelta api POST /api/modules/signing-keys --profile billing-sandbox --yes --data "$(python3 - <<'EOF'
 import json
-pem=open('/Users/craigklinker/.spotopened/module-signing/module-signing-public.pem').read()
+pem=open('~/.<tenant>/module-signing/module-signing-public.pem').read()
 print(json.dumps({"label":"2026-h2","algorithm":"Ed25519","publicKeyPem":pem,"active":True}))
 EOF
 )"
@@ -62,11 +65,11 @@ Environment established by inspection, not assumption:
 
 | | |
 |---|---|
-| Tenant | `spotopened` = `350a7dfe-3cb4-45ea-8816-555bd04c505e` |
-| API | `https://api.kelta.io` (CLI profile `spotopened`) |
+| Tenant | `<tenant-slug>` = `<prod-tenant-id>` |
+| API | `https://<api-host>` (CLI profile `<tenant-slug>`) |
 | Signing | **required** (`KELTA_MODULES_SIGNING_REQUIRED=true`), no platform key |
 | Tenant key | Ed25519, label `2026-h2`, fp `7d796bd4…`, active, 1 dependent module |
-| Precedent | `spotopened-ridb` v0.1.0 is installed and ACTIVE — this path is proven |
+| Precedent | `<tenant-slug>-ridb` v0.1.0 is installed and ACTIVE — this path is proven |
 
 ## ⚠️ The failure mode to watch for
 
@@ -92,7 +95,7 @@ kubectl exec -n emf deploy/emf-worker -- sh -c 'ls /app'
 ```
 
 ✅ Confirmed 2026-08-30: the deployed worker is the JVM image (`/app/app.jar`, Temurin 25.0.4),
-which is also why `spotopened-ridb` works today. If the worker is ever switched to the native
+which is also why `<tenant-slug>-ridb` works today. If the worker is ever switched to the native
 image, every installed module silently becomes inert.
 
 ---
@@ -137,25 +140,25 @@ unzip -p "$JAR" kelta-module.json | python3 -c "import sys,json;m=json.load(sys.
 ## 2. 🔑 Sign the JAR
 
 Use the **same Ed25519 private key** whose public half is registered as `2026-h2` — the one that
-signed `spotopened-ridb`. A different key installs as stubs (see the warning above).
+signed `<tenant-slug>-ridb`. A different key installs as stubs (see the warning above).
 
-On this machine that key is `~/.spotopened/module-signing/module-signing-key.pem`; its public half
+On this machine that key is `~/.<tenant-slug>/module-signing/module-signing-key.pem`; its public half
 matches the registered `2026-h2` anchor exactly. Confirm before signing rather than after:
 
 ```bash
-diff <(grep -v 'BEGIN\|END' ~/.spotopened/module-signing/module-signing-public.pem | tr -d '\n') \
+diff <(grep -v 'BEGIN\|END' ~/.<tenant-slug>/module-signing/module-signing-public.pem | tr -d '\n') \
      <(kelta api GET /api/modules/signing-keys | python3 -c "import sys,json;print(json.load(sys.stdin)['data'][0]['attributes']['publicKeyPem'])" | grep -v 'BEGIN\|END' | tr -d '\n') \
   && echo "key matches the registered anchor"
 ```
 
 ```bash
 JAR=kelta-modules/billing/target/kelta-module-billing-1.0.0.jar
-openssl pkeyutl -sign -rawin -inkey ~/.spotopened/module-signing/module-signing-key.pem -in "$JAR" \
+openssl pkeyutl -sign -rawin -inkey ~/.<tenant-slug>/module-signing/module-signing-key.pem -in "$JAR" \
   | base64 | tr -d '\n' > /tmp/billing.sig
 ```
 
 `-rawin` is required: Ed25519 signs the message itself, and signing a digest instead produces a
-signature the verifier rejects. `scripts/sign-ridb-module.sh` in `spotopened-web` is the proven
+signature the verifier rejects. `scripts/sign-ridb-module.sh` in `<tenant-slug>-web` is the proven
 equivalent for the other module — worth reading if this ever misbehaves.
 
 `tr -d '\n'` is not optional. The verifier uses Java's **basic** Base64 decoder, which rejects
@@ -175,9 +178,9 @@ export KELTA_PAT='klt_...'                  # paste it here, not into a file
 ```
 
 ```bash
-curl -sS -X POST https://api.kelta.io/api/modules/install-jar \
+curl -sS -X POST https://<api-host>/api/modules/install-jar \
   -H "Authorization: Bearer $KELTA_PAT" \
-  -H "X-Tenant-Slug: spotopened" \
+  -H "X-Tenant-Slug: <tenant-slug>" \
   -F "manifest=@kelta-modules/billing/src/main/resources/kelta-module.json" \
   -F "jar=@kelta-modules/billing/target/kelta-module-billing-1.0.0.jar" \
   -F "signature=$(cat /tmp/billing.sig)"
@@ -229,7 +232,7 @@ In the admin UI (**Setup → Credentials → New → type `stripe`**, name **exa
 |---|---|
 | `secretKey` | your Stripe **test-mode** `sk_test_…` |
 | `webhookSecret` | the endpoint signing secret from step 6 (`whsec_…`) |
-| `allowedReturnOrigins` | e.g. `https://app.spotopened.com` |
+| `allowedReturnOrigins` | e.g. `https://<portal-host>` |
 
 Enter these yourself in the UI — never paste them into a terminal, a file, or an agent session.
 Use **test mode** for verification; a real charge is not required to prove the path.
@@ -242,7 +245,7 @@ Use **test mode** for verification; a real charge is not required to prove the p
 Stripe Dashboard → Developers → Webhooks → Add endpoint:
 
 ```
-https://api.kelta.io/api/modules/webhooks/350a7dfe-3cb4-45ea-8816-555bd04c505e/kelta-billing
+https://<api-host>/api/modules/webhooks/<prod-tenant-id>/kelta-billing
 ```
 
 Events: `checkout.session.completed`, `customer.subscription.created`,
@@ -254,7 +257,7 @@ Sanity-check the negative — an unsigned request must never be accepted:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-  https://api.kelta.io/api/modules/webhooks/350a7dfe-3cb4-45ea-8816-555bd04c505e/kelta-billing \
+  https://<api-host>/api/modules/webhooks/<prod-tenant-id>/kelta-billing \
   -H 'Content-Type: application/json' -d '{}'
 ```
 
@@ -334,7 +337,7 @@ every action handler. Uninstall deliberately leaves the collections and their ro
 > the fix is confirmed against the live API and not only the stub server in the unit test.
 
 Run against real Stripe **test-mode** keys on the sandbox tenant
-`c734b580-1204-4e00-97a4-3500a4f5c25e` (`spotopened--billing-stripe-verify`), worker at
+`<sandbox-tenant-id>` (`<sandbox-slug>`), worker at
 `main-0064fa2` (JVM image, `/app/app.jar`).
 
 | Check | Result |
@@ -344,7 +347,7 @@ Run against real Stripe **test-mode** keys on the sandbox tenant
 | Checkout | `https://checkout.stripe.com/c/pay/cs_test_…` |
 | Payment (`4242…`) | redirected to `successUrl` |
 | Webhook signature (negative) | unsigned `POST` → `401` |
-| `checkout.session.completed` | customer mirrored → `cus_VAetLbvzT67xlA` |
+| `checkout.session.completed` | customer mirrored → ``cus_…`` |
 | `customer.subscription.*` | subscription mirrored, `status: active`, plan `PRO` |
 | `currentPeriodEnd` | **`2026-09-30T00:59:51Z` — non-null**, parsed correctly |
 | Entitlements | `{"planCode":"PRO","entitlements":{"watches":25},"subscriptionStatus":"active"}` |
@@ -378,7 +381,7 @@ tenant collection**. Sandbox state (PRO `watches`, probe rule, probe collection)
 `X-Tenant-Slug` header**:
 
 ```
-https://api.kelta.io/<tenant-slug>/api/modules/install-jar
+https://<api-host>/<tenant-slug>/api/modules/install-jar
 ```
 
 This is what the SDK does (`KeltaClient.ts`: `baseUrl = ${rawBase}/${tenantSlug}`), and it is what
@@ -401,7 +404,7 @@ and webhook idempotency converges on redelivery rather than claiming each event 
 
 # Prod rollout — 2026-08-31
 
-Installed and ACTIVE on the `spotopened` tenant (`350a7dfe-3cb4-45ea-8816-555bd04c505e`), worker
+Installed and ACTIVE on the `<tenant-slug>` tenant (`<prod-tenant-id>`), worker
 `main-1480dff` (JVM image).
 
 | Check | Result |
@@ -432,8 +435,8 @@ channel limits would have stopped applying — including paid SMS for free-tier 
 ## What the rollout uncovered, none of it caused by the module
 
 - **Two Stripe accounts.** The tenant's plans and API key point at the live account
-  (`acct_1U2Y4w2Z52nGRWDU`); its then-existing customer and subscription lived in the **test**
-  account (`acct_1U2Y59F2gMDfMQtB`). Prices and the credential were both re-pointed on 2026-08-10
+  (``acct_…LIVE``); its then-existing customer and subscription lived in the **test**
+  account (``acct_…TEST``). Prices and the credential were both re-pointed on 2026-08-10
   (plans 00:24, credential 00:28) and the customer/subscription — created 08-09 — were left behind.
   Hence `No such customer` on every "Manage billing" click. Those orphaned rows have since been
   deleted from both stores.
@@ -447,4 +450,4 @@ channel limits would have stopped applying — including paid SMS for free-tier 
   Roll it and update the credential in one sitting; that is the only guarantee available.
 - **Portal magic-link login double-verifies.** Every `PORTAL_LOGIN result=success` in the auth log
   is followed seconds later by a failed re-verify of the same single-use token, so a working link
-  presents as broken. The defect is in the external `app.spotopened.com` callback, not this repo.
+  presents as broken. The defect is in the external `<portal-host>` callback, not this repo.

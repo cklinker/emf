@@ -28,6 +28,7 @@ set -uo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SELF_DIR/lib/log.sh"
 . "$SELF_DIR/lib/queue.sh"
+. "$SELF_DIR/lib/notify.sh"
 
 EMF_REPO="${EMF_REPO:-$HOME/GitHub/emf}"
 EMF_QUEUE_REPO="${EMF_QUEUE_REPO:-$HOME/GitHub/emf-queue}"
@@ -321,6 +322,7 @@ case "$final_state" in
   MERGED)
     log_event task_done task="$ID" pr="$PR_NUM" duration_sec="$DURATION_SEC"
     queue_done "$TASK_FILE" "$PR_NUM"
+    notify_slack "#rzware-ceo" "${ID} merged — PR #${PR_NUM} ${PR_URL}" || true
     ;;
   CHECK_FAIL|CLOSED|TIMEOUT)
     if (( ATTEMPTS < MAX_ATTEMPTS )); then
@@ -331,7 +333,10 @@ case "$final_state" in
       queue_release_orphan "$TASK_FILE"
     else
       log_error "exhausted retries" final_state="$final_state" attempts="$ATTEMPTS"
-      queue_fail "$TASK_FILE" "$final_state after $MAX_ATTEMPTS attempts (pr #$PR_NUM)"
+      _fail_reason="$final_state after $MAX_ATTEMPTS attempts (pr #$PR_NUM)"
+      queue_fail "$TASK_FILE" "$_fail_reason"
+      notify_slack "#rzware-ceo" \
+        "FAILED: ${ID} — ${_fail_reason}. Attempts: ${ATTEMPTS}/${MAX_ATTEMPTS}. PR: ${PR_URL}. Log: ${JSONL_LOG}" || true
     fi
     ;;
   *)

@@ -171,26 +171,94 @@ public class DefaultEmailService implements EmailService {
         return logId;
     }
 
+    /**
+     * Queues a reply: an email that belongs to an existing conversation.
+     *
+     * <p>Differs from {@link #queueEmail} only in carrying {@link EmailHeaders}, but that
+     * difference is what makes it a reply rather than a fresh message — {@code In-Reply-To}
+     * and {@code References} put it in the right thread in the recipient's client, and
+     * {@code Auto-Submitted} keeps an automated one from provoking the far side's
+     * autoresponder.
+     *
+     * <p>Not part of the {@code EmailService} SPI: adding it there would ripple into every
+     * runtime module for a capability only the mailbox needs.
+     *
+     * <p><b>Callers are responsible for checking the suppression list.</b> This method does
+     * not, because {@link #queueEmail} does not, and diverging here would mean the same
+     * repository has one rule for replies and another for everything else. See the class
+     * javadoc note on suppression.
+     *
+     * @return a future completing with what the provider stamped on the message, notably
+     *         the {@code Message-ID} needed to match the recipient's eventual reply back
+     *         to this conversation. The email log id is available synchronously via
+     *         {@link #queueEmail}-style logging and is included in the failure path.
+     */
+    public java.util.concurrent.CompletableFuture<SendResult> queueReply(
+            String tenantId, String to, String subject, String body,
+            String source, String sourceId,
+            java.util.List<EmailAttachment> attachments, EmailHeaders headers) {
+        if (!enabled) {
+            log.warn("Email delivery disabled — skipping reply to {} with subject '{}'", to, subject);
+            return java.util.concurrent.CompletableFuture.completedFuture(SendResult.unknown());
+        }
+        String logId = emailRepository.createEmailLog(tenantId, to, subject, source, sourceId);
+        TenantEmailSettings tenantSettings = resolveTenantSettings(tenantId);
+        return sendAsyncReporting(logId, to, subject, body, tenantSettings, attachments, headers);
+    }
+
     @Async("emailExecutor")
     public void sendAsync(String logId, String to, String subject, String body,
                           TenantEmailSettings tenantSettings) {
-        sendAsync(logId, to, subject, body, tenantSettings, java.util.List.of());
+        doSend(logId, to, subject, body, tenantSettings, java.util.List.of(), EmailHeaders.none());
     }
 
     @Async("emailExecutor")
     public void sendAsync(String logId, String to, String subject, String body,
                           TenantEmailSettings tenantSettings,
                           java.util.List<EmailAttachment> attachments) {
+        doSend(logId, to, subject, body, tenantSettings, attachments, EmailHeaders.none());
+    }
+
+    /**
+     * Async send that reports the provider's result back to the caller.
+     *
+     * <p>The {@code void} overloads above cannot do this, which is the whole reason this
+     * exists: a conversation cannot be threaded without knowing the {@code Message-ID}
+     * that went out, and that value only exists after the send completes.
+     */
+    @Async("emailExecutor")
+    public java.util.concurrent.CompletableFuture<SendResult> sendAsyncReporting(
+            String logId, String to, String subject, String body,
+            TenantEmailSettings tenantSettings,
+            java.util.List<EmailAttachment> attachments, EmailHeaders headers) {
+        return java.util.concurrent.CompletableFuture.completedFuture(
+                doSend(logId, to, subject, body, tenantSettings, attachments, headers));
+    }
+
+    /**
+     * The single send implementation. Both {@code @Async} entry points delegate here so
+     * that neither self-invokes the other — a self-call would bypass the Spring proxy and
+     * silently run on the calling thread, which is a confusing way to lose asynchrony.
+     *
+     * <p>Never throws. Delivery failures are recorded on the email log and swallowed,
+     * matching the pre-existing contract that callers are not notified of send failures.
+     */
+    private SendResult doSend(String logId, String to, String subject, String body,
+                              TenantEmailSettings tenantSettings,
+                              java.util.List<EmailAttachment> attachments, EmailHeaders headers) {
         String smtpHost = resolveSmtpHost(tenantSettings);
 
         try {
             emailRepository.markSending(logId);
 
-            EmailMessage message = new EmailMessage(to, subject, body, null, attachments);
-            emailProvider.send(message, tenantSettings);
+            EmailMessage message = new EmailMessage(to, subject, body, null, attachments, headers);
+            SendResult result = emailProvider.sendAndReport(message, tenantSettings);
 
             emailRepository.markSent(logId, smtpHost);
             log.info("Email sent: logId={}, to={}, smtpHost={}", logId, to, smtpHost);
+            // A third-party provider is free to return null from the SPI; callers of
+            // queueReply should not have to defend against it.
+            return result != null ? result : SendResult.unknown();
 
         } catch (EmailDeliveryException e) {
             emailRepository.markFailed(logId, e.getMessage(), smtpHost);
@@ -200,6 +268,7 @@ public class DefaultEmailService implements EmailService {
             emailRepository.markFailed(logId, e.getMessage(), smtpHost);
             log.error("Unexpected error during email delivery: logId={}, to={}", logId, to, e);
         }
+        return SendResult.unknown();
     }
 
     private TenantEmailSettings resolveTenantSettings(String tenantId) {

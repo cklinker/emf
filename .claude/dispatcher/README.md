@@ -81,22 +81,50 @@ tail -f /var/log/emf-dispatcher/TASK-2026-05-10-0001.jsonl | jq -c .
 
 Every task defaults to the `emf` mono-repo, but a task can carry an optional `repo:` frontmatter field to target any other repository. The dispatcher pulls all repos with eligible tasks each tick, the worker worktrees the resolved repo (fetching from `origin/<default-branch>` — `main` or `master` is discovered from `origin/HEAD`, not assumed), and the PR is opened there.
 
-**Registering a repo.** A repo name is resolved to a filesystem path via, in order:
+**Path resolution.** A repo name is resolved to a filesystem path via, in order:
 
 1. Env var `RZWARE_REPO_<NAME_UPPER>` (dashes → underscores, e.g. `spotopened-web` → `RZWARE_REPO_SPOTOPENED_WEB`). Set these on the systemd unit — the dispatcher's `spawn_worker` forwards every `RZWARE_REPO_*` var into the worker's tmux session.
 2. Convention fallback `$HOME/GitHub/<name>` if that directory exists.
 3. Otherwise: **fail the task**. A task landing in the wrong repo is worse than a task that fails, so an unresolved `repo:` is not silently retargeted at `emf`.
 
-**Example.** Systemd unit `Environment=` lines:
+**Onboarding a new repo (checklist).** Follow these steps in order:
 
-```
-Environment=RZWARE_REPO_SPOTOPENED_WEB=/home/craig/GitHub/spotopened-web
-Environment=RZWARE_REPO_COUCHPICKS=/home/craig/GitHub/couchpicks
-Environment=RZWARE_REPO_RZWARE_WEBSITE=/home/craig/GitHub/rzware_website
-Environment=RZWARE_REPO_HOMELAB_ARGO=/home/craig/GitHub/homelab-argo
-```
+1. **Confirm the exact GitHub slug.** The brief may use a shorthand. Verify the real org/repo:
+   ```sh
+   gh repo view cklinker/<name>
+   ```
+   The env var key and convention path must use the real repo name (e.g. `rzware-website`, not `rzware_website`).
 
-Then a task frontmatter of `repo: spotopened-web` worktrees `/home/craig/GitHub/spotopened-web` and opens its PR against that repo's default branch.
+2. **Make the path resolvable on worker-01.** Either:
+   - Clone to the convention path (no systemd change needed):
+     ```sh
+     git clone git@github.com:cklinker/<name>.git ~/GitHub/<name>
+     ```
+   - Or set an explicit env var on the installed unit, then reload:
+     ```
+     Environment=RZWARE_REPO_<NAME_UPPER>=/home/craig/GitHub/<name>
+     ```
+     ```sh
+     sudo systemctl daemon-reload && sudo systemctl restart emf-dispatcher
+     ```
+   Do **not** add an env-var entry for a path that does not yet exist — it wins over the convention fallback and produces a more confusing failure than simply being unregistered.
+
+3. **Confirm CI.** Check whether the target repo has GitHub Actions workflows:
+   ```sh
+   gh workflow list -R cklinker/<name>
+   ```
+   If there are none, note it here. `worker.sh`'s CI-poll step will hang waiting for checks that never come — either add a stub workflow or flag `ci: none` in the task brief.
+
+4. **Confirm branch-protection expectations.** `worker.sh` assumes `emf`-style required status checks and squash-merge auto-merge. Verify the target repo's protection rules match, or document the gaps:
+   ```sh
+   gh api repos/cklinker/<name>/branches/main/protection
+   ```
+
+5. **Record the registration in the "Currently registered" list below** so the next onboarding is a lookup, not a re-investigation.
+
+**Currently registered repos** (as of 2026-08-31):
+
+*(none — PR #1419 added the multi-repo code path but no repos beyond `emf` are cloned and confirmed on worker-01 yet)*
 
 ## Safety knobs
 

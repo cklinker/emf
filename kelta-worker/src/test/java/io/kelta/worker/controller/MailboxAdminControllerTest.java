@@ -3,7 +3,11 @@ package io.kelta.worker.controller;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.repository.MailboxAccessRepository;
+import io.kelta.worker.repository.MailboxAutoReplyDecisionRepository;
+import io.kelta.worker.repository.MailboxEscalationRepository;
 import io.kelta.worker.repository.MailboxRepository;
+import io.kelta.worker.service.mailbox.SupportAutoReplySweep;
+import tools.jackson.databind.json.JsonMapper;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.mailbox.MailboxSecretService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +43,9 @@ class MailboxAdminControllerTest {
     private MailboxSecretService secretService;
     private CerbosPermissionResolver permissionResolver;
     private BootstrapRepository bootstrapRepository;
+    private MailboxEscalationRepository escalationRepository;
+    private MailboxAutoReplyDecisionRepository decisionRepository;
+    private SupportAutoReplySweep autoReplySweep;
     private HttpServletRequest request;
     private MailboxAdminController controller;
 
@@ -49,10 +56,15 @@ class MailboxAdminControllerTest {
         secretService = mock(MailboxSecretService.class);
         permissionResolver = mock(CerbosPermissionResolver.class);
         bootstrapRepository = mock(BootstrapRepository.class);
+        escalationRepository = mock(MailboxEscalationRepository.class);
+        decisionRepository = mock(MailboxAutoReplyDecisionRepository.class);
+        autoReplySweep = mock(SupportAutoReplySweep.class);
         request = mock(HttpServletRequest.class);
 
         controller = new MailboxAdminController(mailboxRepository, accessRepository,
-                secretService, permissionResolver, bootstrapRepository);
+                secretService, permissionResolver, bootstrapRepository,
+                escalationRepository, decisionRepository, autoReplySweep,
+                JsonMapper.builder().build());
 
         grantPermission();
         when(request.getHeader("X-User-Id")).thenReturn("user-1");

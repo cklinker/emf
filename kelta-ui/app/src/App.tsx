@@ -81,6 +81,11 @@ const EndUserApprovalsInboxPage = React.lazy(() =>
     default: m.ApprovalsInboxPage,
   }))
 )
+const MailboxAdminPage = React.lazy(() =>
+  import('./pages/MailboxAdminPage/MailboxAdminPage').then((m) => ({
+    default: m.MailboxAdminPage,
+  }))
+)
 const EndUserMailboxConsolePage = React.lazy(() =>
   import('./pages/app/MailboxConsolePage/MailboxConsolePage').then((m) => ({
     default: m.MailboxConsolePage,
@@ -1023,6 +1028,22 @@ function TenantRoutes(): React.ReactElement {
             <AdminPageRoute>
               <RequirePermission permission="MANAGE_EMAIL_TEMPLATES">
                 <EmailTemplatesPage />
+              </RequirePermission>
+            </AdminPageRoute>
+          }
+        />
+
+        {/* Support Mailboxes route. The wrapper is UX only — RequirePermission renders children
+            while permissions load, so MANAGE_SUPPORT_MAILBOX is enforced server-side on every
+            call the page makes. */}
+        <Route
+          path="mailboxes"
+          element={
+            <AdminPageRoute>
+              <RequirePermission permission="MANAGE_SUPPORT_MAILBOX">
+                <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                  <MailboxAdminPage />
+                </React.Suspense>
               </RequirePermission>
             </AdminPageRoute>
           }

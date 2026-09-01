@@ -43,7 +43,7 @@ export interface MailboxHtmlBodyProps {
  * is ours, below.
  */
 function buildSrcDoc(bodyHtml: string, allowRemoteImages: boolean): string {
-  const imgSrc = allowRemoteImages ? "img-src data: https:" : "img-src data:"
+  const imgSrc = allowRemoteImages ? 'img-src data: https:' : 'img-src data:'
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'none';

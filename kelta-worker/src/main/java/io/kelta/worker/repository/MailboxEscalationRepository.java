@@ -182,6 +182,55 @@ public class MailboxEscalationRepository {
                 """, truncate(error), deliveryId, tenantId);
     }
 
+    // ------------------------------------------------------------------ Contact management
+
+    public List<Map<String, Object>> listContacts(String tenantId, String mailboxId) {
+        return jdbcTemplate.queryForList("""
+                SELECT * FROM mailbox_escalation_contact
+                 WHERE tenant_id = ? AND mailbox_id = ?
+                 ORDER BY level, created_at
+                """, tenantId, mailboxId);
+    }
+
+    public java.util.Optional<Map<String, Object>> findContact(String id, String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT * FROM mailbox_escalation_contact WHERE id = ? AND tenant_id = ?", id, tenantId);
+        return rows.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(rows.getFirst());
+    }
+
+    /**
+     * Adds a contact, or updates the channels if that person is already on that level.
+     *
+     * <p>Upsert rather than conflict: re-adding with different channels is how an admin says
+     * "also text me", and erroring would force a remove-then-add that briefly leaves the level
+     * with nobody on it.
+     */
+    public String addContact(String tenantId, String mailboxId, String level, String userId,
+                             String channelsJson, String actor) {
+        String id = UUID.randomUUID().toString();
+        jdbcTemplate.update("""
+                INSERT INTO mailbox_escalation_contact
+                    (id, tenant_id, mailbox_id, level, user_id, channels,
+                     created_by, updated_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, now(), now())
+                ON CONFLICT (mailbox_id, level, user_id)
+                DO UPDATE SET channels = EXCLUDED.channels, updated_by = EXCLUDED.updated_by,
+                              updated_at = now()
+                """, id, tenantId, mailboxId, level, userId, channelsJson,
+                actor == null ? "" : actor, actor == null ? "" : actor);
+
+        List<String> ids = jdbcTemplate.queryForList("""
+                SELECT id FROM mailbox_escalation_contact
+                 WHERE tenant_id = ? AND mailbox_id = ? AND level = ? AND user_id = ?
+                """, String.class, tenantId, mailboxId, level, userId);
+        return ids.isEmpty() ? id : ids.getFirst();
+    }
+
+    public int removeContact(String id, String tenantId) {
+        return jdbcTemplate.update(
+                "DELETE FROM mailbox_escalation_contact WHERE id = ? AND tenant_id = ?", id, tenantId);
+    }
+
     /** Escalations on a thread, newest first, for the console's history strip. */
     public List<Map<String, Object>> listForThread(String tenantId, String threadId) {
         return jdbcTemplate.queryForList("""

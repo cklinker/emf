@@ -81,7 +81,7 @@ A property worth preserving deliberately: because the auto-replier never looks t
 | 4b | Console UI (`MailboxConsolePage`, `MailboxHtmlBody`, routes) | **Shipped** (read-only; replying is slice 5) |
 | 5 | Human replies (VERP `Reply-To`, suppression check, loop guards) | **Shipped** |
 | 6 | `mailbox_template` — matching and policy, referencing `email_template` for copy | **Shipped** (matcher + author-time guard; nothing sends yet) |
-| 7 | Auto-send, shadow mode first | |
+| 7 | Auto-send, shadow mode first, + admin UI | **Shipped** (shadow mode ON by default) |
 | 8 | AI drafts + approval UI, worker→`kelta-ai` client, `X-Internal-Token` on `/api/ai/agents/**` | |
 | 9 | Attachment hardening; fix `FileViewer.tsx:131` (`sandbox="allow-same-origin"` on a same-origin URL) | |
 | 10 | Cut MX from the interim Google Workspace alias over to SES | |

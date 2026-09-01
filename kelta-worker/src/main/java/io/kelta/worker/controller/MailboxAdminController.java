@@ -4,7 +4,11 @@ import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.BootstrapRepository;
 import io.kelta.worker.repository.MailboxAccessRepository;
+import io.kelta.worker.repository.MailboxAutoReplyDecisionRepository;
+import io.kelta.worker.repository.MailboxEscalationRepository;
 import io.kelta.worker.repository.MailboxRepository;
+import io.kelta.worker.service.mailbox.SupportAutoReplySweep;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import io.kelta.worker.service.mailbox.MailboxSecretService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,6 +61,10 @@ public class MailboxAdminController {
             "SES_SNS", "SES_SNS_INLINE", "GENERIC_HMAC", "POSTMARK", "MAILGUN", "CLOUDMAILIN");
     private static final Set<String> ROLES = Set.of("VIEWER", "AGENT", "MANAGER");
     private static final Set<String> PRINCIPAL_TYPES = Set.of("USER", "GROUP");
+    private static final Set<String> ESCALATION_LEVELS =
+            Set.of("WARN", "BREACH", "BREACH_2", "BREACH_3");
+    // SMS is absent: it is billable and nothing here resolves a per-tenant entitlement.
+    private static final Set<String> ESCALATION_CHANNELS = Set.of("email", "push");
 
     /**
      * Deliberately permissive. This validates that a value is shaped like an address, not
@@ -70,17 +78,29 @@ public class MailboxAdminController {
     private final MailboxSecretService secretService;
     private final CerbosPermissionResolver permissionResolver;
     private final BootstrapRepository bootstrapRepository;
+    private final MailboxEscalationRepository escalationRepository;
+    private final MailboxAutoReplyDecisionRepository decisionRepository;
+    private final SupportAutoReplySweep autoReplySweep;
+    private final ObjectMapper objectMapper;
 
     public MailboxAdminController(MailboxRepository mailboxRepository,
                                   MailboxAccessRepository accessRepository,
                                   MailboxSecretService secretService,
                                   CerbosPermissionResolver permissionResolver,
-                                  BootstrapRepository bootstrapRepository) {
+                                  BootstrapRepository bootstrapRepository,
+                                  MailboxEscalationRepository escalationRepository,
+                                  MailboxAutoReplyDecisionRepository decisionRepository,
+                                  SupportAutoReplySweep autoReplySweep,
+                                  ObjectMapper objectMapper) {
         this.mailboxRepository = mailboxRepository;
         this.accessRepository = accessRepository;
         this.secretService = secretService;
         this.permissionResolver = permissionResolver;
         this.bootstrapRepository = bootstrapRepository;
+        this.escalationRepository = escalationRepository;
+        this.decisionRepository = decisionRepository;
+        this.autoReplySweep = autoReplySweep;
+        this.objectMapper = objectMapper;
     }
 
     // ---------------------------------------------------------------- Mailbox CRUD
@@ -284,6 +304,166 @@ public class MailboxAdminController {
         accessRepository.revoke(accessId, tenantId);
         log.info("Mailbox {} access grant {} revoked in tenant {}", id, accessId, tenantId);
         return ResponseEntity.noContent().build();
+    }
+
+    // ---------------------------------------------------------------- Escalation contacts
+
+    /**
+     * Who gets told when a thread in this mailbox breaches its SLA.
+     *
+     * <p>A table rather than columns on the mailbox because escalation is a chain: level 1 goes to
+     * the team, level 3 to whoever owns the outcome. Columns would cap it at whatever we guessed.
+     */
+    @GetMapping("/{id}/escalation-contacts")
+    public ResponseEntity<Map<String, Object>> listEscalationContacts(HttpServletRequest request,
+                                                                      @PathVariable String id) {
+        requirePermission(request);
+        String tenantId = requireTenant();
+        load(id, tenantId);
+        List<Map<String, Object>> records = escalationRepository.listContacts(tenantId, id)
+                .stream().map(this::projectContact).toList();
+        return ResponseEntity.ok(
+                JsonApiResponseBuilder.collection("mailbox-escalation-contacts", records));
+    }
+
+    @PostMapping("/{id}/escalation-contacts")
+    public ResponseEntity<Map<String, Object>> addEscalationContact(HttpServletRequest request,
+                                                                    @PathVariable String id,
+                                                                    @RequestBody Map<String, Object> body) {
+        requirePermission(request);
+        String tenantId = requireTenant();
+        load(id, tenantId);
+
+        Map<String, Object> attrs = attributes(body);
+        String level = upper(attrs.get("level"));
+        String userId = text(attrs.get("userId"));
+        if (!ESCALATION_LEVELS.contains(level)) {
+            throw badRequest("level must be one of " + ESCALATION_LEVELS);
+        }
+        if (userId == null) {
+            throw badRequest("userId is required");
+        }
+        List<String> channels = channels(attrs.get("channels"));
+        if (channels.isEmpty()) {
+            throw badRequest("at least one channel is required");
+        }
+        for (String channel : channels) {
+            if (!ESCALATION_CHANNELS.contains(channel)) {
+                throw badRequest("channel must be one of " + ESCALATION_CHANNELS);
+            }
+        }
+
+        String contactId = escalationRepository.addContact(tenantId, id, level, userId,
+                toJson(channels), actor(request));
+        log.info("Mailbox {} escalation contact added: {} at {} in tenant {}",
+                id, userId, level, tenantId);
+
+        Map<String, Object> row = escalationRepository.findContact(contactId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                JsonApiResponseBuilder.single("mailbox-escalation-contacts", contactId, projectContact(row)));
+    }
+
+    @DeleteMapping("/{id}/escalation-contacts/{contactId}")
+    public ResponseEntity<Void> removeEscalationContact(HttpServletRequest request,
+                                                        @PathVariable String id,
+                                                        @PathVariable String contactId) {
+        requirePermission(request);
+        String tenantId = requireTenant();
+        load(id, tenantId);
+
+        Map<String, Object> row = escalationRepository.findContact(contactId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
+        // A contact id from another mailbox must not be removable through this mailbox's path.
+        if (!id.equals(row.get("mailbox_id"))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found");
+        }
+        escalationRepository.removeContact(contactId, tenantId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ---------------------------------------------------------------- Auto-reply reporting
+
+    /**
+     * What auto-reply has been doing.
+     *
+     * <p>Reports {@code shadowMode} first, because every other number means something different
+     * depending on it: in shadow mode a SHADOW count is "replies we would have sent", and live it
+     * is nothing at all.
+     *
+     * <p>Includes the follow-up rate deliberately. Auto-replying "thanks for writing!" to
+     * everything scores perfect first-response compliance while helping nobody, and the share of
+     * auto-replied threads where the customer wrote back is what exposes that.
+     */
+    @GetMapping("/{id}/auto-reply-report")
+    public ResponseEntity<Map<String, Object>> autoReplyReport(HttpServletRequest request,
+                                                               @PathVariable String id,
+                                                               @RequestParam(defaultValue = "14") int days) {
+        requirePermission(request);
+        String tenantId = requireTenant();
+        load(id, tenantId);
+        int window = Math.max(1, Math.min(days, 90));
+
+        Map<String, Object> followUp = decisionRepository.followUpRate(tenantId, id, window);
+        long autoReplied = number(followUp.get("auto_replied"));
+        long followedUp = number(followUp.get("followed_up"));
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("shadowMode", autoReplySweep.isShadowMode());
+        out.put("days", window);
+        out.put("breakdown", decisionRepository.summarize(tenantId, id, window));
+        out.put("autoReplied", autoReplied);
+        out.put("followedUp", followedUp);
+        out.put("followUpRate", autoReplied == 0 ? null : (double) followedUp / autoReplied);
+        out.put("recent", decisionRepository.listRecent(tenantId, id, 50).stream()
+                .map(this::projectDecision).toList());
+        return ResponseEntity.ok(out);
+    }
+
+    private Map<String, Object> projectContact(Map<String, Object> row) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("mailboxId", row.get("mailbox_id"));
+        out.put("level", row.get("level"));
+        out.put("userId", row.get("user_id"));
+        out.put("channels", row.get("channels"));
+        out.put("createdAt", row.get("created_at"));
+        return out;
+    }
+
+    private Map<String, Object> projectDecision(Map<String, Object> row) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", row.get("id"));
+        out.put("threadId", row.get("thread_id"));
+        out.put("subject", row.get("subject"));
+        out.put("requesterEmail", row.get("requester_email"));
+        out.put("outcome", row.get("outcome"));
+        out.put("vetoReason", row.get("veto_reason"));
+        out.put("matchedCategory", row.get("matched_category"));
+        out.put("confidence", row.get("confidence"));
+        out.put("ambiguous", row.get("ambiguous"));
+        out.put("createdAt", row.get("created_at"));
+        return out;
+    }
+
+    private List<String> channels(Object raw) {
+        if (raw instanceof List<?> list) {
+            return list.stream().filter(java.util.Objects::nonNull)
+                    .map(o -> o.toString().toLowerCase(Locale.ROOT).trim())
+                    .filter(s -> !s.isEmpty()).toList();
+        }
+        return List.of();
+    }
+
+    private String toJson(List<String> channels) {
+        try {
+            return objectMapper.writeValueAsString(channels);
+        } catch (Exception e) {
+            return "[\"email\"]";
+        }
+    }
+
+    private static long number(Object o) {
+        return o instanceof Number n ? n.longValue() : 0L;
     }
 
     // ---------------------------------------------------------------- Helpers

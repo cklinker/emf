@@ -198,6 +198,11 @@ kelta:
     url: ${NATS_URL:nats://localhost:4222}
     connection-name: kelta-worker
 
+  # Support mailbox. verp-secret signs the Reply-To thread token; the service refuses
+  # to start without it, deliberately — an unsigned token is a forgeable one.
+  mailbox:
+    verp-secret: ${KELTA_MAILBOX_VERP_SECRET:}
+
 management:
   endpoints:
     web:

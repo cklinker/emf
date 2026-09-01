@@ -53,11 +53,13 @@ public final class KeltaStack {
 
     /**
      * HMAC signing keys the worker refuses to start without — there is deliberately no
-     * fallback, since an unset key would sign real visit and campaign links with a value
-     * published in this repository. Harness-local literals, never a deployed value.
+     * fallback, since an unset key would sign real visit links, campaign links and support-mailbox
+     * Reply-To thread tokens with a value published in this repository. Harness-local literals,
+     * never a deployed value.
      */
     private static final String VISIT_SECRET = "harness-visit-secret";
     private static final String CAMPAIGN_TRACKING_SECRET = "harness-campaign-tracking-secret";
+    private static final String MAILBOX_VERP_SECRET = "harness-mailbox-verp-secret";
 
     /**
      * Datasource configuration for the worker + auth services. Built once from env
@@ -157,6 +159,7 @@ public final class KeltaStack {
             .withEnv("KELTA_INTERNAL_TOKEN",       INTERNAL_TOKEN)
             .withEnv("KELTA_TELEHEALTH_VISIT_SECRET", VISIT_SECRET)
             .withEnv("CAMPAIGN_TRACKING_SECRET",   CAMPAIGN_TRACKING_SECRET)
+            .withEnv("KELTA_MAILBOX_VERP_SECRET",  MAILBOX_VERP_SECRET)
             .withEnv("EMAIL_ENABLED",              "false")
             .withEnv("SMTP_AUTH",                  "false")
             .withEnv("SMTP_STARTTLS",              "false")

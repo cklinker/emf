@@ -8,6 +8,7 @@ import io.kelta.worker.repository.MailboxMessageRepository;
 import io.kelta.worker.repository.MailboxRepository;
 import io.kelta.worker.repository.MailboxThreadRepository;
 import io.kelta.worker.service.mailbox.MailboxAccessGuard;
+import io.kelta.worker.service.mailbox.MailboxReplyService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,8 @@ public class MailboxController {
     private static final Logger log = LoggerFactory.getLogger(MailboxController.class);
 
     private static final int MAX_PAGE = 100;
+    /** Generous, but bounded: an unbounded body is a cheap way to fill the message table. */
+    private static final int MAX_REPLY_CHARS = 100_000;
 
     /** Transitions an agent may drive from the console. */
     private static final Set<String> ALLOWED_TRANSITIONS = Set.of(
@@ -59,19 +62,22 @@ public class MailboxController {
     private final MailboxAttachmentRepository attachmentRepository;
     private final MailboxEscalationRepository escalationRepository;
     private final MailboxAccessGuard accessGuard;
+    private final MailboxReplyService replyService;
 
     public MailboxController(MailboxRepository mailboxRepository,
                              MailboxThreadRepository threadRepository,
                              MailboxMessageRepository messageRepository,
                              MailboxAttachmentRepository attachmentRepository,
                              MailboxEscalationRepository escalationRepository,
-                             MailboxAccessGuard accessGuard) {
+                             MailboxAccessGuard accessGuard,
+                             MailboxReplyService replyService) {
         this.mailboxRepository = mailboxRepository;
         this.threadRepository = threadRepository;
         this.messageRepository = messageRepository;
         this.attachmentRepository = attachmentRepository;
         this.escalationRepository = escalationRepository;
         this.accessGuard = accessGuard;
+        this.replyService = replyService;
     }
 
     // ------------------------------------------------------------------ Mailboxes
@@ -227,6 +233,55 @@ public class MailboxController {
         threadRepository.transition(tenantId, threadId, status, userId);
         log.info("Thread {} moved to {} by {}", threadId, status, userId);
         return ResponseEntity.ok(reload(tenantId, threadId));
+    }
+
+    /**
+     * Sends a reply on a thread.
+     *
+     * <p>The body carries {@code bodyText} and nothing else. There is deliberately <b>no recipient
+     * parameter</b>: the address comes from the thread, so this endpoint cannot be used to send
+     * mail from our domain to somewhere of the caller's choosing. That is a design constraint
+     * rather than a validation, which is why there is no field to validate.
+     */
+    @PostMapping("/threads/{threadId}/reply")
+    public ResponseEntity<Map<String, Object>> reply(HttpServletRequest request,
+                                                     @PathVariable String threadId,
+                                                     @RequestBody Map<String, Object> body) {
+        String tenantId = requireTenant();
+        String userId = requireUser(request);
+        Map<String, Object> thread = loadThread(tenantId, threadId, userId);
+        accessGuard.requireAct(accessGuard.requireForThread(tenantId, thread, userId));
+
+        String bodyText = text(body.get("bodyText"));
+        if (bodyText == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bodyText is required");
+        }
+        if (bodyText.length() > MAX_REPLY_CHARS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "bodyText exceeds " + MAX_REPLY_CHARS + " characters");
+        }
+
+        MailboxReplyService.Result result =
+                replyService.reply(tenantId, threadId, bodyText, userId, false);
+
+        if (!result.sent()) {
+            // 409 rather than 500: nothing went wrong, we declined. The reason is named so the
+            // console can explain it instead of showing a generic failure.
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    refusalMessage(result.refusal()));
+        }
+        return ResponseEntity.ok(reload(tenantId, threadId));
+    }
+
+    private static String refusalMessage(MailboxReplyService.Refusal refusal) {
+        return switch (refusal) {
+            case SUPPRESSED -> "That address has bounced or reported spam, so we no longer email it";
+            case BOUNCE_OR_AUTOMATED -> "The last message on this thread was automated — replying "
+                    + "would start a mail loop";
+            case UNATTENDED_ADDRESS -> "The sender's address is unattended and cannot receive replies";
+            case NO_RECIPIENT -> "This thread has no reply address";
+            case EMAIL_DISABLED -> "Email delivery is disabled in this environment";
+        };
     }
 
     // ------------------------------------------------------------------ Helpers

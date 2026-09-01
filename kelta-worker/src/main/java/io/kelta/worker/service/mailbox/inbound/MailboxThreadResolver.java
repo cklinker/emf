@@ -25,11 +25,14 @@ public class MailboxThreadResolver {
 
     private final MailboxThreadRepository threadRepository;
     private final MailboxMessageRepository messageRepository;
+    private final io.kelta.worker.service.mailbox.MailboxVerpService verpService;
 
     public MailboxThreadResolver(MailboxThreadRepository threadRepository,
-                                 MailboxMessageRepository messageRepository) {
+                                 MailboxMessageRepository messageRepository,
+                                 io.kelta.worker.service.mailbox.MailboxVerpService verpService) {
         this.threadRepository = threadRepository;
         this.messageRepository = messageRepository;
+        this.verpService = verpService;
     }
 
     /**
@@ -44,6 +47,15 @@ public class MailboxThreadResolver {
                               NormalizedInboundMail mail, boolean requesterVerified,
                               String verificationMethod) {
         String mailboxId = (String) mailbox.get("id");
+
+        // 0. Our own signed thread token in the recipient address. The strongest signal available:
+        //    it is deterministic and survives clients that strip References. The HMAC is what makes
+        //    it safe — a bare +t<threadId> address would let anyone who learns a thread id post
+        //    into that conversation.
+        Optional<String> byToken = verpService.threadIdFrom(mail.toAddresses());
+        if (byToken.isPresent() && threadRepository.findById(byToken.get(), tenantId).isPresent()) {
+            return join(tenantId, mailbox, mail, byToken.get(), requesterVerified, verificationMethod);
+        }
 
         // 1. In-Reply-To, an exact reference to a message we sent or stored.
         Optional<String> byInReplyTo = messageRepository

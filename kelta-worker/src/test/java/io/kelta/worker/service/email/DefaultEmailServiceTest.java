@@ -85,7 +85,7 @@ class DefaultEmailServiceTest {
             String logId = disabledService.queueEmail("t1", "user@test.com", "Subject", "Body", "TEST", null);
 
             assertThat(logId).isNotNull();
-            verify(emailProvider, never()).send(any(), any());
+            verifyNoInteractions(emailProvider);
             verify(emailRepository, never()).createEmailLog(anyString(), anyString(), anyString(), anyString(), any());
         }
     }
@@ -220,7 +220,7 @@ class DefaultEmailServiceTest {
             service.sendAsync("log-1", "user@test.com", "Subject", "<p>Body</p>", null);
 
             verify(emailRepository).markSending("log-1");
-            verify(emailProvider).send(any(EmailMessage.class), isNull());
+            verify(emailProvider).sendAndReport(any(EmailMessage.class), isNull());
             verify(emailRepository).markSent(eq("log-1"), anyString());
         }
 
@@ -228,7 +228,7 @@ class DefaultEmailServiceTest {
         @DisplayName("Should mark log as FAILED when provider throws")
         void shouldMarkFailedOnProviderError() {
             doThrow(new EmailDeliveryException("Connection refused"))
-                    .when(emailProvider).send(any(), any());
+                    .when(emailProvider).sendAndReport(any(), any());
 
             service.sendAsync("log-2", "user@test.com", "Subject", "<p>Body</p>", null);
 

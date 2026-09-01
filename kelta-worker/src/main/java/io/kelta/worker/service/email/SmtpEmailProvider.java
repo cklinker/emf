@@ -50,23 +50,31 @@ public class SmtpEmailProvider implements EmailProvider {
 
     @Override
     public void send(EmailMessage message, TenantEmailSettings tenantSettings) throws EmailDeliveryException {
+        sendAndReport(message, tenantSettings);
+    }
+
+    @Override
+    public SendResult sendAndReport(EmailMessage message, TenantEmailSettings tenantSettings)
+            throws EmailDeliveryException {
         JavaMailSender sender = resolveSender(tenantSettings);
         String fromAddress = resolveFromAddress(tenantSettings);
         String fromName = resolveFromName(tenantSettings);
 
         try {
-            MimeMessage mimeMessage = ((JavaMailSenderImpl) sender instanceof JavaMailSenderImpl impl
-                    ? impl : (JavaMailSenderImpl) platformMailSender).createMimeMessage();
-
-            // Use the resolved sender's createMimeMessage if available
-            if (sender instanceof JavaMailSenderImpl impl) {
-                mimeMessage = impl.createMimeMessage();
-            }
+            // Prefer the resolved (possibly per-tenant) sender's factory so the message
+            // is built against the session that will transmit it. Falling back to the
+            // platform sender only matters for JavaMailSender implementations that are
+            // not JavaMailSenderImpl, which in practice means test doubles.
+            MimeMessage mimeMessage = sender instanceof JavaMailSenderImpl impl
+                    ? impl.createMimeMessage()
+                    : platformMailSender.createMimeMessage();
 
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
             helper.setTo(message.to());
             helper.setFrom(new InternetAddress(fromAddress, fromName));
             helper.setSubject(message.subject());
+
+            applyHeaders(mimeMessage, helper, message.headers());
 
             if (message.bodyText() != null) {
                 helper.setText(message.bodyText(), message.bodyHtml());
@@ -82,6 +90,11 @@ public class SmtpEmailProvider implements EmailProvider {
 
             sender.send(mimeMessage);
 
+            // Read the id back rather than assigning one: saveChanges() — which send()
+            // invokes — regenerates Message-ID unconditionally, so anything set before
+            // this point is already gone. This is the only moment the real value exists.
+            return new SendResult(readMessageId(mimeMessage));
+
         } catch (MailAuthenticationException e) {
             // Invalidate cached sender on auth failure — credentials may have changed
             if (tenantSettings != null && tenantSettings.hasSmtpOverride() && tenantSettings.tenantId() != null) {
@@ -94,6 +107,58 @@ public class SmtpEmailProvider implements EmailProvider {
             throw new EmailDeliveryException("SMTP delivery failed: " + e.getMessage(), e);
         } catch (MessagingException | UnsupportedEncodingException e) {
             throw new EmailDeliveryException("Failed to build email message: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Applies the caller's RFC 5322 headers to the message under construction.
+     *
+     * <p>Values arrive already validated for CR/LF by {@link EmailHeaders}, so there is
+     * no header-injection check here — doing it in the record means an unsafe
+     * {@code EmailHeaders} cannot be constructed at all, rather than merely being
+     * refused at send time by whichever provider remembered to look.
+     *
+     * <p>{@code Message-ID} is deliberately not settable: see {@link #readMessageId}.
+     */
+    private void applyHeaders(MimeMessage mimeMessage, MimeMessageHelper helper, EmailHeaders headers)
+            throws MessagingException {
+        if (headers == null || headers.isEmpty()) {
+            return;
+        }
+        if (headers.replyTo() != null) {
+            helper.setReplyTo(headers.replyTo());
+        }
+        setIfPresent(mimeMessage, "In-Reply-To", headers.inReplyTo());
+        setIfPresent(mimeMessage, "References", headers.references());
+        setIfPresent(mimeMessage, "Auto-Submitted", headers.autoSubmitted());
+        setIfPresent(mimeMessage, "Precedence", headers.precedence());
+        setIfPresent(mimeMessage, "List-Unsubscribe", headers.listUnsubscribe());
+        for (var entry : headers.extra().entrySet()) {
+            setIfPresent(mimeMessage, entry.getKey(), entry.getValue());
+        }
+    }
+
+    private void setIfPresent(MimeMessage mimeMessage, String name, String value)
+            throws MessagingException {
+        if (value != null) {
+            mimeMessage.setHeader(name, value);
+        }
+    }
+
+    /**
+     * Reads back the {@code Message-ID} Jakarta Mail stamped during {@code saveChanges()}.
+     *
+     * <p>Never fails the send. The message is already handed to the MTA by the time this
+     * runs, so throwing here would report a delivery failure for mail that was delivered —
+     * and would do so to make a threading hint available. Losing the hint degrades
+     * conversation threading on later replies; losing the send does not.
+     */
+    private String readMessageId(MimeMessage mimeMessage) {
+        try {
+            return mimeMessage.getMessageID();
+        } catch (MessagingException e) {
+            log.debug("Could not read back Message-ID after send: {}", e.getMessage());
+            return null;
         }
     }
 

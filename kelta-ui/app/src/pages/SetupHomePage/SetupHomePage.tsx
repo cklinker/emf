@@ -37,6 +37,7 @@ import {
   ListChecks,
   Lock,
   LogIn,
+  Inbox,
   Mail,
   Megaphone,
   Menu,
@@ -305,6 +306,13 @@ const CATEGORIES: SetupCategory[] = [
         description: 'Design email templates',
         icon: Mail,
         permission: 'MANAGE_EMAIL_TEMPLATES',
+      },
+      {
+        name: 'Support Mailboxes',
+        path: '/mailboxes',
+        description: 'Shared inboxes, membership, and SLA policy',
+        icon: Inbox,
+        permission: 'MANAGE_SUPPORT_MAILBOX',
       },
       {
         name: 'Campaigns',

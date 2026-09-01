@@ -89,6 +89,27 @@ public class MailboxMessageRepository {
     }
 
     /**
+     * Messages on a thread, oldest first.
+     *
+     * <p>Selects explicit columns rather than {@code *} so {@code body_html} — the raw,
+     * unsanitised, attacker-supplied markup — cannot reach a caller by accident. Only the
+     * sanitised form is ever served, and only through the mailbox controller.
+     */
+    public List<java.util.Map<String, Object>> listForThread(String tenantId, String threadId) {
+        return jdbcTemplate.queryForList("""
+                SELECT id, thread_id, mailbox_id, direction, kind, message_id,
+                       from_address, from_name, to_addresses, cc_addresses, subject,
+                       body_text, body_html_sanitized, snippet,
+                       spf_result, dkim_result, dmarc_result, spam_verdict, virus_verdict,
+                       auto_submitted, is_bulk, is_bounce, delivery_status,
+                       sent_at, received_at
+                  FROM mailbox_message
+                 WHERE tenant_id = ? AND thread_id = ?
+                 ORDER BY received_at
+                """, tenantId, threadId);
+    }
+
+    /**
      * How many messages this address has sent to this mailbox recently.
      *
      * <p>Feeds the per-sender rate limit. Counted from stored rows rather than a cache so the

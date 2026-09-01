@@ -77,7 +77,8 @@ A property worth preserving deliberately: because the auto-replier never looks t
 | 1 | `V191` schema, six system collections, two permissions | **Shipped** |
 | 2 | `MailboxAdminController` (`/api/support/mailboxes`), repositories, secret minting/rotation, gateway static route | **Shipped** |
 | 3 | Ingest: webhook, adapters, MIME parser, jsoup sanitizer, thread resolver, AWS-side raw-MIME store, per-IP budget | **Shipped** (SES_SNS + GENERIC_HMAC adapters; Postmark/Mailgun are one class each) |
-| 4 | Console + SLA sweep + escalation dispatch | |
+| 4a | Console API + SLA sweep + escalation dispatch | **Shipped** |
+| 4b | Console UI (`MailboxConsolePage`, `MailboxHtmlBody`, routes) | |
 | 5 | Human replies (VERP `Reply-To`, suppression check, loop guards) | |
 | 6 | `mailbox_template` — matching and policy, referencing `email_template` for copy | |
 | 7 | Auto-send, shadow mode first | |

@@ -62,7 +62,7 @@ gen-keys:
 		echo "KELTA_ENCRYPTION_KEY=$$KEY" >> .env; \
 		echo "✅  KELTA_ENCRYPTION_KEY written to .env"; \
 	fi
-	@for k in KELTA_TELEHEALTH_VISIT_SECRET CAMPAIGN_TRACKING_SECRET; do \
+	@for k in KELTA_TELEHEALTH_VISIT_SECRET CAMPAIGN_TRACKING_SECRET KELTA_MAILBOX_VERP_SECRET; do \
 		if grep -q "^$$k=." .env 2>/dev/null; then \
 			echo "🔑  $$k already set in .env — skipping"; \
 		else \

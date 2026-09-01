@@ -195,7 +195,13 @@ export function useThreadActions(threadId: string) {
     onSuccess: invalidate,
   })
 
-  return { claim, assign, setStatus }
+  const reply = useMutation({
+    mutationFn: (bodyText: string) =>
+      apiClient.post(`/api/support/threads/${threadId}/reply`, { bodyText }),
+    onSuccess: invalidate,
+  })
+
+  return { claim, assign, setStatus, reply }
 }
 
 /**

@@ -88,6 +88,7 @@ export function MailboxConsolePage() {
   const [tab, setTab] = useState<MailboxView>('open')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showHtml, setShowHtml] = useState(false)
+  const [draft, setDraft] = useState('')
   const [, forceTick] = useState(0)
 
   const mailboxes = useMyMailboxes()
@@ -200,6 +201,9 @@ export function MailboxConsolePage() {
               onSelect={() => {
                 setSelectedId(t.id)
                 setShowHtml(false)
+                // A draft belongs to the thread it was written for; carrying it across would risk
+                // sending one customer's answer to another.
+                setDraft('')
               }}
             />
           ))}
@@ -306,11 +310,28 @@ export function MailboxConsolePage() {
               ))}
             </div>
 
-            <footer className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-              {/* Replying is slice 5. Saying so is better than showing a composer that silently
-                  does nothing. */}
-              Replying from the console is not enabled yet.
-            </footer>
+            <ReplyComposer
+              key={selectedId}
+              disabled={actions.reply.isPending}
+              onSend={(text) =>
+                actions.reply.mutate(text, {
+                  onSuccess: () => {
+                    setDraft('')
+                    toast.success('Reply sent')
+                  },
+                  onError: (error: unknown) => {
+                    // The server names why it declined (suppressed address, mail loop, unattended
+                    // recipient). Surfacing that beats a generic failure the agent cannot act on.
+                    const message =
+                      (error as { serverMessage?: string })?.serverMessage ??
+                      'Could not send the reply'
+                    toast.error(message)
+                  },
+                })
+              }
+              value={draft}
+              onChange={setDraft}
+            />
           </>
         )}
       </section>
@@ -446,5 +467,55 @@ function MessageBubble({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Plain-text reply box.
+ *
+ * Plain text only, deliberately: nothing here authors HTML, so nothing here can inject it. Rich
+ * replies arrive with templates, which own their markup and are authored by staff rather than
+ * assembled from a text box.
+ *
+ * There is no recipient field. The server reads the address from the thread and ignores anything
+ * else, so offering one would be a lie about what the button does.
+ */
+function ReplyComposer({
+  value,
+  onChange,
+  onSend,
+  disabled,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSend: (text: string) => void
+  disabled: boolean
+}) {
+  const trimmed = value.trim()
+  return (
+    <footer className="border-t border-border p-3">
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Write a reply…"
+        rows={3}
+        disabled={disabled}
+        className="w-full resize-y rounded-md border border-border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+        data-testid="mailbox-reply-input"
+      />
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">
+          Sends to the address on this conversation.
+        </span>
+        <Button
+          size="sm"
+          disabled={disabled || trimmed.length === 0}
+          onClick={() => onSend(trimmed)}
+          data-testid="mailbox-reply-send"
+        >
+          {disabled ? 'Sending…' : 'Send reply'}
+        </Button>
+      </div>
+    </footer>
   )
 }

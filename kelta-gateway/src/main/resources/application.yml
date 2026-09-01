@@ -82,7 +82,9 @@ kelta:
       # Per-IP limits for UNAUTHENTICATED paths, which the tenant limiter cannot
       # cover (it needs a principal). Comma-separated <path-prefix>=<per-minute>.
       # Matched by longest prefix; each prefix gets its own per-IP bucket.
-      ip-paths: ${RATE_LIMIT_IP_PATHS:/actuator/health=100,/api/modules/webhooks=300}
+      # /api/webhooks/mail is generous on purpose: SNS delivers in bursts from a small
+      # pool of AWS IPs, so a tight budget drops real customer mail rather than abuse.
+      ip-paths: ${RATE_LIMIT_IP_PATHS:/actuator/health=100,/api/modules/webhooks=300,/api/webhooks/mail=600}
       # IPs / CIDR ranges exempt from ALL rate limiting (per-IP and per-tenant).
       # For trusted infrastructure whose traffic is legitimately bursty: uptime
       # probes, in-cluster callers, a payment processor's webhook egress ranges.

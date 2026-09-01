@@ -75,7 +75,7 @@ public class IpRateLimitFilter implements GlobalFilter, Ordered {
      * budgets are enforced by kelta-auth's own {@code PortalPublicRateLimitFilter}.
      */
     static final String DEFAULT_IP_PATHS =
-            "/actuator/health=100,/api/modules/webhooks=300";
+            "/actuator/health=100,/api/modules/webhooks=300,/api/webhooks/mail=600";
 
     /** path prefix -> requests permitted per window, longest prefix first. */
     private final Map<String, Integer> pathBudgets;

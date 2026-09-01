@@ -148,10 +148,15 @@ class IpRateLimitFilterTest {
         void defaultsShouldNotIncludePortalPaths() {
             // /portal/** is served by kelta-auth's own ingress, so an entry here
             // would read as protection that can never fire.
+            //
+            // Asserted as "no key starts with /portal" rather than as an exhaustive key list.
+            // The exhaustive form (which also carried a duplicated key) failed every time a
+            // legitimate public path was added, producing a failure that named portal paths
+            // while actually objecting to something unrelated.
             Map<String, Integer> defaults = IpRateLimitFilter.parsePathBudgets(
                     List.of(IpRateLimitFilter.DEFAULT_IP_PATHS.split(",")));
-            assertThat(defaults).containsOnlyKeys("/actuator/health", "/api/modules/webhooks",
-                    "/api/modules/webhooks");
+            assertThat(defaults).isNotEmpty();
+            assertThat(defaults.keySet()).noneMatch(path -> path.startsWith("/portal"));
         }
     }
 

@@ -40,6 +40,30 @@ public final class SnsSignatureVerifier {
 
     /** True only when the message's signature verifies against a genuine SNS signing cert. */
     public boolean verify(JsonNode message) {
+        return verify(message, null);
+    }
+
+    /**
+     * Verifies the signature and, when {@code expectedTopicArn} is given, that the message came
+     * from that specific topic.
+     *
+     * <p>The pin matters more than it looks. A valid signature only proves that <i>some</i> SNS
+     * topic in <i>some</i> AWS account signed this message — and anyone can create a topic and
+     * publish a properly signed message to a public endpoint. Without the pin, "the signature
+     * checks out" means nothing stronger than "this came from AWS".
+     *
+     * @param expectedTopicArn the ARN this endpoint accepts, or {@code null} to accept any topic
+     *                         (only appropriate where the caller has another binding to the
+     *                         sender)
+     */
+    public boolean verify(JsonNode message, String expectedTopicArn) {
+        if (expectedTopicArn != null && !expectedTopicArn.isBlank()) {
+            String actual = message.path("TopicArn").asText(null);
+            if (!expectedTopicArn.equals(actual)) {
+                log.warn("Rejecting SNS message: TopicArn '{}' is not the expected topic", actual);
+                return false;
+            }
+        }
         try {
             String type = message.path("Type").asText(null);
             String signingCertUrl = message.path("SigningCertURL").asText(null);

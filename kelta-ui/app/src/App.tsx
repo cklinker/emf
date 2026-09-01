@@ -81,6 +81,11 @@ const EndUserApprovalsInboxPage = React.lazy(() =>
     default: m.ApprovalsInboxPage,
   }))
 )
+const EndUserMailboxConsolePage = React.lazy(() =>
+  import('./pages/app/MailboxConsolePage/MailboxConsolePage').then((m) => ({
+    default: m.MailboxConsolePage,
+  }))
+)
 const EndUserChatConsolePage = React.lazy(() =>
   import('./pages/app/ChatConsolePage/ChatConsolePage').then((m) => ({
     default: m.ChatConsolePage,
@@ -1512,6 +1517,17 @@ function TenantRoutes(): React.ReactElement {
             element={
               <React.Suspense fallback={<PageLoader message="Loading..." />}>
                 <EndUserChatConsolePage />
+              </React.Suspense>
+            }
+          />
+          {/* No RequirePermission wrapper, matching chat and approvals: membership is enforced
+              server-side and a non-member simply sees an empty state. A client gate here would
+              also fail open while permissions load, so it would be decoration either way. */}
+          <Route
+            path="mailbox"
+            element={
+              <React.Suspense fallback={<PageLoader message="Loading..." />}>
+                <EndUserMailboxConsolePage />
               </React.Suspense>
             }
           />

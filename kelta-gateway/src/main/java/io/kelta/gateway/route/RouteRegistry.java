@@ -43,7 +43,14 @@ public class RouteRegistry {
      * must keep it. Only the member-controller routes below invert that.
      */
     private static final Set<String> AUTHORITATIVE_STATIC_PATHS = Set.of(
-            "/api/watches/**", "/api/wins/**", "/api/devices/**", "/api/billing/**");
+            "/api/watches/**", "/api/wins/**", "/api/devices/**", "/api/billing/**",
+            // Platform-owned prefixes served by their own controllers, not by collection CRUD.
+            // ConfigEventListener builds a dynamic route "/api/<collectionName>/**" for every
+            // collection and this registry replaces by path, so without these entries a tenant
+            // that names a collection "modules", "files" or "images" takes the prefix over --
+            // for every tenant, since the registry is keyed by path alone. Module HTTP routes,
+            // signed-JAR upload, file serving and image transforms all hang off these.
+            "/api/modules/**", "/api/files/**", "/api/images/**");
 
     private final ConcurrentHashMap<String, RouteDefinition> routes;
 

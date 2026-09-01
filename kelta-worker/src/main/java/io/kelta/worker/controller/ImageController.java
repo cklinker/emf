@@ -48,7 +48,11 @@ public class ImageController {
         this.transformService = transformService;
     }
 
-    @GetMapping("/**")
+    // Depth-1..3 patterns are explicit and the catch-all only backstops deeper keys. DynamicCollectionRouter
+    // maps all-variable GETs up to four segments under "/api", and Spring's PathPattern comparator ranks any
+    // pattern containing "**" last -- so a bare "/**" here never wins, and every request was answered by the
+    // router as a record read of a collection named "files"/"images" (404). See concerns.md -> Fragile Areas.
+    @GetMapping({"/{p1}", "/{p1}/{p2}", "/{p1}/{p2}/{p3}", "/**"})
     public void serveImage(HttpServletRequest request, HttpServletResponse response,
                            @RequestHeader(value = "X-Cerbos-Scope", required = false) String tenantId,
                            @RequestHeader(value = "X-User-Email", required = false) String userEmail,

@@ -425,7 +425,24 @@ class RouteRegistryTest {
             "non-member static routes keep last-write-wins so per-resource Cerbos still applies");
     }
 
-    private RouteDefinition createRoute(String id, String path) {
+        @Test
+    void platformOwnedPrefixesCannotBeTakenOverByATenantCollection() {
+        // ConfigEventListener builds "/api/<collectionName>/**" for every collection, and this
+        // registry replaces by path with no tenant in the key -- so a collection named "modules",
+        // "files" or "images" would take the prefix over for EVERY tenant. Module HTTP routes,
+        // signed-JAR upload, file serving and image transforms all hang off these.
+        for (String path : List.of("/api/modules/**", "/api/files/**", "/api/images/**")) {
+            registry.addRoute(createRoute("static-" + path, path));
+            registry.addRoute(createRoute("collection-uuid-pretending-to-own-" + path, path));
+
+            Optional<RouteDefinition> owner = registry.findByPath(path);
+            assertTrue(owner.isPresent(), path + " lost its route entirely");
+            assertEquals("static-" + path, owner.get().getId(),
+                    path + " was taken over by a dynamic collection route");
+        }
+    }
+
+private RouteDefinition createRoute(String id, String path) {
         return new RouteDefinition(
             id,
             path,

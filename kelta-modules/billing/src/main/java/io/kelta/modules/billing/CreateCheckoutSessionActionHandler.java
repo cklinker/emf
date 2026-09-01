@@ -164,38 +164,68 @@ public class CreateCheckoutSessionActionHandler implements ActionHandler {
      *
      * <p>Fails closed — no configured origins means no allowed URL.
      */
+    /**
+     * Whether a return URL may be handed to Stripe, matched against the tenant's allowed origins.
+     *
+     * <p>Mirrors the semantics of the platform's {@code ReturnUrlValidator}, which this replaced:
+     * both sides compare a <em>normalised origin</em> rather than raw URI parts, because the raw
+     * comparison disagrees with itself -- {@code https://a.test} carries port -1 and
+     * {@code https://a.test:443} carries 443, so a correctly configured origin can reject its own
+     * URL.
+     *
+     * <p>Two rules are security rules, not tidiness. Credentials in the authority
+     * ({@code https://paypal.com@attacker.test/}) make the real host unreadable to a person
+     * glancing at the address bar, so any userinfo rejects the URL outright. And plain HTTP is
+     * refused except on loopback: this URL is where a member lands after paying, and downgrading
+     * that hop leaks the session to the network. A tenant cannot opt out by configuring an
+     * {@code http://} origin.
+     */
     static boolean isAllowedUrl(String url, List<String> allowedOrigins) {
-        if (url == null || url.isBlank() || allowedOrigins.isEmpty()) {
+        if (url == null || url.isBlank() || allowedOrigins == null || allowedOrigins.isEmpty()) {
             return false;
         }
-        URI candidate;
-        try {
-            candidate = URI.create(url);
-        } catch (RuntimeException e) {
-            return false;
-        }
-        if (candidate.getHost() == null || candidate.getScheme() == null) {
+        String origin = originOf(url);
+        if (origin == null) {
             return false;
         }
         for (String allowed : allowedOrigins) {
-            try {
-                URI origin = URI.create(allowed);
-                if (origin.getHost() == null) {
-                    continue;
-                }
-                boolean sameScheme = candidate.getScheme()
-                        .equalsIgnoreCase(origin.getScheme());
-                boolean sameHost = candidate.getHost().toLowerCase(Locale.ROOT)
-                        .equals(origin.getHost().toLowerCase(Locale.ROOT));
-                boolean samePort = candidate.getPort() == origin.getPort();
-                if (sameScheme && sameHost && samePort) {
-                    return true;
-                }
-            } catch (RuntimeException e) {
-                // A malformed configured origin authorizes nothing.
+            String allowedOrigin = originOf(allowed);
+            if (allowedOrigin != null && allowedOrigin.equals(origin)) {
+                return true;
             }
         }
         return false;
+    }
+
+    /** The scheme://host[:port] of a URL with default ports dropped, or null if it is not usable. */
+    private static String originOf(String url) {
+        URI uri;
+        try {
+            uri = URI.create(url.trim());
+        } catch (RuntimeException e) {
+            return null;
+        }
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if (scheme == null || host == null || host.isBlank()) {
+            return null;
+        }
+        if (uri.getUserInfo() != null) {
+            return null;
+        }
+        scheme = scheme.toLowerCase(Locale.ROOT);
+        host = host.toLowerCase(Locale.ROOT);
+
+        boolean loopback = "localhost".equals(host) || "127.0.0.1".equals(host);
+        if (!"https".equals(scheme) && !("http".equals(scheme) && loopback)) {
+            return null;
+        }
+
+        int port = uri.getPort();
+        boolean defaultPort = port == -1
+                || ("https".equals(scheme) && port == 443)
+                || ("http".equals(scheme) && port == 80);
+        return defaultPort ? scheme + "://" + host : scheme + "://" + host + ":" + port;
     }
 
 }

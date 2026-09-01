@@ -320,8 +320,10 @@ point — without it a caller could redirect a paying member to an attacker-cont
 Test connection calls `GET /v1/account`; the webhook secret can only be format-checked,
 since verifying it needs a real delivery.
 
-**Webhook.** `POST /api/billing/webhooks/stripe/{tenantId}` — a gateway
-`unauthenticated-paths` entry. The `Stripe-Signature` HMAC over the **raw** body is the only
+**Webhook.** `POST /api/modules/webhooks/{tenantId}/kelta-billing` — a gateway
+`unauthenticated-paths` entry. The compiled-in `/api/billing/webhooks/stripe/{tenantId}` route was
+deleted once the module served this one; the verification below is now the **module's**, not the
+platform's, and the platform verifies nothing on this path. The `Stripe-Signature` HMAC over the **raw** body is the only
 trust anchor, so the body must be verified before it is parsed: re-serializing JSON changes
 the bytes and invalidates a genuine signature. Verification is constant-time, tolerates 5
 minutes of clock drift in either direction (an unbounded window leaves a captured request
@@ -372,9 +374,11 @@ portal sessions use a **per-attempt** key — a deterministic one would replay t
 session for the processor's 24-hour idempotency window, which would stop a member buying a
 second one-time pass of the same plan on the same day.
 
-**Member endpoints.** `POST /api/billing/checkout-sessions {planCode, successUrl, cancelUrl}`
-→ `{url}`; `POST /api/billing/portal-sessions {returnUrl}` → `{url}` (409 when the member has
-never transacted — there is nothing to manage); `GET /api/billing/me`; `GET /api/billing/plans`.
+**Member endpoints.** Served by the module under `/api/modules/kelta-billing/x`:
+`POST .../checkout-sessions {planCode, successUrl, cancelUrl}` → `{url}`;
+`POST .../portal-sessions {returnUrl}` → `{url}` (refused when the member has never transacted —
+there is nothing to manage); `GET .../me`; `GET .../plans`. The compiled-in `/api/billing/*`
+controller was deleted; response shapes are byte-identical and pinned by a contract test.
 Return URLs must be absolute HTTPS whose **origin** exactly matches an entry in the
 credential's `allowedReturnOrigins` — origin equality, not prefix, because a prefix check also
 accepts `https://app.example.com.evil.test`. An empty allowlist denies everything, so a tenant
@@ -392,7 +396,7 @@ open** — a billing glitch must not block a tenant's data entry.
 price id recorded on a `billing-plans` row; Stripe Tax if the tenant charges tax; the Billing
 Portal configured; retry/dunning settings; and a webhook endpoint pointed at the URL above
 with its signing secret stored in the credential. Local testing:
-`stripe listen --forward-to localhost:<gw>/api/billing/webhooks/stripe/<tenantId>`.
+`stripe listen --forward-to localhost:<gw>/api/modules/webhooks/<tenantId>/kelta-billing`.
 
 ## Email (SMTP)
 

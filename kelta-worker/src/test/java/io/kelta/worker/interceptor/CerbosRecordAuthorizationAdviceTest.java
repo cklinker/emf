@@ -54,7 +54,7 @@ class CerbosRecordAuthorizationAdviceTest {
     @DisplayName("self-scoped controllers")
     class SelfScoped {
 
-        /** Stands in for WatchController/WinController/PushDeviceController/BillingController. */
+        /** Stands in for WatchController/WinController/PushDeviceController. */
         static class MemberController implements SelfScopedController {
             public Map<String, Object> list() {
                 return Map.of();

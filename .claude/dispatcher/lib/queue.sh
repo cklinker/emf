@@ -319,6 +319,37 @@ in_run_window() {
   [ "$h" -ge 22 ] || [ "$h" -lt 6 ]
 }
 
+# --- budget: daily spend ceiling (D-010) -------------------------------------
+# Sums estimated_cost_usd from cost-*.json files in EMF_LOG_DIR whose ts falls
+# on today in America/Denver. Returns 0 (exceeded) when sum >= ceiling; 1 when
+# not exceeded or DAILY_COST_CEILING_USD is unset/empty.
+#
+# Running workers are never killed — this gate only stops new claims.
+# dispatch.sh checks it every tick; the gate state ("ceiling") lets the caller
+# log only on transition (same pattern as throttled / in_run_window).
+cost_ceiling_exceeded() {
+  [[ -z "${DAILY_COST_CEILING_USD:-}" ]] && return 1
+  command -v jq >/dev/null 2>&1 || return 1
+
+  local today log_dir
+  today="$(TZ=America/Denver date +%Y-%m-%d)"
+  log_dir="${EMF_LOG_DIR:-/var/log/emf-dispatcher}"
+
+  local total=0 f ts cost file_day
+  shopt -s nullglob
+  for f in "$log_dir"/cost-*.json; do
+    ts="$(jq -r '.ts // empty' "$f" 2>/dev/null)"
+    [[ -n "$ts" ]] || continue
+    file_day="$(TZ=America/Denver date -d "$ts" +%Y-%m-%d 2>/dev/null)" || continue
+    [[ "$file_day" == "$today" ]] || continue
+    cost="$(jq -r '.estimated_cost_usd // 0' "$f" 2>/dev/null)"
+    total="$(awk -v a="$total" -v b="${cost:-0}" 'BEGIN { printf "%.6f", a+b }')"
+  done
+  shopt -u nullglob
+
+  awk -v t="$total" -v c="$DAILY_COST_CEILING_USD" 'BEGIN { exit (t+0 >= c+0 ? 0 : 1) }'
+}
+
 # ---------------------------------------------------------------------------
 
 # --- budget: detect a usage-limit signal and self-throttle (BUDGET.md §13) --

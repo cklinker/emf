@@ -146,6 +146,10 @@ main_loop() {
       [[ "$gate" == "window" ]] || { log_info "outside run window (RUN_WINDOW=${RUN_WINDOW:-nightly}); idling"; gate="window"; }
       sleep "$TICK_SECONDS"; continue
     fi
+    if cost_ceiling_exceeded; then
+      [[ "$gate" == "ceiling" ]] || { log_info "daily spend ceiling reached (DAILY_COST_CEILING_USD=${DAILY_COST_CEILING_USD:-}); idling"; gate="ceiling"; }
+      sleep "$TICK_SECONDS"; continue
+    fi
     [[ -z "$gate" ]] || { log_info "gate cleared ($gate); resuming"; gate=""; }
     # ----------------------------------------------------------------------
 

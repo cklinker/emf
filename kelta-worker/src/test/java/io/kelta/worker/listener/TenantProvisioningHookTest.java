@@ -91,9 +91,13 @@ class TenantProvisioningHookTest {
                     contains("INSERT INTO profile"),
                     anyString(), eq(TENANT_ID), anyString(), anyString());
 
-            // 8 profiles × 26 permissions = 208 permission records
-            // (26th is MANAGE_BILLING, consumer-alerting slice 1)
-            verify(jdbcTemplate, times(208)).update(
+            // Every profile gets an explicit row per permission — granted or not —
+            // so the count is profiles x ALL_PERMISSIONS. Derived rather than
+            // hardcoded: a literal here has to be recomputed by hand every time a
+            // permission is added, and the failure it produces looks like a bug in
+            // provisioning rather than a stale number in a test.
+            int expectedPermissionRows = 8 * TenantProvisioningHook.ALL_PERMISSIONS.size();
+            verify(jdbcTemplate, times(expectedPermissionRows)).update(
                     contains("INSERT INTO profile_system_permission"),
                     anyString(), anyString(), anyString(), anyString(), anyBoolean());
         }

@@ -144,7 +144,10 @@ export function MailboxConsolePage() {
     <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-[1200px] gap-4 p-6">
       {/* Rail */}
       <aside className="flex w-[380px] shrink-0 flex-col gap-3">
-        <Select value={mailboxId ?? '__all__'} onValueChange={(v) => setMailboxId(v === '__all__' ? undefined : v)}>
+        <Select
+          value={mailboxId ?? '__all__'}
+          onValueChange={(v) => setMailboxId(v === '__all__' ? undefined : v)}
+        >
           <SelectTrigger data-testid="mailbox-selector">
             <SelectValue placeholder="All mailboxes" />
           </SelectTrigger>
@@ -352,7 +355,11 @@ function ThreadRow({
   const countdown = formatSlaCountdown(dueAt, state)
   const unread = isThreadUnread(thread)
   const accent =
-    state === 'BREACHED' ? 'border-l-destructive' : state === 'AT_RISK' ? 'border-l-amber-500' : 'border-l-transparent'
+    state === 'BREACHED'
+      ? 'border-l-destructive'
+      : state === 'AT_RISK'
+        ? 'border-l-amber-500'
+        : 'border-l-transparent'
 
   return (
     <button
@@ -370,12 +377,16 @@ function ThreadRow({
         </span>
         {countdown && <StatusBadge variant={slaVariant(state)} label={countdown} />}
       </div>
-      <span className={`truncate text-sm ${unread ? 'font-medium text-foreground' : 'text-foreground'}`}>
+      <span
+        className={`truncate text-sm ${unread ? 'font-medium text-foreground' : 'text-foreground'}`}
+      >
         {thread.subject || '(no subject)'}
       </span>
       <span className="truncate text-[11px] text-muted-foreground">
         {thread.status}
-        {thread.messageCount ? ` · ${thread.messageCount} message${thread.messageCount === 1 ? '' : 's'}` : ''}
+        {thread.messageCount
+          ? ` · ${thread.messageCount} message${thread.messageCount === 1 ? '' : 's'}`
+          : ''}
       </span>
     </button>
   )

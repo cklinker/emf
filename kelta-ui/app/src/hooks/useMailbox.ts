@@ -162,7 +162,8 @@ export function useMailboxCounts(mailboxId?: string) {
 
   return useQuery({
     queryKey: ['support-summary', mailboxId ?? null],
-    queryFn: () => apiClient.get<MailboxCounts>(`/api/support/threads/summary?${params.toString()}`),
+    queryFn: () =>
+      apiClient.get<MailboxCounts>(`/api/support/threads/summary?${params.toString()}`),
     refetchInterval: SUMMARY_POLL_MS,
   })
 }

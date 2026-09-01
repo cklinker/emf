@@ -117,6 +117,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(mailboxMessages());
         definitions.add(mailboxAttachments());
         definitions.add(mailboxInboundEvents());
+        definitions.add(mailboxTemplates());
 
         // Scheduling (telehealth slice 4)
         definitions.add(telehealthAvailability());
@@ -572,6 +573,48 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("rejectReason", 200).withColumnName("reject_reason"))
             .addField(FieldDefinition.datetime("receivedAt").withColumnName("received_at"))
             .addField(FieldDefinition.datetime("processedAt").withColumnName("processed_at"))
+            .build();
+    }
+
+    /**
+     * Canned answers (support-mailbox slice 6).
+     *
+     * <p>The one WRITABLE collection in this feature. It is pure configuration with no side
+     * effects on save — unlike a thread, whose status change has to settle an SLA clock — so it
+     * follows {@code email-templates} rather than the read-only pattern used by the rest.
+     *
+     * <p>Writable does not mean unguarded: {@code MailboxTemplateGuardHook} refuses to mark a
+     * template auto-sendable when its copy references anything but platform constants. That check
+     * has to be a hook precisely because this collection is reachable through the generic JSON:API
+     * route, where a controller check would not run.
+     *
+     * <p>The copy itself lives in {@code email_template}, referenced by {@code templateKey}. This
+     * row holds only matching and policy, which is what keeps {@code autoSendEligible} off
+     * {@code email_template} — otherwise every invoice notice would be one boolean away from being
+     * sent unreviewed to whoever emailed support.
+     */
+    public static CollectionDefinition mailboxTemplates() {
+        return systemBuilder("mailbox-templates", "Mailbox Templates", "mailbox_template")
+            .displayFieldName("category")
+            .addField(FieldDefinition.masterDetail("mailboxId", "mailboxes", "Mailbox")
+                .withColumnName("mailbox_id"))
+            .addField(FieldDefinition.requiredString("category", 60))
+            .addField(FieldDefinition.requiredString("templateKey", 200)
+                .withColumnName("template_key"))
+            .addField(FieldDefinition.text("description"))
+            .addField(FieldDefinition.json("matchKeywords").withColumnName("match_keywords"))
+            .addField(FieldDefinition.json("excludeKeywords").withColumnName("exclude_keywords"))
+            .addField(FieldDefinition.integer("priority"))
+            // Every automation default is off. A template is not auto-sendable because it matches
+            // well; someone has to say so, and the guard hook decides whether they may.
+            .addField(FieldDefinition.bool("autoSendEligible", false)
+                .withColumnName("auto_send_eligible"))
+            .addField(FieldDefinition.doubleField("minConfidence").withColumnName("min_confidence"))
+            .addField(FieldDefinition.bool("requiresVerifiedSender", false)
+                .withColumnName("requires_verified_sender"))
+            .addField(FieldDefinition.bool("disclosesAccountData", false)
+                .withColumnName("discloses_account_data"))
+            .addField(FieldDefinition.bool("active", true))
             .build();
     }
 

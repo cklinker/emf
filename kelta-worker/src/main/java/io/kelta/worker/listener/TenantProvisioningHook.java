@@ -32,7 +32,8 @@ public class TenantProvisioningHook implements BeforeSaveHook {
     private static final String DEFAULT_PASSWORD_HASH =
             "$2a$10$zAQaSHX1XSR1bwUL3pz9EOzecplsxInVizZc9HwLf7xPluSiE1EP6";
 
-    private static final List<String> ALL_PERMISSIONS = List.of(
+    /** Visible for testing: the provisioning row count is derived from this. */
+    static final List<String> ALL_PERMISSIONS = List.of(
             "VIEW_SETUP", "CUSTOMIZE_APPLICATION", "MANAGE_USERS", "MANAGE_GROUPS",
             "MANAGE_SHARING", "MANAGE_WORKFLOWS", "MANAGE_REPORTS", "MANAGE_EMAIL_TEMPLATES",
             "MANAGE_CONNECTED_APPS", "MANAGE_DATA", "API_ACCESS", "VIEW_ALL_DATA",
@@ -40,7 +41,8 @@ public class TenantProvisioningHook implements BeforeSaveHook {
             "MANAGE_CREDENTIALS", "VIEW_CREDENTIALS",
             "MANAGE_API_SPECS", "VIEW_API_SPECS", "MANAGE_CAMPAIGNS",
             "MANAGE_DELEGATED_ADMINS", "MANAGE_SANDBOXES", "VIEW_ANALYTICS",
-            "MANAGE_CHAT", "MANAGE_BILLING"
+            "MANAGE_CHAT", "MANAGE_BILLING",
+            "VIEW_SUPPORT_MAILBOX", "MANAGE_SUPPORT_MAILBOX"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -130,7 +132,8 @@ public class TenantProvisioningHook implements BeforeSaveHook {
                                 "MANAGE_CREDENTIALS", "VIEW_CREDENTIALS",
                                 "MANAGE_API_SPECS", "VIEW_API_SPECS", "MANAGE_CAMPAIGNS",
                                 "MANAGE_DELEGATED_ADMINS", "MANAGE_SANDBOXES", "VIEW_ANALYTICS",
-                                "MANAGE_CHAT", "MANAGE_BILLING")),
+                                "MANAGE_CHAT", "MANAGE_BILLING",
+                                "VIEW_SUPPORT_MAILBOX", "MANAGE_SUPPORT_MAILBOX")),
                 new ProfileDef("Standard User",
                         "Read, create, and edit records in all collections",
                         Set.of("API_ACCESS", "MANAGE_LISTVIEWS", "VIEW_CREDENTIALS", "VIEW_API_SPECS",

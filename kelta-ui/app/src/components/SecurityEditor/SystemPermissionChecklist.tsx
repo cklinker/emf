@@ -126,6 +126,18 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
           'Supervisor chat access: all conversations, queue management, cross-assignment',
       },
       {
+        name: 'VIEW_SUPPORT_MAILBOX',
+        label: 'View Support Mailbox',
+        description:
+          'Open the support mailbox console. Which mailboxes are visible is set by per-mailbox membership, not by this permission',
+      },
+      {
+        name: 'MANAGE_SUPPORT_MAILBOX',
+        label: 'Manage Support Mailbox',
+        description:
+          'Configure mailboxes, grant membership, set SLA and auto-reply policy, view all threads, download raw messages',
+      },
+      {
         name: 'MANAGE_BILLING',
         label: 'Manage Billing',
         description: 'Configure portal billing plans and entitlement rules',

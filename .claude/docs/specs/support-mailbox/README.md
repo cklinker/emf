@@ -75,7 +75,7 @@ A property worth preserving deliberately: because the auto-replier never looks t
 |---|---|---|
 | 0 | `EmailHeaders`, `SendResult`, `EmailProvider.sendAndReport`, `DefaultEmailService.queueReply` | **Shipped** (#1423) |
 | 1 | `V191` schema, six system collections, two permissions | **Shipped** |
-| 2 | `MailboxAdminController` (`/api/support/mailboxes`), repositories, secret minting/rotation, gateway static route | |
+| 2 | `MailboxAdminController` (`/api/support/mailboxes`), repositories, secret minting/rotation, gateway static route | **Shipped** |
 | 3 | Ingest: webhook, adapters, MIME parser, jsoup sanitizer, thread resolver, AWS-side raw-MIME store, per-IP budget | |
 | 4 | Console + SLA sweep + escalation dispatch | |
 | 5 | Human replies (VERP `Reply-To`, suppression check, loop guards) | |

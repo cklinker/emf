@@ -162,14 +162,17 @@ public class RouteConfigService {
     }
 
     /**
-     * Registers static routes for non-collection API endpoints served by the worker.
+     * The static (non-collection) route table.
      *
-     * <p>These endpoints are not returned in the bootstrap collection list because
-     * they are not standard CRUD collections. They still need gateway routes so
-     * requests are proxied to the worker instead of returning 404.
+     * <p>These endpoints are not returned in the bootstrap collection list because they are
+     * not standard CRUD collections. They still need gateway routes so requests are proxied
+     * to the worker instead of returning 404.
+     *
+     * <p>Package-visible so tests can derive the expected route count from it. Restating that
+     * number as a literal in a test means every route added here fails an assertion that reads
+     * like a routing bug but is only a stale constant.
      */
-    private void registerStaticRoutes() {
-        String[][] staticRoutes = {
+    static final String[][] STATIC_ROUTES = {
                 // Core admin/config endpoints (not data collections)
                 {"admin", "/api/admin/**", "admin"},
                 {"me", "/api/me/**", "me"},
@@ -201,6 +204,13 @@ public class RouteConfigService {
                 // Scheduling (telehealth slice 4) — controller enforces owner/provider authz;
                 // /api/telehealth/visits/** additionally rides the unauthenticated-paths list
                 {"telehealth", "/api/telehealth/**", "telehealth"},
+                // Support mailbox (support-mailbox slice 2) — a static- route, so only
+                // API_ACCESS is checked here; MailboxAdminController enforces
+                // MANAGE_SUPPORT_MAILBOX and, later, per-mailbox membership. Inbound mail does
+                // NOT ride this path: it arrives on /api/webhooks/mail/** under the existing
+                // unauthenticated-paths prefix, deliberately a different top-level segment so a
+                // prefix-matching config change cannot open the authenticated surface.
+                {"support", "/api/support/**", "support"},
                 // Automation & integration
                 {"flows", "/api/flows/**", "flows"},
                 {"approval-processes", "/api/approval-processes/**", "approval-processes"},
@@ -256,7 +266,9 @@ public class RouteConfigService {
                 {"scim", "/scim/v2/**", "scim"},
         };
 
-        for (String[] routeDef : staticRoutes) {
+    /** Registers every {@link #STATIC_ROUTES} entry against the worker service URL. */
+    private void registerStaticRoutes() {
+        for (String[] routeDef : STATIC_ROUTES) {
             RouteDefinition route = new RouteDefinition(
                     "static-" + routeDef[0],
                     routeDef[1],
@@ -267,7 +279,7 @@ public class RouteConfigService {
             logger.debug("Registered static route: {}", route);
         }
 
-        logger.info("Registered {} static routes", staticRoutes.length);
+        logger.info("Registered {} static routes", STATIC_ROUTES.length);
     }
 
     private boolean validateRoute(RouteDefinition route) {

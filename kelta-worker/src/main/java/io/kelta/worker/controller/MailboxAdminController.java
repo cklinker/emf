@@ -10,6 +10,7 @@ import io.kelta.worker.service.mailbox.MailboxSecretService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -38,6 +39,13 @@ import java.util.regex.Pattern;
  */
 @RestController
 @RequestMapping("/api/support/mailboxes")
+// Gated on the SAME property that creates EncryptionService and CredentialResolverImpl
+// (both @ConditionalOnProperty "kelta.encryption.key"). Without the gate this component is a
+// required dependency on beans that may not exist, and the whole worker fails to start in any
+// environment without an encryption key. @ConditionalOnBean is deliberately not used here: it
+// is order-sensitive during component scan and can drop the bean even when the dependency is
+// later registered — see TenantEmailSettingsController for the same reasoning.
+@ConditionalOnProperty(name = "kelta.encryption.key")
 public class MailboxAdminController {
 
     private static final Logger log = LoggerFactory.getLogger(MailboxAdminController.class);

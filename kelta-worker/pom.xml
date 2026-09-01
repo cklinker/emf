@@ -198,6 +198,17 @@
             <artifactId>s3</artifactId>
         </dependency>
 
+        <!-- HTML sanitisation for inbound mail bodies (support-mailbox slice 3).
+             jsoup rather than the OWASP sanitizer: one dependency, no Guava, and its
+             Cleaner is straight parsing rather than reflection, which matters because
+             this module also builds as a GraalVM native image. OWASP's advantage is a
+             real CSS policy, and we drop `style` entirely, so it does not apply. -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.18.3</version>
+        </dependency>
+
         <!-- Cerbos SDK for authorization -->
         <dependency>
             <groupId>dev.cerbos</groupId>

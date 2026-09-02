@@ -76,6 +76,7 @@ public class MailboxAdminController {
     private final MailboxRepository mailboxRepository;
     private final MailboxAccessRepository accessRepository;
     private final MailboxSecretService secretService;
+    private final io.kelta.worker.service.mailbox.MailboxAccessGuard accessGuard;
     private final CerbosPermissionResolver permissionResolver;
     private final BootstrapRepository bootstrapRepository;
     private final MailboxEscalationRepository escalationRepository;
@@ -86,6 +87,7 @@ public class MailboxAdminController {
     public MailboxAdminController(MailboxRepository mailboxRepository,
                                   MailboxAccessRepository accessRepository,
                                   MailboxSecretService secretService,
+                                  io.kelta.worker.service.mailbox.MailboxAccessGuard accessGuard,
                                   CerbosPermissionResolver permissionResolver,
                                   BootstrapRepository bootstrapRepository,
                                   MailboxEscalationRepository escalationRepository,
@@ -95,6 +97,7 @@ public class MailboxAdminController {
         this.mailboxRepository = mailboxRepository;
         this.accessRepository = accessRepository;
         this.secretService = secretService;
+        this.accessGuard = accessGuard;
         this.permissionResolver = permissionResolver;
         this.bootstrapRepository = bootstrapRepository;
         this.escalationRepository = escalationRepository;
@@ -276,6 +279,17 @@ public class MailboxAdminController {
             throw badRequest("role must be one of " + ROLES);
         }
 
+        if ("USER".equals(principalType)) {
+            // An admin will reasonably type an email here. Resolving it to the user id keeps the
+            // grant matching what the console looks up, and keeps the value inside varchar(36),
+            // which most real email addresses do not fit in.
+            String resolved = accessGuard.resolveUserId(tenantId, principalId);
+            if (resolved == null) {
+                throw badRequest("No user in this tenant matches '" + principalId + "'");
+            }
+            principalId = resolved;
+        }
+
         String accessId = accessRepository.grant(tenantId, id, principalType, principalId, role, actor(request));
         // Granting access is a permission change, so it belongs in the log whether or not
         // anyone is watching the audit trail today.
@@ -353,7 +367,11 @@ public class MailboxAdminController {
             }
         }
 
-        String contactId = escalationRepository.addContact(tenantId, id, level, userId,
+        String resolvedUser = accessGuard.resolveUserId(tenantId, userId);
+        if (resolvedUser == null) {
+            throw badRequest("No user in this tenant matches '" + userId + "'");
+        }
+        String contactId = escalationRepository.addContact(tenantId, id, level, resolvedUser,
                 toJson(channels), actor(request));
         log.info("Mailbox {} escalation contact added: {} at {} in tenant {}",
                 id, userId, level, tenantId);
@@ -425,7 +443,9 @@ public class MailboxAdminController {
         out.put("mailboxId", row.get("mailbox_id"));
         out.put("level", row.get("level"));
         out.put("userId", row.get("user_id"));
-        out.put("channels", row.get("channels"));
+        // Parsed rather than passed through: the driver hands back a PGobject wrapper, and
+        // serialising that leaks {"type":"jsonb","value":"..."} into the API.
+        out.put("channels", parseChannels(row.get("channels")));
         out.put("createdAt", row.get("created_at"));
         return out;
     }
@@ -459,6 +479,18 @@ public class MailboxAdminController {
             return objectMapper.writeValueAsString(channels);
         } catch (Exception e) {
             return "[\"email\"]";
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> parseChannels(Object raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        try {
+            return (List<String>) objectMapper.readValue(raw.toString(), List.class);
+        } catch (Exception e) {
+            return List.of();
         }
     }
 

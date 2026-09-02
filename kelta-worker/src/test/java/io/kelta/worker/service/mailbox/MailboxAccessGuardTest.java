@@ -39,7 +39,8 @@ class MailboxAccessGuardTest {
     void setUp() {
         mailboxRepository = mock(MailboxRepository.class);
         accessRepository = mock(MailboxAccessRepository.class);
-        guard = new MailboxAccessGuard(mailboxRepository, accessRepository);
+        guard = new MailboxAccessGuard(mailboxRepository, accessRepository,
+                mock(org.springframework.jdbc.core.JdbcTemplate.class));
         when(mailboxRepository.findById(MAILBOX, TENANT))
                 .thenReturn(Optional.of(Map.of("id", MAILBOX, "tenant_id", TENANT)));
     }

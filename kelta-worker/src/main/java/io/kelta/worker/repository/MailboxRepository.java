@@ -79,8 +79,12 @@ public class MailboxRepository {
     /** True when another mailbox in the tenant already claims {@code address}. */
     public boolean addressExists(String tenantId, String address, String excludeId) {
         Integer n = jdbcTemplate.queryForObject(
+                // The excludeId parameter is cast explicitly. In `? IS NULL` Postgres has no
+                // context from which to infer a parameter's type and rejects the statement with
+                // "could not determine data type of parameter" — a failure invisible to a test
+                // that mocks JdbcTemplate, because the SQL is never sent to a server.
                 "SELECT count(*) FROM mailbox WHERE tenant_id = ? AND lower(address) = lower(?) "
-                        + "AND (? IS NULL OR id <> ?)",
+                        + "AND (?::text IS NULL OR id <> ?)",
                 Integer.class, tenantId, address, excludeId, excludeId);
         return n != null && n > 0;
     }

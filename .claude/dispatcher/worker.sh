@@ -137,7 +137,11 @@ log_info "worktree created" path="$WT"
 # ---- 2. Claude session ------------------------------------------------------
 
 WORKER_PROMPT="$WT/.claude/dispatcher/worker-prompt.md"
-[[ -f "$WORKER_PROMPT" ]] || { log_error "worker-prompt missing" path="$WORKER_PROMPT"; queue_fail "$TASK_FILE" "worker-prompt.md missing in worktree"; exit 1; }
+if [[ ! -f "$WORKER_PROMPT" ]]; then
+  WORKER_PROMPT="$EMF_REPO/.claude/dispatcher/worker-prompt.md"
+  log_warn "no worker-prompt in task repo; falling back to emf" fallback="$WORKER_PROMPT"
+fi
+[[ -f "$WORKER_PROMPT" ]] || { log_error "worker-prompt missing (tried task repo and emf fallback)"; queue_fail "$TASK_FILE" "worker-prompt.md missing in worktree"; exit 1; }
 
 USER_PROMPT="$(cat <<EOF
 Begin task ${ID}.

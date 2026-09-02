@@ -409,8 +409,15 @@ public class MailboxController {
      * the entire basis for membership checks below.
      */
     private String requireUser(HttpServletRequest request) {
-        String userId = request.getHeader("X-User-Id");
-        if (userId == null || userId.isBlank()) {
+        String header = request.getHeader("X-User-Id");
+        if (header == null || header.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No identity");
+        }
+        // The gateway stamps this header with the user's EMAIL, not their id. Every store and
+        // comparison below is in terms of platform_user.id, so it is resolved once here rather
+        // than leaking two different notions of identity through the rest of the controller.
+        String userId = accessGuard.resolveUserId(requireTenant(), header);
+        if (userId == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No identity");
         }
         return userId;

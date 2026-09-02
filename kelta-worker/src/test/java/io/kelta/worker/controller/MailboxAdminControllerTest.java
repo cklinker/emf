@@ -6,6 +6,7 @@ import io.kelta.worker.repository.MailboxAccessRepository;
 import io.kelta.worker.repository.MailboxAutoReplyDecisionRepository;
 import io.kelta.worker.repository.MailboxEscalationRepository;
 import io.kelta.worker.repository.MailboxRepository;
+import io.kelta.worker.service.mailbox.MailboxAccessGuard;
 import io.kelta.worker.service.mailbox.SupportAutoReplySweep;
 import tools.jackson.databind.json.JsonMapper;
 import io.kelta.worker.service.CerbosPermissionResolver;
@@ -46,6 +47,7 @@ class MailboxAdminControllerTest {
     private MailboxEscalationRepository escalationRepository;
     private MailboxAutoReplyDecisionRepository decisionRepository;
     private SupportAutoReplySweep autoReplySweep;
+    private MailboxAccessGuard accessGuard;
     private HttpServletRequest request;
     private MailboxAdminController controller;
 
@@ -61,8 +63,14 @@ class MailboxAdminControllerTest {
         autoReplySweep = mock(SupportAutoReplySweep.class);
         request = mock(HttpServletRequest.class);
 
+        accessGuard = mock(MailboxAccessGuard.class);
+        // The gateway stamps X-User-Id with an email; the guard maps it to a user id. Tests pass
+        // ids through unchanged so they exercise the controller rather than the lookup.
+        when(accessGuard.resolveUserId(anyString(), anyString()))
+                .thenAnswer(inv -> inv.getArgument(1));
+
         controller = new MailboxAdminController(mailboxRepository, accessRepository,
-                secretService, permissionResolver, bootstrapRepository,
+                secretService, accessGuard, permissionResolver, bootstrapRepository,
                 escalationRepository, decisionRepository, autoReplySweep,
                 JsonMapper.builder().build());
 

@@ -2,6 +2,7 @@ package io.kelta.worker.service.mailbox;
 
 import io.kelta.worker.repository.MailboxAccessRepository;
 import io.kelta.worker.repository.MailboxRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -33,11 +34,41 @@ public class MailboxAccessGuard {
 
     private final MailboxRepository mailboxRepository;
     private final MailboxAccessRepository accessRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     public MailboxAccessGuard(MailboxRepository mailboxRepository,
-                              MailboxAccessRepository accessRepository) {
+                              MailboxAccessRepository accessRepository,
+                              JdbcTemplate jdbcTemplate) {
         this.mailboxRepository = mailboxRepository;
         this.accessRepository = accessRepository;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    /**
+     * Turns whatever the gateway stamped in {@code X-User-Id} into a {@code platform_user.id}.
+     *
+     * <p>The gateway sets that header to the user's <b>email</b>, not their id — see
+     * {@code HeaderTransformationFilter}. Everything downstream of here stores and compares user
+     * ids: {@code group_membership.member_id} is a uuid, escalation dispatch looks the recipient up
+     * by {@code platform_user.id}, and the columns are {@code varchar(36)}, which most real email
+     * addresses do not fit in. Resolving once, here, is what keeps those three consistent.
+     *
+     * <p>Returns the input unchanged when it already looks like an id, so an internal caller that
+     * legitimately holds a user id is not broken by this.
+     */
+    public String resolveUserId(String tenantId, String headerValue) {
+        if (headerValue == null || headerValue.isBlank()) {
+            return null;
+        }
+        if (!headerValue.contains("@")) {
+            return headerValue;
+        }
+        List<String> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM platform_user WHERE tenant_id = ? AND lower(email) = lower(?)",
+                String.class, tenantId, headerValue);
+        // An unresolvable identity yields null, which every caller treats as "no access" — the
+        // safe direction, and indistinguishable from a non-member to the outside.
+        return ids.isEmpty() ? null : ids.getFirst();
     }
 
     /** What one user may do with one mailbox. */

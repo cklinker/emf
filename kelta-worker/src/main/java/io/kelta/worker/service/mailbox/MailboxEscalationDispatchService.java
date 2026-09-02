@@ -34,7 +34,20 @@ public class MailboxEscalationDispatchService {
 
     private static final Logger log = LoggerFactory.getLogger(MailboxEscalationDispatchService.class);
 
-    private static final String EMAIL_TEMPLATE = "support.sla_escalation";
+    /**
+     * The {@code template_key} of the escalation body seeded by V192 — resolved with
+     * {@code sendByKey}, never {@code sendByName}.
+     *
+     * <p>{@code email_template} has both a {@code name} and a {@code template_key}, and they are
+     * different strings for the same row: this template is named "Support SLA escalation" and keyed
+     * "support.sla_escalation". Passing the key to {@code sendByName} matches nothing, so every
+     * escalation email failed with "template not found" while the row sat in the table.
+     *
+     * <p>Both lookups exist and both are legitimate — {@code AlertDispatchService} resolves a
+     * tenant-authored template whose {@code name} is the lookup value — which is exactly why the
+     * mistake reads as correct code.
+     */
+    private static final String EMAIL_TEMPLATE_KEY = "support.sla_escalation";
     private static final String CHANNEL_EMAIL = "email";
     private static final String CHANNEL_PUSH = "push";
 
@@ -121,10 +134,10 @@ public class MailboxEscalationDispatchService {
                 if (address == null || address.isBlank()) {
                     throw new IllegalStateException("user has no email address");
                 }
-                emailService.sendByName(tenantId, address, EMAIL_TEMPLATE, context,
+                emailService.sendByKey(tenantId, address, EMAIL_TEMPLATE_KEY, context,
                                 "support-escalation", escalation.id())
                         .orElseThrow(() -> new IllegalStateException(
-                                "email template '" + EMAIL_TEMPLATE + "' not found"));
+                                "email template key '" + EMAIL_TEMPLATE_KEY + "' not found"));
             }
             case CHANNEL_PUSH -> {
                 if (pushService == null) {

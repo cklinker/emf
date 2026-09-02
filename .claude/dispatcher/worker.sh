@@ -108,6 +108,19 @@ if git -C "$REPO_PATH" show-ref --verify --quiet "refs/heads/$BRANCH"; then
   git -C "$REPO_PATH" branch -D "$BRANCH" >/dev/null 2>&1
 fi
 if git -C "$REPO_PATH" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+  # If the previous attempt timed out and left the branch open, the PR may have
+  # merged in the meantime. Detect that before deleting and avoid a wasted retry.
+  _old_pr_num="$(queue_get_field "$TASK_FILE" pr)"
+  if [[ -n "$_old_pr_num" ]] && [[ "$_old_pr_num" =~ ^[0-9]+$ ]]; then
+    _old_recheck="$(gh pr view "$_old_pr_num" --json state,mergedAt 2>/dev/null)"
+    _old_merged="$(printf '%s' "$_old_recheck" | jq -r '.mergedAt // ""')"
+    if [[ -n "$_old_merged" ]]; then
+      log_event task_done task="$ID" pr="$_old_pr_num" via="late_merge_detected"
+      queue_done "$TASK_FILE" "$_old_pr_num"
+      notify_slack "#rzware-ceo" "${ID} merged — PR #${_old_pr_num} (landed after timeout)" || true
+      exit 0
+    fi
+  fi
   log_warn "stale remote branch exists, deleting" branch="$BRANCH"
   git -C "$REPO_PATH" push origin --delete "$BRANCH" >/dev/null 2>&1
 fi
@@ -324,7 +337,7 @@ case "$final_state" in
     queue_done "$TASK_FILE" "$PR_NUM"
     notify_slack "#rzware-ceo" "${ID} merged — PR #${PR_NUM} ${PR_URL}" || true
     ;;
-  CHECK_FAIL|CLOSED|TIMEOUT)
+  CHECK_FAIL|CLOSED)
     if (( ATTEMPTS < MAX_ATTEMPTS )); then
       log_info "releasing for retry" final_state="$final_state" attempts="$ATTEMPTS" max="$MAX_ATTEMPTS"
       # Close the PR so the next attempt opens a fresh one.
@@ -337,6 +350,31 @@ case "$final_state" in
       queue_fail "$TASK_FILE" "$_fail_reason"
       notify_slack "#rzware-ceo" \
         "FAILED: ${ID} — ${_fail_reason}. Attempts: ${ATTEMPTS}/${MAX_ATTEMPTS}. PR: ${PR_URL}. Log: ${JSONL_LOG}" || true
+    fi
+    ;;
+  TIMEOUT)
+    # Re-check the live PR state: the poll loop exits on deadline but the PR
+    # may have merged in the seconds since the last poll_interval check.
+    _to_raw="$(gh pr view "$PR_NUM" --json state,mergedAt 2>/dev/null)"
+    _to_merged_at="$(printf '%s' "$_to_raw" | jq -r '.mergedAt // ""')"
+    _to_state="$(printf '%s' "$_to_raw" | jq -r '.state // "UNKNOWN"')"
+    if [[ "$_to_state" == "MERGED" || -n "$_to_merged_at" ]]; then
+      log_event task_done task="$ID" pr="$PR_NUM" duration_sec="$DURATION_SEC" via="timeout_recheck"
+      queue_done "$TASK_FILE" "$PR_NUM"
+      notify_slack "#rzware-ceo" "${ID} merged — PR #${PR_NUM} ${PR_URL} (caught at timeout recheck)" || true
+    elif (( ATTEMPTS < MAX_ATTEMPTS )); then
+      # CI is still pending. Leave the PR and branch intact so the auto-merge
+      # workflow can land them; release for retry without closing or deleting.
+      log_info "ci still pending at timeout; leaving PR and branch open for retry" \
+        attempts="$ATTEMPTS" max="$MAX_ATTEMPTS" pr="$PR_NUM"
+      queue_release_orphan "$TASK_FILE"
+    else
+      # All attempts exhausted. Fail, but leave the PR open — it may still merge.
+      log_error "exhausted retries on timeout; PR left open" attempts="$ATTEMPTS" pr="$PR_NUM"
+      _fail_reason="still pending after ${PR_TIMEOUT_MIN} minutes (pr #${PR_NUM}, attempt ${ATTEMPTS})"
+      queue_fail "$TASK_FILE" "$_fail_reason"
+      notify_slack "#rzware-ceo" \
+        "FAILED: ${ID} — ${_fail_reason}. PR: ${PR_URL} (left open). Log: ${JSONL_LOG}" || true
     fi
     ;;
   *)

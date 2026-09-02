@@ -236,7 +236,7 @@ public class MailboxThreadRepository {
         return jdbcTemplate.update("""
                 UPDATE mailbox_thread
                    SET assigned_to = ?,
-                       status = CASE WHEN ? IS NULL THEN 'OPEN' ELSE 'ASSIGNED' END,
+                       status = CASE WHEN ?::varchar IS NULL THEN 'OPEN' ELSE 'ASSIGNED' END,
                        updated_at = now(), updated_by = ?
                  WHERE id = ? AND tenant_id = ? AND status NOT IN """ + CLOSED_STATUSES + """
                 """, userId, userId, actor, threadId, tenantId);
@@ -263,14 +263,14 @@ public class MailboxThreadRepository {
         return jdbcTemplate.update("""
                 UPDATE mailbox_thread
                    SET status      = ?,
-                       resolved_at = CASE WHEN ? THEN COALESCE(resolved_at, now()) ELSE resolved_at END,
-                       closed_at   = CASE WHEN ? THEN COALESCE(closed_at, now())   ELSE closed_at END,
-                       sla_paused_at = CASE WHEN ? THEN COALESCE(sla_paused_at, now()) ELSE NULL END,
+                       resolved_at = CASE WHEN ?::boolean THEN COALESCE(resolved_at, now()) ELSE resolved_at END,
+                       closed_at   = CASE WHEN ?::boolean THEN COALESCE(closed_at, now())   ELSE closed_at END,
+                       sla_paused_at = CASE WHEN ?::boolean THEN COALESCE(sla_paused_at, now()) ELSE NULL END,
                        sla_resolution_state = CASE
-                           WHEN ? AND sla_resolution_state = 'PENDING' THEN 'MET'
+                           WHEN ?::boolean AND sla_resolution_state = 'PENDING' THEN 'MET'
                            ELSE sla_resolution_state END,
                        sla_first_response_state = CASE
-                           WHEN ? AND sla_first_response_state = 'PENDING' THEN 'MET'
+                           WHEN ?::boolean AND sla_first_response_state = 'PENDING' THEN 'MET'
                            ELSE sla_first_response_state END,
                        updated_at = now(), updated_by = ?
                  WHERE id = ? AND tenant_id = ?

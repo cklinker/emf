@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { AlertTriangle, Inbox, Mail, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Inbox, Mail, Paperclip, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -19,8 +19,10 @@ import {
   useMailboxThread,
   useMailboxThreads,
   useMyMailboxes,
+  useDownloadAttachment,
   useThreadActions,
   worstSlaState,
+  type MailboxAttachment,
   type MailboxMessage,
   type MailboxThread,
   type MailboxView,
@@ -416,6 +418,93 @@ function SlaBadge({ thread }: { thread: MailboxThread }) {
   )
 }
 
+/**
+ * One attachment: its name, what it actually is, and a way to save it.
+ *
+ * The filename is rendered as text inside a button, never as an `<a href>` to the file. Nothing
+ * here navigates to attachment content, so no sender-chosen string ever becomes a URL this app
+ * follows.
+ *
+ * When the sniffed type and the sender's declared type disagree, both are shown. That mismatch is
+ * the most useful thing an agent can know before saving a file — a `.png` that is actually
+ * `text/html` is not a mislabelled image.
+ */
+function AttachmentRow({
+  messageId,
+  attachment,
+}: {
+  messageId: string
+  attachment: MailboxAttachment
+}) {
+  const { download } = useDownloadAttachment()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const declared = attachment.declaredContentType
+  const mismatch = !!declared && declared.toLowerCase() !== attachment.contentType.toLowerCase()
+  const infected = attachment.scanStatus === 'INFECTED'
+  const canDownload = attachment.downloadable !== false && !infected
+
+  const onDownload = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await download(messageId, attachment)
+    } catch {
+      setError('Could not download that attachment')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <li className="text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2">
+        <Paperclip className="h-3 w-3 shrink-0" aria-hidden />
+        <span className="font-medium text-foreground break-all">{attachment.filename}</span>
+        <span>· {attachment.contentType}</span>
+        {typeof attachment.sizeBytes === 'number' && (
+          <span>· {formatBytes(attachment.sizeBytes)}</span>
+        )}
+        {canDownload && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1 text-[11px]"
+            onClick={onDownload}
+            disabled={busy}
+            data-testid={`mailbox-attachment-download-${attachment.id}`}
+          >
+            {busy ? 'Saving…' : 'Download'}
+          </Button>
+        )}
+      </div>
+
+      {mismatch && (
+        <div className="mt-0.5 text-amber-600" data-testid="mailbox-attachment-mismatch">
+          Sender labelled this {declared}. Its contents are {attachment.contentType}.
+        </div>
+      )}
+      {infected && (
+        <div className="mt-0.5 text-destructive">
+          Blocked: this attachment failed a malware scan.
+        </div>
+      )}
+      {!infected && attachment.downloadable === false && (
+        <div className="mt-0.5">Contents were not stored, so this cannot be downloaded.</div>
+      )}
+      {error && <div className="mt-0.5 text-destructive">{error}</div>}
+    </li>
+  )
+}
+
+/** Bytes in the units a human reads, for a size that is only ever informational. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function MessageBubble({
   message,
   showHtml,
@@ -466,13 +555,9 @@ function MessageBubble({
         )}
 
         {(message.attachments?.length ?? 0) > 0 && (
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-2 space-y-1" data-testid="mailbox-attachments">
             {message.attachments?.map((a) => (
-              <li key={a.id} className="text-[11px] text-muted-foreground">
-                {/* Filenames are sender-chosen; rendered as text, never as a link. Attachment
-                    download arrives with the hardening slice. */}
-                {a.filename} · {a.contentType}
-              </li>
+              <AttachmentRow key={a.id} messageId={message.id} attachment={a} />
             ))}
           </ul>
         )}

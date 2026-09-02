@@ -129,6 +129,51 @@ describe('FileViewer', () => {
     expect(screen.getByTestId('file-viewer-text')).toBeDefined()
   })
 
+  /**
+   * The regression guard for the preview frame's sandbox.
+   *
+   * This attribute previously read `allow-same-origin`, on a same-origin /api/files/** URL, which
+   * handed uploaded file content this app's own origin. Scripts were blocked because
+   * `allow-scripts` was absent — but those two tokens together are the documented sandbox escape,
+   * and `allow-scripts` is exactly what someone adds to make a stubborn preview render.
+   *
+   * Empty is the most restrictive value, not the least. Asserting on `''` exactly, rather than on
+   * the absence of particular tokens, is what makes this test hard to weaken by accident: an
+   * absent attribute means no sandboxing at all and would pass a `not.toContain` check.
+   */
+  it('sandboxes the preview frame with an EMPTY sandbox attribute', () => {
+    render(
+      <FileViewer
+        attachment={makeAttachment({
+          fileName: 'evil.html',
+          contentType: 'text/html',
+          downloadUrl: 'https://s3.example.com/evil.html',
+        })}
+        onClose={vi.fn()}
+        onDownload={vi.fn()}
+      />
+    )
+    const frame = screen.getByTitle('evil.html')
+    expect(frame.getAttribute('sandbox')).toBe('')
+  })
+
+  it('never grants the preview frame same-origin or scripting', () => {
+    render(
+      <FileViewer
+        attachment={makeAttachment({
+          fileName: 'readme.txt',
+          contentType: 'text/plain',
+          downloadUrl: 'https://s3.example.com/readme.txt',
+        })}
+        onClose={vi.fn()}
+        onDownload={vi.fn()}
+      />
+    )
+    const sandbox = screen.getByTitle('readme.txt').getAttribute('sandbox') ?? ''
+    expect(sandbox).not.toContain('allow-same-origin')
+    expect(sandbox).not.toContain('allow-scripts')
+  })
+
   it('renders text preview for code types', () => {
     render(
       <FileViewer

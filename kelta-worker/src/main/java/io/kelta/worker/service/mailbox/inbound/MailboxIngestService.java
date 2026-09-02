@@ -1,6 +1,7 @@
 package io.kelta.worker.service.mailbox.inbound;
 
 import io.kelta.worker.repository.MailboxAttachmentRepository;
+import io.kelta.worker.service.mailbox.AttachmentContentType;
 import io.kelta.worker.repository.MailboxInboundEventRepository;
 import io.kelta.worker.repository.MailboxMessageRepository;
 import io.kelta.worker.repository.MailboxThreadRepository;
@@ -193,13 +194,28 @@ public class MailboxIngestService {
                                   NormalizedInboundMail mail) {
         for (NormalizedInboundMail.ParsedAttachment att : mail.attachments()) {
             String checksum = sha256(att.content());
+
+            // The type is read out of the bytes. att.contentType() is the sender's MIME header —
+            // a claim, and one it costs nothing to falsify — so it is kept only as
+            // declared_content_type. A disagreement between the two is worth logging: it is the
+            // clearest signal available that a file is trying to be something it is not.
+            String declared = att.contentType();
+            String sniffed = AttachmentContentType.sniff(att.content());
+            if (declared != null && !declared.equalsIgnoreCase(sniffed)) {
+                log.info("Attachment '{}' on message {} declared {} but sniffed as {}",
+                        att.filename(), messageId, declared, sniffed);
+            }
+
             String key = null;
             if (storageService.isEnabled()) {
                 try {
                     key = tenantId + "/mailbox/" + mailboxId + "/" + messageId + "/" + checksum;
-                    // Content type is ours, from the parser's normalisation — never the value the
-                    // sender put in the MIME header, which is a claim rather than a fact.
-                    storageService.uploadObject(key, att.content(), att.contentType());
+                    // Stored under the type we are prepared to serve, not the sniffed one: an
+                    // object store that hands back its own stored Content-Type must never be the
+                    // thing that reintroduces text/html on a presigned URL, which bypasses the
+                    // download controller and every header it sets.
+                    storageService.uploadObject(key, att.content(),
+                            AttachmentContentType.serveAs(sniffed));
                 } catch (Exception e) {
                     log.warn("Failed to store attachment '{}' on message {}: {}",
                             att.filename(), messageId, e.getMessage());
@@ -207,7 +223,7 @@ public class MailboxIngestService {
                 }
             }
             attachmentRepository.insert(tenantId, messageId, mailboxId,
-                    att.filename(), att.contentType(), att.size(),
+                    att.filename(), sniffed, declared, att.size(),
                     att.contentId(), att.inline(), key, checksum, "UNKNOWN");
         }
     }

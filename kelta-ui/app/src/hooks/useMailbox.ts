@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
 
@@ -50,10 +51,15 @@ export interface MailboxThread {
 export interface MailboxAttachment {
   id: string
   filename: string
+  /** Determined server-side from the bytes, not from the sender's MIME header. */
   contentType: string
+  /** What the sender claimed. Shown only when it disagrees with `contentType`. */
+  declaredContentType?: string | null
   sizeBytes?: number | null
   inline?: boolean | null
   scanStatus?: string | null
+  /** False when the content was never stored, or when a scan found malware. */
+  downloadable?: boolean | null
 }
 
 export interface MailboxMessage {
@@ -245,4 +251,46 @@ export function formatSlaCountdown(dueAt: string | null, state: SlaState): strin
   const minutes = totalMinutes % 60
   const span = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
   return overdue ? `Overdue ${span}` : `${span} left`
+}
+
+/**
+ * Downloads one attachment through the membership-checked endpoint.
+ *
+ * <p>Fetched as a blob rather than linked with an anchor, because the request needs the bearer
+ * token an `<a href>` cannot carry. The object URL is revoked immediately after the click: it is a
+ * handle to the file's bytes held in this document, and leaving it alive leaves attachment content
+ * reachable from the page for the rest of the session.
+ *
+ * The `download` attribute is set unconditionally, so the browser saves the file instead of
+ * navigating to it, whatever the response headers say. The server sends
+ * `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff` as well — this is the
+ * third of three, not the only one.
+ */
+export function useDownloadAttachment(): {
+  download: (messageId: string, attachment: MailboxAttachment) => Promise<void>
+} {
+  const { apiClient } = useApi()
+
+  const download = useCallback(
+    async (messageId: string, attachment: MailboxAttachment): Promise<void> => {
+      const blob = await apiClient.getBlob(
+        `/api/support/messages/${messageId}/attachments/${attachment.id}`
+      )
+
+      const url = window.URL.createObjectURL(blob)
+      try {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = attachment.filename || 'attachment'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+      } finally {
+        window.URL.revokeObjectURL(url)
+      }
+    },
+    [apiClient]
+  )
+
+  return { download }
 }

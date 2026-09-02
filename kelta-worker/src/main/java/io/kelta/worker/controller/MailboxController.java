@@ -7,9 +7,12 @@ import io.kelta.worker.repository.MailboxEscalationRepository;
 import io.kelta.worker.repository.MailboxMessageRepository;
 import io.kelta.worker.repository.MailboxRepository;
 import io.kelta.worker.repository.MailboxThreadRepository;
+import io.kelta.worker.service.S3StorageService;
+import io.kelta.worker.service.mailbox.AttachmentContentType;
 import io.kelta.worker.service.mailbox.MailboxAccessGuard;
 import io.kelta.worker.service.mailbox.MailboxReplyService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -23,6 +26,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -47,6 +53,8 @@ import java.util.Set;
 public class MailboxController {
 
     private static final Logger log = LoggerFactory.getLogger(MailboxController.class);
+    /** Separate channel so attachment reads are auditable without trawling application logs. */
+    private static final Logger securityLog = LoggerFactory.getLogger("security.audit");
 
     private static final int MAX_PAGE = 100;
     /** Generous, but bounded: an unbounded body is a cheap way to fill the message table. */
@@ -63,6 +71,7 @@ public class MailboxController {
     private final MailboxEscalationRepository escalationRepository;
     private final MailboxAccessGuard accessGuard;
     private final MailboxReplyService replyService;
+    private final S3StorageService storageService;
 
     public MailboxController(MailboxRepository mailboxRepository,
                              MailboxThreadRepository threadRepository,
@@ -70,7 +79,8 @@ public class MailboxController {
                              MailboxAttachmentRepository attachmentRepository,
                              MailboxEscalationRepository escalationRepository,
                              MailboxAccessGuard accessGuard,
-                             MailboxReplyService replyService) {
+                             MailboxReplyService replyService,
+                             S3StorageService storageService) {
         this.mailboxRepository = mailboxRepository;
         this.threadRepository = threadRepository;
         this.messageRepository = messageRepository;
@@ -78,6 +88,7 @@ public class MailboxController {
         this.escalationRepository = escalationRepository;
         this.accessGuard = accessGuard;
         this.replyService = replyService;
+        this.storageService = storageService;
     }
 
     // ------------------------------------------------------------------ Mailboxes
@@ -273,6 +284,123 @@ public class MailboxController {
         return ResponseEntity.ok(reload(tenantId, threadId));
     }
 
+    /**
+     * Downloads one attachment.
+     *
+     * <p>Deliberately not routed through {@code /api/files/**}. {@code FileController} serves a
+     * set of types {@code inline}, sets no {@code X-Content-Type-Options}, and authorizes by
+     * comparing the key's first segment to the Cerbos scope — which is a tenant check, not a
+     * mailbox-membership check. Any agent in the tenant could read any other mailbox's
+     * attachments through it, and an HTML attachment would render in the app's own origin.
+     *
+     * <p>Every response here is a download:
+     *
+     * <ul>
+     *   <li>{@code Content-Type} comes from {@link AttachmentContentType#serveAs} over the sniffed
+     *       type — never the sender's header, and never an active type.</li>
+     *   <li>{@code Content-Disposition: attachment} unconditionally. There is no inline case, so
+     *       there is no list of types someone can widen later.</li>
+     *   <li>{@code X-Content-Type-Options: nosniff}, so a browser cannot rescue the markup we just
+     *       declined to name.</li>
+     *   <li>{@code Content-Security-Policy: default-src 'none'; sandbox}, which neuters the
+     *       document even if it is somehow rendered anyway.</li>
+     * </ul>
+     *
+     * <p>The filename is echoed in {@code Content-Disposition} using RFC 5987 encoding rather than
+     * interpolated raw: it is sender-chosen, and a quote or newline in it would otherwise let the
+     * sender write headers of their own.
+     */
+    @GetMapping("/messages/{messageId}/attachments/{attachmentId}")
+    public void downloadAttachment(HttpServletRequest request,
+                                   HttpServletResponse response,
+                                   @PathVariable String messageId,
+                                   @PathVariable String attachmentId) throws IOException {
+        String tenantId = requireTenant();
+        String userId = requireUser(request);
+
+        // Scoped to the message, so an attachment id alone is not a handle to someone else's file.
+        Map<String, Object> attachment = attachmentRepository
+                .findForDownload(tenantId, messageId, attachmentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
+
+        // Membership is checked against the attachment's OWN mailbox. Without this, belonging to
+        // any one mailbox would grant every attachment in the tenant.
+        accessGuard.require(tenantId, (String) attachment.get("mailbox_id"), userId);
+
+        if ("INFECTED".equals(attachment.get("scan_status"))) {
+            // 403 rather than 404: the row exists and the agent may see it listed. Telling them why
+            // it will not download is the whole point of having recorded a verdict.
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This attachment failed a malware scan and cannot be downloaded");
+        }
+
+        String storageKey = (String) attachment.get("storage_key");
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "The attachment's content was not stored");
+        }
+
+        String filename = (String) attachment.get("filename");
+        String served = AttachmentContentType.serveAs((String) attachment.get("content_type"));
+
+        try (S3StorageService.StorageObject obj = storageService.streamObject(storageKey)) {
+            response.setStatus(HttpStatus.OK.value());
+            // The stored object's own content type is ignored: this response describes the bytes
+            // on our terms, and a stored type is one more thing an attacker could have influenced.
+            response.setContentType(served);
+            if (obj.contentLength() > 0) {
+                response.setContentLengthLong(obj.contentLength());
+            }
+            response.setHeader("Content-Disposition", contentDisposition(filename));
+            response.setHeader("X-Content-Type-Options", "nosniff");
+            response.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+            response.setHeader("Referrer-Policy", "no-referrer");
+            response.setHeader("Cache-Control", "private, no-store");
+
+            try (OutputStream out = response.getOutputStream()) {
+                obj.content().transferTo(out);
+            }
+        }
+
+        securityLog.info("security_event=MAILBOX_ATTACHMENT_SERVED user={} mailbox={} message={} "
+                        + "attachment={} servedType={}",
+                userId, attachment.get("mailbox_id"), messageId, attachmentId, served);
+    }
+
+    /**
+     * Builds a {@code Content-Disposition} value that a sender-chosen filename cannot break out of.
+     *
+     * <p>Both forms are emitted, per RFC 6266: a conservative ASCII {@code filename} for old
+     * clients, and {@code filename*} with RFC 5987 percent-encoding carrying the real name. The
+     * ASCII form keeps only characters that cannot terminate the header or the quoted string.
+     */
+    static String contentDisposition(String filename) {
+        String name = filename == null || filename.isBlank() ? "attachment" : filename;
+
+        StringBuilder ascii = new StringBuilder(name.length());
+        for (char c : name.toCharArray()) {
+            ascii.append(c >= 0x20 && c < 0x7F && c != '"' && c != '\\' ? c : '_');
+        }
+        String fallback = ascii.toString().strip();
+        if (fallback.isEmpty()) {
+            fallback = "attachment";
+        }
+
+        StringBuilder encoded = new StringBuilder();
+        for (byte b : name.getBytes(StandardCharsets.UTF_8)) {
+            int v = b & 0xFF;
+            boolean unreserved = (v >= 'A' && v <= 'Z') || (v >= 'a' && v <= 'z')
+                    || (v >= '0' && v <= '9') || v == '-' || v == '.' || v == '_' || v == '~';
+            if (unreserved) {
+                encoded.append((char) v);
+            } else {
+                encoded.append('%').append(String.format("%02X", v));
+            }
+        }
+
+        return "attachment; filename=\"" + fallback + "\"; filename*=UTF-8''" + encoded;
+    }
+
     private static String refusalMessage(MailboxReplyService.Refusal refusal) {
         return switch (refusal) {
             case SUPPRESSED -> "That address has bounced or reported spam, so we no longer email it";
@@ -374,11 +502,18 @@ public class MailboxController {
                     Map<String, Object> att = new LinkedHashMap<>();
                     att.put("id", a.get("id"));
                     att.put("filename", a.get("filename"));
+                    // Ours, from the bytes.
                     att.put("contentType", a.get("content_type"));
+                    // The sender's claim. Surfaced so the console can show the two disagreeing —
+                    // a .png that sniffs as text/html is the thing an agent most needs to see
+                    // before deciding whether to open it.
+                    att.put("declaredContentType", a.get("declared_content_type"));
                     att.put("sizeBytes", a.get("size_bytes"));
                     att.put("inline", a.get("inline"));
                     att.put("contentId", a.get("content_id"));
                     att.put("scanStatus", a.get("scan_status"));
+                    att.put("downloadable", a.get("storage_key") != null
+                            && !"INFECTED".equals(a.get("scan_status")));
                     return att;
                 }).toList());
         return out;

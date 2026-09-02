@@ -5,6 +5,34 @@ at the bottom so reviewers can see what's already been addressed.
 
 ## Security Risks
 
+**No malware scanning exists anywhere in the platform, and the support mailbox makes
+strangers the upload source (support-mailbox slice 9).** Until inbound mail shipped, every
+byte in object storage arrived from an authenticated user of a tenant. `support@` inverts
+that: anyone with an SMTP client can now put a file into Garage and a filename into the
+console. There is no ClamAV, no scanning sidecar, and no third-party scanning integration
+in any repo — `mailbox_attachment.scan_status` exists and is written `UNKNOWN` for every
+row that is not caught by SES's own verdict.
+
+What actually protects the platform today, in order:
+- **SES scans before we ever see it.** A `virus` verdict of `FAIL` means attachments are
+  discarded at ingest and never stored (`MailboxIngestService`), and the thread is marked
+  SPAM so no SLA clock starts. This is the only real scanning in the path, it is Amazon's,
+  and it only covers mail arriving through SES.
+- **Nothing is ever executed or rendered server-side.** Attachments are bytes we store and
+  hand back; no thumbnailer, no text extractor, no preview generator opens them. Most
+  scanning gaps become incidents through exactly that kind of processing, and there is none.
+- **Every download is inert by construction.** `AttachmentContentType.serveAs` refuses to
+  name an active type, `Content-Disposition: attachment` is unconditional, and
+  `X-Content-Type-Options: nosniff` stops the browser rescuing what we declined to name.
+
+What that leaves: a malicious file reaches an agent's own machine if they choose to save
+and open it. Nothing above prevents that, and `scan_status = UNKNOWN` is honest about it.
+`INFECTED` is already enforced on the download path, so wiring a real scanner means writing
+that value — the refusal is built and waiting for it.
+
+Worth doing before a mailbox is opened to a high-volume public address. Not worth blocking
+on for a low-volume support address whose mail already passes SES's scanner.
+
 **Public-traffic controls — what is enforced, and where (consumer-alerting slice 7).**
 Rate limiting is now Redis-backed everywhere, so a budget is the fleet's rather than each
 replica's. Three things are worth knowing before changing any of it:

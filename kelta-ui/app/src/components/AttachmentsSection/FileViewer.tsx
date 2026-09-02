@@ -128,7 +128,17 @@ function PreviewContent({
             src={url}
             title={attachment.fileName}
             className="w-full h-full border border-border rounded bg-muted/30"
-            sandbox="allow-same-origin"
+            // Empty is the most restrictive value, not the least: it drops the frame into an
+            // opaque origin with scripting, forms and navigation all off.
+            //
+            // This previously read `allow-same-origin`, on a same-origin /api/files/** URL. That
+            // handed the framed document this app's own origin. Scripts were still blocked, since
+            // `allow-scripts` was absent — but the two tokens together are the documented sandbox
+            // escape, and the missing one is exactly what someone adds to make a preview render
+            // properly. Uploaded file content must never hold the app's origin, whatever else is
+            // switched off alongside it.
+            sandbox=""
+            referrerPolicy="no-referrer"
           />
         </div>
       )

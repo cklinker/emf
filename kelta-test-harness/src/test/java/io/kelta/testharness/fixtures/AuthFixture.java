@@ -75,6 +75,14 @@ public final class AuthFixture {
      * {@code <slug>-admin@kelta.local} from {@code TenantProvisioningHook}. Direct-login
      * accepts email or username, so the email form is used uniformly.
      */
+    /**
+     * The admin's login name, which is also the value the gateway stamps into {@code X-User-Id}.
+     * Exposed because grants take a principal in exactly this form.
+     */
+    public static String adminUsername(String tenantSlug) {
+        return adminUsernameForSlug(tenantSlug);
+    }
+
     private static String adminUsernameForSlug(String tenantSlug) {
         return TenantFixture.DEFAULT_SLUG.equals(tenantSlug)
                 ? "admin@kelta.local"

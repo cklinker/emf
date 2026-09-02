@@ -190,7 +190,7 @@ public class MailboxThreadRepository {
                        (SELECT r.last_read_at FROM mailbox_thread_read r
                          WHERE r.thread_id = t.id AND r.user_id = ?) AS last_read_at
                   FROM mailbox_thread t
-                 WHERE """ + where + """
+                 WHERE """ + " " + where + """
                  ORDER BY COALESCE(t.sla_first_response_due_at, t.sla_resolution_due_at)
                           ASC NULLS LAST,
                           t.last_message_at DESC

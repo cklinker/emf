@@ -75,14 +75,20 @@ public class MailboxSlaSweep {
             return;
         }
         try {
-            escalationRepository.settleStates();
-
+            // Claim BEFORE settling, never after. settleStates() moves a newly-late thread from
+            // PENDING to BREACHED, and claimDue reads that same column; settling first meant a
+            // thread crossed its due time and lost its claim eligibility within one tick, so the
+            // BREACH notification was dropped in the same pass that noticed the breach. claimDue
+            // now also accepts BREACHED, which covers the later levels and any thread that was
+            // already settled by an older build — this ordering just avoids a one-tick delay.
             int fired = 0;
             for (String clock : List.of(CLOCK_FIRST_RESPONSE, CLOCK_RESOLUTION)) {
                 for (Step step : chain) {
                     fired += fire(clock, step);
                 }
             }
+
+            escalationRepository.settleStates();
             lastRunEpochSeconds = System.currentTimeMillis() / 1000;
             if (fired > 0) {
                 log.info("Fired {} support SLA escalation(s)", fired);

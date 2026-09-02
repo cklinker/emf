@@ -48,6 +48,16 @@ public class MailboxEscalationRepository {
      *
      * <p>{@code offsetMinutes} is negative for the WARN level, which is what makes one query shape
      * serve both "approaching" and "past" thresholds.
+     *
+     * <p><b>The state filter accepts BREACHED as well as PENDING, and must.</b> {@link
+     * #settleStates()} rewrites PENDING to BREACHED the moment a thread passes its due time, so a
+     * filter of {@code = 'PENDING'} matches only threads that are not yet late — precisely the ones
+     * with nothing to escalate. Every level at or past the due time (BREACH, BREACH_2, BREACH_3)
+     * then claims nothing, forever, while WARN keeps working because it fires <i>before</i> the
+     * settle. The failure is silent in both directions: the console shows a correct BREACHED badge
+     * and the sweep logs no error, because zero claimed rows is indistinguishable from "nothing is
+     * late". Once-per-level delivery comes from the {@code ON CONFLICT} on
+     * {@code (tenant_id, thread_id, clock, level)}, never from the state column.
      */
     public List<Claimed> claimDue(String clock, String level, int offsetMinutes, int limit) {
         String dueColumn = "FIRST_RESPONSE".equals(clock)
@@ -67,7 +77,7 @@ public class MailboxEscalationRepository {
                 SELECT gen_random_uuid()::text, t.tenant_id, t.mailbox_id, t.id, ?, ?,
                        t.%s, now(), now()
                   FROM mailbox_thread t
-                 WHERE t.%s = 'PENDING'
+                 WHERE t.%s IN ('PENDING', 'BREACHED')
                    AND t.%s IS NOT NULL
                    %s
                    AND t.status NOT IN %s
@@ -96,7 +106,14 @@ public class MailboxEscalationRepository {
      * Moves threads past their due time into the BREACHED state, and answered ones into MET.
      *
      * <p>Separate from claiming so the state column stays truthful even when nobody is configured
-     * to be notified. The console reads this; the escalation chain does not depend on it.
+     * to be notified.
+     *
+     * <p><b>The escalation chain does read this column</b>, so the two are coupled whether or not
+     * that is desirable: {@link #claimDue} filters on it, and this method is what moves a thread out
+     * of PENDING. That is why {@code claimDue} accepts BREACHED, and why this runs <i>after</i> the
+     * fire loop in {@code MailboxSlaSweep} rather than before it. An earlier version of this comment
+     * asserted the opposite and the code was written to match the comment; the result was that no
+     * BREACH notification could ever be sent.
      */
     public int settleStates() {
         int met = jdbcTemplate.update("""

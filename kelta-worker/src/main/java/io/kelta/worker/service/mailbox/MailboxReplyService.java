@@ -141,10 +141,18 @@ public class MailboxReplyService {
         String subject = replySubject((String) thread.get("subject"));
         EmailHeaders headers = buildHeaders(tenantId, threadId, mailbox, lastInbound, automated);
 
+        // The mailbox replies as itself. Falling back to the mailbox address keeps a mailbox with
+        // no explicit reply_from_address sending as something the customer recognises, rather than
+        // as the tenant's noreply@ identity.
+        String fromAddress = firstNonBlank((String) mailbox.get("reply_from_address"),
+                (String) mailbox.get("address"));
+        String fromName = firstNonBlank((String) mailbox.get("reply_from_name"),
+                (String) mailbox.get("name"));
+
         SendResult sendResult;
         try {
             sendResult = emailService.queueReply(tenantId, to, subject, bodyText,
-                    "support-mailbox", threadId, List.of(), headers).join();
+                    "support-mailbox", threadId, fromAddress, fromName, List.of(), headers).join();
         } catch (Exception e) {
             log.error("Reply on thread {} could not be sent: {}", threadId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not send the reply");
@@ -152,6 +160,15 @@ public class MailboxReplyService {
 
         String messageId = recordOutbound(tenantId, thread, mailbox, to, subject, bodyText,
                 headers, sendResult, actorUserId);
+
+        if (!sendResult.delivered()) {
+            // The row is kept — an agent needs to see the attempt and that it failed — but the
+            // clock keeps running. Stopping it here would mark the SLA met on the strength of a
+            // reply the customer never received, which is the one outcome the clock exists to
+            // prevent, and would suppress the escalation that should now fire.
+            log.error("Reply on thread {} was recorded but not delivered", threadId);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not send the reply");
+        }
 
         // Stops the first-response clock. COALESCE inside means a second reply never moves it.
         threadRepository.recordFirstResponse(tenantId, threadId);
@@ -247,14 +264,27 @@ public class MailboxReplyService {
 
         // insertInbound writes direction='INBOUND'; correct it and stamp the author. Reusing the
         // insert keeps one column list rather than two that can drift apart.
+        // QUEUED would be a lie by the time this runs: queueReply has already been joined, so the
+        // send has either happened or failed. Left at QUEUED, every reply ever sent shows as
+        // permanently pending in the console and a genuinely failed one is indistinguishable from
+        // a delivered one.
         jdbcTemplate.update("""
                 UPDATE mailbox_message
-                   SET direction = 'OUTBOUND', author_user_id = ?, delivery_status = 'QUEUED',
+                   SET direction = 'OUTBOUND', author_user_id = ?, delivery_status = ?,
                        sent_at = now(), updated_at = now()
                  WHERE id = ? AND tenant_id = ?
-                """, actorUserId, messageId, tenantId);
+                """, actorUserId, sendResult != null && sendResult.delivered() ? "SENT" : "FAILED",
+                messageId, tenantId);
 
         return messageId;
+    }
+
+    /** First non-blank of the two, or null. Used to fall back from a configured value to a default. */
+    private static String firstNonBlank(String preferred, String fallback) {
+        if (preferred != null && !preferred.isBlank()) {
+            return preferred;
+        }
+        return fallback != null && !fallback.isBlank() ? fallback : null;
     }
 
     private Optional<Map<String, Object>> lastInboundMessage(String tenantId, String threadId) {

@@ -71,8 +71,9 @@ class MailboxReplyServiceTest {
         when(suppressionRepository.isSuppressed(anyString(), anyString())).thenReturn(false);
         when(messageRepository.insertInbound(any())).thenReturn("msg-1");
         when(emailService.queueReply(anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyList(), any(EmailHeaders.class)))
-                .thenReturn(CompletableFuture.completedFuture(new SendResult("<out@kelta>")));
+                anyString(), anyString(), anyString(), anyString(), anyList(),
+                any(EmailHeaders.class)))
+                .thenReturn(CompletableFuture.completedFuture(SendResult.sent("<out@kelta>")));
         when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
     }
 
@@ -89,7 +90,8 @@ class MailboxReplyServiceTest {
 
         assertThat(result.sent()).isTrue();
         verify(emailService).queueReply(eq(TENANT), eq("alex@example.com"), eq("Re: Booking question"),
-                eq("Here is your answer."), eq("support-mailbox"), eq(THREAD), anyList(),
+                eq("Here is your answer."), eq("support-mailbox"), eq(THREAD),
+                eq("support@spotopened.com"), eq("Support"), anyList(),
                 any(EmailHeaders.class));
         verify(threadRepository).recordFirstResponse(TENANT, THREAD);
     }
@@ -213,7 +215,7 @@ class MailboxReplyServiceTest {
     private EmailHeaders capturedHeaders() {
         ArgumentCaptor<EmailHeaders> captor = ArgumentCaptor.forClass(EmailHeaders.class);
         verify(emailService).queueReply(anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyList(), captor.capture());
+                anyString(), anyString(), anyString(), anyString(), anyList(), captor.capture());
         return captor.getValue();
     }
 }

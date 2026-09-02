@@ -195,14 +195,23 @@ public class DefaultEmailService implements EmailService {
      */
     public java.util.concurrent.CompletableFuture<SendResult> queueReply(
             String tenantId, String to, String subject, String body,
-            String source, String sourceId,
+            String source, String sourceId, String fromAddress, String fromName,
             java.util.List<EmailAttachment> attachments, EmailHeaders headers) {
         if (!enabled) {
             log.warn("Email delivery disabled — skipping reply to {} with subject '{}'", to, subject);
-            return java.util.concurrent.CompletableFuture.completedFuture(SendResult.unknown());
+            return java.util.concurrent.CompletableFuture.completedFuture(SendResult.notDelivered());
         }
         String logId = emailRepository.createEmailLog(tenantId, to, subject, source, sourceId);
         TenantEmailSettings tenantSettings = resolveTenantSettings(tenantId);
+        // A reply sends as the mailbox, not as the tenant-wide identity. Without this the message
+        // goes out from the tenant's from-address — usually noreply@ — while the database records
+        // the mailbox address, so the wire and the row disagree and only the recipient can tell.
+        if (fromAddress != null && !fromAddress.isBlank()) {
+            tenantSettings = tenantSettings == null
+                    ? new TenantEmailSettings(tenantId, null, 0, null, null, false,
+                            fromAddress, fromName)
+                    : tenantSettings.withFrom(fromAddress, fromName);
+        }
         return sendAsyncReporting(logId, to, subject, body, tenantSettings, attachments, headers);
     }
 
@@ -258,7 +267,7 @@ public class DefaultEmailService implements EmailService {
             log.info("Email sent: logId={}, to={}, smtpHost={}", logId, to, smtpHost);
             // A third-party provider is free to return null from the SPI; callers of
             // queueReply should not have to defend against it.
-            return result != null ? result : SendResult.unknown();
+            return result != null ? result : SendResult.sent(null);
 
         } catch (EmailDeliveryException e) {
             emailRepository.markFailed(logId, e.getMessage(), smtpHost);
@@ -268,7 +277,7 @@ public class DefaultEmailService implements EmailService {
             emailRepository.markFailed(logId, e.getMessage(), smtpHost);
             log.error("Unexpected error during email delivery: logId={}, to={}", logId, to, e);
         }
-        return SendResult.unknown();
+        return SendResult.notDelivered();
     }
 
     private TenantEmailSettings resolveTenantSettings(String tenantId) {

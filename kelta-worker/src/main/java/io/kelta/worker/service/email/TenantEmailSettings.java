@@ -50,6 +50,31 @@ public record TenantEmailSettings(
     }
 
     /**
+     * Returns a copy sending as {@code address} instead of the tenant default.
+     *
+     * <p>A shared mailbox must reply as itself. The tenant-wide from-address is typically a
+     * {@code noreply@} identity, and a support reply arriving from that address tells the customer
+     * not to answer the very message asking them to — while the mailbox address it should have come
+     * from sits recorded in the database, making the discrepancy invisible to anyone reading rows
+     * rather than mail.
+     *
+     * <p>SMTP settings are carried through unchanged: this changes who the message is <i>from</i>,
+     * never which server sends it. The address must belong to a verified sending identity or the
+     * provider will reject it.
+     *
+     * @param address the from-address to send as; blank or null leaves this object unchanged
+     * @param name    the display name, or null to keep the existing one
+     * @return a copy with the from-identity replaced
+     */
+    public TenantEmailSettings withFrom(String address, String name) {
+        if (address == null || address.isBlank()) {
+            return this;
+        }
+        return new TenantEmailSettings(tenantId, smtpHost, smtpPort, smtpUsername, smtpPassword,
+                smtpStartTls, address, name != null && !name.isBlank() ? name : fromName);
+    }
+
+    /**
      * Parses tenant email settings from the legacy tenant.settings JSONB blob.
      * Prefer {@link #fromCredential(String, Map, Map, String, String)} for new credential-backed config.
      *

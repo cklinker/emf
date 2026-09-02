@@ -93,7 +93,7 @@ public class SmtpEmailProvider implements EmailProvider {
             // Read the id back rather than assigning one: saveChanges() — which send()
             // invokes — regenerates Message-ID unconditionally, so anything set before
             // this point is already gone. This is the only moment the real value exists.
-            return new SendResult(readMessageId(mimeMessage));
+            return SendResult.sent(readMessageId(mimeMessage));
 
         } catch (MailAuthenticationException e) {
             // Invalidate cached sender on auth failure — credentials may have changed

@@ -41,6 +41,7 @@ public interface EmailProvider {
     default SendResult sendAndReport(EmailMessage message, TenantEmailSettings tenantSettings)
             throws EmailDeliveryException {
         send(message, tenantSettings);
-        return SendResult.unknown();
+        // send() returning normally means the provider accepted it; only the id is unknown.
+        return SendResult.sent(null);
     }
 }

@@ -13,15 +13,25 @@ package io.kelta.worker.service.email;
  * a recipient's reply carries it in {@code In-Reply-To}, and without a record of what
  * we stamped, that reply cannot be matched to the conversation it belongs to.
  *
+ * <p>{@code delivered} is separate from {@code messageId} because the two genuinely differ.
+ * A provider may accept a message and report no id ({@code delivered=true, messageId=null});
+ * a send may fail outright ({@code delivered=false}). Collapsing both into one "unknown" value —
+ * as an earlier version did — left the caller unable to tell a sent reply from a failed one, so
+ * every outbound message was recorded with the same optimistic status regardless of what happened.
+ *
  * @param messageId the stamped {@code Message-ID} including angle brackets,
  *                  or {@code null} if the provider does not report one
+ * @param delivered whether the provider accepted the message for delivery
  */
-public record SendResult(String messageId) {
+public record SendResult(String messageId, boolean delivered) {
 
-    private static final SendResult UNKNOWN = new SendResult(null);
+    /** The provider accepted the message. {@code messageId} may be null if it reported none. */
+    public static SendResult sent(String messageId) {
+        return new SendResult(messageId, true);
+    }
 
-    /** For providers that hand off without reporting an id. */
-    public static SendResult unknown() {
-        return UNKNOWN;
+    /** The message was not handed off — delivery failed, or sending is disabled. */
+    public static SendResult notDelivered() {
+        return new SendResult(null, false);
     }
 }
